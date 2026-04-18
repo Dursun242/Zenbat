@@ -140,7 +140,7 @@ const TX = {
   saveQuote:"✓ Enregistrer le devis", clearQuote:"🗑 Effacer",
   inputPlaceholder:"Ex : pose carrelage 25€/m² · 40m²  ou  peinture murs 12€/m²…",
   inputHint:"Entrée pour envoyer · les lignes s'ajoutent en direct",
-  agentGreeting:"Bonjour 👋 Décrivez-moi les travaux ligne par ligne.\n\nEx : *Pose carrelage 25€/m² pour 40m², fourniture carrelage 18€/m²*",
+  agentGreeting:"Bonjour 👋 Décrivez-moi les travaux ligne par ligne — dans la langue que vous voulez (français, arabe, darija, espagnol, anglais…), je réponds en français.\n\nEx : *Pose carrelage 25€/m² pour 40m², fourniture carrelage 18€/m²*",
   errNetwork:"Pas de connexion internet. Vérifiez votre réseau et réessayez.",
   errApi:"L'assistant IA ne répond pas. Réessayez dans quelques secondes.",
   errGeneral:"Quelque chose s'est mal passé. Réessayez.",
@@ -1530,7 +1530,7 @@ Ligne ajoutée ✓ Souhaitez-vous ajouter d'autres travaux ?`,
   const visibleLignes = lignes.slice(0,visibleCount);
 
   return (
-    <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 110px)",background:"#f8fafc"}}>
+    <div style={{display:"flex",flexDirection:"column",height:"100%",background:"#f8fafc"}}>
       <style>{`
         @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
         @keyframes slideIn{from{opacity:0;transform:translateX(-14px) scale(.97)}to{opacity:1;transform:translateX(0) scale(1)}}
