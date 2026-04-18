@@ -4,7 +4,7 @@ Ce document décrit la procédure complète pour déployer Zenbat de zéro, de f
 
 Stack détectée :
 
-- **Front-end** : React 18 + Vite 5
+- **Front-end** : React 18 + Vite 5, **PWA** (installable iPhone + Android)
 - **API** : Fonction serverless `api/claude.js` (proxy Anthropic) — convention Vercel
 - **Hébergement recommandé** : **Vercel** (zéro config, HTTPS, CDN global, fonctions serverless natives)
 
@@ -128,6 +128,45 @@ Une fois le projet connecté à Git, Vercel déploie **automatiquement** :
 - `main` → **Production** (votre domaine principal)
 - toute autre branche → **Preview** (URL unique, utile pour valider avant merge)
 - chaque PR → URL de preview commentée sur GitHub
+
+---
+
+## 4 bis. PWA — installation sur iPhone / Android
+
+L'app est une **PWA** : vos clients peuvent l'installer sur leur écran d'accueil sans passer par un store.
+
+### Ce qui est en place
+- `vite-plugin-pwa` + service worker auto-généré (précache de l'app shell, fonctionne hors-ligne).
+- `public/manifest.webmanifest` : nom, thème, icônes (64/192/512 + maskable + apple-touch).
+- Meta tags iOS/Android dans `index.html` (`theme-color`, `apple-mobile-web-app-*`).
+- Les appels `/api/*` sont **exclus du cache** (toujours réseau).
+- Mise à jour automatique : quand vous déployez une nouvelle version, les utilisateurs la récupèrent au prochain chargement.
+
+### Installation côté utilisateur
+- **Android (Chrome / Edge)** : bandeau automatique « Installer l'app » ou menu ⋮ → « Installer l'application ».
+- **iPhone / iPad (Safari uniquement)** : bouton Partager → « Sur l'écran d'accueil ».
+  > ⚠️ iOS n'autorise l'install **que depuis Safari**, pas Chrome iOS.
+
+### Remplacer le logo placeholder
+Le logo actuel est un placeholder. Pour votre vrai logo :
+
+1. Remplacez `public/icon.svg` par votre logo (SVG carré, fond opaque recommandé).
+2. Régénérez toutes les tailles PNG :
+   ```bash
+   npm run generate-pwa-assets
+   ```
+3. Commit + push → Vercel redéploie, les nouveaux icônes arrivent.
+
+### Tester l'install en local
+```bash
+npm run build && npm run preview
+# Ouvrir http://localhost:4173 dans Chrome
+# DevTools → Application → Manifest : vérifier qu'il est bien détecté
+# Puis cliquer sur l'icône « Installer » dans la barre d'adresse
+```
+
+### Audit qualité (optionnel)
+Lighthouse (onglet DevTools → Lighthouse) → catégorie **PWA**. Vise un score > 90.
 
 ---
 
