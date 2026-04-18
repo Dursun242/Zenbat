@@ -77,23 +77,20 @@ const I = {
 
 function LogoMark({size=24,white=false,boxed=false}) {
   const stroke = white ? "#ffffff" : "#0f172a";
-  const svg = (col) => (
+  const mark = (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true">
-      <path d="M16 20 Q22 14 34 16 L46 16"
-        stroke={col} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-      <path d="M46 16 L17 46"
-        stroke={col} strokeWidth="2.2" strokeLinecap="round" fill="none"/>
-      <path d="M17 46 Q26 49 38 46 Q44 44 46 40"
-        stroke={col} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-      <rect x="43" y="14" width="7" height="7" rx="1.5" fill="#22c55e"/>
+      <path d="M14 18 Q20 13 31 13 L44 13" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <path d="M44 13 L16 47" stroke={stroke} strokeWidth="2" strokeLinecap="round" fill="none"/>
+      <path d="M16 47 L38 47 Q46 47 46 39" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <rect x="44" y="10" width="7" height="7" rx="1.6" fill="#22c55e"/>
     </svg>
   );
-  if(!boxed) return svg(stroke);
+  if(!boxed) return mark;
   const pad = Math.round(size*0.22);
   const box = size + pad*2;
   return (
-    <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:box,height:box,borderRadius:Math.round(box*0.22),background:"#0f172a"}}>
-      {svg("#ffffff")}
+    <span style={{display:"inline-flex"}}>
+      <img src="/logo-icon.svg" alt="Zenbat" width={box} height={box} style={{display:"block",width:box,height:box,borderRadius:Math.round(box*0.22)}}/>
     </span>
   );
 }
