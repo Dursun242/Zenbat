@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 const fmt  = n => new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR"}).format(n||0);
 const fmtD = d => d ? new Date(d).toLocaleDateString("fr-FR") : "—";
@@ -437,6 +439,42 @@ function PDFViewer({d, cl, brand, onClose}) {
   const ac = brand.color||"#22c55e";
   const validUntil = new Date(d.date_emission);
   validUntil.setDate(validUntil.getDate()+(brand.validityDays||30));
+  const pageRef = useRef(null);
+  const [downloading, setDownloading] = useState(false);
+
+  const download = async () => {
+    if(!pageRef.current||downloading) return;
+    setDownloading(true);
+    const el = pageRef.current;
+    const orig = { width: el.style.width, boxShadow: el.style.boxShadow, borderRadius: el.style.borderRadius };
+    el.style.width = "210mm";
+    el.style.boxShadow = "none";
+    el.style.borderRadius = "0";
+    try {
+      const canvas = await html2canvas(el, { scale: 2, backgroundColor: "#ffffff", useCORS: true, windowWidth: el.scrollWidth });
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+      const pageW = 210, pageH = 297;
+      const imgH = (canvas.height * pageW) / canvas.width;
+      if (imgH <= pageH) {
+        pdf.addImage(imgData, "JPEG", 0, 0, pageW, imgH);
+      } else {
+        let remaining = imgH, y = 0;
+        while (remaining > 0) {
+          pdf.addImage(imgData, "JPEG", 0, -y, pageW, imgH);
+          remaining -= pageH;
+          y += pageH;
+          if (remaining > 0) pdf.addPage();
+        }
+      }
+      pdf.save(`${d.numero}.pdf`);
+    } finally {
+      el.style.width = orig.width;
+      el.style.boxShadow = orig.boxShadow;
+      el.style.borderRadius = orig.borderRadius;
+      setDownloading(false);
+    }
+  };
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",zIndex:200,display:"flex",flexDirection:"column"}} className="fu">
@@ -447,14 +485,16 @@ function PDFViewer({d, cl, brand, onClose}) {
           <span style={{color:"white",fontSize:13,fontWeight:600}}>{d.numero}.pdf <span style={{color:"#64748b",fontWeight:400,marginLeft:6}}>· A4</span></span>
         </div>
         <div style={{display:"flex",gap:8}}>
-          <button onClick={()=>window.print()} style={{background:"#22c55e",color:"white",border:"none",borderRadius:10,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>⬇ Télécharger</button>
+          <button onClick={download} disabled={downloading} style={{background:downloading?"#64748b":"#22c55e",color:"white",border:"none",borderRadius:10,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:downloading?"wait":"pointer",display:"flex",alignItems:"center",gap:6}}>
+            {downloading ? <><span style={{display:"inline-block",width:12,height:12,border:"2px solid white",borderTopColor:"transparent",borderRadius:"50%",animation:"spin 1s linear infinite"}}/> Génération…</> : "⬇ Télécharger PDF"}
+          </button>
           <button onClick={onClose} style={{background:"#1e293b",color:"#94a3b8",border:"none",borderRadius:10,padding:"7px 12px",cursor:"pointer"}}>{I.x}</button>
         </div>
       </div>
 
       <div style={{flex:1,overflowY:"auto",padding:"20px 16px",background:"#1e293b"}}>
         {/* Page A4 210×297mm */}
-        <div style={{background:"white",borderRadius:4,width:"min(210mm, 100%)",minHeight:"297mm",margin:"0 auto",boxShadow:"0 20px 60px rgba(0,0,0,.5)",fontFamily,display:"flex",flexDirection:"column"}}>
+        <div ref={pageRef} style={{background:"white",borderRadius:4,width:"min(210mm, 100%)",minHeight:"297mm",margin:"0 auto",boxShadow:"0 20px 60px rgba(0,0,0,.5)",fontFamily,display:"flex",flexDirection:"column"}}>
 
           {/* En-tête coloré */}
           <div style={{background:ac,padding:"24px 28px",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
