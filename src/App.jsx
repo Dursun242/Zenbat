@@ -75,8 +75,48 @@ const I = {
   phone: <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>,
 };
 
-function Logo({size=22,white=false}) {
-  return <span style={{fontWeight:800,fontSize:size,letterSpacing:"-0.5px"}}><span style={{color:"#22c55e"}}>Zen</span><span style={{color:white?"white":"#0f172a"}}>bat</span></span>;
+function LogoMark({size=24,white=false,boxed=false}) {
+  const stroke = white ? "#ffffff" : "#0f172a";
+  const s = size;
+  const mark = (
+    <svg width={s} height={s} viewBox="0 0 44 44" fill="none" aria-hidden="true">
+      <path d="M11 13 H32" stroke={stroke} strokeWidth="2" strokeLinecap="round"/>
+      <path d="M32 13 L12 31" stroke={stroke} strokeWidth="2" strokeLinecap="round"/>
+      <path d="M12 31 H33" stroke={stroke} strokeWidth="2" strokeLinecap="round"/>
+      <rect x="30" y="9.5" width="5" height="5" rx="1" fill="#22c55e"/>
+    </svg>
+  );
+  if(!boxed) return mark;
+  const pad = Math.round(s*0.22);
+  return (
+    <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:s+pad*2,height:s+pad*2,borderRadius:Math.round((s+pad*2)*0.22),background:"#0f172a"}}>
+      <svg width={s} height={s} viewBox="0 0 44 44" fill="none" aria-hidden="true">
+        <path d="M11 13 H32" stroke="#ffffff" strokeWidth="2" strokeLinecap="round"/>
+        <path d="M32 13 L12 31" stroke="#ffffff" strokeWidth="2" strokeLinecap="round"/>
+        <path d="M12 31 H33" stroke="#ffffff" strokeWidth="2" strokeLinecap="round"/>
+        <rect x="30" y="9.5" width="5" height="5" rx="1" fill="#22c55e"/>
+      </svg>
+    </span>
+  );
+}
+
+function Logo({size=22,white=false,markOnly=false,tagline=false}) {
+  if(markOnly) return <LogoMark size={size} white={white}/>;
+  const wordSize = size;
+  const markSize = Math.round(size*1.15);
+  const sep = white ? "rgba(255,255,255,.25)" : "rgba(15,23,42,.18)";
+  return (
+    <span style={{display:"inline-flex",alignItems:"center",gap:Math.round(size*0.45),lineHeight:1}}>
+      <LogoMark size={markSize} white={white}/>
+      <span style={{width:1,height:Math.round(size*1.05),background:sep}}/>
+      <span style={{display:"inline-flex",flexDirection:"column",alignItems:"flex-start",gap:2}}>
+        <span style={{fontWeight:800,fontSize:wordSize,letterSpacing:"-0.5px"}}>
+          <span style={{color:"#22c55e"}}>Zen</span><span style={{color:white?"white":"#0f172a"}}>bat</span>
+        </span>
+        {tagline && <span style={{fontSize:Math.max(8,Math.round(size*0.38)),letterSpacing:"2px",color:white?"rgba(255,255,255,.55)":"rgba(15,23,42,.5)",fontWeight:500}}>DEVIS · INTELLIGENCE</span>}
+      </span>
+    </span>
+  );
 }
 
 const DEFAULT_BRAND = {
@@ -1832,9 +1872,9 @@ function AuthScreen({onEnter}) {
     <div style={{minHeight:"100vh",background:"#0f172a",display:"flex",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"'DM Sans',sans-serif"}}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}@keyframes spin{to{transform:rotate(360deg)}}@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style>
       <div style={{width:"100%",maxWidth:360,animation:"fadeUp .4s ease both"}}>
-        <div style={{textAlign:"center",marginBottom:36}}>
-          <div style={{fontSize:44,fontWeight:800,letterSpacing:"-1px",marginBottom:10}}><span style={{color:"#22c55e"}}>Zen</span><span style={{color:"white"}}>bat</span></div>
-          <p style={{color:"#64748b",fontSize:13,lineHeight:1.5}}>Devis BTP en 2 minutes,<br/>dictés à l'IA.</p>
+        <div style={{textAlign:"center",marginBottom:36,display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
+          <Logo size={34} white tagline/>
+          <p style={{color:"#64748b",fontSize:13,lineHeight:1.5,marginTop:6}}>Devis BTP en 2 minutes,<br/>dictés à l'IA.</p>
         </div>
 
         <button onClick={()=>onEnter(null, true)}
