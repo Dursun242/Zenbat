@@ -33,12 +33,6 @@ export function AuthProvider({ children }) {
       },
     }), [])
 
-  const signInWithGoogle = useCallback(() =>
-    supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
-    }), [])
-
   const signOut = useCallback(() => supabase.auth.signOut(), [])
 
   const value = {
@@ -47,7 +41,6 @@ export function AuthProvider({ children }) {
     loading,
     signInWithPassword,
     signUpWithPassword,
-    signInWithGoogle,
     signOut,
   }
 

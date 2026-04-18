@@ -174,7 +174,7 @@ Lighthouse (onglet DevTools → Lighthouse) → catégorie **PWA**. Vise un scor
 
 ### Ce qui est en place dans le code
 - Client Supabase : `src/lib/supabase.js` (persist + autoRefresh + PKCE OAuth).
-- Auth : `src/lib/auth.jsx` (`<AuthProvider>` + hook `useAuth`) → email+mdp **et** Google OAuth.
+- Auth : `src/lib/auth.jsx` (`<AuthProvider>` + hook `useAuth`) → email + mot de passe.
 - Pages : `src/pages/Login.jsx`, `src/pages/Signup.jsx`, `src/pages/AuthCallback.jsx`.
 - Gate auth : `src/Root.jsx` affiche Login si pas de session, sinon l'app.
 - Data layer : `src/lib/api.js` (helpers `listClients`, `createDevis`, `uploadDevisPdf`, …).
@@ -201,13 +201,7 @@ Recommandations :
 - **Confirm email** : activé (Supabase → Authentication → Email Templates → personnaliser en français).
 - Ajouter votre domaine dans **Authentication → URL Configuration → Site URL** = `https://zenbat.fr`, et dans **Redirect URLs** = `https://zenbat.fr/auth/callback` + `http://localhost:5173/auth/callback` (dev).
 
-**Google OAuth** — étapes :
-1. <https://console.cloud.google.com/> → créer un projet *(ou réutiliser)*.
-2. **APIs & Services → OAuth consent screen** → type « External » → remplir nom d'app, email de support, domaine autorisé.
-3. **Credentials → Create credentials → OAuth client ID → Web application**.
-   - Authorized JavaScript origins : `https://zenbat.fr`, `http://localhost:5173`.
-   - Authorized redirect URIs : `https://xzgierhkazzmyvjxzepx.supabase.co/auth/v1/callback` (copier l'URL depuis Supabase → Auth → Providers → Google).
-4. Copier **Client ID** + **Client Secret** → les coller dans **Supabase → Authentication → Providers → Google → activer**.
+> Google OAuth n'est pas activé pour l'instant (décision produit). Pour l'ajouter plus tard : Google Cloud Console → APIs & Services → OAuth consent screen + Credentials (Web application) → coller Client ID/Secret dans Supabase → Auth → Providers → Google. Côté code, ré-exposer un `signInWithGoogle` dans `src/lib/auth.jsx` + réafficher le bouton dans `Login.jsx`.
 
 #### c) Ajouter les variables dans Vercel
 
