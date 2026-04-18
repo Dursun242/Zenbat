@@ -77,10 +77,33 @@ function Logo({size=22,white=false}) {
 const DEFAULT_BRAND = {
   companyName:"", logo:null, siret:"", tva:"",
   address:"", city:"", phone:"", email:"", website:"",
-  color:"#22c55e", fontStyle:"modern",
+  color:"#22c55e", fontStyle:"modern", pdfTemplate:"moderne",
   mentionsLegales:"", rib:"", iban:"", bic:"",
   paymentTerms:"Acompte 30% à la commande, solde à réception.",
   validityDays:30,
+};
+
+// TVA France (2026) : 20 % normal · 10 % rénovation/entretien logement +2 ans ·
+// 5,5 % travaux d'économie d'énergie logement +2 ans · 2,1 % cas particuliers.
+const TVA_RATES = [
+  { v:0.20,  label:"20 %",  hint:"Taux normal (neuf, pro)" },
+  { v:0.10,  label:"10 %",  hint:"Rénovation / entretien logement +2 ans" },
+  { v:0.055, label:"5,5 %", hint:"Travaux d'économie d'énergie" },
+  { v:0.021, label:"2,1 %", hint:"Cas particuliers" },
+];
+const DEFAULT_TVA = 0.20;
+const tvaLabel = r => { const f = TVA_RATES.find(t=>Math.abs(t.v-r)<1e-6); return f?f.label:`${(r*100).toString().replace(".",",")} %`; };
+const tvaBreakdown = lignes => {
+  const m = new Map();
+  for (const l of lignes) {
+    if (l.type_ligne !== "ouvrage") continue;
+    const r = typeof l.tva === "number" ? l.tva : DEFAULT_TVA;
+    const base = (l.quantite||0) * (l.prix_unitaire||0);
+    const cur = m.get(r) || { base:0, tva:0 };
+    cur.base += base; cur.tva += base * r;
+    m.set(r, cur);
+  }
+  return [...m.entries()].sort((a,b)=>b[0]-a[0]).map(([rate,{base,tva}])=>({rate,base,tva}));
 };
 
 const TX = {
@@ -274,6 +297,11 @@ function Onboarding({brand,setBrand,onDone}) {
     {id:"tech",     label:"Tech",      sample:"Space Grotesk"},
   ];
 
+  const TEMPLATES = [
+    {id:"moderne",   label:"Moderne",   desc:"Liseré fin coloré, typographie éditoriale, rails légers."},
+    {id:"classique", label:"Classique", desc:"Cartouches Maître d'ouvrage / Entreprise, tableau zébré, TVA par ligne."},
+  ];
+
   const COLORS = ["#22c55e","#3b82f6","#f97316","#8b5cf6","#ef4444","#0891b2","#0f172a","#d97706"];
 
   const STEPS = [
@@ -380,6 +408,23 @@ function Onboarding({brand,setBrand,onDone}) {
               </div>
             </div>
 
+            {/* Gabarit PDF */}
+            <div>
+              <label style={{display:"block",fontSize:11,fontWeight:600,color:"#94a3b8",marginBottom:10}}>GABARIT DU DEVIS PDF</label>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {TEMPLATES.map(t=>(
+                  <button key={t.id} onClick={()=>set("pdfTemplate",t.id)}
+                    style={{background:local.pdfTemplate===t.id?"#1e3a2f":"#1e293b",border:`1.5px solid ${local.pdfTemplate===t.id?"#22c55e":"#334155"}`,borderRadius:12,padding:"12px 16px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,transition:"all .2s",textAlign:"left"}}>
+                    <div>
+                      <div style={{fontSize:14,color:"white",fontWeight:700}}>{t.label}</div>
+                      <div style={{fontSize:10,color:"#64748b",marginTop:3,lineHeight:1.4}}>{t.desc}</div>
+                    </div>
+                    {local.pdfTemplate===t.id&&<div style={{color:"#22c55e",flexShrink:0}}>{I.check}</div>}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Prévisualisation mini */}
             <div>
               <label style={{display:"block",fontSize:11,fontWeight:600,color:"#94a3b8",marginBottom:10}}>APERÇU ENTÊTE PDF</label>
@@ -463,7 +508,8 @@ function Field({dark,label,val,onChange,placeholder,type="text"}) {
 function PDFViewer({d, cl, brand, onClose, autoDownload}) {
   const lignes = d.lignes?.length ? d.lignes : DEMO_LIGNES;
   const ht  = lignes.filter(l=>l.type_ligne==="ouvrage").reduce((s,l)=>s+(l.quantite*(l.prix_unitaire||0)),0);
-  const tva = ht * 0.20;
+  const tvaRows = tvaBreakdown(lignes);
+  const tva = tvaRows.reduce((s,r)=>s+r.tva,0);
   const ttc = ht + tva;
   const fontFamily = brand.fontStyle==="elegant"?"Playfair Display":brand.fontStyle==="tech"?"Space Grotesk":"DM Sans";
   const ac = brand.color||"#22c55e";
@@ -538,6 +584,142 @@ function PDFViewer({d, cl, brand, onClose, autoDownload}) {
       <div style={{flex:1,overflowY:"auto",padding:"20px 16px",background:"#1e293b"}}>
         {/* Page A4 210×297mm */}
         <div ref={pageRef} style={{background:"white",borderRadius:4,width:"min(210mm, 100%)",minHeight:"297mm",margin:"0 auto",boxShadow:"0 20px 60px rgba(0,0,0,.5)",fontFamily,display:"flex",flexDirection:"column"}}>
+        {brand.pdfTemplate==="classique" ? (<>
+          {/* ▼ Gabarit CLASSIQUE */}
+          <div style={{padding:"22px 32px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`3px solid ${ac}`,gap:18}}>
+            <div>
+              {brand.logo
+                ? <img src={brand.logo} alt="" style={{height:46,maxWidth:190,objectFit:"contain"}}/>
+                : <div style={{fontWeight:800,fontSize:19,color:"#0f172a",fontFamily}}>{brand.companyName||"Votre Entreprise"}</div>}
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:10,color:"#64748b",letterSpacing:"2.5px",fontWeight:600}}>DEVIS</div>
+              <div style={{fontSize:18,fontWeight:800,color:ac,fontFamily,letterSpacing:".5px",marginTop:2}}>{d.numero}</div>
+              <div style={{fontSize:9.5,color:"#94a3b8",marginTop:5,lineHeight:1.6}}>Émis le {fmtD(d.date_emission)}<br/>Valide jusqu'au {fmtD(validUntil.toISOString())}</div>
+            </div>
+          </div>
+
+          <div style={{padding:"18px 32px 10px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+            <div style={{border:"1px solid #d6deea",borderRadius:2,padding:"12px 14px",minHeight:96}}>
+              <div style={{fontSize:9,color:ac,fontWeight:700,letterSpacing:"1.5px",marginBottom:7}}>MAÎTRE D'OUVRAGE</div>
+              <div style={{fontSize:13,fontWeight:700,color:"#0f172a",fontFamily,marginBottom:6}}>{cl?.raison_sociale||`${cl?.prenom||""} ${cl?.nom||""}`.trim()||"—"}</div>
+              <div style={{fontSize:10,color:"#475569",lineHeight:1.6}}>
+                {cl?.ville&&<div>{cl.ville}</div>}
+                {cl?.email&&<div>{cl.email}</div>}
+              </div>
+            </div>
+            <div style={{border:"1px solid #d6deea",borderRadius:2,padding:"12px 14px",minHeight:96}}>
+              <div style={{fontSize:9,color:ac,fontWeight:700,letterSpacing:"1.5px",marginBottom:7}}>ENTREPRISE</div>
+              <div style={{fontSize:13,fontWeight:700,color:"#0f172a",fontFamily,marginBottom:6}}>{brand.companyName||"Votre Entreprise"}</div>
+              <div style={{fontSize:10,color:"#475569",lineHeight:1.6}}>
+                {brand.address&&<div>{brand.address}</div>}
+                {brand.city&&<div>{brand.city}</div>}
+                {brand.phone&&<div>Tél : {brand.phone}</div>}
+                {brand.email&&<div>{brand.email}</div>}
+                {brand.siret&&<div>SIRET : {brand.siret}</div>}
+              </div>
+            </div>
+          </div>
+
+          <div style={{padding:"10px 32px 6px",display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+            <div style={{fontSize:12,fontWeight:700,color:ac,letterSpacing:"1px"}}>DÉTAIL DES PRESTATIONS</div>
+            {d.ville_chantier&&<div style={{fontSize:10,color:"#64748b"}}>Chantier : <b style={{color:"#334155"}}>{d.ville_chantier}</b></div>}
+          </div>
+
+          <div style={{padding:"0 32px 12px"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",border:"1px solid #d6deea"}}>
+              <thead>
+                <tr style={{background:"#1e3a5f"}}>
+                  <th style={{textAlign:"left",padding:"9px 10px",fontSize:9.5,fontWeight:700,color:"white",letterSpacing:".5px"}}>Description</th>
+                  <th style={{textAlign:"center",padding:"9px 6px",fontSize:9.5,fontWeight:700,color:"white",width:46}}>Unité</th>
+                  <th style={{textAlign:"center",padding:"9px 6px",fontSize:9.5,fontWeight:700,color:"white",width:42}}>Qté</th>
+                  <th style={{textAlign:"right",padding:"9px 6px",fontSize:9.5,fontWeight:700,color:"white",width:66}}>PU HT</th>
+                  <th style={{textAlign:"center",padding:"9px 6px",fontSize:9.5,fontWeight:700,color:"white",width:46}}>TVA</th>
+                  <th style={{textAlign:"right",padding:"9px 10px",fontSize:9.5,fontWeight:700,color:"white",width:80}}>Total HT</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(()=>{
+                  let idx = 0;
+                  return lignes.map(l=>{
+                    if(l.type_ligne==="lot") return (
+                      <tr key={l.id} style={{background:"#e4ebf5"}}>
+                        <td colSpan={6} style={{padding:"7px 10px",fontSize:10,fontWeight:800,color:"#1e3a5f",letterSpacing:"1.2px",fontFamily,textTransform:"uppercase"}}>{l.designation}</td>
+                      </tr>
+                    );
+                    const bg = idx%2===0 ? "#f3f6fb" : "#ffffff";
+                    idx++;
+                    const r = typeof l.tva==="number" ? l.tva : DEFAULT_TVA;
+                    return (
+                      <tr key={l.id} style={{background:bg,borderBottom:"1px solid #e4ebf5"}}>
+                        <td style={{padding:"8px 10px",fontSize:10.5,color:"#0f172a",fontFamily,textTransform:"uppercase",letterSpacing:".3px"}}>{l.designation}</td>
+                        <td style={{padding:"8px 6px",fontSize:10.5,color:"#64748b",textAlign:"center"}}>{l.unite}</td>
+                        <td style={{padding:"8px 6px",fontSize:10.5,color:"#0f172a",textAlign:"center",fontVariantNumeric:"tabular-nums"}}>{l.quantite}</td>
+                        <td style={{padding:"8px 6px",fontSize:10.5,color:"#0f172a",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{fmt(l.prix_unitaire)}</td>
+                        <td style={{padding:"8px 6px",fontSize:9.5,color:"#475569",textAlign:"center"}}>{tvaLabel(r)}</td>
+                        <td style={{padding:"8px 10px",fontSize:10.5,fontWeight:700,color:"#0f172a",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{fmt(l.quantite*(l.prix_unitaire||0))}</td>
+                      </tr>
+                    );
+                  });
+                })()}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{padding:"2px 32px 14px",display:"flex",justifyContent:"flex-end"}}>
+            <div style={{minWidth:260}}>
+              <div style={{display:"flex",justifyContent:"space-between",padding:"5px 12px",fontSize:11,color:"#0f172a",fontVariantNumeric:"tabular-nums"}}>
+                <span style={{fontWeight:700}}>Total HT</span><span style={{fontWeight:700}}>{fmt(ht)}</span>
+              </div>
+              {tvaRows.map(r=>(
+                <div key={r.rate} style={{display:"flex",justifyContent:"space-between",padding:"4px 12px",fontSize:10.5,color:"#475569",fontVariantNumeric:"tabular-nums"}}>
+                  <span>TVA {tvaLabel(r.rate)}{tvaRows.length>1?` (base ${fmt(r.base)})`:""}</span><span>{fmt(r.tva)}</span>
+                </div>
+              ))}
+              <div style={{marginTop:6,background:"#e4ebf5",borderLeft:`4px solid ${ac}`,padding:"11px 12px",display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+                <span style={{fontSize:13,fontWeight:800,color:"#0f172a",fontFamily,letterSpacing:".5px"}}>TOTAL TTC</span>
+                <span style={{fontSize:15,fontWeight:800,color:ac,fontFamily,fontVariantNumeric:"tabular-nums"}}>{fmt(ttc)}</span>
+              </div>
+            </div>
+          </div>
+
+          {brand.mentionsLegales&&(
+            <div style={{padding:"10px 32px 4px"}}>
+              <div style={{fontSize:11,fontWeight:700,color:ac,letterSpacing:"1px",marginBottom:5}}>OBSERVATIONS</div>
+              <div style={{fontSize:10,color:"#334155",lineHeight:1.6}}>{brand.mentionsLegales}</div>
+            </div>
+          )}
+          {brand.paymentTerms&&(
+            <div style={{padding:"10px 32px 4px"}}>
+              <div style={{fontSize:11,fontWeight:700,color:ac,letterSpacing:"1px",marginBottom:5}}>CONDITIONS</div>
+              <div style={{fontSize:10,color:"#334155",lineHeight:1.6}}>{brand.paymentTerms}</div>
+            </div>
+          )}
+          {brand.rib&&(
+            <div style={{padding:"10px 32px 4px"}}>
+              <div style={{fontSize:11,fontWeight:700,color:ac,letterSpacing:"1px",marginBottom:5}}>COORDONNÉES BANCAIRES</div>
+              <div style={{fontSize:10,color:"#334155"}}>{brand.rib}</div>
+              {brand.iban&&<div style={{fontSize:9.5,color:"#64748b",fontFamily:"monospace",marginTop:2}}>{brand.iban}</div>}
+              {brand.bic&&<div style={{fontSize:9.5,color:"#64748b",fontFamily:"monospace"}}>BIC {brand.bic}</div>}
+            </div>
+          )}
+
+          <div style={{padding:"14px 32px 10px",display:"flex",gap:24}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:9,color:ac,fontWeight:700,letterSpacing:"1.5px",marginBottom:6}}>SIGNATURE CLIENT</div>
+              <div style={{border:"1px solid #d6deea",borderRadius:2,height:64,padding:8,fontSize:9,color:"#94a3b8"}}>Bon pour accord</div>
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:9,color:ac,fontWeight:700,letterSpacing:"1.5px",marginBottom:6}}>DATE</div>
+              <div style={{border:"1px solid #d6deea",borderRadius:2,height:64}}/>
+            </div>
+          </div>
+
+          <div style={{padding:"10px 32px 16px",marginTop:"auto",borderTop:"1px solid #d6deea",display:"flex",justifyContent:"space-between",fontSize:8,color:"#94a3b8"}}>
+            <span>{brand.companyName}{brand.siret&&` · SIRET ${brand.siret}`}{brand.tva&&` · TVA ${brand.tva}`}</span>
+            <span style={{color:"#cbd5e1"}}>Généré via Zenbat</span>
+          </div>
+        </>) : (<>
 
           {/* Liseré supérieur */}
           <div style={{height:6,background:ac}}/>
@@ -619,13 +801,15 @@ function PDFViewer({d, cl, brand, onClose, autoDownload}) {
 
           {/* Totaux */}
           <div style={{padding:"20px 32px 26px",display:"flex",justifyContent:"flex-end"}}>
-            <div style={{minWidth:230}}>
+            <div style={{minWidth:240}}>
               <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",fontSize:10.5,color:"#64748b",fontVariantNumeric:"tabular-nums"}}>
                 <span>Total HT</span><span>{fmt(ht)}</span>
               </div>
-              <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",fontSize:10.5,color:"#64748b",fontVariantNumeric:"tabular-nums"}}>
-                <span>TVA 20 %</span><span>{fmt(tva)}</span>
-              </div>
+              {tvaRows.map(r=>(
+                <div key={r.rate} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:10.5,color:"#64748b",fontVariantNumeric:"tabular-nums"}}>
+                  <span>TVA {tvaLabel(r.rate)}{tvaRows.length>1?` sur ${fmt(r.base)}`:""}</span><span>{fmt(r.tva)}</span>
+                </div>
+              ))}
               <div style={{borderTop:`1.5px solid ${ac}`,marginTop:6,paddingTop:10,display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
                 <span style={{fontSize:11,fontWeight:600,color:"#0f172a",fontFamily,letterSpacing:"1px"}}>TOTAL TTC</span>
                 <span style={{fontSize:18,fontWeight:700,color:ac,fontFamily,fontVariantNumeric:"tabular-nums"}}>{fmt(ttc)}</span>
@@ -673,6 +857,7 @@ function PDFViewer({d, cl, brand, onClose, autoDownload}) {
             <span style={{color:"#94a3b8",fontSize:8,letterSpacing:".3px"}}>{brand.companyName}{brand.siret&&` · SIRET ${brand.siret}`}{brand.tva&&` · TVA ${brand.tva}`}</span>
             <span style={{color:"#cbd5e1",fontSize:8,letterSpacing:".3px"}}>Généré via Zenbat</span>
           </div>
+        </>)}
         </div>
       </div>
     </div>
@@ -1013,7 +1198,7 @@ Ne fais JAMAIS de récapitulatif en texte (pas de « - Maçonnerie : 50 m² × 6
 FORMAT STRICT du JSON (aucune autre clé, aucun commentaire, pas de markdown) :
 {"objet":"titre court","lignes":[
   {"type_ligne":"lot","designation":"NOM DU LOT EN MAJUSCULES"},
-  {"type_ligne":"ouvrage","lot":"nom lot","designation":"description précise","unite":"m2|ml|u|m3|fg|ens","quantite":10,"prix_unitaire":25}
+  {"type_ligne":"ouvrage","lot":"nom lot","designation":"description précise","unite":"m2|ml|u|m3|fg|ens","quantite":10,"prix_unitaire":25,"tva":0.20}
 ]}
 
 RÈGLES :
@@ -1023,10 +1208,17 @@ RÈGLES :
 - Désignations professionnelles en français.
 - Après le bloc <DEVIS>, écris UNE phrase courte en français (confirmation ou question unique). Pas de liste, pas de totaux.
 
-MONTANT CIBLE : Si l'utilisateur précise un montant total ("pour 30 000€", "environ 30k€", "devis de 30 000€", "budget 30 000"), la somme de (quantite × prix_unitaire) sur TOUTES les lignes "ouvrage" DOIT atteindre ce montant à ±2 % près. Vérifie ta somme avant de répondre, ajuste les quantités et/ou prix_unitaire si besoin. Par défaut le montant est TTC : divise donc par 1,20 pour obtenir le HT cible que doit atteindre la somme des lignes. N'interprète le montant comme HT que si l'utilisateur le précise explicitement ("HT", "hors taxes", "hors TVA"). C'est une obligation, pas une approximation.
+TVA par ligne (champ "tva", valeur décimale) :
+- 0.20 par défaut (taux normal : neuf, pro, commercial).
+- 0.10 pour travaux de rénovation, amélioration, transformation, entretien d'un logement achevé depuis plus de 2 ans.
+- 0.055 pour travaux d'économie d'énergie (isolation, pompe à chaleur, chaudière HPE, menuiseries performantes) dans un logement achevé depuis plus de 2 ans.
+- 0.021 uniquement si l'utilisateur le mentionne explicitement.
+Si l'utilisateur précise un taux pour une ligne ("pose carrelage 40m² 25€ TVA 10%"), applique-le à cette ligne. Si le devis global concerne une rénovation de logement, mets 0.10 par défaut sur les lignes concernées.
+
+MONTANT CIBLE : Si l'utilisateur précise un montant total ("pour 30 000€", "environ 30k€", "devis de 30 000€", "budget 30 000"), la somme TTC du devis (= somme ligne par ligne de quantite × prix_unitaire × (1 + tva)) DOIT atteindre ce montant à ±2 % près. Vérifie avant de répondre, ajuste les quantités et/ou prix_unitaire si besoin. Par défaut le montant est TTC. N'interprète le montant comme HT que si l'utilisateur le précise explicitement ("HT", "hors taxes", "hors TVA") ; dans ce cas c'est la somme HT (= quantite × prix_unitaire, hors TVA) qui doit atteindre la cible. C'est une obligation.
 
 EXEMPLE pour « maçonnerie 50m² à 60€ » :
-<DEVIS>{"objet":"Travaux de maçonnerie","lignes":[{"type_ligne":"lot","designation":"MAÇONNERIE"},{"type_ligne":"ouvrage","lot":"Maçonnerie","designation":"Travaux de maçonnerie","unite":"m2","quantite":50,"prix_unitaire":60}]}</DEVIS>
+<DEVIS>{"objet":"Travaux de maçonnerie","lignes":[{"type_ligne":"lot","designation":"MAÇONNERIE"},{"type_ligne":"ouvrage","lot":"Maçonnerie","designation":"Travaux de maçonnerie","unite":"m2","quantite":50,"prix_unitaire":60,"tva":0.20}]}</DEVIS>
 Ligne ajoutée ✓ Souhaitez-vous ajouter d'autres travaux ?`,
           messages:newMsgs.map(m=>({role:m.role,content:m.content}))
         })
@@ -1170,25 +1362,31 @@ Ligne ajoutée ✓ Souhaitez-vous ajouter d'autres travaux ?`,
                   </td></tr>
                 )}
               </tbody>
-              {ht>0&&visibleCount>=lignes.length&&(
-                <tfoot>
-                  <tr style={{borderTop:`2px solid ${ac}`}}>
-                    <td colSpan={3} style={{padding:"8px 14px",fontSize:12,fontWeight:700,color:"#0f172a",fontFamily}}>Total HT</td>
-                    <td style={{padding:"8px 14px",textAlign:"right",fontSize:14,fontWeight:800,color:ac,fontFamily,animation:"totalCount .4s ease both"}}>{fmt(ht)}</td>
-                    <td/>
-                  </tr>
-                  <tr style={{background:"#f8fafc"}}>
-                    <td colSpan={3} style={{padding:"4px 14px 8px",fontSize:11,color:"#64748b"}}>TVA 20%</td>
-                    <td style={{padding:"4px 14px 8px",textAlign:"right",fontSize:11,color:"#64748b"}}>{fmt(ht*.2)}</td>
-                    <td/>
-                  </tr>
-                  <tr style={{background:ac}}>
-                    <td colSpan={3} style={{padding:"8px 14px",fontSize:13,fontWeight:800,color:"white",fontFamily}}>Total TTC</td>
-                    <td style={{padding:"8px 14px",textAlign:"right",fontSize:15,fontWeight:800,color:"white",fontFamily}}>{fmt(ht*1.2)}</td>
-                    <td/>
-                  </tr>
-                </tfoot>
-              )}
+              {ht>0&&visibleCount>=lignes.length&&(()=>{
+                const rows = tvaBreakdown(lignes);
+                const tvaTot = rows.reduce((s,r)=>s+r.tva,0);
+                return (
+                  <tfoot>
+                    <tr style={{borderTop:`2px solid ${ac}`}}>
+                      <td colSpan={3} style={{padding:"8px 14px",fontSize:12,fontWeight:700,color:"#0f172a",fontFamily}}>Total HT</td>
+                      <td style={{padding:"8px 14px",textAlign:"right",fontSize:14,fontWeight:800,color:ac,fontFamily,animation:"totalCount .4s ease both"}}>{fmt(ht)}</td>
+                      <td/>
+                    </tr>
+                    {rows.map(r=>(
+                      <tr key={r.rate} style={{background:"#f8fafc"}}>
+                        <td colSpan={3} style={{padding:"3px 14px",fontSize:11,color:"#64748b"}}>TVA {tvaLabel(r.rate)}{rows.length>1?` (base ${fmt(r.base)})`:""}</td>
+                        <td style={{padding:"3px 14px",textAlign:"right",fontSize:11,color:"#64748b"}}>{fmt(r.tva)}</td>
+                        <td/>
+                      </tr>
+                    ))}
+                    <tr style={{background:ac}}>
+                      <td colSpan={3} style={{padding:"8px 14px",fontSize:13,fontWeight:800,color:"white",fontFamily}}>Total TTC</td>
+                      <td style={{padding:"8px 14px",textAlign:"right",fontSize:15,fontWeight:800,color:"white",fontFamily}}>{fmt(ht+tvaTot)}</td>
+                      <td/>
+                    </tr>
+                  </tfoot>
+                );
+              })()}
             </table>
           )}
         </div>
