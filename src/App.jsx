@@ -877,8 +877,8 @@ function AgentIA({devis,setDevis,clients,plan,aiUsed,setAiUsed,onPaywall,setTab,
     const newMsgs=[...msgs,userMsg];
     setMsgs(newMsgs); setInput(""); setLoading(true); setAiUsed(n=>n+1);
     try {
-      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,
+      const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:1000,
           system:`Tu es un assistant expert BTP France intégré dans l'application Zenbat.
 
 LANGUE : Tu comprends toutes les langues (arabe, darija, espagnol, portugais, anglais, etc.) mais tu réponds TOUJOURS en français, sans exception. Si l'utilisateur écrit en arabe ou dans une autre langue, tu comprends ce qu'il dit et tu réponds en français. Le devis est toujours rédigé en français professionnel.
