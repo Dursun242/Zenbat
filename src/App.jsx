@@ -68,6 +68,11 @@ const I = {
   img:   <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>,
   paint: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M2 13.5A9 9 0 0013.5 2"/><path d="M11 6l7 7-4 4-7-7"/><circle cx="18" cy="19" r="2"/></svg>,
   pdf:   <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><path d="M8 13h8M8 17h5"/></svg>,
+  plus:  <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+  trash: <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-2 14a2 2 0 01-2 2H9a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>,
+  edit:  <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4z"/></svg>,
+  cam:   <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>,
+  phone: <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>,
 };
 
 function Logo({size=22,white=false}) {
@@ -262,8 +267,8 @@ export default function App() {
 
       <div style={{flex:1,overflowY:"auto",paddingBottom:64}}>
         {tab==="dashboard"    && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}/>}
-        {tab==="clients"      && <ClientsList clients={clients} goClient={goClient}/>}
-        {tab==="client_detail"&& selC && <ClientDetail c={clients.find(x=>x.id===selC)} clientDevis={devis.filter(d=>d.client_id===selC)} onBack={()=>setTab("clients")} goDevis={goDevis}/>}
+        {tab==="clients"      && <ClientsList clients={clients} setClients={setClients} goClient={goClient} accent={brand.color}/>}
+        {tab==="client_detail"&& selC && <ClientDetail c={clients.find(x=>x.id===selC)} clients={clients} setClients={setClients} clientDevis={devis.filter(d=>d.client_id===selC)} onBack={()=>setTab("clients")} goDevis={goDevis} accent={brand.color}/>}
         {tab==="devis"        && <DevisList devis={devis} clients={clients} goDevis={goDevis} setTab={setTab}/>}
         {tab==="devis_detail" && selD && (
           <DevisDetail d={devis.find(x=>x.id===selD)} cl={clients.find(c=>c.id===devis.find(x=>x.id===selD)?.client_id)}
@@ -938,45 +943,250 @@ function Dashboard({stats,devis,clients,goDevis,setTab,brand}) {
 // ══════════════════════════════════════════════════════════
 //  CLIENTS
 // ══════════════════════════════════════════════════════════
-function ClientsList({clients,goClient}) {
+async function scanContactFromImage(file) {
+  const b64 = await new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=()=>resolve(r.result.split(",")[1]);
+    r.onerror=reject;
+    r.readAsDataURL(file);
+  });
+  const media = file.type && file.type.startsWith("image/") ? file.type : "image/jpeg";
+  const res = await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      model:"claude-sonnet-4-5",
+      max_tokens:500,
+      system:"Tu es un extracteur de contact. L'utilisateur t'envoie une photo de carte de visite ou une capture d'écran d'un SMS. Tu extrais les informations du contact et tu retournes UNIQUEMENT un JSON valide, sans aucun texte autour, sans balises, sans markdown. Clés attendues : raison_sociale, nom, prenom, email, phone, address, ville. Si une information est absente, mets une chaîne vide. Si c'est un particulier, laisse raison_sociale vide. Le champ phone doit être au format français si possible (ex: 02 35 12 34 56).",
+      messages:[{role:"user",content:[
+        {type:"image",source:{type:"base64",media_type:media,data:b64}},
+        {type:"text",text:"Extrais le contact de cette image. Réponds avec un JSON uniquement."}
+      ]}]
+    })
+  });
+  const data = await res.json();
+  const txt = data?.content?.[0]?.text || "";
+  const m = txt.match(/\{[\s\S]*\}/);
+  if(!m) throw new Error("Impossible de lire les informations du contact.");
+  const raw = JSON.parse(m[0]);
+  return {
+    raison_sociale: raw.raison_sociale||"",
+    nom: raw.nom||"",
+    prenom: raw.prenom||"",
+    email: raw.email||"",
+    phone: raw.phone||raw.telephone||"",
+    address: raw.address||raw.adresse||"",
+    ville: raw.ville||"",
+  };
+}
+
+function ClientFormSheet({initial,onClose,onSave,accent="#22c55e",title}) {
+  const [type,setType]=useState(initial?.type || (initial?.raison_sociale?"entreprise":(initial?.nom||initial?.prenom)?"particulier":"entreprise"));
+  const [form,setForm]=useState({
+    raison_sociale:initial?.raison_sociale||"",
+    nom:initial?.nom||"", prenom:initial?.prenom||"",
+    email:initial?.email||"", phone:initial?.phone||"",
+    address:initial?.address||"", ville:initial?.ville||"",
+  });
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const canSave = type==="entreprise" ? !!form.raison_sociale.trim() : !!(form.nom.trim()||form.prenom.trim());
+  const submit = () => {
+    if(!canSave) return;
+    onSave({
+      type,
+      ...(type==="entreprise"?{raison_sociale:form.raison_sociale.trim(),nom:"",prenom:""}:{raison_sociale:"",nom:form.nom.trim(),prenom:form.prenom.trim()}),
+      email:form.email.trim(), phone:form.phone.trim(),
+      address:form.address.trim(), ville:form.ville.trim(),
+    });
+  };
   return (
-    <div style={{padding:18}} className="fu">
-      <div style={{marginBottom:16}}><h1 style={{fontSize:20,fontWeight:700,color:"#0f172a"}}>Clients</h1></div>
-      <div style={{background:"white",borderRadius:14,border:"1px solid #f1f5f9",overflow:"hidden"}}>
-        {clients.map(c=>(
-          <div key={c.id} onClick={()=>goClient(c.id)} style={{padding:"13px 16px",borderBottom:"1px solid #f8fafc",display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}
-            onMouseOver={e=>e.currentTarget.style.background="#fafafa"} onMouseOut={e=>e.currentTarget.style.background="white"}>
-            <div style={{width:40,height:40,borderRadius:12,background:"#f0fdf4",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,color:"#16a34a",fontSize:16,flexShrink:0}}>
-              {(c.raison_sociale||c.prenom||"?")[0]}
-            </div>
-            <div style={{flex:1}}>
-              <div style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>{c.raison_sociale||`${c.prenom} ${c.nom}`}</div>
-              <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>{c.email} · {c.ville}</div>
-            </div>
+    <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,.5)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:120,animation:"fadeUp .2s ease both"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} className="pop" style={{background:"white",width:"100%",maxWidth:520,maxHeight:"90vh",borderTopLeftRadius:20,borderTopRightRadius:20,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        <div style={{padding:"14px 18px",borderBottom:"1px solid #f1f5f9",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>{title||(initial?.id?"Modifier le client":"Nouveau client")}</div>
+          <button onClick={onClose} style={{background:"#f1f5f9",border:"none",width:28,height:28,borderRadius:8,cursor:"pointer",color:"#64748b",display:"flex",alignItems:"center",justifyContent:"center"}}>{I.x}</button>
+        </div>
+        <div style={{flex:1,overflowY:"auto",padding:"14px 16px 18px",display:"flex",flexDirection:"column",gap:11}}>
+          <div style={{display:"flex",gap:6}}>
+            {[["entreprise","Entreprise"],["particulier","Particulier"]].map(([k,l])=>(
+              <button key={k} onClick={()=>setType(k)}
+                style={{flex:1,padding:"9px",borderRadius:10,border:`1.5px solid ${type===k?accent:"#e2e8f0"}`,cursor:"pointer",fontSize:12,fontWeight:600,
+                  background:type===k?accent+"15":"white",color:type===k?accent:"#64748b"}}>{l}</button>
+            ))}
           </div>
-        ))}
+          {type==="entreprise"
+            ? <Field label="Raison sociale *" val={form.raison_sociale} onChange={v=>set("raison_sociale",v)} placeholder="Ex : Alcéane Bailleur Social"/>
+            : <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <Field label="Prénom" val={form.prenom} onChange={v=>set("prenom",v)} placeholder="Sophie"/>
+                <Field label="Nom *" val={form.nom} onChange={v=>set("nom",v)} placeholder="Martin"/>
+              </div>
+          }
+          <Field label="Email" val={form.email} onChange={v=>set("email",v)} placeholder="contact@exemple.fr"/>
+          <Field label="Téléphone" val={form.phone} onChange={v=>set("phone",v)} placeholder="02 35 00 00 00"/>
+          <Field label="Adresse" val={form.address} onChange={v=>set("address",v)} placeholder="12 rue des Artisans"/>
+          <Field label="Ville" val={form.ville} onChange={v=>set("ville",v)} placeholder="Le Havre"/>
+          <button onClick={submit} disabled={!canSave}
+            style={{marginTop:4,background:canSave?accent:"#e2e8f0",color:"white",border:"none",borderRadius:11,padding:"12px",fontSize:13,fontWeight:700,cursor:canSave?"pointer":"not-allowed"}}>
+            {initial?.id?"Enregistrer les modifications":"Créer le contact"}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-function ClientDetail({c,clientDevis,onBack,goDevis}) {
+function ClientsList({clients,setClients,goClient,accent="#22c55e"}) {
+  const [sheet,setSheet]=useState(false);
+  const [editing,setEditing]=useState(null);
+  const [scanning,setScanning]=useState(null);
+  const [prefill,setPrefill]=useState(null);
+  const [err,setErr]=useState("");
+  const cardInput=useRef(null), smsInput=useRef(null);
+
+  const handleScan = async (file,source) => {
+    if(!file) return;
+    setSheet(false); setErr("");
+    setScanning(source);
+    try {
+      const data = await scanContactFromImage(file);
+      setScanning(null);
+      setPrefill(data);
+    } catch(e) {
+      setScanning(null);
+      setErr(e.message||"Lecture impossible. Essayez avec une photo plus nette.");
+    }
+  };
+
+  const save = (data) => {
+    if(editing?.id) setClients(cs=>cs.map(x=>x.id===editing.id?{...x,...data}:x));
+    else setClients(cs=>[...cs,{...data,id:uid()}]);
+    setEditing(null); setPrefill(null);
+  };
+
+  return (
+    <div style={{padding:18,position:"relative",minHeight:"100%"}} className="fu">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div><h1 style={{fontSize:20,fontWeight:700,color:"#0f172a"}}>Clients</h1><p style={{color:"#94a3b8",fontSize:11,marginTop:2}}>{clients.length} contact{clients.length>1?"s":""}</p></div>
+      </div>
+
+      {err && <div style={{background:"#fef2f2",border:"1px solid #fecaca",color:"#991b1b",padding:"10px 12px",borderRadius:12,fontSize:12,marginBottom:12}}>{err}</div>}
+
+      {clients.length===0
+        ? <div style={{background:"white",borderRadius:14,border:"1px dashed #e2e8f0",padding:"32px 18px",textAlign:"center"}}>
+            <div style={{fontSize:13,color:"#64748b",marginBottom:12}}>Aucun contact. Appuyez sur + pour en ajouter.</div>
+          </div>
+        : <div style={{background:"white",borderRadius:14,border:"1px solid #f1f5f9",overflow:"hidden"}}>
+            {clients.map(c=>(
+              <div key={c.id} onClick={()=>goClient(c.id)} style={{padding:"13px 16px",borderBottom:"1px solid #f8fafc",display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}
+                onMouseOver={e=>e.currentTarget.style.background="#fafafa"} onMouseOut={e=>e.currentTarget.style.background="white"}>
+                <div style={{width:40,height:40,borderRadius:12,background:"#f0fdf4",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,color:"#16a34a",fontSize:16,flexShrink:0}}>
+                  {(c.raison_sociale||c.prenom||c.nom||"?")[0]}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.raison_sociale||`${c.prenom||""} ${c.nom||""}`.trim()||"—"}</div>
+                  <div style={{fontSize:11,color:"#94a3b8",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{[c.email,c.ville].filter(Boolean).join(" · ")||c.phone||"—"}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+      }
+
+      <button onClick={()=>setSheet(true)}
+        style={{position:"fixed",right:18,bottom:82,width:54,height:54,borderRadius:"50%",background:accent,color:"white",border:"none",boxShadow:"0 10px 24px rgba(15,23,42,.18)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",zIndex:50}}>
+        {I.plus}
+      </button>
+
+      <input ref={cardInput} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>handleScan(e.target.files?.[0],"carte")}/>
+      <input ref={smsInput}  type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleScan(e.target.files?.[0],"sms")}/>
+
+      {sheet && (
+        <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,.5)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:110}} onClick={()=>setSheet(false)}>
+          <div onClick={e=>e.stopPropagation()} className="pop" style={{background:"white",width:"100%",maxWidth:520,borderTopLeftRadius:20,borderTopRightRadius:20,padding:"14px 14px 20px"}}>
+            <div style={{width:36,height:4,background:"#e2e8f0",borderRadius:2,margin:"0 auto 14px"}}/>
+            <div style={{fontSize:15,fontWeight:700,color:"#0f172a",padding:"0 4px 10px"}}>Ajouter un contact</div>
+            {[
+              {k:"manual",  t:"Créer manuellement",       d:"Saisir les informations à la main",     ic:I.edit, fn:()=>{setSheet(false);setPrefill({});}},
+              {k:"card",    t:"Scanner une carte de visite", d:"Photographier la carte, extraction auto", ic:I.cam,  fn:()=>{cardInput.current?.click();}},
+              {k:"sms",     t:"Importer une capture d'écran", d:"SMS, email, signature… l'IA extrait",  ic:I.img,  fn:()=>{smsInput.current?.click();}},
+            ].map(o=>(
+              <button key={o.k} onClick={o.fn}
+                style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 12px",background:"white",border:"1px solid #f1f5f9",borderRadius:12,marginTop:8,cursor:"pointer",textAlign:"left"}}>
+                <div style={{width:40,height:40,borderRadius:12,background:accent+"15",color:accent,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{o.ic}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>{o.t}</div>
+                  <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>{o.d}</div>
+                </div>
+                <div style={{color:"#cbd5e1",fontSize:18}}>›</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {scanning && (
+        <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:120}}>
+          <div style={{background:"white",borderRadius:16,padding:"22px 26px",textAlign:"center",maxWidth:280}}>
+            <div style={{width:34,height:34,borderRadius:"50%",border:`3px solid ${accent}`,borderTopColor:"transparent",margin:"0 auto 12px",animation:"spin .8s linear infinite"}}/>
+            <div style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>Lecture en cours…</div>
+            <div style={{fontSize:11,color:"#94a3b8",marginTop:4}}>L'IA extrait les informations du contact</div>
+          </div>
+        </div>
+      )}
+
+      {prefill && (
+        <ClientFormSheet
+          initial={prefill}
+          accent={accent}
+          title="Nouveau contact"
+          onClose={()=>setPrefill(null)}
+          onSave={save}
+        />
+      )}
+
+      {editing && (
+        <ClientFormSheet
+          initial={editing}
+          accent={accent}
+          onClose={()=>setEditing(null)}
+          onSave={save}
+        />
+      )}
+    </div>
+  );
+}
+
+function ClientDetail({c,clients,setClients,clientDevis,onBack,goDevis,accent="#22c55e"}) {
+  const [editing,setEditing]=useState(false);
+  if(!c) return null;
+  const del = () => {
+    if(!confirm(`Supprimer « ${c.raison_sociale||`${c.prenom||""} ${c.nom||""}`.trim()} » ?`)) return;
+    setClients(cs=>cs.filter(x=>x.id!==c.id));
+    onBack();
+  };
   return (
     <div style={{padding:18}} className="fu">
-      <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",color:"#64748b",fontSize:13,marginBottom:14,cursor:"pointer"}}>{I.back} Retour</button>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",color:"#64748b",fontSize:13,cursor:"pointer"}}>{I.back} Retour</button>
+        <div style={{display:"flex",gap:6}}>
+          <button onClick={()=>setEditing(true)} style={{background:"white",border:"1px solid #e2e8f0",borderRadius:10,padding:"7px 12px",fontSize:12,color:"#0f172a",cursor:"pointer",display:"flex",alignItems:"center",gap:5,fontWeight:500}}>{I.edit} Modifier</button>
+          <button onClick={del} style={{background:"white",border:"1px solid #fecaca",borderRadius:10,padding:"7px 12px",fontSize:12,color:"#dc2626",cursor:"pointer",display:"flex",alignItems:"center",gap:5,fontWeight:500}}>{I.trash} Supprimer</button>
+        </div>
+      </div>
       <div style={{background:"white",borderRadius:14,border:"1px solid #f1f5f9",padding:18,marginBottom:12}}>
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
           <div style={{width:46,height:46,borderRadius:14,background:"#f0fdf4",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,color:"#16a34a",fontSize:20}}>
-            {(c.raison_sociale||c.prenom||"?")[0]}
+            {(c.raison_sociale||c.prenom||c.nom||"?")[0]}
           </div>
-          <div><div style={{fontWeight:700,fontSize:16,color:"#0f172a"}}>{c.raison_sociale||`${c.prenom} ${c.nom}`}</div><div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>{c.type} · {c.ville}</div></div>
+          <div><div style={{fontWeight:700,fontSize:16,color:"#0f172a"}}>{c.raison_sociale||`${c.prenom||""} ${c.nom||""}`.trim()||"—"}</div><div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>{[c.type,c.ville].filter(Boolean).join(" · ")}</div></div>
         </div>
-        {[["Email",c.email],["Ville",c.ville]].filter(([,v])=>v).map(([k,v])=>(
-          <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderTop:"1px solid #f8fafc"}}><span style={{fontSize:12,color:"#94a3b8"}}>{k}</span><span style={{fontSize:12,color:"#0f172a",fontWeight:500}}>{v}</span></div>
+        {[["Email",c.email],["Téléphone",c.phone],["Adresse",c.address],["Ville",c.ville]].filter(([,v])=>v).map(([k,v])=>(
+          <div key={k} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"7px 0",borderTop:"1px solid #f8fafc"}}>
+            <span style={{fontSize:12,color:"#94a3b8"}}>{k}</span>
+            <span style={{fontSize:12,color:"#0f172a",fontWeight:500,textAlign:"right"}}>{v}</span>
+          </div>
         ))}
       </div>
       <div style={{background:"white",borderRadius:14,border:"1px solid #f1f5f9",overflow:"hidden"}}>
         <div style={{padding:"12px 16px",borderBottom:"1px solid #f8fafc",fontWeight:600,fontSize:13,color:"#0f172a"}}>Devis ({clientDevis.length})</div>
+        {clientDevis.length===0 && <div style={{padding:"16px",fontSize:12,color:"#94a3b8",textAlign:"center"}}>Aucun devis pour ce contact.</div>}
         {clientDevis.map(d=>(
           <div key={d.id} onClick={()=>goDevis(d.id)} style={{padding:"12px 16px",borderBottom:"1px solid #f8fafc",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}
             onMouseOver={e=>e.currentTarget.style.background="#fafafa"} onMouseOut={e=>e.currentTarget.style.background="white"}>
@@ -985,6 +1195,15 @@ function ClientDetail({c,clientDevis,onBack,goDevis}) {
           </div>
         ))}
       </div>
+
+      {editing && (
+        <ClientFormSheet
+          initial={c}
+          accent={accent}
+          onClose={()=>setEditing(false)}
+          onSave={data=>{ setClients(cs=>cs.map(x=>x.id===c.id?{...x,...data}:x)); setEditing(false); }}
+        />
+      )}
     </div>
   );
 }
