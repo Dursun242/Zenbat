@@ -1082,7 +1082,7 @@ function ClientsList({clients,setClients,goClient,accent="#22c55e"}) {
                 </div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:13,fontWeight:600,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.raison_sociale||`${c.prenom||""} ${c.nom||""}`.trim()||"—"}</div>
-                  <div style={{fontSize:11,color:"#94a3b8",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{[c.email,c.ville].filter(Boolean).join(" · ")||c.phone||"—"}</div>
+                  <div style={{fontSize:11,color:"#94a3b8",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{[c.email,c.phone,c.ville].filter(Boolean).join(" · ")||"—"}</div>
                 </div>
               </div>
             ))}
