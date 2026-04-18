@@ -170,6 +170,80 @@ Lighthouse (onglet DevTools → Lighthouse) → catégorie **PWA**. Vise un scor
 
 ---
 
+## 4 ter. Supabase — base de données, auth, stockage PDF
+
+### Ce qui est en place dans le code
+- Client Supabase : `src/lib/supabase.js` (persist + autoRefresh + PKCE OAuth).
+- Auth : `src/lib/auth.jsx` (`<AuthProvider>` + hook `useAuth`) → email+mdp **et** Google OAuth.
+- Pages : `src/pages/Login.jsx`, `src/pages/Signup.jsx`, `src/pages/AuthCallback.jsx`.
+- Gate auth : `src/Root.jsx` affiche Login si pas de session, sinon l'app.
+- Data layer : `src/lib/api.js` (helpers `listClients`, `createDevis`, `uploadDevisPdf`, …).
+- Schéma SQL : `supabase/migrations/0001_init.sql` (profiles, clients, devis, lignes_devis + RLS + bucket `devis-pdfs`).
+
+### Setup (une seule fois)
+
+#### a) Appliquer le schéma à votre projet Supabase
+Copiez/collez `supabase/migrations/0001_init.sql` dans **Supabase → SQL Editor → New query → Run**.
+Vérifier : onglet **Table Editor** → les 4 tables `profiles / clients / devis / lignes_devis` apparaissent. Onglet **Storage** → bucket privé `devis-pdfs` présent.
+
+> Alternative CLI (plus propre sur le long terme) :
+> ```bash
+> npm i -g supabase
+> supabase login
+> supabase link --project-ref xzgierhkazzmyvjxzepx
+> supabase db push
+> ```
+
+#### b) Activer les providers d'authentification
+
+**Email + mot de passe** — Supabase → **Authentication → Providers → Email** → activé (par défaut).
+Recommandations :
+- **Confirm email** : activé (Supabase → Authentication → Email Templates → personnaliser en français).
+- Ajouter votre domaine dans **Authentication → URL Configuration → Site URL** = `https://zenbat.fr`, et dans **Redirect URLs** = `https://zenbat.fr/auth/callback` + `http://localhost:5173/auth/callback` (dev).
+
+**Google OAuth** — étapes :
+1. <https://console.cloud.google.com/> → créer un projet *(ou réutiliser)*.
+2. **APIs & Services → OAuth consent screen** → type « External » → remplir nom d'app, email de support, domaine autorisé.
+3. **Credentials → Create credentials → OAuth client ID → Web application**.
+   - Authorized JavaScript origins : `https://zenbat.fr`, `http://localhost:5173`.
+   - Authorized redirect URIs : `https://xzgierhkazzmyvjxzepx.supabase.co/auth/v1/callback` (copier l'URL depuis Supabase → Auth → Providers → Google).
+4. Copier **Client ID** + **Client Secret** → les coller dans **Supabase → Authentication → Providers → Google → activer**.
+
+#### c) Ajouter les variables dans Vercel
+
+Vercel → Settings → Environment Variables (Production + Preview + Development) :
+- `VITE_SUPABASE_URL` = `https://xzgierhkazzmyvjxzepx.supabase.co`
+- `VITE_SUPABASE_ANON_KEY` = *(copier « anon public » depuis Supabase → Settings → API)*
+
+Pour le dev local : `cp .env.example .env.local` puis coller les mêmes valeurs.
+
+### Schéma en bref
+
+```
+profiles  (1-1 avec auth.users) — company_name, plan (free/pro), ai_used
+   │
+   ├── clients         — entreprise | particulier, contact, adresse
+   │
+   └── devis           — numero, objet, statut, montant_ht, odoo_sign_id, pdf_path
+           │
+           └── lignes_devis  — lot | ouvrage, désignation, qté, PU
+```
+
+**RLS** activée partout : `auth.uid() = owner_id`. Un utilisateur ne peut jamais lire ni modifier les données d'un autre — c'est enforced **au niveau Postgres**, impossible à contourner depuis le front.
+
+**Bucket `devis-pdfs`** : privé, path `{user_id}/{devis_id}.pdf`. URLs signées (1h par défaut) via `getDevisPdfUrl()`.
+
+### Intégration dans l'UI existante
+L'app actuelle (`src/App.jsx`) utilise des données de démo en mémoire. Le scaffold ci-dessus **ne casse rien** : la gate d'auth s'active dès que les env vars sont en place, et les helpers de `src/lib/api.js` sont prêts à être appelés à la place des `DEMO_CLIENTS` / `DEMO_DEVIS`.
+
+Plan de bascule recommandé (itératif) :
+1. Remplacer `useState(DEMO_CLIENTS)` par un `useEffect` qui appelle `listClients()`.
+2. Idem pour les devis (`listDevis`, `createDevis`, `updateDevis`).
+3. Brancher la génération PDF sur `uploadDevisPdf(devisId, blob)`.
+4. Connecter le bouton « Envoyer pour signature » → fonction serverless Odoo (voir §8).
+
+---
+
 ## 5. Domaine personnalisé
 
 1. Dashboard Vercel → projet → **Settings → Domains**.
