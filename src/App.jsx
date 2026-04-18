@@ -77,25 +77,23 @@ const I = {
 
 function LogoMark({size=24,white=false,boxed=false}) {
   const stroke = white ? "#ffffff" : "#0f172a";
-  const s = size;
-  const mark = (
-    <svg width={s} height={s} viewBox="0 0 44 44" fill="none" aria-hidden="true">
-      <path d="M11 13 H32" stroke={stroke} strokeWidth="2" strokeLinecap="round"/>
-      <path d="M32 13 L12 31" stroke={stroke} strokeWidth="2" strokeLinecap="round"/>
-      <path d="M12 31 H33" stroke={stroke} strokeWidth="2" strokeLinecap="round"/>
-      <rect x="30" y="9.5" width="5" height="5" rx="1" fill="#22c55e"/>
+  const svg = (col) => (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true">
+      <path d="M16 20 Q22 14 34 16 L46 16"
+        stroke={col} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <path d="M46 16 L17 46"
+        stroke={col} strokeWidth="2.2" strokeLinecap="round" fill="none"/>
+      <path d="M17 46 Q26 49 38 46 Q44 44 46 40"
+        stroke={col} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <rect x="43" y="14" width="7" height="7" rx="1.5" fill="#22c55e"/>
     </svg>
   );
-  if(!boxed) return mark;
-  const pad = Math.round(s*0.22);
+  if(!boxed) return svg(stroke);
+  const pad = Math.round(size*0.22);
+  const box = size + pad*2;
   return (
-    <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:s+pad*2,height:s+pad*2,borderRadius:Math.round((s+pad*2)*0.22),background:"#0f172a"}}>
-      <svg width={s} height={s} viewBox="0 0 44 44" fill="none" aria-hidden="true">
-        <path d="M11 13 H32" stroke="#ffffff" strokeWidth="2" strokeLinecap="round"/>
-        <path d="M32 13 L12 31" stroke="#ffffff" strokeWidth="2" strokeLinecap="round"/>
-        <path d="M12 31 H33" stroke="#ffffff" strokeWidth="2" strokeLinecap="round"/>
-        <rect x="30" y="9.5" width="5" height="5" rx="1" fill="#22c55e"/>
-      </svg>
+    <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:box,height:box,borderRadius:Math.round(box*0.22),background:"#0f172a"}}>
+      {svg("#ffffff")}
     </span>
   );
 }
