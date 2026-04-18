@@ -197,7 +197,7 @@ export default function App() {
             onBack={()=>setTab("devis")} brand={brand}
             onChange={u=>setDevis(ds=>ds.map(x=>x.id===selD?u:x))}/>
         )}
-        {tab==="agent" && <AgentIA devis={devis} setDevis={setDevis} clients={clients} plan={plan} devisSaved={devisSaved} setDevisSaved={setDevisSaved} onPaywall={()=>setScreen("paywall")} setTab={setTab} brand={brand}/>}
+        {tab==="agent" && <AgentIA devis={devis} setDevis={setDevis} clients={clients} setClients={setClients} plan={plan} devisSaved={devisSaved} setDevisSaved={setDevisSaved} onPaywall={()=>setScreen("paywall")} setTab={setTab} brand={brand}/>}
       </div>
 
       <HelpButton tab={tab}/>
@@ -845,7 +845,7 @@ function DevisDetail({d,cl,onBack,brand,onChange}) {
 // ══════════════════════════════════════════════════════════
 //  AGENT IA — lignes qui pop une par une
 // ══════════════════════════════════════════════════════════
-function AgentIA({devis,setDevis,clients,plan,devisSaved,setDevisSaved,onPaywall,setTab,brand}) {
+function AgentIA({devis,setDevis,clients,setClients,plan,devisSaved,setDevisSaved,onPaywall,setTab,brand}) {
   const greeting = TX.agentGreeting;
   const [msgs,    setMsgs]   = useState([{role:"assistant",content:TX.agentGreeting}]);
   const [input,   setInput]  = useState("");
@@ -853,6 +853,7 @@ function AgentIA({devis,setDevis,clients,plan,devisSaved,setDevisSaved,onPaywall
   const [lignes,  setLignes] = useState([]);
   const [objet,   setObjet]  = useState("");
   const [visibleCount, setVisibleCount] = useState(0);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const chatRef  = useRef(null);
   const inputRef = useRef(null);
   const ac = brand.color||"#22c55e";
@@ -935,10 +936,15 @@ Ligne ajoutée ✓ Souhaitez-vous ajouter d'autres travaux ?`,
 
   const save = () => {
     if(plan==="free"&&devisSaved>=2){onPaywall();return;}
+    setPickerOpen(true);
+  };
+
+  const finalizeSave = (clientId) => {
     const ht2=lignes.filter(l=>l.type_ligne==="ouvrage").reduce((s,l)=>s+(l.quantite*(l.prix_unitaire||0)),0);
-    setDevis(ds=>[...ds,{id:uid(),numero:`DEV-2026-${String(devis.length+1).padStart(4,"0")}`,objet:objet||"Devis IA",client_id:"",ville_chantier:"",statut:"brouillon",montant_ht:ht2,date_emission:new Date().toISOString().split("T")[0],lignes,odoo_sign_url:null}]);
+    const cl=clients.find(c=>c.id===clientId);
+    setDevis(ds=>[...ds,{id:uid(),numero:`DEV-2026-${String(devis.length+1).padStart(4,"0")}`,objet:objet||"Devis IA",client_id:clientId,ville_chantier:cl?.ville||"",statut:"brouillon",montant_ht:ht2,date_emission:new Date().toISOString().split("T")[0],lignes,odoo_sign_url:null}]);
     setDevisSaved(n=>n+1);
-    setLignes([]); setObjet("");
+    setLignes([]); setObjet(""); setPickerOpen(false);
     setMsgs([{role:"assistant",content:TX.quoteSaved}]);
     setTimeout(()=>setTab("devis"),2500);
   };
@@ -1115,6 +1121,113 @@ Ligne ajoutée ✓ Souhaitez-vous ajouter d'autres travaux ?`,
           </div>
           <div style={{textAlign:"center",fontSize:9,color:"#cbd5e1",marginTop:6}}>{TX.inputHint}</div>
         </div>
+      </div>
+
+      {pickerOpen && (
+        <ClientPicker
+          clients={clients}
+          accent={ac}
+          onClose={()=>setPickerOpen(false)}
+          onPick={id=>finalizeSave(id)}
+          onCreate={c=>{ const id=uid(); setClients(cs=>[...cs,{...c,id}]); finalizeSave(id); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ClientPicker({clients,accent,onClose,onPick,onCreate}) {
+  const [mode, setMode] = useState("pick");
+  const [query, setQuery] = useState("");
+  const [type, setType] = useState("entreprise");
+  const [form, setForm] = useState({raison_sociale:"",nom:"",prenom:"",email:"",ville:""});
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  const filtered = clients.filter(c=>{
+    const q=query.trim().toLowerCase(); if(!q) return true;
+    return (c.raison_sociale||"").toLowerCase().includes(q)
+      || `${c.prenom||""} ${c.nom||""}`.toLowerCase().includes(q)
+      || (c.email||"").toLowerCase().includes(q)
+      || (c.ville||"").toLowerCase().includes(q);
+  });
+
+  const canCreate = type==="entreprise" ? !!form.raison_sociale.trim() : !!(form.nom.trim()||form.prenom.trim());
+
+  const submit = () => {
+    if(!canCreate) return;
+    onCreate({type,...(type==="entreprise"?{raison_sociale:form.raison_sociale}:{nom:form.nom,prenom:form.prenom}),email:form.email,ville:form.ville});
+  };
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,.5)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:100,animation:"fadeUp .2s ease both"}}
+      onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} className="pop"
+        style={{background:"white",width:"100%",maxWidth:520,maxHeight:"85vh",borderTopLeftRadius:20,borderTopRightRadius:20,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        <div style={{padding:"14px 18px",borderBottom:"1px solid #f1f5f9",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div>
+            <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>À quel client est destiné ce devis ?</div>
+            <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>Choisissez dans la liste ou créez une nouvelle fiche</div>
+          </div>
+          <button onClick={onClose} style={{background:"#f1f5f9",border:"none",width:28,height:28,borderRadius:8,cursor:"pointer",color:"#64748b",display:"flex",alignItems:"center",justifyContent:"center"}}>{I.x}</button>
+        </div>
+
+        <div style={{display:"flex",padding:"10px 14px 0",gap:6}}>
+          {[["pick","Client existant"],["new","+ Nouveau client"]].map(([k,l])=>(
+            <button key={k} onClick={()=>setMode(k)}
+              style={{flex:1,padding:"8px",borderRadius:10,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,
+                background:mode===k?accent:"#f1f5f9",color:mode===k?"white":"#64748b"}}>{l}</button>
+          ))}
+        </div>
+
+        {mode==="pick" && (
+          <div style={{flex:1,overflowY:"auto",padding:"12px 14px 18px"}}>
+            <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Rechercher un client…"
+              style={{width:"100%",padding:"10px 12px",borderRadius:10,border:"1px solid #e2e8f0",fontSize:13,outline:"none",marginBottom:10}}/>
+            {filtered.length===0 && (
+              <div style={{textAlign:"center",padding:"22px 10px",color:"#94a3b8",fontSize:12}}>
+                Aucun client trouvé.<br/>
+                <button onClick={()=>setMode("new")} style={{marginTop:10,background:accent,color:"white",border:"none",borderRadius:9,padding:"8px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>+ Créer « {query||"nouveau client"} »</button>
+              </div>
+            )}
+            {filtered.map(c=>(
+              <button key={c.id} onClick={()=>onPick(c.id)}
+                style={{width:"100%",padding:"11px 12px",background:"white",border:"1px solid #f1f5f9",borderRadius:12,marginBottom:6,cursor:"pointer",display:"flex",alignItems:"center",gap:10,textAlign:"left"}}>
+                <div style={{width:36,height:36,borderRadius:10,background:"#f0fdf4",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,color:"#16a34a",fontSize:14}}>
+                  {(c.raison_sociale||c.prenom||"?")[0]}
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>{c.raison_sociale||`${c.prenom||""} ${c.nom||""}`.trim()||"—"}</div>
+                  <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>{[c.email,c.ville].filter(Boolean).join(" · ")||"—"}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {mode==="new" && (
+          <div style={{flex:1,overflowY:"auto",padding:"12px 14px 18px",display:"flex",flexDirection:"column",gap:10}}>
+            <div style={{display:"flex",gap:6}}>
+              {[["entreprise","Entreprise"],["particulier","Particulier"]].map(([k,l])=>(
+                <button key={k} onClick={()=>setType(k)}
+                  style={{flex:1,padding:"9px",borderRadius:10,border:`1.5px solid ${type===k?accent:"#e2e8f0"}`,cursor:"pointer",fontSize:12,fontWeight:600,
+                    background:type===k?accent+"15":"white",color:type===k?accent:"#64748b"}}>{l}</button>
+              ))}
+            </div>
+            {type==="entreprise"
+              ? <Field label="Raison sociale *" val={form.raison_sociale} onChange={v=>set("raison_sociale",v)} placeholder="Ex : Alcéane Bailleur Social"/>
+              : <>
+                  <Field label="Prénom" val={form.prenom} onChange={v=>set("prenom",v)} placeholder="Sophie"/>
+                  <Field label="Nom *" val={form.nom} onChange={v=>set("nom",v)} placeholder="Martin"/>
+                </>
+            }
+            <Field label="Email" val={form.email} onChange={v=>set("email",v)} placeholder="contact@exemple.fr"/>
+            <Field label="Ville" val={form.ville} onChange={v=>set("ville",v)} placeholder="Le Havre"/>
+            <button onClick={submit} disabled={!canCreate}
+              style={{marginTop:6,background:canCreate?accent:"#e2e8f0",color:"white",border:"none",borderRadius:11,padding:"11px",fontSize:13,fontWeight:700,cursor:canCreate?"pointer":"not-allowed"}}>
+              Créer le client et enregistrer le devis
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
