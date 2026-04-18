@@ -79,10 +79,10 @@ function LogoMark({size=24,white=false,boxed=false}) {
   const stroke = white ? "#ffffff" : "#0f172a";
   const mark = (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true">
-      <path d="M14 18 Q20 13 31 13 L44 13" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-      <path d="M44 13 L16 47" stroke={stroke} strokeWidth="2" strokeLinecap="round" fill="none"/>
-      <path d="M16 47 L38 47 Q46 47 46 39" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-      <rect x="44" y="10" width="7" height="7" rx="1.6" fill="#22c55e"/>
+      <path d="M14 14 H44" stroke={stroke} strokeWidth="2" strokeLinecap="square"/>
+      <path d="M44 14 L16 48" stroke={stroke} strokeWidth="2" strokeLinecap="square"/>
+      <path d="M16 48 H46" stroke={stroke} strokeWidth="2" strokeLinecap="square"/>
+      <rect x="44" y="10" width="7" height="7" fill="#22c55e"/>
     </svg>
   );
   if(!boxed) return mark;
