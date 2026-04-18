@@ -22,43 +22,17 @@ Stack détectée :
 
 ---
 
-## 1. ⚠️ Point bloquant à corriger avant tout déploiement
+## 1. Architecture des appels IA
 
-**Aujourd'hui, `src/App.jsx` (ligne ~880) appelle directement `https://api.anthropic.com/v1/messages` depuis le navigateur.**
+Le front-end (`src/App.jsx`) appelle l'endpoint relatif **`/api/claude`** (jamais directement `api.anthropic.com`).
 
-Cela pose **trois problèmes** pour une mise en production :
+La fonction serverless `api/claude.js` joue le rôle de proxy :
 
-1. **Sécurité** : si vous ajoutez la clé côté front, elle est visible par tous les utilisateurs → vol de clé garanti.
-2. **CORS** : l'API Anthropic rejettera la requête dans un navigateur de production.
-3. **Coûts incontrôlés** : pas de rate-limiting possible côté client.
+- elle lit la clé `ANTHROPIC_KEY` **uniquement côté serveur** (jamais exposée au navigateur) ;
+- elle vérifie la présence de la clé et renvoie une erreur claire sinon ;
+- elle restreint l'origine CORS en production à la liste `ALLOWED_ORIGINS` (cf. §6).
 
-### Correction (obligatoire)
-
-La fonction proxy existe déjà dans `api/claude.js`. Il suffit de faire pointer le front vers elle.
-
-Dans `src/App.jsx`, remplacez :
-
-```js
-const res = await fetch("https://api.anthropic.com/v1/messages", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ ... })
-});
-```
-
-par :
-
-```js
-const res = await fetch("/api/claude", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ ... })
-});
-```
-
-La clé reste **exclusivement côté serveur**, dans la variable d'env `ANTHROPIC_KEY`.
-
-> 💡 Pour le dev local, le même endpoint `/api/claude` fonctionne via `vercel dev` (voir §3).
+> 💡 Pour le dev local, `/api/claude` fonctionne via `vercel dev` (voir §3).
 
 ---
 
@@ -126,6 +100,7 @@ vercel dev                 # → http://localhost:3000, /api/claude opérationne
    - Install command : `npm install`
 5. Ouvrez **Environment Variables** et ajoutez :
    - `ANTHROPIC_KEY` = `sk-ant-…` (cochez **Production**, **Preview**, **Development**)
+   - `ALLOWED_ORIGINS` = `https://zenbat.fr,https://www.zenbat.fr` (Production) — liste CSV des domaines autorisés à appeler `/api/claude`.
 6. Cliquez **Deploy**.
 7. Dans 30 secondes, l'URL `https://zenbat-xxx.vercel.app` est en ligne.
 
@@ -177,20 +152,12 @@ Une fois le projet connecté à Git, Vercel déploie **automatiquement** :
 - [ ] Rate-limiting côté `api/claude.js` (voir §8 — améliorations).
 - [ ] Rotation de la clé Anthropic si elle a été exposée à un moment.
 
-### Durcir `api/claude.js` (exemple)
+Le fichier `api/claude.js` livré applique déjà ces règles :
 
-```js
-// En production, remplacer le "*" par votre domaine
-const ALLOWED_ORIGIN = process.env.VERCEL_ENV === "production"
-  ? "https://zenbat.fr"
-  : "*";
-res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
-
-// Refus si pas de clé (évite un 500 opaque)
-if (!process.env.ANTHROPIC_KEY) {
-  return res.status(500).json({ error: "ANTHROPIC_KEY non configurée" });
-}
-```
+- **CORS strict en production** via la variable `ALLOWED_ORIGINS` (CSV).
+  En `preview`/`development`, l'origin de la requête est renvoyé tel quel pour faciliter le debug.
+- **Garde-fou** : 500 explicite si `ANTHROPIC_KEY` manque, 502 si l'upstream Anthropic est injoignable.
+- **Vary: Origin** pour que les caches CDN ne mélangent pas les réponses entre domaines.
 
 ---
 
@@ -214,7 +181,7 @@ if (!process.env.ANTHROPIC_KEY) {
 4. **Observabilité** — Vercel Analytics + Sentry pour les erreurs front/back.
 5. **Tests** — Vitest + Playwright sur le flux « créer un devis → PDF ».
 6. **CI/CD** — le workflow Vercel suffit ; ajouter une GitHub Action `lint + typecheck` si vous migrez vers TypeScript.
-7. **Nettoyage** — le fichier `main.jsx` à la racine est un doublon de `src/main.jsx` (non utilisé par `index.html`). À supprimer.
+7. **Nettoyage** — le fichier `crm-preview.jsx` à la racine (~85 ko) est une ébauche non référencée par l'app : à archiver hors repo ou supprimer si plus utile.
 
 ---
 
@@ -233,15 +200,12 @@ En cas de régression en production :
 ## 10. Récapitulatif express (TL;DR)
 
 ```bash
-# 1. Corriger l'appel API front (§1) — obligatoire
-# 2. Commit + push
-git add .gitignore .env.example vercel.json DEPLOIEMENT.md
-git commit -m "chore: setup deployment"
+# 1. Push sur GitHub
 git push
 
-# 3. Sur vercel.com/new : importer le repo
-# 4. Ajouter la variable d'env ANTHROPIC_KEY
-# 5. Deploy → 🎉
+# 2. Sur vercel.com/new : importer le repo
+# 3. Env vars : ANTHROPIC_KEY (obligatoire) + ALLOWED_ORIGINS (prod)
+# 4. Deploy → 🎉
 ```
 
 Temps total de mise en ligne depuis un dépôt propre : **≈ 10 minutes**.
