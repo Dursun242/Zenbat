@@ -1012,7 +1012,7 @@ RÈGLES :
 - Désignations professionnelles en français.
 - Après le bloc <DEVIS>, écris UNE phrase courte en français (confirmation ou question unique). Pas de liste, pas de totaux.
 
-MONTANT CIBLE : Si l'utilisateur précise un montant total ("pour 30 000€", "environ 30k€", "devis de 30 000€", "budget 30 000"), la somme de (quantite × prix_unitaire) sur TOUTES les lignes "ouvrage" DOIT atteindre ce montant à ±2 % près. Vérifie ta somme avant de répondre, ajuste les quantités et/ou prix_unitaire si besoin. Par défaut le montant est interprété en HT ; si l'utilisateur dit explicitement "TTC", divise par 1,20 pour obtenir le HT cible. C'est une obligation, pas une approximation.
+MONTANT CIBLE : Si l'utilisateur précise un montant total ("pour 30 000€", "environ 30k€", "devis de 30 000€", "budget 30 000"), la somme de (quantite × prix_unitaire) sur TOUTES les lignes "ouvrage" DOIT atteindre ce montant à ±2 % près. Vérifie ta somme avant de répondre, ajuste les quantités et/ou prix_unitaire si besoin. Par défaut le montant est TTC : divise donc par 1,20 pour obtenir le HT cible que doit atteindre la somme des lignes. N'interprète le montant comme HT que si l'utilisateur le précise explicitement ("HT", "hors taxes", "hors TVA"). C'est une obligation, pas une approximation.
 
 EXEMPLE pour « maçonnerie 50m² à 60€ » :
 <DEVIS>{"objet":"Travaux de maçonnerie","lignes":[{"type_ligne":"lot","designation":"MAÇONNERIE"},{"type_ligne":"ouvrage","lot":"Maçonnerie","designation":"Travaux de maçonnerie","unite":"m2","quantite":50,"prix_unitaire":60}]}</DEVIS>
