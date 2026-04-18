@@ -194,6 +194,7 @@ export default function App() {
         {tab==="devis"        && <DevisList devis={devis} clients={clients} goDevis={goDevis} setTab={setTab}/>}
         {tab==="devis_detail" && selD && (
           <DevisDetail d={devis.find(x=>x.id===selD)} cl={clients.find(c=>c.id===devis.find(x=>x.id===selD)?.client_id)}
+            clients={clients} setClients={setClients}
             onBack={()=>setTab("devis")} brand={brand}
             onChange={u=>setDevis(ds=>ds.map(x=>x.id===selD?u:x))}/>
         )}
@@ -439,20 +440,21 @@ function PDFViewer({d, cl, brand, onClose}) {
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",zIndex:200,display:"flex",flexDirection:"column"}} className="fu">
+      <style>{`@page{size:A4;margin:0}@media print{body{margin:0}}`}</style>
       <div style={{background:"#0f172a",padding:"12px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{color:"#22c55e"}}>{I.pdf}</div>
-          <span style={{color:"white",fontSize:13,fontWeight:600}}>{d.numero}.pdf</span>
+          <span style={{color:"white",fontSize:13,fontWeight:600}}>{d.numero}.pdf <span style={{color:"#64748b",fontWeight:400,marginLeft:6}}>· A4</span></span>
         </div>
         <div style={{display:"flex",gap:8}}>
-          <button style={{background:"#22c55e",color:"white",border:"none",borderRadius:10,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>⬇ Télécharger</button>
+          <button onClick={()=>window.print()} style={{background:"#22c55e",color:"white",border:"none",borderRadius:10,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>⬇ Télécharger</button>
           <button onClick={onClose} style={{background:"#1e293b",color:"#94a3b8",border:"none",borderRadius:10,padding:"7px 12px",cursor:"pointer"}}>{I.x}</button>
         </div>
       </div>
 
       <div style={{flex:1,overflowY:"auto",padding:"20px 16px",background:"#1e293b"}}>
-        {/* Page A4 simulée */}
-        <div style={{background:"white",borderRadius:4,maxWidth:600,margin:"0 auto",boxShadow:"0 20px 60px rgba(0,0,0,.5)",fontFamily}}>
+        {/* Page A4 210×297mm */}
+        <div style={{background:"white",borderRadius:4,width:"min(210mm, 100%)",minHeight:"297mm",margin:"0 auto",boxShadow:"0 20px 60px rgba(0,0,0,.5)",fontFamily,display:"flex",flexDirection:"column"}}>
 
           {/* En-tête coloré */}
           <div style={{background:ac,padding:"24px 28px",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
@@ -731,12 +733,18 @@ function DevisList({devis,clients,goDevis,setTab}) {
 // ══════════════════════════════════════════════════════════
 //  DEVIS DETAIL — avec bouton PDF live
 // ══════════════════════════════════════════════════════════
-function DevisDetail({d,cl,onBack,brand,onChange}) {
+function DevisDetail({d,cl,clients,setClients,onBack,brand,onChange}) {
   const [showPDF, setShowPDF] = useState(false);
   const [sending, setSending] = useState(false);
   const [signUrl, setSignUrl] = useState(d.odoo_sign_url||null);
   const [log,     setLog]     = useState([]);
   const [showLog, setShowLog] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const assignClient = (id) => {
+    const c=clients.find(x=>x.id===id);
+    onChange({...d,client_id:id,ville_chantier:d.ville_chantier||c?.ville||""});
+    setPickerOpen(false);
+  };
   const lignes = d.lignes?.length?d.lignes:DEMO_LIGNES;
   const ht  = lignes.filter(l=>l.type_ligne==="ouvrage").reduce((s,l)=>s+(l.quantite*(l.prix_unitaire||0)),0);
   const ac  = brand.color||"#22c55e";
@@ -762,15 +770,33 @@ function DevisDetail({d,cl,onBack,brand,onChange}) {
   return (
     <>
       {showPDF&&<PDFViewer d={d} cl={cl} brand={brand} onClose={()=>setShowPDF(false)}/>}
+      {pickerOpen&&(
+        <ClientPicker
+          clients={clients}
+          accent={ac}
+          onClose={()=>setPickerOpen(false)}
+          onPick={assignClient}
+          onCreate={c=>{ const id=uid(); setClients(cs=>[...cs,{...c,id}]); assignClient(id); }}
+        />
+      )}
 
       <div style={{minHeight:"100%",background:"#f8fafc"}} className="fu">
         <div style={{background:"white",borderBottom:"1px solid #f1f5f9",padding:"13px 18px"}}>
           <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",color:"#64748b",fontSize:13,marginBottom:12,cursor:"pointer"}}>{I.back} Retour</button>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-            <div>
+            <div style={{flex:1}}>
               <div style={{fontSize:10,color:"#94a3b8",fontFamily:"monospace",marginBottom:3}}>{d.numero}</div>
               <div style={{fontSize:17,fontWeight:700,color:"#0f172a",lineHeight:1.3}}>{d.objet}</div>
-              <div style={{fontSize:12,color:"#64748b",marginTop:4}}>{cl?.raison_sociale||`${cl?.prenom||""} ${cl?.nom||""}`.trim()||"—"} · {d.ville_chantier}</div>
+              {cl
+                ? <div style={{fontSize:12,color:"#64748b",marginTop:4,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    <span>{cl.raison_sociale||`${cl.prenom||""} ${cl.nom||""}`.trim()||"—"} · {d.ville_chantier||"—"}</span>
+                    <button onClick={()=>setPickerOpen(true)} style={{background:"none",border:"none",color:ac,fontSize:11,fontWeight:600,cursor:"pointer",padding:0}}>Modifier</button>
+                  </div>
+                : <button onClick={()=>setPickerOpen(true)}
+                    style={{marginTop:8,background:ac+"15",color:ac,border:`1.5px dashed ${ac}`,borderRadius:10,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:6}}>
+                    + Ajouter un client
+                  </button>
+              }
             </div>
             <div style={{textAlign:"right"}}>
               <div style={{fontSize:20,fontWeight:700,color:"#0f172a"}}>{fmt(ht)}</div>
