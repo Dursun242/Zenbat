@@ -777,21 +777,21 @@ function PDFViewer({d, cl, brand, onClose, autoDownload}) {
               <tbody>
                 {lignes.map((l,i)=>{
                   const prev = lignes[i-1];
-                  const lotSpace = l.type_ligne==="lot" && prev ? 14 : 0;
+                  const lotSpace = l.type_ligne==="lot" && prev ? 8 : 0;
                   if(l.type_ligne==="lot") return (
                     <tr key={l.id}>
-                      <td colSpan={5} style={{paddingTop:lotSpace+12,paddingBottom:6}}>
+                      <td colSpan={5} style={{paddingTop:lotSpace+6,paddingBottom:3}}>
                         <div style={{fontSize:10,fontWeight:700,color:ac,letterSpacing:"2.5px",fontFamily,textTransform:"uppercase"}}>{l.designation}</div>
                       </td>
                     </tr>
                   );
                   return (
                     <tr key={l.id} style={{borderTop:"1px solid #f1f5f9"}}>
-                      <td style={{padding:"10px 0",fontSize:10.5,color:"#1e293b",fontFamily,lineHeight:1.45}}>{l.designation}</td>
-                      <td style={{padding:"10px 6px",fontSize:10.5,color:"#334155",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{l.quantite}</td>
-                      <td style={{padding:"10px 6px",fontSize:9.5,color:"#94a3b8",textAlign:"center"}}>{l.unite}</td>
-                      <td style={{padding:"10px 6px",fontSize:10.5,color:"#334155",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{fmt(l.prix_unitaire)}</td>
-                      <td style={{padding:"10px 0",fontSize:10.5,fontWeight:600,color:"#0f172a",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{fmt(l.quantite*(l.prix_unitaire||0))}</td>
+                      <td style={{padding:"5px 0",fontSize:10.5,color:"#1e293b",fontFamily,lineHeight:1.35}}>{l.designation}</td>
+                      <td style={{padding:"5px 6px",fontSize:10.5,color:"#334155",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{l.quantite}</td>
+                      <td style={{padding:"5px 6px",fontSize:9.5,color:"#94a3b8",textAlign:"center"}}>{l.unite}</td>
+                      <td style={{padding:"5px 6px",fontSize:10.5,color:"#334155",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{fmt(l.prix_unitaire)}</td>
+                      <td style={{padding:"5px 0",fontSize:10.5,fontWeight:600,color:"#0f172a",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{fmt(l.quantite*(l.prix_unitaire||0))}</td>
                     </tr>
                   );
                 })}
