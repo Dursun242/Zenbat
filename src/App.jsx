@@ -149,10 +149,14 @@ export default function App() {
   const [plan,   setPlan]   = useState(saved?.plan || "free");
   const [devisSaved, setDevisSaved] = useState(saved?.devisSaved || 0);
 
+  const [autoPDF, setAutoPDF] = useState(null);
+
   useEffect(() => { saveState({ screen, brand, clients, devis, plan, devisSaved }); },
     [screen, brand, clients, devis, plan, devisSaved]);
 
   const logout = () => { clearState(); window.location.reload(); };
+
+  const openDevisPDF = (id) => { setAutoPDF(id); setSelD(id); setTab("devis_detail"); };
 
   const goDevis  = id => { setSelD(id); setTab("devis_detail"); };
   const goClient = id => { setSelC(id); setTab("client_detail"); };
@@ -222,9 +226,11 @@ export default function App() {
           <DevisDetail d={devis.find(x=>x.id===selD)} cl={clients.find(c=>c.id===devis.find(x=>x.id===selD)?.client_id)}
             clients={clients} setClients={setClients}
             onBack={()=>setTab("devis")} brand={brand}
+            autoPDF={autoPDF===selD}
+            clearAutoPDF={()=>setAutoPDF(null)}
             onChange={u=>setDevis(ds=>ds.map(x=>x.id===selD?u:x))}/>
         )}
-        {tab==="agent" && <AgentIA devis={devis} setDevis={setDevis} clients={clients} setClients={setClients} plan={plan} devisSaved={devisSaved} setDevisSaved={setDevisSaved} onPaywall={()=>setScreen("paywall")} setTab={setTab} brand={brand}/>}
+        {tab==="agent" && <AgentIA devis={devis} setDevis={setDevis} clients={clients} setClients={setClients} plan={plan} devisSaved={devisSaved} setDevisSaved={setDevisSaved} onPaywall={()=>setScreen("paywall")} setTab={setTab} brand={brand} onSaved={openDevisPDF}/>}
       </div>
 
       <HelpButton tab={tab}/>
@@ -797,8 +803,9 @@ function DevisList({devis,clients,goDevis,setTab}) {
 // ══════════════════════════════════════════════════════════
 //  DEVIS DETAIL — avec bouton PDF live
 // ══════════════════════════════════════════════════════════
-function DevisDetail({d,cl,clients,setClients,onBack,brand,onChange}) {
-  const [showPDF, setShowPDF] = useState(false);
+function DevisDetail({d,cl,clients,setClients,onBack,brand,onChange,autoPDF,clearAutoPDF}) {
+  const [showPDF, setShowPDF] = useState(!!autoPDF);
+  useEffect(() => { if(autoPDF){ setShowPDF(true); clearAutoPDF?.(); } }, [autoPDF]);
   const [sending, setSending] = useState(false);
   const [signUrl, setSignUrl] = useState(d.odoo_sign_url||null);
   const [log,     setLog]     = useState([]);
@@ -935,7 +942,7 @@ function DevisDetail({d,cl,clients,setClients,onBack,brand,onChange}) {
 // ══════════════════════════════════════════════════════════
 //  AGENT IA — lignes qui pop une par une
 // ══════════════════════════════════════════════════════════
-function AgentIA({devis,setDevis,clients,setClients,plan,devisSaved,setDevisSaved,onPaywall,setTab,brand}) {
+function AgentIA({devis,setDevis,clients,setClients,plan,devisSaved,setDevisSaved,onPaywall,setTab,brand,onSaved}) {
   const greeting = TX.agentGreeting;
   const [msgs,    setMsgs]   = useState([{role:"assistant",content:TX.agentGreeting}]);
   const [input,   setInput]  = useState("");
@@ -1032,11 +1039,12 @@ Ligne ajoutée ✓ Souhaitez-vous ajouter d'autres travaux ?`,
   const finalizeSave = (clientId) => {
     const ht2=lignes.filter(l=>l.type_ligne==="ouvrage").reduce((s,l)=>s+(l.quantite*(l.prix_unitaire||0)),0);
     const cl=clients.find(c=>c.id===clientId);
-    setDevis(ds=>[...ds,{id:uid(),numero:`DEV-2026-${String(devis.length+1).padStart(4,"0")}`,objet:objet||"Devis IA",client_id:clientId,ville_chantier:cl?.ville||"",statut:"brouillon",montant_ht:ht2,date_emission:new Date().toISOString().split("T")[0],lignes,odoo_sign_url:null}]);
+    const newId = uid();
+    setDevis(ds=>[...ds,{id:newId,numero:`DEV-2026-${String(devis.length+1).padStart(4,"0")}`,objet:objet||"Devis IA",client_id:clientId,ville_chantier:cl?.ville||"",statut:"brouillon",montant_ht:ht2,date_emission:new Date().toISOString().split("T")[0],lignes,odoo_sign_url:null}]);
     setDevisSaved(n=>n+1);
     setLignes([]); setObjet(""); setPickerOpen(false);
-    setMsgs([{role:"assistant",content:TX.quoteSaved}]);
-    setTimeout(()=>setTab("devis"),2500);
+    setMsgs([{role:"assistant",content:TX.agentGreeting}]);
+    onSaved?.(newId);
   };
 
   const visibleLignes = lignes.slice(0,visibleCount);
@@ -1050,8 +1058,14 @@ Ligne ajoutée ✓ Souhaitez-vous ajouter d'autres travaux ?`,
         @keyframes totalCount{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
       `}</style>
 
-      {/* ═══ HAUT : PDF EN-TÊTE + LIGNES ═══════════════════ */}
-      <div style={{flexShrink:0,background:"white",borderBottom:"2px solid #f1f5f9",maxHeight:"52%",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      {/* ═══ HAUT : compacte quand vide, PDF + lignes sinon ═══ */}
+      {lignes.length===0 ? (
+        <div style={{flexShrink:0,background:"white",borderBottom:"1px solid #f1f5f9",padding:"8px 16px",display:"flex",alignItems:"center",gap:8}}>
+          <div style={{width:6,height:6,borderRadius:"50%",background:ac}}/>
+          <span style={{fontSize:11,color:"#94a3b8",fontWeight:500}}>Décrivez les travaux — le devis se construit en direct</span>
+        </div>
+      ) : (
+      <div style={{flexShrink:0,background:"white",borderBottom:"2px solid #f1f5f9",maxHeight:"52%",display:"flex",flexDirection:"column",overflow:"hidden",animation:"fadeUp .3s ease both"}}>
 
         {/* En-tête PDF avec branding */}
         <div style={{background:ac,padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
@@ -1081,11 +1095,7 @@ Ligne ajoutée ✓ Souhaitez-vous ajouter d'autres travaux ?`,
         {/* Lignes du devis — scrollables */}
         <div style={{flex:1,overflowY:"auto",minHeight:0}}>
           {visibleLignes.length===0 ? (
-            <div style={{padding:"20px 16px",textAlign:"center"}}>
-              <div style={{fontSize:24,marginBottom:8}}>📋</div>
-              <div style={{fontSize:12,color:"#94a3b8",fontWeight:500}}>Les lignes du devis apparaîtront ici</div>
-              <div style={{fontSize:11,color:"#cbd5e1",marginTop:4}}>Décrivez les travaux ci-dessous</div>
-            </div>
+            <div style={{padding:"12px 16px",textAlign:"center",fontSize:11,color:"#94a3b8"}}>Ajout en cours…</div>
           ) : (
             <table style={{width:"100%",borderCollapse:"collapse"}}>
               <thead style={{position:"sticky",top:0,background:"white",zIndex:1}}>
@@ -1165,6 +1175,7 @@ Ligne ajoutée ✓ Souhaitez-vous ajouter d'autres travaux ?`,
           </div>
         )}
       </div>
+      )}
 
       {/* ═══ BAS : CHAT ══════════════════════════════════════ */}
       <div style={{flex:1,display:"flex",flexDirection:"column",minHeight:0}}>
@@ -1327,68 +1338,45 @@ function ClientPicker({clients,accent,onClose,onPick,onCreate}) {
 //  AUTH
 // ══════════════════════════════════════════════════════════
 function AuthScreen({onEnter}) {
-  const [mode,setMode]=useState("login");
-  const [siret,setSiret]=useState("");
-  const [company,setCompany]=useState(null);
-  const [searching,setSearching]=useState(false);
-
-  const searchPappers=async()=>{
-    if(siret.length<9)return;
-    setSearching(true);
-    await new Promise(r=>setTimeout(r,1200));
-    setCompany({nom:"Maçonnerie Dupont SAS",ville:"Le Havre",siret,activite:"Construction de maisons individuelles"});
-    setSearching(false);
-  };
+  const [advanced, setAdvanced] = useState(false);
 
   return (
-    <div style={{minHeight:"100vh",background:"#0f172a",display:"flex",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"'DM Sans',sans-serif"}}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      <div style={{width:"100%",maxWidth:360}}>
-        <div style={{textAlign:"center",marginBottom:28}}>
-          <div style={{marginBottom:14,fontSize:38,fontWeight:800,letterSpacing:"-1px"}}><span style={{color:"#22c55e"}}>Zen</span><span style={{color:"white"}}>bat</span></div>
-          <p style={{color:"#64748b",fontSize:12}}>Devis BTP · Simple · Rapide · Professionnel</p>
+    <div style={{minHeight:"100vh",background:"#0f172a",display:"flex",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"'DM Sans',sans-serif"}}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}@keyframes spin{to{transform:rotate(360deg)}}@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style>
+      <div style={{width:"100%",maxWidth:360,animation:"fadeUp .4s ease both"}}>
+        <div style={{textAlign:"center",marginBottom:36}}>
+          <div style={{fontSize:44,fontWeight:800,letterSpacing:"-1px",marginBottom:10}}><span style={{color:"#22c55e"}}>Zen</span><span style={{color:"white"}}>bat</span></div>
+          <p style={{color:"#64748b",fontSize:13,lineHeight:1.5}}>Devis BTP en 2 minutes,<br/>dictés à l'IA.</p>
         </div>
-        <div style={{background:"white",borderRadius:24,padding:24,boxShadow:"0 24px 48px rgba(0,0,0,.3)"}}>
-          <div style={{display:"flex",background:"#f1f5f9",borderRadius:12,padding:4,marginBottom:20}}>
-            {[["login","Se connecter"],["signup","Créer un compte"]].map(([m,l])=>(
-              <button key={m} onClick={()=>setMode(m)} style={{flex:1,padding:"8px",borderRadius:10,border:"none",fontSize:12,fontWeight:600,background:mode===m?"white":"transparent",color:mode===m?"#0f172a":"#94a3b8",cursor:"pointer",boxShadow:mode===m?"0 1px 3px rgba(0,0,0,.1)":"none"}}>{l}</button>
-            ))}
-          </div>
-          <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            {mode==="signup"&&(
-              <div>
-                <label style={{display:"block",fontSize:11,fontWeight:600,color:"#64748b",marginBottom:6}}>SIRET — Identification Pappers</label>
-                <div style={{display:"flex",gap:8}}>
-                  <input value={siret} onChange={e=>setSiret(e.target.value.replace(/\D/g,""))} placeholder="14 chiffres" maxLength={14}
-                    style={{flex:1,border:"1px solid #e2e8f0",borderRadius:12,padding:"10px 12px",fontSize:13,outline:"none"}}/>
-                  <button onClick={searchPappers} disabled={siret.length<9||searching}
-                    style={{background:siret.length>=9?"#22c55e":"#d1fae5",color:"white",border:"none",borderRadius:12,padding:"10px 12px",fontSize:12,fontWeight:600,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",minWidth:68}}>
-                    {searching?<span style={{display:"inline-block",width:13,height:13,border:"2px solid white",borderTopColor:"transparent",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>:"Chercher"}
-                  </button>
-                </div>
-                {company&&(
-                  <div style={{marginTop:10,background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:12,padding:"10px 14px"}}>
-                    <div style={{fontSize:12,fontWeight:700,color:"#15803d"}}>{company.nom}</div>
-                    <div style={{fontSize:11,color:"#16a34a",marginTop:2}}>{company.activite} · {company.ville}</div>
-                  </div>
-                )}
-              </div>
-            )}
-            <input type="email" placeholder="Email" style={{width:"100%",border:"1px solid #e2e8f0",borderRadius:12,padding:"10px 14px",fontSize:13,outline:"none"}}/>
-            <input type="password" placeholder="Mot de passe" onKeyDown={e=>e.key==="Enter"&&onEnter(company?.nom||null, mode==="signup")} style={{width:"100%",border:"1px solid #e2e8f0",borderRadius:12,padding:"10px 14px",fontSize:13,outline:"none"}}/>
-            <button onClick={()=>onEnter(company?.nom||null, mode==="signup")} style={{width:"100%",background:"#22c55e",color:"white",border:"none",borderRadius:12,padding:"13px",fontSize:13,fontWeight:700,marginTop:4,cursor:"pointer"}}>
-              {mode==="login"?"Se connecter →":"Créer mon compte gratuit →"}
+
+        <button onClick={()=>onEnter(null, true)}
+          style={{width:"100%",background:"#22c55e",color:"white",border:"none",borderRadius:14,padding:"16px",fontSize:15,fontWeight:700,cursor:"pointer",boxShadow:"0 8px 24px rgba(34,197,94,.3)",marginBottom:10}}>
+          Commencer gratuitement →
+        </button>
+        <button onClick={()=>onEnter(null, false)}
+          style={{width:"100%",background:"transparent",color:"#94a3b8",border:"1px solid #334155",borderRadius:14,padding:"13px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+          J'ai déjà un compte
+        </button>
+
+        <div style={{textAlign:"center",marginTop:20}}>
+          <button onClick={()=>setAdvanced(v=>!v)} style={{background:"none",border:"none",color:"#475569",fontSize:11,cursor:"pointer",textDecoration:"underline"}}>
+            {advanced ? "Masquer" : "Options avancées"}
+          </button>
+        </div>
+
+        {advanced && (
+          <div style={{marginTop:14,background:"#1e293b",border:"1px solid #334155",borderRadius:14,padding:14,animation:"fadeUp .25s ease both"}}>
+            <button style={{width:"100%",border:"1px solid #334155",borderRadius:10,padding:"10px",fontSize:12,fontWeight:600,background:"white",display:"flex",alignItems:"center",justifyContent:"center",gap:8,color:"#374151",cursor:"pointer"}} onClick={()=>onEnter(null,false)}>
+              <svg width="15" height="15" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+              Continuer avec Google
             </button>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:10,margin:"16px 0"}}>
-            <hr style={{flex:1,border:"none",borderTop:"1px solid #f1f5f9"}}/><span style={{color:"#cbd5e1",fontSize:11}}>ou</span><hr style={{flex:1,border:"none",borderTop:"1px solid #f1f5f9"}}/>
-          </div>
-          <button onClick={()=>onEnter(null, mode==="signup")} style={{width:"100%",border:"1px solid #e2e8f0",borderRadius:12,padding:"11px",fontSize:12,fontWeight:600,background:"white",display:"flex",alignItems:"center",justifyContent:"center",gap:8,color:"#374151",cursor:"pointer"}}>
-            <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-            Continuer avec Google
-          </button>
-          {mode==="signup"&&<p style={{textAlign:"center",fontSize:11,color:"#94a3b8",marginTop:14}}>2 devis IA gratuits/mois · puis 15€/mois</p>}
-        </div>
+        )}
+
+        <p style={{textAlign:"center",fontSize:11,color:"#475569",marginTop:24,lineHeight:1.6}}>
+          2 devis IA gratuits par mois<br/>
+          <span style={{color:"#64748b"}}>Pas de carte requise</span>
+        </p>
       </div>
     </div>
   );
