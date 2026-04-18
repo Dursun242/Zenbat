@@ -877,7 +877,7 @@ function AgentIA({devis,setDevis,clients,plan,aiUsed,setAiUsed,onPaywall,setTab,
     const newMsgs=[...msgs,userMsg];
     setMsgs(newMsgs); setInput(""); setLoading(true); setAiUsed(n=>n+1);
     try {
-      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
+      const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,
           system:`Tu es un assistant expert BTP France intégré dans l'application Zenbat.
 
