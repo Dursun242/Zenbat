@@ -460,7 +460,7 @@ function Field({dark,label,val,onChange,placeholder,type="text"}) {
 // ══════════════════════════════════════════════════════════
 //  PDF LIVE VIEWER (simulé avec HTML)
 // ══════════════════════════════════════════════════════════
-function PDFViewer({d, cl, brand, onClose}) {
+function PDFViewer({d, cl, brand, onClose, autoDownload}) {
   const lignes = d.lignes?.length ? d.lignes : DEMO_LIGNES;
   const ht  = lignes.filter(l=>l.type_ligne==="ouvrage").reduce((s,l)=>s+(l.quantite*(l.prix_unitaire||0)),0);
   const tva = ht * 0.20;
@@ -476,8 +476,9 @@ function PDFViewer({d, cl, brand, onClose}) {
     if(!pageRef.current||downloading) return;
     setDownloading(true);
     const el = pageRef.current;
-    const orig = { width: el.style.width, boxShadow: el.style.boxShadow, borderRadius: el.style.borderRadius };
+    const orig = { width: el.style.width, minHeight: el.style.minHeight, boxShadow: el.style.boxShadow, borderRadius: el.style.borderRadius };
     el.style.width = "210mm";
+    el.style.minHeight = "auto";
     el.style.boxShadow = "none";
     el.style.borderRadius = "0";
     try {
@@ -486,28 +487,40 @@ function PDFViewer({d, cl, brand, onClose}) {
       const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
       const pageW = 210, pageH = 297;
       const imgH = (canvas.height * pageW) / canvas.width;
-      if (imgH <= pageH) {
-        pdf.addImage(imgData, "JPEG", 0, 0, pageW, imgH);
+      if (imgH <= pageH + 2) {
+        pdf.addImage(imgData, "JPEG", 0, 0, pageW, Math.min(imgH, pageH));
       } else {
         let remaining = imgH, y = 0;
-        while (remaining > 0) {
+        while (remaining > 1) {
           pdf.addImage(imgData, "JPEG", 0, -y, pageW, imgH);
           remaining -= pageH;
           y += pageH;
-          if (remaining > 0) pdf.addPage();
+          if (remaining > 1) pdf.addPage();
         }
       }
       pdf.save(`${d.numero}.pdf`);
     } finally {
       el.style.width = orig.width;
+      el.style.minHeight = orig.minHeight;
       el.style.boxShadow = orig.boxShadow;
       el.style.borderRadius = orig.borderRadius;
       setDownloading(false);
     }
   };
 
+  useEffect(() => {
+    if (!autoDownload) return;
+    let cancelled = false;
+    const id = setTimeout(async () => {
+      if (cancelled) return;
+      await download();
+      if (!cancelled) onClose?.();
+    }, 150);
+    return () => { cancelled = true; clearTimeout(id); };
+  }, [autoDownload]);
+
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",zIndex:200,display:"flex",flexDirection:"column"}} className="fu">
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",zIndex:200,display:"flex",flexDirection:"column",opacity:autoDownload?0:1,pointerEvents:autoDownload?"none":"auto"}} className="fu">
       <style>{`@page{size:A4;margin:0}@media print{body{margin:0}}`}</style>
       <div style={{background:"#0f172a",padding:"12px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -804,8 +817,10 @@ function DevisList({devis,clients,goDevis,setTab}) {
 //  DEVIS DETAIL — avec bouton PDF live
 // ══════════════════════════════════════════════════════════
 function DevisDetail({d,cl,clients,setClients,onBack,brand,onChange,autoPDF,clearAutoPDF}) {
-  const [showPDF, setShowPDF] = useState(!!autoPDF);
-  useEffect(() => { if(autoPDF){ setShowPDF(true); clearAutoPDF?.(); } }, [autoPDF]);
+  const [showPDF, setShowPDF] = useState(false);
+  const [autoDL, setAutoDL]   = useState(false);
+  useEffect(() => { if(autoPDF){ setShowPDF(true); setAutoDL(true); clearAutoPDF?.(); } }, [autoPDF]);
+  const closePDF = () => { setShowPDF(false); setAutoDL(false); };
   const [sending, setSending] = useState(false);
   const [signUrl, setSignUrl] = useState(d.odoo_sign_url||null);
   const [log,     setLog]     = useState([]);
@@ -840,7 +855,7 @@ function DevisDetail({d,cl,clients,setClients,onBack,brand,onChange,autoPDF,clea
 
   return (
     <>
-      {showPDF&&<PDFViewer d={d} cl={cl} brand={brand} onClose={()=>setShowPDF(false)}/>}
+      {showPDF&&<PDFViewer d={d} cl={cl} brand={brand} onClose={closePDF} autoDownload={autoDL}/>}
       {pickerOpen&&(
         <ClientPicker
           clients={clients}
