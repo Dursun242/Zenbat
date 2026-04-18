@@ -106,6 +106,26 @@ const tvaBreakdown = lignes => {
   return [...m.entries()].sort((a,b)=>b[0]-a[0]).map(([rate,{base,tva}])=>({rate,base,tva}));
 };
 
+// Extrait un montant cible depuis un message libre ("pour 25 000€", "25k€", "budget 30000").
+// Retourne null si rien de clair. Fusionne "25 000"/"25.000" → 25000 avant matching.
+const parseTargetAmount = text => {
+  if (!text) return null;
+  let s = " " + text + " ";
+  for (let i = 0; i < 3; i++) s = s.replace(/(\d)[ \u00a0.](\d{3})(?=\D|$)/g, "$1$2");
+  const cands = [];
+  const kRe = /(\d+(?:[.,]\d+)?)\s*k(?:€|\s*euros?|\s*eur\b)?/gi;
+  const eRe = /(\d{3,})(?:[.,]\d{1,2})?\s*(?:€|euros?\b|eur\b)/gi;
+  let m;
+  while ((m = kRe.exec(s)) !== null) cands.push(parseFloat(m[1].replace(",",".")) * 1000);
+  while ((m = eRe.exec(s)) !== null) cands.push(parseFloat(m[1].replace(",",".")));
+  if (!cands.length && /budget|total|devis\s+(?:de|pour)|montant|pour\s+(?:un|une)|environ|tutar/i.test(text)) {
+    const nums = [...s.matchAll(/\b(\d{4,})\b/g)].map(x => parseInt(x[1])).filter(n => n >= 500 && n <= 10_000_000);
+    if (nums.length) cands.push(Math.max(...nums));
+  }
+  return cands.length ? Math.max(...cands) : null;
+};
+const hasHTMarker = text => /\bHT\b|\bhors[\s-]?taxes?\b|\bhors[\s-]?tva\b/i.test(text||"");
+
 const TX = {
   dashboard:"Accueil", clients:"Clients", devis:"Devis", agent:"Agent IA",
   myProfile:"Mon profil",
@@ -1215,7 +1235,7 @@ TVA par ligne (champ "tva", valeur décimale) :
 - 0.021 uniquement si l'utilisateur le mentionne explicitement.
 Si l'utilisateur précise un taux pour une ligne ("pose carrelage 40m² 25€ TVA 10%"), applique-le à cette ligne. Si le devis global concerne une rénovation de logement, mets 0.10 par défaut sur les lignes concernées.
 
-MONTANT CIBLE : Si l'utilisateur précise un montant total ("pour 30 000€", "environ 30k€", "devis de 30 000€", "budget 30 000"), la somme TTC du devis (= somme ligne par ligne de quantite × prix_unitaire × (1 + tva)) DOIT atteindre ce montant à ±2 % près. Vérifie avant de répondre, ajuste les quantités et/ou prix_unitaire si besoin. Par défaut le montant est TTC. N'interprète le montant comme HT que si l'utilisateur le précise explicitement ("HT", "hors taxes", "hors TVA") ; dans ce cas c'est la somme HT (= quantite × prix_unitaire, hors TVA) qui doit atteindre la cible. C'est une obligation.
+MONTANT CIBLE : Si l'utilisateur précise un montant total ("pour 30 000€", "environ 30k€", "devis de 30 000€", "budget 30 000"), la somme TTC du devis (= somme ligne par ligne de quantite × prix_unitaire × (1 + tva)) DOIT atteindre ce montant à ±2,5 % près. Vérifie avant de répondre, ajuste les quantités et/ou prix_unitaire si besoin. Par défaut le montant est TTC. N'interprète le montant comme HT que si l'utilisateur le précise explicitement ("HT", "hors taxes", "hors TVA") ; dans ce cas c'est la somme HT (= quantite × prix_unitaire, hors TVA) qui doit atteindre la cible. C'est une obligation.
 
 EXEMPLE pour « maçonnerie 50m² à 60€ » :
 <DEVIS>{"objet":"Travaux de maçonnerie","lignes":[{"type_ligne":"lot","designation":"MAÇONNERIE"},{"type_ligne":"ouvrage","lot":"Maçonnerie","designation":"Travaux de maçonnerie","unite":"m2","quantite":50,"prix_unitaire":60,"tva":0.20}]}</DEVIS>
@@ -1232,6 +1252,27 @@ Ligne ajoutée ✓ Souhaitez-vous ajouter d'autres travaux ?`,
         try{
           const parsed=JSON.parse(match[1].trim());
           const newLignes=(parsed.lignes||[]).map(l=>({...l,id:uid()}));
+          // Filet de sécurité : si l'utilisateur a donné un budget, on aligne
+          // uniformément les prix unitaires pour rester à ±2,5 % de la cible.
+          const target = parseTargetAmount(userMsg.content);
+          if (target && target >= 100) {
+            const ouvrages = newLignes.filter(l=>l.type_ligne==="ouvrage");
+            if (ouvrages.length) {
+              const isHT = hasHTMarker(userMsg.content);
+              const actual = ouvrages.reduce((s,l)=>{
+                const base = (l.quantite||0)*(l.prix_unitaire||0);
+                return s + (isHT ? base : base * (1 + (typeof l.tva==="number"?l.tva:DEFAULT_TVA)));
+              }, 0);
+              if (actual > 0) {
+                const ratio = target / actual;
+                if (Math.abs(ratio - 1) > 0.025) {
+                  for (const l of ouvrages) {
+                    l.prix_unitaire = Math.round((l.prix_unitaire||0) * ratio * 100) / 100;
+                  }
+                }
+              }
+            }
+          }
           if(parsed.objet&&!objet) setObjet(parsed.objet);
           setLignes(prev=>{
             const existingDesigs=new Set(prev.map(l=>l.designation));
