@@ -22,16 +22,26 @@
     </div>
     <script>
       (function () {
-        function show(msg) {
+        function format(err, fallback) {
+          if (!err) return fallback || 'Unknown error';
+          var name = err.name || '';
+          var msg = err.message || '';
+          var stack = err.stack || '';
+          var parts = [];
+          if (name || msg) parts.push((name ? name + ': ' : '') + msg);
+          if (stack) parts.push(stack);
+          return parts.join('\n\n') || String(err);
+        }
+        function show(text) {
           var box = document.getElementById('boot-error');
           var pre = document.getElementById('boot-error-msg');
-          if (box && pre) { pre.textContent = String(msg); box.style.display = 'block'; }
+          if (box && pre) { pre.textContent = String(text); box.style.display = 'block'; }
         }
         window.addEventListener('error', function (e) {
-          show((e.error && (e.error.stack || e.error.message)) || e.message || 'Unknown error');
+          show(format(e.error, e.message));
         });
         window.addEventListener('unhandledrejection', function (e) {
-          show((e.reason && (e.reason.stack || e.reason.message)) || e.reason || 'Unhandled promise rejection');
+          show(format(e.reason, 'Unhandled promise rejection'));
         });
         setTimeout(function () {
           var root = document.getElementById('root');
