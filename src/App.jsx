@@ -134,7 +134,7 @@ export default function App() {
   const [selD,   setSelD]   = useState(null);
   const [selC,   setSelC]   = useState(null);
   const [plan,   setPlan]   = useState("free");
-  const [aiUsed, setAiUsed] = useState(0);
+  const [devisSaved, setDevisSaved] = useState(0);
 
   const goDevis  = id => { setSelD(id); setTab("devis_detail"); };
   const goClient = id => { setSelC(id); setTab("client_detail"); };
@@ -182,7 +182,7 @@ export default function App() {
           </button>
           {plan==="pro"
             ? <span style={{background:"rgba(34,197,94,.15)",color:"#4ade80",fontSize:10,fontWeight:700,padding:"3px 8px",borderRadius:20,border:"1px solid rgba(34,197,94,.25)"}}>PRO</span>
-            : <span style={{background:"#1e293b",color:"#94a3b8",fontSize:10,padding:"3px 8px",borderRadius:20}}>{Math.max(0,2-aiUsed)} IA</span>
+            : <span style={{background:"#1e293b",color:"#94a3b8",fontSize:10,padding:"3px 8px",borderRadius:20}}>{Math.max(0,2-devisSaved)} devis</span>
           }
         </div>
       </header>
@@ -197,7 +197,7 @@ export default function App() {
             onBack={()=>setTab("devis")} brand={brand}
             onChange={u=>setDevis(ds=>ds.map(x=>x.id===selD?u:x))}/>
         )}
-        {tab==="agent" && <AgentIA devis={devis} setDevis={setDevis} clients={clients} plan={plan} aiUsed={aiUsed} setAiUsed={setAiUsed} onPaywall={()=>setScreen("paywall")} setTab={setTab} brand={brand}/>}
+        {tab==="agent" && <AgentIA devis={devis} setDevis={setDevis} clients={clients} plan={plan} devisSaved={devisSaved} setDevisSaved={setDevisSaved} onPaywall={()=>setScreen("paywall")} setTab={setTab} brand={brand}/>}
       </div>
 
       <HelpButton tab={tab}/>
@@ -210,7 +210,7 @@ export default function App() {
               {active&&<span style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:28,height:2.5,background:"#22c55e",borderRadius:2}}/>}
               <div style={{position:"relative"}}>
                 {icon}
-                {id==="agent"&&plan==="free"&&aiUsed>0&&<span style={{position:"absolute",top:-4,right:-8,background:"#f97316",color:"white",fontSize:8,fontWeight:700,width:14,height:14,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}}>{Math.max(0,2-aiUsed)}</span>}
+                {id==="agent"&&plan==="free"&&devisSaved>0&&<span style={{position:"absolute",top:-4,right:-8,background:"#f97316",color:"white",fontSize:8,fontWeight:700,width:14,height:14,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}}>{Math.max(0,2-devisSaved)}</span>}
               </div>
               <span style={{fontSize:10,fontWeight:active?700:400}}>{label}</span>
             </button>
@@ -845,7 +845,7 @@ function DevisDetail({d,cl,onBack,brand,onChange}) {
 // ══════════════════════════════════════════════════════════
 //  AGENT IA — lignes qui pop une par une
 // ══════════════════════════════════════════════════════════
-function AgentIA({devis,setDevis,clients,plan,aiUsed,setAiUsed,onPaywall,setTab,brand}) {
+function AgentIA({devis,setDevis,clients,plan,devisSaved,setDevisSaved,onPaywall,setTab,brand}) {
   const greeting = TX.agentGreeting;
   const [msgs,    setMsgs]   = useState([{role:"assistant",content:TX.agentGreeting}]);
   const [input,   setInput]  = useState("");
@@ -872,10 +872,9 @@ function AgentIA({devis,setDevis,clients,plan,aiUsed,setAiUsed,onPaywall,setTab,
 
   const send = async () => {
     if(!input.trim()||loading) return;
-    if(plan==="free"&&aiUsed>=2){onPaywall();return;}
     const userMsg={role:"user",content:input};
     const newMsgs=[...msgs,userMsg];
-    setMsgs(newMsgs); setInput(""); setLoading(true); setAiUsed(n=>n+1);
+    setMsgs(newMsgs); setInput(""); setLoading(true);
     try {
       const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:1000,
@@ -925,8 +924,10 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
   const deleteLigne = id => setLignes(l=>l.filter(x=>x.id!==id));
 
   const save = () => {
+    if(plan==="free"&&devisSaved>=2){onPaywall();return;}
     const ht2=lignes.filter(l=>l.type_ligne==="ouvrage").reduce((s,l)=>s+(l.quantite*(l.prix_unitaire||0)),0);
     setDevis(ds=>[...ds,{id:uid(),numero:`DEV-2026-${String(devis.length+1).padStart(4,"0")}`,objet:objet||"Devis IA",client_id:"",ville_chantier:"",statut:"brouillon",montant_ht:ht2,date_emission:new Date().toISOString().split("T")[0],lignes,odoo_sign_url:null}]);
+    setDevisSaved(n=>n+1);
     setLignes([]); setObjet("");
     setMsgs([{role:"assistant",content:TX.quoteSaved}]);
     setTimeout(()=>setTab("devis"),2500);
