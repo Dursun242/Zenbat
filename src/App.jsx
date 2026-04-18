@@ -539,128 +539,139 @@ function PDFViewer({d, cl, brand, onClose, autoDownload}) {
         {/* Page A4 210×297mm */}
         <div ref={pageRef} style={{background:"white",borderRadius:4,width:"min(210mm, 100%)",minHeight:"297mm",margin:"0 auto",boxShadow:"0 20px 60px rgba(0,0,0,.5)",fontFamily,display:"flex",flexDirection:"column"}}>
 
-          {/* En-tête coloré */}
-          <div style={{background:ac,padding:"24px 28px",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-            <div>
+          {/* Liseré supérieur */}
+          <div style={{height:6,background:ac}}/>
+
+          {/* En-tête sobre */}
+          <div style={{padding:"28px 32px 22px",display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:24}}>
+            <div style={{flex:1}}>
               {brand.logo
-                ? <img src={brand.logo} alt="" style={{height:48,maxWidth:160,objectFit:"contain",display:"block",marginBottom:8}}/>
-                : <div style={{fontWeight:800,fontSize:20,color:"white",marginBottom:6}}>{brand.companyName||"Votre Entreprise"}</div>
+                ? <img src={brand.logo} alt="" style={{height:42,maxWidth:170,objectFit:"contain",display:"block",marginBottom:10}}/>
+                : <div style={{fontWeight:700,fontSize:17,color:"#0f172a",marginBottom:6,fontFamily,letterSpacing:".2px"}}>{brand.companyName||"Votre Entreprise"}</div>
               }
-              {brand.companyName&&brand.logo&&<div style={{fontWeight:700,fontSize:14,color:"rgba(255,255,255,.9)"}}>{brand.companyName}</div>}
-              <div style={{color:"rgba(255,255,255,.7)",fontSize:10,lineHeight:1.8,marginTop:4}}>
+              {brand.companyName&&brand.logo&&<div style={{fontWeight:600,fontSize:11,color:"#0f172a",marginBottom:4}}>{brand.companyName}</div>}
+              <div style={{color:"#94a3b8",fontSize:9.5,lineHeight:1.7}}>
                 {brand.address&&<div>{brand.address}</div>}
                 {brand.city&&<div>{brand.city}</div>}
-                {brand.phone&&<div>Tél : {brand.phone}</div>}
+                {brand.phone&&<div>{brand.phone}</div>}
                 {brand.email&&<div>{brand.email}</div>}
               </div>
             </div>
             <div style={{textAlign:"right"}}>
-              <div style={{color:"rgba(255,255,255,.5)",fontSize:10,fontWeight:600,letterSpacing:"2px",marginBottom:4}}>DEVIS</div>
-              <div style={{color:"white",fontWeight:700,fontSize:18,fontFamily}}>{d.numero}</div>
-              <div style={{color:"rgba(255,255,255,.7)",fontSize:10,marginTop:6}}>Émis le {fmtD(d.date_emission)}</div>
-              <div style={{color:"rgba(255,255,255,.7)",fontSize:10}}>Valide jusqu'au {fmtD(validUntil.toISOString())}</div>
+              <div style={{color:"#cbd5e1",fontSize:9,fontWeight:600,letterSpacing:"3px",marginBottom:6}}>DEVIS</div>
+              <div style={{color:ac,fontWeight:700,fontSize:22,fontFamily,letterSpacing:".5px"}}>{d.numero}</div>
+              <div style={{color:"#94a3b8",fontSize:9.5,marginTop:8,lineHeight:1.7}}>
+                <div>Émis le {fmtD(d.date_emission)}</div>
+                <div>Valide jusqu'au {fmtD(validUntil.toISOString())}</div>
+              </div>
             </div>
           </div>
 
-          {/* Destinataire */}
-          <div style={{padding:"20px 28px",borderBottom:"1px solid #f1f5f9",background:"#fafafa"}}>
-            <div style={{fontSize:9,color:"#94a3b8",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>DESTINATAIRE</div>
-            <div style={{fontSize:14,fontWeight:700,color:"#0f172a",fontFamily}}>{cl?.raison_sociale||`${cl?.prenom||""} ${cl?.nom||""}`.trim()||"—"}</div>
-            {cl?.email&&<div style={{fontSize:11,color:"#64748b",marginTop:2}}>{cl.email}</div>}
-            <div style={{fontSize:12,fontWeight:600,color:"#374151",marginTop:6}}>Chantier : {d.ville_chantier||"—"}</div>
+          {/* Destinataire + chantier */}
+          <div style={{padding:"18px 32px 22px",borderTop:"1px solid #eef1f5",display:"flex",justifyContent:"space-between",gap:24}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:8.5,color:"#94a3b8",fontWeight:600,letterSpacing:"2px",marginBottom:7}}>ADRESSÉ À</div>
+              <div style={{fontSize:14,fontWeight:700,color:"#0f172a",fontFamily,letterSpacing:".2px"}}>{cl?.raison_sociale||`${cl?.prenom||""} ${cl?.nom||""}`.trim()||"—"}</div>
+              {cl?.email&&<div style={{fontSize:10,color:"#94a3b8",marginTop:3}}>{cl.email}</div>}
+            </div>
+            {d.ville_chantier&&<div style={{textAlign:"right"}}>
+              <div style={{fontSize:8.5,color:"#94a3b8",fontWeight:600,letterSpacing:"2px",marginBottom:7}}>CHANTIER</div>
+              <div style={{fontSize:12,color:"#334155",fontFamily}}>{d.ville_chantier}</div>
+            </div>}
           </div>
 
           {/* Lignes */}
-          <div style={{padding:"20px 28px"}}>
-            <div style={{fontSize:9,color:"#94a3b8",fontWeight:700,letterSpacing:"1px",marginBottom:12}}>DÉTAIL DES PRESTATIONS</div>
+          <div style={{padding:"10px 32px 0"}}>
             <table style={{width:"100%",borderCollapse:"collapse"}}>
               <thead>
-                <tr style={{background:ac+"18"}}>
-                  <th style={{textAlign:"left",padding:"8px 10px",fontSize:10,fontWeight:600,color:"#374151",fontFamily}}>Désignation</th>
-                  <th style={{textAlign:"center",padding:"8px 6px",fontSize:10,fontWeight:600,color:"#374151",width:40}}>Qté</th>
-                  <th style={{textAlign:"center",padding:"8px 6px",fontSize:10,fontWeight:600,color:"#374151",width:40}}>U.</th>
-                  <th style={{textAlign:"right",padding:"8px 6px",fontSize:10,fontWeight:600,color:"#374151",width:60}}>P.U. HT</th>
-                  <th style={{textAlign:"right",padding:"8px 10px",fontSize:10,fontWeight:600,color:"#374151",width:70}}>Montant HT</th>
+                <tr style={{borderBottom:`1.5px solid ${ac}`}}>
+                  <th style={{textAlign:"left",padding:"9px 0",fontSize:8.5,fontWeight:600,color:"#94a3b8",letterSpacing:"1.5px"}}>DÉSIGNATION</th>
+                  <th style={{textAlign:"right",padding:"9px 6px",fontSize:8.5,fontWeight:600,color:"#94a3b8",letterSpacing:"1.5px",width:50}}>QTÉ</th>
+                  <th style={{textAlign:"center",padding:"9px 6px",fontSize:8.5,fontWeight:600,color:"#94a3b8",letterSpacing:"1.5px",width:35}}>U.</th>
+                  <th style={{textAlign:"right",padding:"9px 6px",fontSize:8.5,fontWeight:600,color:"#94a3b8",letterSpacing:"1.5px",width:70}}>P.U. HT</th>
+                  <th style={{textAlign:"right",padding:"9px 0",fontSize:8.5,fontWeight:600,color:"#94a3b8",letterSpacing:"1.5px",width:80}}>MONTANT HT</th>
                 </tr>
               </thead>
               <tbody>
-                {lignes.map(l=>{
+                {lignes.map((l,i)=>{
+                  const prev = lignes[i-1];
+                  const lotSpace = l.type_ligne==="lot" && prev ? 14 : 0;
                   if(l.type_ligne==="lot") return (
-                    <tr key={l.id} style={{background:"#1e293b"}}>
-                      <td colSpan={5} style={{padding:"7px 10px",fontWeight:700,fontSize:11,color:"white",letterSpacing:".5px",fontFamily}}>{l.designation}</td>
+                    <tr key={l.id}>
+                      <td colSpan={5} style={{paddingTop:lotSpace+12,paddingBottom:6}}>
+                        <div style={{fontSize:10,fontWeight:700,color:ac,letterSpacing:"2.5px",fontFamily,textTransform:"uppercase"}}>{l.designation}</div>
+                      </td>
                     </tr>
                   );
                   return (
-                    <tr key={l.id} style={{borderBottom:"1px solid #f8fafc"}}>
-                      <td style={{padding:"7px 10px",fontSize:11,color:"#1e293b",fontFamily}}>{l.designation}</td>
-                      <td style={{padding:"7px 6px",fontSize:11,color:"#374151",textAlign:"center"}}>{l.quantite}</td>
-                      <td style={{padding:"7px 6px",fontSize:11,color:"#94a3b8",textAlign:"center"}}>{l.unite}</td>
-                      <td style={{padding:"7px 6px",fontSize:11,color:"#374151",textAlign:"right"}}>{fmt(l.prix_unitaire)}</td>
-                      <td style={{padding:"7px 10px",fontSize:11,fontWeight:600,color:"#0f172a",textAlign:"right"}}>{fmt(l.quantite*(l.prix_unitaire||0))}</td>
+                    <tr key={l.id} style={{borderTop:"1px solid #f1f5f9"}}>
+                      <td style={{padding:"10px 0",fontSize:10.5,color:"#1e293b",fontFamily,lineHeight:1.45}}>{l.designation}</td>
+                      <td style={{padding:"10px 6px",fontSize:10.5,color:"#334155",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{l.quantite}</td>
+                      <td style={{padding:"10px 6px",fontSize:9.5,color:"#94a3b8",textAlign:"center"}}>{l.unite}</td>
+                      <td style={{padding:"10px 6px",fontSize:10.5,color:"#334155",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{fmt(l.prix_unitaire)}</td>
+                      <td style={{padding:"10px 0",fontSize:10.5,fontWeight:600,color:"#0f172a",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{fmt(l.quantite*(l.prix_unitaire||0))}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+          </div>
 
-            {/* Totaux */}
-            <div style={{marginTop:16,display:"flex",justifyContent:"flex-end"}}>
-              <div style={{width:220}}>
-                {[["Total HT",fmt(ht)],["TVA 20 %",fmt(tva)]].map(([k,v])=>(
-                  <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #f1f5f9"}}>
-                    <span style={{fontSize:11,color:"#64748b",fontFamily}}>{k}</span>
-                    <span style={{fontSize:11,color:"#374151",fontFamily}}>{v}</span>
-                  </div>
-                ))}
-                <div style={{display:"flex",justifyContent:"space-between",padding:"10px 0",marginTop:4}}>
-                  <span style={{fontSize:13,fontWeight:700,color:"#0f172a",fontFamily}}>Total TTC</span>
-                  <span style={{fontSize:15,fontWeight:800,color:ac,fontFamily}}>{fmt(ttc)}</span>
-                </div>
+          {/* Totaux */}
+          <div style={{padding:"20px 32px 26px",display:"flex",justifyContent:"flex-end"}}>
+            <div style={{minWidth:230}}>
+              <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",fontSize:10.5,color:"#64748b",fontVariantNumeric:"tabular-nums"}}>
+                <span>Total HT</span><span>{fmt(ht)}</span>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",fontSize:10.5,color:"#64748b",fontVariantNumeric:"tabular-nums"}}>
+                <span>TVA 20 %</span><span>{fmt(tva)}</span>
+              </div>
+              <div style={{borderTop:`1.5px solid ${ac}`,marginTop:6,paddingTop:10,display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+                <span style={{fontSize:11,fontWeight:600,color:"#0f172a",fontFamily,letterSpacing:"1px"}}>TOTAL TTC</span>
+                <span style={{fontSize:18,fontWeight:700,color:ac,fontFamily,fontVariantNumeric:"tabular-nums"}}>{fmt(ttc)}</span>
               </div>
             </div>
           </div>
 
           {/* Conditions paiement + RIB */}
           {(brand.paymentTerms||brand.rib)&&(
-            <div style={{padding:"16px 28px",borderTop:"1px solid #f1f5f9",background:"#fafafa"}}>
-              {brand.paymentTerms&&<div style={{marginBottom:10}}>
-                <div style={{fontSize:9,color:"#94a3b8",fontWeight:700,letterSpacing:"1px",marginBottom:4}}>CONDITIONS DE PAIEMENT</div>
-                <div style={{fontSize:11,color:"#374151",fontFamily}}>{brand.paymentTerms}</div>
+            <div style={{padding:"18px 32px",borderTop:"1px solid #eef1f5",display:"flex",gap:32}}>
+              {brand.paymentTerms&&<div style={{flex:1}}>
+                <div style={{fontSize:8.5,color:"#94a3b8",fontWeight:600,letterSpacing:"2px",marginBottom:6}}>CONDITIONS DE PAIEMENT</div>
+                <div style={{fontSize:10.5,color:"#334155",fontFamily,lineHeight:1.55}}>{brand.paymentTerms}</div>
               </div>}
-              {brand.rib&&<div>
-                <div style={{fontSize:9,color:"#94a3b8",fontWeight:700,letterSpacing:"1px",marginBottom:4}}>COORDONNÉES BANCAIRES</div>
-                <div style={{fontSize:11,color:"#374151",fontFamily}}>{brand.rib}</div>
-                {brand.iban&&<div style={{fontSize:10,color:"#64748b",fontFamily:"monospace",marginTop:2}}>IBAN : {brand.iban}</div>}
-                {brand.bic&&<div style={{fontSize:10,color:"#64748b",fontFamily:"monospace"}}>BIC : {brand.bic}</div>}
+              {brand.rib&&<div style={{flex:1}}>
+                <div style={{fontSize:8.5,color:"#94a3b8",fontWeight:600,letterSpacing:"2px",marginBottom:6}}>COORDONNÉES BANCAIRES</div>
+                <div style={{fontSize:10.5,color:"#334155",fontFamily}}>{brand.rib}</div>
+                {brand.iban&&<div style={{fontSize:9.5,color:"#64748b",fontFamily:"monospace",marginTop:3,letterSpacing:".3px"}}>{brand.iban}</div>}
+                {brand.bic&&<div style={{fontSize:9.5,color:"#64748b",fontFamily:"monospace",letterSpacing:".3px"}}>BIC {brand.bic}</div>}
               </div>}
             </div>
           )}
 
           {/* Signature */}
-          <div style={{padding:"16px 28px",borderTop:"1px solid #f1f5f9",display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
-            <div style={{width:"45%"}}>
-              <div style={{fontSize:9,color:"#94a3b8",fontWeight:700,letterSpacing:"1px",marginBottom:8}}>SIGNATURE CLIENT</div>
-              <div style={{height:60,border:"1px dashed #cbd5e1",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                <span style={{fontSize:10,color:"#cbd5e1"}}>Bon pour accord</span>
-              </div>
+          <div style={{padding:"22px 32px 18px",borderTop:"1px solid #eef1f5",display:"flex",justifyContent:"space-between",alignItems:"flex-end",gap:40}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:8.5,color:"#94a3b8",fontWeight:600,letterSpacing:"2px",marginBottom:32}}>SIGNATURE CLIENT · Bon pour accord</div>
+              <div style={{borderBottom:"1px solid #cbd5e1"}}/>
             </div>
-            <div style={{textAlign:"right"}}>
-              <div style={{fontSize:9,color:"#94a3b8"}}>Date de signature</div>
-              <div style={{height:28,width:120,borderBottom:"1px solid #e2e8f0",marginTop:8}}/>
+            <div style={{flex:"0 0 150px"}}>
+              <div style={{fontSize:8.5,color:"#94a3b8",fontWeight:600,letterSpacing:"2px",marginBottom:32}}>DATE</div>
+              <div style={{borderBottom:"1px solid #cbd5e1"}}/>
             </div>
           </div>
 
           {/* Mentions légales */}
           {brand.mentionsLegales&&(
-            <div style={{padding:"12px 28px",borderTop:"1px solid #f1f5f9",background:"#f8fafc"}}>
-              <div style={{fontSize:8,color:"#94a3b8",lineHeight:1.6}}>{brand.mentionsLegales}</div>
+            <div style={{padding:"14px 32px 4px"}}>
+              <div style={{fontSize:8,color:"#cbd5e1",lineHeight:1.7,fontStyle:"italic"}}>{brand.mentionsLegales}</div>
             </div>
           )}
 
           {/* Footer SIRET */}
-          <div style={{background:ac,padding:"10px 28px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{color:"rgba(255,255,255,.7)",fontSize:8}}>{brand.companyName}{brand.siret&&` — SIRET ${brand.siret}`}{brand.tva&&` — TVA ${brand.tva}`}</span>
-            <span style={{color:"rgba(255,255,255,.5)",fontSize:8}}>Document généré via Zenbat</span>
+          <div style={{padding:"12px 32px 18px",marginTop:"auto",borderTop:"1px solid #eef1f5",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{color:"#94a3b8",fontSize:8,letterSpacing:".3px"}}>{brand.companyName}{brand.siret&&` · SIRET ${brand.siret}`}{brand.tva&&` · TVA ${brand.tva}`}</span>
+            <span style={{color:"#cbd5e1",fontSize:8,letterSpacing:".3px"}}>Généré via Zenbat</span>
           </div>
         </div>
       </div>
