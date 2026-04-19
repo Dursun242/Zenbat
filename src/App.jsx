@@ -104,7 +104,17 @@ export default function App() {
   const [selD,   setSelD]   = useState(null);
   const [selC,   setSelC]   = useState(null);
   const [plan,   setPlan]   = useState("free");
-  const [aiUsed, setAiUsed] = useState(0);
+  const TRIAL_DAYS = 30;
+  const [trialStart] = useState(() => {
+    if (typeof window === "undefined") return Date.now();
+    const stored = localStorage.getItem("zenbat_trial_start");
+    if (stored) return Number(stored);
+    const now = Date.now();
+    localStorage.setItem("zenbat_trial_start", String(now));
+    return now;
+  });
+  const daysLeft = Math.max(0, TRIAL_DAYS - Math.floor((Date.now() - trialStart) / 86400000));
+  const trialExpired = plan === "free" && daysLeft === 0;
 
   const goDevis  = id => { setSelD(id); setTab("devis_detail"); };
   const goClient = id => { setSelC(id); setTab("client_detail"); };
@@ -126,7 +136,7 @@ export default function App() {
 
   if (screen==="auth")       return <AuthScreen onEnter={co=>{setBrand(b=>({...b,companyName:co||""}));setScreen("onboarding");}}/>;
   if (screen==="onboarding") return <Onboarding brand={brand} setBrand={setBrand} onDone={()=>setScreen("app")}/>;
-  if (screen==="paywall")    return <PaywallScreen onBack={()=>setScreen("app")} onSubscribe={()=>{setPlan("pro");setScreen("app");}}/>;
+  if (screen==="paywall")    return <PaywallScreen daysLeft={daysLeft} onBack={()=>setScreen("app")} onSubscribe={()=>{setPlan("pro");setScreen("app");}}/>;
 
   return (
     <div style={{fontFamily:"'DM Sans',sans-serif",height:"100dvh",display:"flex",flexDirection:"column",background:"#f8fafc",overflow:"hidden"}}>
@@ -152,7 +162,7 @@ export default function App() {
           </button>
           {plan==="pro"
             ? <span style={{background:"rgba(34,197,94,.15)",color:"#4ade80",fontSize:10,fontWeight:700,padding:"3px 8px",borderRadius:20,border:"1px solid rgba(34,197,94,.25)"}}>PRO</span>
-            : <span style={{background:"#1e293b",color:"#94a3b8",fontSize:10,padding:"3px 8px",borderRadius:20}}>{Math.max(0,2-aiUsed)} IA</span>
+            : <span style={{background:daysLeft<=7?"rgba(249,115,22,.15)":"#1e293b",color:daysLeft<=7?"#fb923c":"#94a3b8",fontSize:10,fontWeight:600,padding:"3px 8px",borderRadius:20,border:daysLeft<=7?"1px solid rgba(249,115,22,.25)":"none"}}>Essai · {daysLeft}j</span>
           }
         </div>
       </header>
@@ -167,7 +177,7 @@ export default function App() {
             onBack={()=>setTab("devis")} brand={brand}
             onChange={u=>setDevis(ds=>ds.map(x=>x.id===selD?u:x))}/>
         )}
-        {tab==="agent" && <AgentIA devis={devis} setDevis={setDevis} clients={clients} plan={plan} aiUsed={aiUsed} setAiUsed={setAiUsed} onPaywall={()=>setScreen("paywall")} setTab={setTab} brand={brand}/>}
+        {tab==="agent" && <AgentIA devis={devis} setDevis={setDevis} clients={clients} plan={plan} trialExpired={trialExpired} onPaywall={()=>setScreen("paywall")} setTab={setTab} brand={brand}/>}
       </div>
 
       <nav style={{position:"fixed",bottom:0,left:0,right:0,paddingBottom:"env(safe-area-inset-bottom)",background:"#0f172a",borderTop:"1px solid rgba(255,255,255,.06)",display:"flex",zIndex:50}}>
@@ -178,7 +188,7 @@ export default function App() {
               {active&&<span style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:28,height:2.5,background:"#22c55e",borderRadius:2}}/>}
               <div style={{position:"relative"}}>
                 {icon}
-                {id==="agent"&&plan==="free"&&aiUsed>0&&<span style={{position:"absolute",top:-4,right:-8,background:"#f97316",color:"white",fontSize:8,fontWeight:700,width:14,height:14,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}}>{Math.max(0,2-aiUsed)}</span>}
+                {id==="agent"&&plan==="free"&&daysLeft<=7&&<span style={{position:"absolute",top:-4,right:-10,background:daysLeft===0?"#ef4444":"#f97316",color:"white",fontSize:8,fontWeight:700,padding:"0 4px",height:14,minWidth:14,borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center"}}>{daysLeft===0?"!":`${daysLeft}j`}</span>}
               </div>
               <span style={{fontSize:10,fontWeight:active?700:400}}>{label}</span>
             </button>
@@ -913,7 +923,7 @@ function DevisDetail({d,cl,onBack,brand,onChange}) {
 // ══════════════════════════════════════════════════════════
 //  AGENT IA — lignes qui pop une par une
 // ══════════════════════════════════════════════════════════
-function AgentIA({devis,setDevis,clients,plan,aiUsed,setAiUsed,onPaywall,setTab,brand}) {
+function AgentIA({devis,setDevis,clients,plan,trialExpired,onPaywall,setTab,brand}) {
   const greeting = TX.agentGreeting;
   const [msgs,    setMsgs]   = useState([{role:"assistant",content:TX.agentGreeting}]);
   const [input,   setInput]  = useState("");
@@ -950,10 +960,10 @@ function AgentIA({devis,setDevis,clients,plan,aiUsed,setAiUsed,onPaywall,setTab,
 
   const send = async () => {
     if(!input.trim()||loading) return;
-    if(plan==="free"&&aiUsed>=2){onPaywall();return;}
+    if(trialExpired){onPaywall();return;}
     const userMsg={role:"user",content:input};
     const newMsgs=[...msgs,userMsg];
-    setMsgs(newMsgs); setInput(""); setLoading(true); setAiUsed(n=>n+1);
+    setMsgs(newMsgs); setInput(""); setLoading(true);
     try {
       const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,
@@ -1290,14 +1300,15 @@ function AuthScreen({onEnter}) {
   );
 }
 
-function PaywallScreen({onBack,onSubscribe}) {
+function PaywallScreen({daysLeft=0,onBack,onSubscribe}) {
+  const expired = daysLeft <= 0;
   return (
     <div style={{minHeight:"100vh",background:"#0f172a",display:"flex",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"'DM Sans',sans-serif"}}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}`}</style>
       <div style={{width:"100%",maxWidth:360,textAlign:"center"}}>
         <div style={{marginBottom:20,fontSize:32,fontWeight:800}}><span style={{color:"#22c55e"}}>Zen</span><span style={{color:"white"}}>bat</span></div>
-        <h2 style={{color:"white",fontSize:20,fontWeight:700,marginBottom:8}}>Essais IA épuisés</h2>
-        <p style={{color:"#64748b",fontSize:13,marginBottom:24,lineHeight:1.6}}>Vos 2 générations gratuites ce mois sont utilisées.</p>
+        <h2 style={{color:"white",fontSize:20,fontWeight:700,marginBottom:8}}>{expired?"Période d'essai terminée":`Encore ${daysLeft} jour${daysLeft>1?"s":""} d'essai`}</h2>
+        <p style={{color:"#64748b",fontSize:13,marginBottom:24,lineHeight:1.6}}>{expired?"Votre essai gratuit de 30 jours est terminé. Passez à Zenbat Pro pour continuer à utiliser l'Agent IA, le PDF brandé et l'envoi en signature.":"Profitez de toutes les fonctionnalités gratuitement pendant votre essai. Passez à Pro à tout moment."}</p>
         <div style={{background:"white",borderRadius:24,padding:22,textAlign:"left",marginBottom:14,boxShadow:"0 24px 48px rgba(0,0,0,.3)"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
             <div><div style={{fontWeight:700,fontSize:16,color:"#0f172a"}}>Zenbat Pro</div><div style={{color:"#94a3b8",fontSize:11,marginTop:2}}>Pour artisans et entreprises BTP</div></div>
