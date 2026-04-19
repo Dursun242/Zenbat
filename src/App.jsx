@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useAuth } from "./lib/auth.jsx";
 
 const fmt  = n => new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR"}).format(n||0);
 const fmtD = d => d ? new Date(d).toLocaleDateString("fr-FR") : "—";
@@ -69,7 +70,41 @@ const DEFAULT_BRAND = {
   mentionsLegales:"", rib:"", iban:"", bic:"",
   paymentTerms:"Acompte 30% à la commande, solde à réception.",
   validityDays:30,
+  trades:[],
 };
+
+// Liste des métiers principaux du BTP en France.
+// L'utilisateur en sélectionne jusqu'à 5 pendant l'onboarding pour spécialiser
+// l'agent IA et éviter qu'il génère des devis hors-périmètre.
+const BTP_TRADES = [
+  { id:"maconnerie",      label:"Maçonnerie",                icon:"🧱" },
+  { id:"gros_oeuvre",     label:"Gros œuvre / Béton",        icon:"🏗️" },
+  { id:"terrassement",    label:"Terrassement / VRD",        icon:"🚜" },
+  { id:"charpente",       label:"Charpente",                 icon:"🪵" },
+  { id:"couverture",      label:"Couverture / Zinguerie",    icon:"🏠" },
+  { id:"etancheite",      label:"Étanchéité",                icon:"💧" },
+  { id:"facade",          label:"Façade / Ravalement",       icon:"🏛️" },
+  { id:"isolation",       label:"Isolation (ITE / ITI)",     icon:"🧊" },
+  { id:"platrerie",       label:"Plâtrerie / Cloisons",      icon:"📐" },
+  { id:"menuiserie_int",  label:"Menuiserie intérieure",     icon:"🚪" },
+  { id:"menuiserie_ext",  label:"Menuiserie ext. / Alu",     icon:"🪟" },
+  { id:"serrurerie",      label:"Serrurerie / Métallerie",   icon:"🔧" },
+  { id:"plomberie",       label:"Plomberie",                 icon:"🚰" },
+  { id:"sanitaire",       label:"Sanitaire / Salle de bain", icon:"🛁" },
+  { id:"chauffage",       label:"Chauffage / PAC",           icon:"🔥" },
+  { id:"climatisation",   label:"Climatisation / VMC",       icon:"❄️" },
+  { id:"electricite",     label:"Électricité",               icon:"⚡" },
+  { id:"domotique",       label:"Domotique / Courants faibles", icon:"📡" },
+  { id:"peinture",        label:"Peinture / Décoration",     icon:"🎨" },
+  { id:"carrelage",       label:"Carrelage / Faïence",       icon:"🟦" },
+  { id:"sol_souple",      label:"Sols souples / Parquet",    icon:"🟫" },
+  { id:"vitrerie",        label:"Vitrerie / Miroiterie",     icon:"🪞" },
+  { id:"cuisine",         label:"Cuisine / Agencement",      icon:"🍳" },
+  { id:"piscine",         label:"Piscine / Spa",             icon:"🏊" },
+  { id:"paysagiste",      label:"Paysagiste / Espaces verts",icon:"🌳" },
+  { id:"demolition",      label:"Démolition / Désamiantage", icon:"🧨" },
+];
+const tradesLabels = (ids=[]) => ids.map(id => BTP_TRADES.find(t=>t.id===id)?.label).filter(Boolean);
 
 const TX = {
   dashboard:"Accueil", clients:"Clients", devis:"Devis", agent:"Agent IA",
@@ -78,9 +113,9 @@ const TX = {
   aiAgent:"Agent IA — Créer un devis", aiDesc:"Décrivez les travaux, je génère le devis",
   signedCA:"CA signé HT", inProgress:"En cours", accepted:"Acceptés",
   saveQuote:"✓ Enregistrer le devis", clearQuote:"🗑 Effacer",
-  inputPlaceholder:"Ex : pose carrelage 25€/m² · 40m²  ou  peinture murs 12€/m²…",
+  inputPlaceholder:"Décris les travaux dans ta langue — réponse en français",
   inputHint:"Entrée pour envoyer · les lignes s'ajoutent en direct",
-  agentGreeting:"Bonjour 👋 Décrivez-moi les travaux ligne par ligne.\n\nEx : *Pose carrelage 25€/m² pour 40m², fourniture carrelage 18€/m²*",
+  agentGreeting:"Bonjour 👋 Décrivez-moi les travaux ligne par ligne, dans la langue de votre choix (français, arabe, darija, espagnol, anglais, portugais…). Je rédige systématiquement le devis en français professionnel.\n\nEx : *Pose carrelage 25€/m² pour 40m², fourniture carrelage 18€/m²*",
   errNetwork:"Pas de connexion internet. Vérifiez votre réseau et réessayez.",
   errApi:"L'assistant IA ne répond pas. Réessayez dans quelques secondes.",
   errGeneral:"Quelque chose s'est mal passé. Réessayez.",
@@ -97,14 +132,28 @@ const TX = {
 
 export default function App() {
   const [screen, setScreen] = useState("app");
-  const [brand,  setBrand]  = useState({...DEFAULT_BRAND, companyName:"Maçonnerie Dupont SAS", city:"76600 Le Havre", phone:"02 35 12 34 56", email:"contact@dupont-maconnerie.fr", siret:"12345678900010", color:"#22c55e", fontStyle:"modern", paymentTerms:"Acompte 30% à la commande, solde à réception.", mentionsLegales:"Assurance décennale n°12345 — Garantie biennale incluse — TVA 20%", rib:"Crédit Mutuel Le Havre", iban:"FR76 1234 5678 9012 3456 7890 123", bic:"CMCIFRPP", validityDays:30});
+  const [brand,  setBrand]  = useState({...DEFAULT_BRAND, companyName:"Maçonnerie Dupont SAS", city:"76600 Le Havre", phone:"02 35 12 34 56", email:"contact@dupont-maconnerie.fr", siret:"12345678900010", color:"#22c55e", fontStyle:"modern", paymentTerms:"Acompte 30% à la commande, solde à réception.", mentionsLegales:"Assurance décennale n°12345 — Garantie biennale incluse — TVA 20%", rib:"Crédit Mutuel Le Havre", iban:"FR76 1234 5678 9012 3456 7890 123", bic:"CMCIFRPP", validityDays:30, trades:["maconnerie","gros_oeuvre","carrelage","platrerie","peinture"]});
   const [clients,setClients]= useState(DEMO_CLIENTS);
   const [devis,  setDevis]  = useState(DEMO_DEVIS);
   const [tab,    setTab]    = useState("dashboard");
   const [selD,   setSelD]   = useState(null);
   const [selC,   setSelC]   = useState(null);
   const [plan,   setPlan]   = useState("free");
-  const [aiUsed, setAiUsed] = useState(0);
+  const TRIAL_DAYS = 30;
+  const { user } = useAuth();
+  // L'essai démarre à la date de création du compte Supabase (auth.users.created_at).
+  // Fallback localStorage si pas encore d'utilisateur (rendu pendant le chargement de la session).
+  const trialStart = (() => {
+    if (user?.created_at) return new Date(user.created_at).getTime();
+    if (typeof window === "undefined") return Date.now();
+    const stored = localStorage.getItem("zenbat_trial_start");
+    if (stored) return Number(stored);
+    const now = Date.now();
+    localStorage.setItem("zenbat_trial_start", String(now));
+    return now;
+  })();
+  const daysLeft = Math.max(0, TRIAL_DAYS - Math.floor((Date.now() - trialStart) / 86400000));
+  const trialExpired = plan === "free" && daysLeft === 0;
 
   const goDevis  = id => { setSelD(id); setTab("devis_detail"); };
   const goClient = id => { setSelC(id); setTab("client_detail"); };
@@ -126,7 +175,7 @@ export default function App() {
 
   if (screen==="auth")       return <AuthScreen onEnter={co=>{setBrand(b=>({...b,companyName:co||""}));setScreen("onboarding");}}/>;
   if (screen==="onboarding") return <Onboarding brand={brand} setBrand={setBrand} onDone={()=>setScreen("app")}/>;
-  if (screen==="paywall")    return <PaywallScreen onBack={()=>setScreen("app")} onSubscribe={()=>{setPlan("pro");setScreen("app");}}/>;
+  if (screen==="paywall")    return <PaywallScreen daysLeft={daysLeft} onBack={()=>setScreen("app")} onSubscribe={()=>{setPlan("pro");setScreen("app");}}/>;
 
   return (
     <div style={{fontFamily:"'DM Sans',sans-serif",height:"100dvh",display:"flex",flexDirection:"column",background:"#f8fafc",overflow:"hidden"}}>
@@ -152,7 +201,7 @@ export default function App() {
           </button>
           {plan==="pro"
             ? <span style={{background:"rgba(34,197,94,.15)",color:"#4ade80",fontSize:10,fontWeight:700,padding:"3px 8px",borderRadius:20,border:"1px solid rgba(34,197,94,.25)"}}>PRO</span>
-            : <span style={{background:"#1e293b",color:"#94a3b8",fontSize:10,padding:"3px 8px",borderRadius:20}}>{Math.max(0,2-aiUsed)} IA</span>
+            : <span style={{background:daysLeft<=7?"rgba(249,115,22,.15)":"#1e293b",color:daysLeft<=7?"#fb923c":"#94a3b8",fontSize:10,fontWeight:600,padding:"3px 8px",borderRadius:20,border:daysLeft<=7?"1px solid rgba(249,115,22,.25)":"none"}}>Essai · {daysLeft}j</span>
           }
         </div>
       </header>
@@ -167,7 +216,7 @@ export default function App() {
             onBack={()=>setTab("devis")} brand={brand}
             onChange={u=>setDevis(ds=>ds.map(x=>x.id===selD?u:x))}/>
         )}
-        {tab==="agent" && <AgentIA devis={devis} setDevis={setDevis} clients={clients} plan={plan} aiUsed={aiUsed} setAiUsed={setAiUsed} onPaywall={()=>setScreen("paywall")} setTab={setTab} brand={brand}/>}
+        {tab==="agent" && <AgentIA devis={devis} setDevis={setDevis} clients={clients} plan={plan} trialExpired={trialExpired} onPaywall={()=>setScreen("paywall")} setTab={setTab} brand={brand}/>}
       </div>
 
       <nav style={{position:"fixed",bottom:0,left:0,right:0,paddingBottom:"env(safe-area-inset-bottom)",background:"#0f172a",borderTop:"1px solid rgba(255,255,255,.06)",display:"flex",zIndex:50}}>
@@ -178,7 +227,7 @@ export default function App() {
               {active&&<span style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:28,height:2.5,background:"#22c55e",borderRadius:2}}/>}
               <div style={{position:"relative"}}>
                 {icon}
-                {id==="agent"&&plan==="free"&&aiUsed>0&&<span style={{position:"absolute",top:-4,right:-8,background:"#f97316",color:"white",fontSize:8,fontWeight:700,width:14,height:14,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}}>{Math.max(0,2-aiUsed)}</span>}
+                {id==="agent"&&plan==="free"&&daysLeft<=7&&<span style={{position:"absolute",top:-4,right:-10,background:daysLeft===0?"#ef4444":"#f97316",color:"white",fontSize:8,fontWeight:700,padding:"0 4px",height:14,minWidth:14,borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center"}}>{daysLeft===0?"!":`${daysLeft}j`}</span>}
               </div>
               <span style={{fontSize:10,fontWeight:active?700:400}}>{label}</span>
             </button>
@@ -212,11 +261,19 @@ function Onboarding({brand,setBrand,onDone}) {
   const COLORS = ["#22c55e","#3b82f6","#f97316","#8b5cf6","#ef4444","#0891b2","#0f172a","#d97706"];
 
   const STEPS = [
-    { title:"Votre identité", icon:"🏢" },
-    { title:"Coordonnées",    icon:"📍" },
-    { title:"Apparence PDF",  icon:"🎨" },
-    { title:"Informations légales", icon:"📋" },
+    { title:"Votre identité",          icon:"🏢" },
+    { title:"Vos métiers BTP",         icon:"🛠️" },
+    { title:"Coordonnées",             icon:"📍" },
+    { title:"Apparence PDF",           icon:"🎨" },
+    { title:"Informations légales",    icon:"📋" },
   ];
+
+  const toggleTrade = (id) => setLocal(b => {
+    const cur = b.trades || [];
+    if (cur.includes(id)) return {...b, trades: cur.filter(x=>x!==id)};
+    if (cur.length >= 5) return b;
+    return {...b, trades: [...cur, id]};
+  });
 
   const save = () => { setBrand(local); onDone(); };
 
@@ -269,8 +326,48 @@ function Onboarding({brand,setBrand,onDone}) {
           </div>
         )}
 
-        {/* STEP 1 — Coordonnées */}
+        {/* STEP 1 — Métiers BTP */}
         {step===1&&(
+          <div className="pop" style={{display:"flex",flexDirection:"column",gap:14}}>
+            <div style={{background:"#1e3a2f",border:"1px solid rgba(34,197,94,.3)",borderRadius:12,padding:"10px 14px"}}>
+              <div style={{color:"#86efac",fontSize:12,fontWeight:600,marginBottom:2}}>Choisissez jusqu'à 5 métiers</div>
+              <div style={{color:"#94a3b8",fontSize:11,lineHeight:1.5}}>L'agent IA générera uniquement des devis pour vos métiers. Hors-sujet refusé automatiquement.</div>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,color:"#64748b"}}>
+              <span>{(local.trades||[]).length} / 5 sélectionnés</span>
+              {(local.trades||[]).length>0 && <button onClick={()=>set("trades",[])} style={{background:"none",border:"none",color:"#64748b",fontSize:11,cursor:"pointer",textDecoration:"underline"}}>Réinitialiser</button>}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              {BTP_TRADES.map(t => {
+                const selected = (local.trades||[]).includes(t.id);
+                const disabled = !selected && (local.trades||[]).length >= 5;
+                return (
+                  <button key={t.id} onClick={()=>toggleTrade(t.id)} disabled={disabled}
+                    style={{
+                      background: selected ? "#1e3a2f" : "#1e293b",
+                      border: `1.5px solid ${selected ? "#22c55e" : "#334155"}`,
+                      borderRadius: 12,
+                      padding: "10px 8px",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 4,
+                      cursor: disabled ? "not-allowed" : "pointer",
+                      opacity: disabled ? 0.4 : 1,
+                      transition: "all .15s",
+                      minHeight: 64,
+                    }}>
+                    <span style={{fontSize:18}}>{t.icon}</span>
+                    <span style={{fontSize:10,fontWeight:600,color:selected?"#86efac":"#cbd5e1",textAlign:"center",lineHeight:1.2}}>{t.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* STEP 2 — Coordonnées */}
+        {step===2&&(
           <div className="pop" style={{display:"flex",flexDirection:"column",gap:14}}>
             <Field dark label="Adresse" val={local.address} onChange={v=>set("address",v)} placeholder="12 rue des Artisans"/>
             <Field dark label="Ville / Code postal" val={local.city} onChange={v=>set("city",v)} placeholder="76600 Le Havre"/>
@@ -280,8 +377,8 @@ function Onboarding({brand,setBrand,onDone}) {
           </div>
         )}
 
-        {/* STEP 2 — Apparence */}
-        {step===2&&(
+        {/* STEP 3 — Apparence */}
+        {step===3&&(
           <div className="pop" style={{display:"flex",flexDirection:"column",gap:20}}>
             {/* Couleur principale */}
             <div>
@@ -344,8 +441,8 @@ function Onboarding({brand,setBrand,onDone}) {
           </div>
         )}
 
-        {/* STEP 3 — Légal */}
-        {step===3&&(
+        {/* STEP 4 — Légal */}
+        {step===4&&(
           <div className="pop" style={{display:"flex",flexDirection:"column",gap:14}}>
             <Field dark label="RIB / Nom de la banque" val={local.rib} onChange={v=>set("rib",v)} placeholder="Crédit Mutuel — Agence Le Havre"/>
             <Field dark label="IBAN" val={local.iban} onChange={v=>set("iban",v)} placeholder="FR76 1234 5678 9012 3456 7890 123"/>
@@ -396,155 +493,255 @@ function Field({dark,label,val,onChange,placeholder,type="text"}) {
 //  PDF LIVE VIEWER (simulé avec HTML)
 // ══════════════════════════════════════════════════════════
 function PDFViewer({d, cl, brand, onClose}) {
+  const MM_TO_PX = 3.7795275591;
+  const A4_PX = 210 * MM_TO_PX;
+  const wrapRef = useRef(null);
+  const pageRef = useRef(null);
+  const [fitScale, setFitScale] = useState(() => {
+    if (typeof window === "undefined") return 1;
+    const avail = Math.max(240, window.innerWidth - 32);
+    return Math.min(1, avail / A4_PX);
+  });
+  const [userZoom, setUserZoom] = useState(1);
+  const scale = fitScale * userZoom;
+  const [pageH, setPageH] = useState(null);
+
+  useEffect(() => {
+    if (!wrapRef.current) return;
+    const compute = () => {
+      const w = wrapRef.current?.clientWidth || (window.innerWidth - 32);
+      setFitScale(Math.min(1, w / A4_PX));
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(wrapRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!pageRef.current) return;
+    const measure = () => {
+      const h = pageRef.current?.offsetHeight || 0;
+      setPageH(h * scale);
+    };
+    measure();
+    const id = setTimeout(measure, 50);
+    return () => clearTimeout(id);
+  }, [scale, d.numero]);
+
   const lignes = d.lignes?.length ? d.lignes : DEMO_LIGNES;
-  const ht  = lignes.filter(l=>l.type_ligne==="ouvrage").reduce((s,l)=>s+(l.quantite*(l.prix_unitaire||0)),0);
-  const tva = ht * 0.20;
+  const ouvrages = lignes.filter(l=>l.type_ligne==="ouvrage");
+  const rateOf = (l)=> Number(l.tva_rate ?? d.tva_rate ?? 20);
+  const ht  = ouvrages.reduce((s,l)=>s+((l.quantite||0)*(l.prix_unitaire||0)),0);
+  // Regroupement par taux de TVA
+  const tvaGroups = ouvrages.reduce((acc,l)=>{
+    const r = rateOf(l);
+    const lineHt = (l.quantite||0)*(l.prix_unitaire||0);
+    acc[r] = (acc[r]||0) + lineHt;
+    return acc;
+  },{});
+  const tvaRows = Object.keys(tvaGroups).map(r=>Number(r)).sort((a,b)=>a-b).map(r=>({
+    rate: r,
+    base: tvaGroups[r],
+    montant: tvaGroups[r] * (r/100),
+  }));
+  const tva = tvaRows.reduce((s,row)=>s+row.montant,0);
   const ttc = ht + tva;
   const fontFamily = brand.fontStyle==="elegant"?"Playfair Display":brand.fontStyle==="tech"?"Space Grotesk":"DM Sans";
-  const ac = brand.color||"#22c55e";
+  const navy = "#1e3a5f";
   const validUntil = new Date(d.date_emission);
   validUntil.setDate(validUntil.getDate()+(brand.validityDays||30));
+  const clientName = cl?.raison_sociale || `${cl?.prenom||""} ${cl?.nom||""}`.trim() || "—";
+
+  const clientLines = [
+    cl?.adresse,
+    [cl?.code_postal, cl?.ville].filter(Boolean).join(" "),
+    cl?.email,
+    cl?.telephone && `Tél : ${cl.telephone}`,
+  ].filter(Boolean);
+
+  const companyLines = [
+    brand.address,
+    [brand.postalCode, brand.city].filter(Boolean).join(" ") || brand.city,
+    brand.phone && `Tél : ${brand.phone}`,
+    brand.email,
+    brand.siret && `SIRET : ${brand.siret}`,
+  ].filter(Boolean);
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",zIndex:200,display:"flex",flexDirection:"column"}} className="fu">
-      <div style={{background:"#0f172a",padding:"12px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",zIndex:200,display:"flex",flexDirection:"column"}} className="fu pdf-modal">
+      <style>{`
+        @page { size: A4; margin: 0; }
+        @media print {
+          body > *:not(.pdf-modal) { display: none !important; }
+          .pdf-modal { position: static !important; background: white !important; }
+          .pdf-modal .pdf-toolbar { display: none !important; }
+          .pdf-modal .pdf-scroll { overflow: visible !important; padding: 0 !important; background: white !important; }
+          .pdf-modal .pdf-page-wrap { width: auto !important; height: auto !important; }
+          .pdf-modal .pdf-page { transform: none !important; position: static !important; box-shadow: none !important; margin: 0 !important; border-radius: 0 !important; width: 210mm !important; min-height: 297mm !important; max-width: none !important; }
+        }
+      `}</style>
+
+      <div className="pdf-toolbar" style={{background:"#0f172a",padding:"calc(12px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 12px calc(18px + env(safe-area-inset-left))",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{color:"#22c55e"}}>{I.pdf}</div>
           <span style={{color:"white",fontSize:13,fontWeight:600}}>{d.numero}.pdf</span>
         </div>
-        <div style={{display:"flex",gap:8}}>
-          <button style={{background:"#22c55e",color:"white",border:"none",borderRadius:10,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>⬇ Télécharger</button>
-          <button onClick={onClose} style={{background:"#1e293b",color:"#94a3b8",border:"none",borderRadius:10,padding:"7px 12px",cursor:"pointer"}}>{I.x}</button>
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          <div style={{display:"flex",background:"#1e293b",borderRadius:10,overflow:"hidden"}}>
+            <button onClick={()=>setUserZoom(z=>Math.max(0.5, +(z-0.25).toFixed(2)))} style={{background:"none",border:"none",color:"#94a3b8",width:30,height:30,fontSize:16,cursor:"pointer",padding:0}} aria-label="Dézoomer">−</button>
+            <button onClick={()=>setUserZoom(1)} style={{background:"none",border:"none",color:"#94a3b8",padding:"0 8px",fontSize:11,fontWeight:600,cursor:"pointer",minWidth:44}} aria-label="Réinitialiser zoom">{Math.round(scale*100)}%</button>
+            <button onClick={()=>setUserZoom(z=>Math.min(3, +(z+0.25).toFixed(2)))} style={{background:"none",border:"none",color:"#94a3b8",width:30,height:30,fontSize:16,cursor:"pointer",padding:0}} aria-label="Zoomer">+</button>
+          </div>
+          <button onClick={()=>window.print()} style={{background:"#22c55e",color:"white",border:"none",borderRadius:10,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>⬇</button>
+          <button onClick={onClose} style={{background:"#1e293b",color:"#94a3b8",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer"}}>{I.x}</button>
         </div>
       </div>
 
-      <div style={{flex:1,overflowY:"auto",padding:"20px 16px",background:"#1e293b"}}>
-        {/* Page A4 simulée */}
-        <div style={{background:"white",borderRadius:4,maxWidth:600,margin:"0 auto",boxShadow:"0 20px 60px rgba(0,0,0,.5)",fontFamily}}>
+      <div className="pdf-scroll" ref={wrapRef} style={{flex:1,overflow:"auto",padding:"16px 16px calc(20px + env(safe-area-inset-bottom))",background:"#1e293b"}}>
+        <div className="pdf-page-wrap" style={{width:`calc(210mm * ${scale})`,height:pageH?`${pageH}px`:"auto",margin:"0 auto",position:"relative"}}>
+        <div ref={pageRef} className="pdf-page" style={{background:"white",width:"210mm",minHeight:"297mm",boxShadow:"0 20px 60px rgba(0,0,0,.5)",padding:"15mm",fontFamily,color:"#1a1a1a",fontSize:11,lineHeight:1.5,boxSizing:"border-box",transform:`scale(${scale})`,transformOrigin:"top left",position:"absolute",top:0,left:0}}>
 
-          {/* En-tête coloré */}
-          <div style={{background:ac,padding:"24px 28px",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+          {/* En-tête : n° devis + dates */}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:18,paddingBottom:12,borderBottom:`2px solid ${navy}`}}>
             <div>
-              {brand.logo
-                ? <img src={brand.logo} alt="" style={{height:48,maxWidth:160,objectFit:"contain",display:"block",marginBottom:8}}/>
-                : <div style={{fontWeight:800,fontSize:20,color:"white",marginBottom:6}}>{brand.companyName||"Votre Entreprise"}</div>
-              }
-              {brand.companyName&&brand.logo&&<div style={{fontWeight:700,fontSize:14,color:"rgba(255,255,255,.9)"}}>{brand.companyName}</div>}
-              <div style={{color:"rgba(255,255,255,.7)",fontSize:10,lineHeight:1.8,marginTop:4}}>
-                {brand.address&&<div>{brand.address}</div>}
-                {brand.city&&<div>{brand.city}</div>}
-                {brand.phone&&<div>Tél : {brand.phone}</div>}
-                {brand.email&&<div>{brand.email}</div>}
-              </div>
+              {brand.logo && <img src={brand.logo} alt="" style={{height:44,maxWidth:180,objectFit:"contain",display:"block",marginBottom:6}}/>}
+              <div style={{fontWeight:800,fontSize:16,color:navy}}>{brand.companyName||"Votre Entreprise"}</div>
             </div>
             <div style={{textAlign:"right"}}>
-              <div style={{color:"rgba(255,255,255,.5)",fontSize:10,fontWeight:600,letterSpacing:"2px",marginBottom:4}}>DEVIS</div>
-              <div style={{color:"white",fontWeight:700,fontSize:18,fontFamily}}>{d.numero}</div>
-              <div style={{color:"rgba(255,255,255,.7)",fontSize:10,marginTop:6}}>Émis le {fmtD(d.date_emission)}</div>
-              <div style={{color:"rgba(255,255,255,.7)",fontSize:10}}>Valide jusqu'au {fmtD(validUntil.toISOString())}</div>
+              <div style={{color:"#94a3b8",fontSize:10,fontWeight:600,letterSpacing:"2px"}}>DEVIS</div>
+              <div style={{color:navy,fontWeight:800,fontSize:20,marginTop:2}}>{d.numero}</div>
+              <div style={{color:"#64748b",fontSize:10,marginTop:6}}>Émis le <strong style={{color:"#1a1a1a"}}>{fmtD(d.date_emission)}</strong></div>
+              <div style={{color:"#64748b",fontSize:10}}>Valide jusqu'au <strong style={{color:"#1a1a1a"}}>{fmtD(validUntil.toISOString())}</strong></div>
             </div>
           </div>
 
-          {/* Destinataire */}
-          <div style={{padding:"20px 28px",borderBottom:"1px solid #f1f5f9",background:"#fafafa"}}>
-            <div style={{fontSize:9,color:"#94a3b8",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>DESTINATAIRE</div>
-            <div style={{fontSize:14,fontWeight:700,color:"#0f172a",fontFamily}}>{cl?.raison_sociale||`${cl?.prenom||""} ${cl?.nom||""}`.trim()||"—"}</div>
-            {cl?.email&&<div style={{fontSize:11,color:"#64748b",marginTop:2}}>{cl.email}</div>}
-            <div style={{fontSize:12,fontWeight:600,color:"#374151",marginTop:6}}>Chantier : {d.ville_chantier||"—"}</div>
+          {/* Boxes ENTREPRISE / MAÎTRE D'OUVRAGE */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+            <div style={{border:"1px solid #d4d4d8",borderRadius:4,padding:"10px 12px",minHeight:110}}>
+              <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>ENTREPRISE</div>
+              <div style={{fontSize:13,fontWeight:700,color:"#111",marginBottom:4}}>{brand.companyName||"—"}</div>
+              {companyLines.map((line,i)=>(<div key={i} style={{fontSize:10,color:"#4b5563",lineHeight:1.6}}>{line}</div>))}
+            </div>
+            <div style={{border:"1px solid #d4d4d8",borderRadius:4,padding:"10px 12px",minHeight:110}}>
+              <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>MAÎTRE D'OUVRAGE</div>
+              <div style={{fontSize:13,fontWeight:700,color:"#111",marginBottom:4}}>{clientName}</div>
+              {clientLines.map((line,i)=>(<div key={i} style={{fontSize:10,color:"#4b5563",lineHeight:1.6}}>{line}</div>))}
+            </div>
           </div>
 
-          {/* Lignes */}
-          <div style={{padding:"20px 28px"}}>
-            <div style={{fontSize:9,color:"#94a3b8",fontWeight:700,letterSpacing:"1px",marginBottom:12}}>DÉTAIL DES PRESTATIONS</div>
-            <table style={{width:"100%",borderCollapse:"collapse"}}>
-              <thead>
-                <tr style={{background:ac+"18"}}>
-                  <th style={{textAlign:"left",padding:"8px 10px",fontSize:10,fontWeight:600,color:"#374151",fontFamily}}>Désignation</th>
-                  <th style={{textAlign:"center",padding:"8px 6px",fontSize:10,fontWeight:600,color:"#374151",width:40}}>Qté</th>
-                  <th style={{textAlign:"center",padding:"8px 6px",fontSize:10,fontWeight:600,color:"#374151",width:40}}>U.</th>
-                  <th style={{textAlign:"right",padding:"8px 6px",fontSize:10,fontWeight:600,color:"#374151",width:60}}>P.U. HT</th>
-                  <th style={{textAlign:"right",padding:"8px 10px",fontSize:10,fontWeight:600,color:"#374151",width:70}}>Montant HT</th>
-                </tr>
-              </thead>
+          {/* Chantier */}
+          {(d.ville_chantier||d.objet)&&(
+            <div style={{background:"#f8f9fb",border:"1px solid #e5e7eb",borderRadius:4,padding:"8px 12px",marginBottom:14,fontSize:10,color:"#374151"}}>
+              {d.objet && <div><strong>Objet :</strong> {d.objet}</div>}
+              {d.ville_chantier && <div><strong>Chantier :</strong> {d.ville_chantier}</div>}
+            </div>
+          )}
+
+          {/* Détail des prestations */}
+          <div style={{fontSize:11,fontWeight:700,color:navy,marginBottom:8}}>DÉTAIL DES PRESTATIONS</div>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,marginBottom:14}}>
+            <thead>
+              <tr style={{background:navy,color:"white"}}>
+                <th style={{textAlign:"left",padding:"8px 10px",fontWeight:600}}>Description</th>
+                <th style={{textAlign:"center",padding:"8px 6px",fontWeight:600,width:50}}>Unité</th>
+                <th style={{textAlign:"center",padding:"8px 6px",fontWeight:600,width:45}}>Qté</th>
+                <th style={{textAlign:"right",padding:"8px 8px",fontWeight:600,width:70}}>PU HT</th>
+                <th style={{textAlign:"center",padding:"8px 6px",fontWeight:600,width:50}}>TVA</th>
+                <th style={{textAlign:"right",padding:"8px 10px",fontWeight:600,width:80}}>Total HT</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lignes.map((l,i)=>{
+                if(l.type_ligne==="lot") return (
+                  <tr key={l.id}>
+                    <td colSpan={6} style={{padding:"8px 10px",fontWeight:700,fontSize:10,color:navy,textTransform:"uppercase",letterSpacing:".5px",borderBottom:`1px solid ${navy}33`,background:"#eef2f7"}}>{l.designation}</td>
+                  </tr>
+                );
+                const total = (l.quantite||0)*(l.prix_unitaire||0);
+                return (
+                  <tr key={l.id} style={{background:i%2?"#f8f9fb":"white",borderBottom:"1px solid #e5e7eb"}}>
+                    <td style={{padding:"7px 10px"}}>{l.designation}</td>
+                    <td style={{padding:"7px 6px",textAlign:"center",color:"#6b7280"}}>{l.unite||"—"}</td>
+                    <td style={{padding:"7px 6px",textAlign:"center"}}>{l.quantite}</td>
+                    <td style={{padding:"7px 8px",textAlign:"right"}}>{fmt(l.prix_unitaire)}</td>
+                    <td style={{padding:"7px 6px",textAlign:"center",color:"#6b7280"}}>{rateOf(l).toString().replace(".",",")}%</td>
+                    <td style={{padding:"7px 10px",textAlign:"right",fontWeight:600}}>{fmt(total)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {/* Totaux */}
+          <div style={{display:"flex",justifyContent:"flex-end",marginBottom:16}}>
+            <table style={{fontSize:10,borderCollapse:"collapse",minWidth:260}}>
               <tbody>
-                {lignes.map(l=>{
-                  if(l.type_ligne==="lot") return (
-                    <tr key={l.id} style={{background:"#1e293b"}}>
-                      <td colSpan={5} style={{padding:"7px 10px",fontWeight:700,fontSize:11,color:"white",letterSpacing:".5px",fontFamily}}>{l.designation}</td>
-                    </tr>
-                  );
-                  return (
-                    <tr key={l.id} style={{borderBottom:"1px solid #f8fafc"}}>
-                      <td style={{padding:"7px 10px",fontSize:11,color:"#1e293b",fontFamily}}>{l.designation}</td>
-                      <td style={{padding:"7px 6px",fontSize:11,color:"#374151",textAlign:"center"}}>{l.quantite}</td>
-                      <td style={{padding:"7px 6px",fontSize:11,color:"#94a3b8",textAlign:"center"}}>{l.unite}</td>
-                      <td style={{padding:"7px 6px",fontSize:11,color:"#374151",textAlign:"right"}}>{fmt(l.prix_unitaire)}</td>
-                      <td style={{padding:"7px 10px",fontSize:11,fontWeight:600,color:"#0f172a",textAlign:"right"}}>{fmt(l.quantite*(l.prix_unitaire||0))}</td>
-                    </tr>
-                  );
-                })}
+                <tr><td style={{padding:"4px 10px",color:"#4b5563"}}>Total HT</td><td style={{padding:"4px 10px",textAlign:"right",fontWeight:600}}>{fmt(ht)}</td></tr>
+                {tvaRows.map(row=>(
+                  <tr key={row.rate}>
+                    <td style={{padding:"4px 10px",color:"#4b5563"}}>
+                      TVA {row.rate.toString().replace(".",",")}%
+                      <span style={{color:"#9ca3af",fontSize:9,marginLeft:4}}>(sur {fmt(row.base)})</span>
+                    </td>
+                    <td style={{padding:"4px 10px",textAlign:"right"}}>{fmt(row.montant)}</td>
+                  </tr>
+                ))}
+                <tr style={{background:"#eef2f7",borderTop:`2px solid ${navy}`}}>
+                  <td style={{padding:"8px 10px",fontWeight:800,color:navy,fontSize:11}}>TOTAL TTC</td>
+                  <td style={{padding:"8px 10px",textAlign:"right",fontWeight:800,color:navy,fontSize:12}}>{fmt(ttc)}</td>
+                </tr>
               </tbody>
             </table>
-
-            {/* Totaux */}
-            <div style={{marginTop:16,display:"flex",justifyContent:"flex-end"}}>
-              <div style={{width:220}}>
-                {[["Total HT",fmt(ht)],["TVA 20 %",fmt(tva)]].map(([k,v])=>(
-                  <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #f1f5f9"}}>
-                    <span style={{fontSize:11,color:"#64748b",fontFamily}}>{k}</span>
-                    <span style={{fontSize:11,color:"#374151",fontFamily}}>{v}</span>
-                  </div>
-                ))}
-                <div style={{display:"flex",justifyContent:"space-between",padding:"10px 0",marginTop:4}}>
-                  <span style={{fontSize:13,fontWeight:700,color:"#0f172a",fontFamily}}>Total TTC</span>
-                  <span style={{fontSize:15,fontWeight:800,color:ac,fontFamily}}>{fmt(ttc)}</span>
-                </div>
-              </div>
-            </div>
           </div>
 
-          {/* Conditions paiement + RIB */}
-          {(brand.paymentTerms||brand.rib)&&(
-            <div style={{padding:"16px 28px",borderTop:"1px solid #f1f5f9",background:"#fafafa"}}>
-              {brand.paymentTerms&&<div style={{marginBottom:10}}>
-                <div style={{fontSize:9,color:"#94a3b8",fontWeight:700,letterSpacing:"1px",marginBottom:4}}>CONDITIONS DE PAIEMENT</div>
-                <div style={{fontSize:11,color:"#374151",fontFamily}}>{brand.paymentTerms}</div>
-              </div>}
-              {brand.rib&&<div>
-                <div style={{fontSize:9,color:"#94a3b8",fontWeight:700,letterSpacing:"1px",marginBottom:4}}>COORDONNÉES BANCAIRES</div>
-                <div style={{fontSize:11,color:"#374151",fontFamily}}>{brand.rib}</div>
-                {brand.iban&&<div style={{fontSize:10,color:"#64748b",fontFamily:"monospace",marginTop:2}}>IBAN : {brand.iban}</div>}
-                {brand.bic&&<div style={{fontSize:10,color:"#64748b",fontFamily:"monospace"}}>BIC : {brand.bic}</div>}
-              </div>}
+          {/* Observations */}
+          {(d.observations||brand.defaultObservations)&&(
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:11,fontWeight:700,color:navy,marginBottom:4}}>OBSERVATIONS</div>
+              <div style={{fontSize:10,color:"#374151",lineHeight:1.6}}>{d.observations||brand.defaultObservations}</div>
+            </div>
+          )}
+
+          {/* Conditions */}
+          {brand.paymentTerms&&(
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:11,fontWeight:700,color:navy,marginBottom:4}}>CONDITIONS</div>
+              <div style={{fontSize:10,color:"#374151",lineHeight:1.6}}>{brand.paymentTerms}</div>
+            </div>
+          )}
+
+          {/* RIB */}
+          {brand.rib&&(
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:11,fontWeight:700,color:navy,marginBottom:4}}>COORDONNÉES BANCAIRES</div>
+              <div style={{fontSize:10,color:"#374151"}}>{brand.rib}</div>
+              {brand.iban&&<div style={{fontSize:9,color:"#4b5563",fontFamily:"monospace"}}>IBAN : {brand.iban}</div>}
+              {brand.bic&&<div style={{fontSize:9,color:"#4b5563",fontFamily:"monospace"}}>BIC : {brand.bic}</div>}
             </div>
           )}
 
           {/* Signature */}
-          <div style={{padding:"16px 28px",borderTop:"1px solid #f1f5f9",display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
-            <div style={{width:"45%"}}>
-              <div style={{fontSize:9,color:"#94a3b8",fontWeight:700,letterSpacing:"1px",marginBottom:8}}>SIGNATURE CLIENT</div>
-              <div style={{height:60,border:"1px dashed #cbd5e1",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                <span style={{fontSize:10,color:"#cbd5e1"}}>Bon pour accord</span>
-              </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginTop:20,paddingTop:14,borderTop:"1px solid #d4d4d8"}}>
+            <div>
+              <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>SIGNATURE CLIENT · Bon pour accord</div>
+              <div style={{height:60,borderBottom:"1px solid #9ca3af"}}/>
             </div>
-            <div style={{textAlign:"right"}}>
-              <div style={{fontSize:9,color:"#94a3b8"}}>Date de signature</div>
-              <div style={{height:28,width:120,borderBottom:"1px solid #e2e8f0",marginTop:8}}/>
+            <div>
+              <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>DATE</div>
+              <div style={{height:60,borderBottom:"1px solid #9ca3af"}}/>
             </div>
           </div>
 
-          {/* Mentions légales */}
-          {brand.mentionsLegales&&(
-            <div style={{padding:"12px 28px",borderTop:"1px solid #f1f5f9",background:"#f8fafc"}}>
-              <div style={{fontSize:8,color:"#94a3b8",lineHeight:1.6}}>{brand.mentionsLegales}</div>
+          {/* Footer mentions + SIRET */}
+          <div style={{marginTop:18,paddingTop:10,borderTop:"1px solid #e5e7eb",display:"flex",justifyContent:"space-between",gap:10,fontSize:8,color:"#9ca3af",lineHeight:1.5}}>
+            <div style={{flex:1}}>
+              {brand.mentionsLegales}
+              {brand.siret && <div>SIRET {brand.siret}</div>}
             </div>
-          )}
-
-          {/* Footer SIRET */}
-          <div style={{background:ac,padding:"10px 28px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{color:"rgba(255,255,255,.7)",fontSize:8}}>{brand.companyName}{brand.siret&&` — SIRET ${brand.siret}`}{brand.tva&&` — TVA ${brand.tva}`}</span>
-            <span style={{color:"rgba(255,255,255,.5)",fontSize:8}}>Document généré via Zenbat</span>
+            <div style={{textAlign:"right"}}>Généré via Zenbat</div>
           </div>
+        </div>
         </div>
       </div>
     </div>
@@ -813,7 +1010,7 @@ function DevisDetail({d,cl,onBack,brand,onChange}) {
 // ══════════════════════════════════════════════════════════
 //  AGENT IA — lignes qui pop une par une
 // ══════════════════════════════════════════════════════════
-function AgentIA({devis,setDevis,clients,plan,aiUsed,setAiUsed,onPaywall,setTab,brand}) {
+function AgentIA({devis,setDevis,clients,plan,trialExpired,onPaywall,setTab,brand}) {
   const greeting = TX.agentGreeting;
   const [msgs,    setMsgs]   = useState([{role:"assistant",content:TX.agentGreeting}]);
   const [input,   setInput]  = useState("");
@@ -837,27 +1034,61 @@ function AgentIA({devis,setDevis,clients,plan,aiUsed,setAiUsed,onPaywall,setTab,
   },[lignes]);
 
   const ht = lignes.filter(l=>l.type_ligne==="ouvrage").reduce((s,l)=>s+(l.quantite*(l.prix_unitaire||0)),0);
+  const tvaGroupsEditor = lignes.filter(l=>l.type_ligne==="ouvrage").reduce((a,l)=>{
+    const r = Number(l.tva_rate ?? 20);
+    a[r] = (a[r]||0) + (l.quantite||0)*(l.prix_unitaire||0);
+    return a;
+  },{});
+  const tvaRowsEditor = Object.keys(tvaGroupsEditor).map(r=>Number(r)).sort((a,b)=>a-b).map(r=>({
+    rate: r, base: tvaGroupsEditor[r], montant: tvaGroupsEditor[r]*(r/100)
+  }));
+  const tvaTotalEditor = tvaRowsEditor.reduce((s,r)=>s+r.montant,0);
+  const ttcEditor = ht + tvaTotalEditor;
 
   const send = async () => {
     if(!input.trim()||loading) return;
-    if(plan==="free"&&aiUsed>=2){onPaywall();return;}
+    if(trialExpired){onPaywall();return;}
     const userMsg={role:"user",content:input};
     const newMsgs=[...msgs,userMsg];
-    setMsgs(newMsgs); setInput(""); setLoading(true); setAiUsed(n=>n+1);
+    setMsgs(newMsgs); setInput(""); setLoading(true);
     try {
+      const tradeNames = tradesLabels(brand.trades);
+      const tradesBlock = tradeNames.length
+        ? `\n\nSPÉCIALISATION DE L'ENTREPRISE — RÈGLE ABSOLUE :
+L'entreprise est spécialisée UNIQUEMENT dans les métiers suivants : ${tradeNames.join(", ")}.
+- Tu génères UNIQUEMENT des devis pour ces métiers.
+- Si la demande sort de ce périmètre (ex : peinture demandée mais entreprise = plomberie), tu REFUSES poliment et tu ne renvoies AUCUNE balise <DEVIS>. Tu réponds en français : "Désolé, ${brand.companyName||"l'entreprise"} ne réalise pas ce type de travaux. Nous sommes spécialisés en : ${tradeNames.join(", ")}. Souhaitez-vous un devis dans l'un de ces domaines ?"
+- Pour les demandes mixtes (ex : rénovation salle de bain alors que l'entreprise fait plomberie + carrelage), tu génères uniquement les lignes qui correspondent à tes métiers et tu signales en une phrase courte ce qui n'a pas été inclus.
+- En cas de doute léger (ex : un travail à la frontière de l'un de tes métiers), accepte et précise-le brièvement.`
+        : "";
       const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,
-          system:`Tu es un assistant expert BTP France intégré dans l'application Zenbat.
+          system:`Tu es un assistant expert BTP France intégré dans l'application Zenbat.${tradesBlock}
 
-LANGUE : Tu comprends toutes les langues (arabe, darija, espagnol, portugais, anglais, etc.) mais tu réponds TOUJOURS en français, sans exception. Si l'utilisateur écrit en arabe ou dans une autre langue, tu comprends ce qu'il dit et tu réponds en français. Le devis est toujours rédigé en français professionnel.
+LANGUE — RÈGLE ABSOLUE :
+1. Tu comprends TOUTES les langues : français, arabe littéraire, darija marocaine, kabyle, espagnol, portugais, anglais, roumain, polonais, turc, wolof, bambara, tamoul, ourdou, hindi, chinois, russe, ukrainien, italien, allemand, etc. Tu comprends aussi les mélanges de langues et le français phonétique.
+2. Tu réponds TOUJOURS en français professionnel, 100% du temps, SANS EXCEPTION, même si l'utilisateur écrit dans une autre langue. N'utilise JAMAIS un seul mot dans la langue d'origine de l'utilisateur.
+3. Tu TRADUIS systématiquement en français toutes les prestations décrites, quel que soit la langue d'entrée. Exemples :
+   - "zellige f l'7amam" (darija) → "Pose de zellige dans la salle de bain"
+   - "tile the bathroom floor" (anglais) → "Pose de carrelage au sol de la salle de bain"
+   - "pintar las paredes" (espagnol) → "Peinture des murs"
+   - "دهان الجدران" (arabe) → "Peinture des murs"
+4. Le JSON (objet, lots, désignations, unités) est TOUJOURS rédigé en français normé du bâtiment. Aucune trace de la langue d'origine ne doit apparaître. Utilise la terminologie technique française du BTP (ex : "cloison placo BA13", "chape de ravoirage", "enduit de finition").
+5. Le message conversationnel (hors balises <DEVIS>) est lui aussi 100% en français.
 
 TÂCHE : L'utilisateur décrit des travaux à devisser. TOUJOURS répondre avec un JSON entre <DEVIS></DEVIS> même si c'est une seule ligne.
-Si l'utilisateur donne un prix unitaire explicite, utilise-le EXACTEMENT.
+Si l'utilisateur donne un prix unitaire explicite, utilise-le EXACTEMENT (quelle que soit la langue dans laquelle il l'a écrit).
 
 Format strict : {"objet":"titre court en français","lignes":[
   {"type_ligne":"lot","designation":"NOM DU LOT EN FRANÇAIS"},
-  {"type_ligne":"ouvrage","lot":"nom lot","designation":"description en français","unite":"m2|ml|u|m3|fg|ens","quantite":10,"prix_unitaire":25}
+  {"type_ligne":"ouvrage","lot":"nom lot","designation":"description en français","unite":"m2|ml|u|m3|fg|ens","quantite":10,"prix_unitaire":25,"tva_rate":20}
 ]}
+
+TVA : applique le taux correct par ouvrage selon la réglementation française :
+- 5.5% : travaux d'amélioration de la qualité énergétique (isolation thermique, pompe à chaleur, chaudière à haute performance, fenêtres isolantes dans logement >2 ans).
+- 10% : travaux d'entretien/rénovation/amélioration dans logement d'habitation achevé depuis plus de 2 ans (peinture, plomberie courante, carrelage, revêtements sols/murs, cuisine, salle de bain).
+- 20% : neuf, gros œuvre, démolition/évacuation, logement <2 ans, locaux professionnels, fournitures livrées sans pose.
+Mets "tva_rate":5.5, 10 ou 20 (nombre sans guillemets, sans %) pour CHAQUE ligne "ouvrage". En cas de doute, utilise 10.
 
 Règles : prix réalistes BTP France 2025, groupe par lots, désignations professionnelles en français.
 Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génère quand même un JSON partiel.`,
@@ -972,7 +1203,20 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
                     <tr key={l.id} style={{borderBottom:"1px solid #f8fafc",animation:"rowPop .3s cubic-bezier(.34,1.3,.64,1) both",animationDelay:`${idx*0.06}s`}}>
                       <td style={{padding:"8px 14px"}}>
                         <div style={{fontSize:12,fontWeight:500,color:"#1e293b",fontFamily}}>{l.designation}</div>
-                        <div style={{fontSize:10,color:"#94a3b8",marginTop:1}}>{l.unite}</div>
+                        <div style={{fontSize:10,color:"#94a3b8",marginTop:1,display:"flex",alignItems:"center",gap:6}}>
+                          <span>{l.unite}</span>
+                          <button
+                            onClick={()=>{
+                              const cycle = [20, 10, 5.5];
+                              const cur = Number(l.tva_rate ?? 20);
+                              const next = cycle[(cycle.indexOf(cur)+1) % cycle.length];
+                              setLignes(prev=>prev.map(x=>x.id===l.id?{...x,tva_rate:next}:x));
+                            }}
+                            title="Cliquer pour changer le taux de TVA"
+                            style={{background:"#eef2f7",color:"#475569",border:"none",borderRadius:4,padding:"1px 6px",fontSize:9,fontWeight:600,cursor:"pointer"}}>
+                            TVA {(l.tva_rate ?? 20).toString().replace(".",",")}%
+                          </button>
+                        </div>
                       </td>
                       <td style={{padding:"8px",textAlign:"right",fontSize:12,color:"#374151",fontWeight:600}}>{l.quantite}</td>
                       <td style={{padding:"8px",textAlign:"right",fontSize:11,color:"#64748b"}}>{fmt(l.prix_unitaire)}</td>
@@ -1000,14 +1244,18 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
                     <td style={{padding:"8px 14px",textAlign:"right",fontSize:14,fontWeight:800,color:ac,fontFamily,animation:"totalCount .4s ease both"}}>{fmt(ht)}</td>
                     <td/>
                   </tr>
-                  <tr style={{background:"#f8fafc"}}>
-                    <td colSpan={3} style={{padding:"4px 14px 8px",fontSize:11,color:"#64748b"}}>TVA 20%</td>
-                    <td style={{padding:"4px 14px 8px",textAlign:"right",fontSize:11,color:"#64748b"}}>{fmt(ht*.2)}</td>
-                    <td/>
-                  </tr>
+                  {tvaRowsEditor.map(row=>(
+                    <tr key={row.rate} style={{background:"#f8fafc"}}>
+                      <td colSpan={3} style={{padding:"4px 14px",fontSize:11,color:"#64748b"}}>
+                        TVA {row.rate.toString().replace(".",",")}% <span style={{color:"#cbd5e1",fontSize:10}}>(sur {fmt(row.base)})</span>
+                      </td>
+                      <td style={{padding:"4px 14px",textAlign:"right",fontSize:11,color:"#64748b"}}>{fmt(row.montant)}</td>
+                      <td/>
+                    </tr>
+                  ))}
                   <tr style={{background:ac}}>
                     <td colSpan={3} style={{padding:"8px 14px",fontSize:13,fontWeight:800,color:"white",fontFamily}}>Total TTC</td>
-                    <td style={{padding:"8px 14px",textAlign:"right",fontSize:15,fontWeight:800,color:"white",fontFamily}}>{fmt(ht*1.2)}</td>
+                    <td style={{padding:"8px 14px",textAlign:"right",fontSize:15,fontWeight:800,color:"white",fontFamily}}>{fmt(ttcEditor)}</td>
                     <td/>
                   </tr>
                 </tfoot>
@@ -1148,14 +1396,15 @@ function AuthScreen({onEnter}) {
   );
 }
 
-function PaywallScreen({onBack,onSubscribe}) {
+function PaywallScreen({daysLeft=0,onBack,onSubscribe}) {
+  const expired = daysLeft <= 0;
   return (
     <div style={{minHeight:"100vh",background:"#0f172a",display:"flex",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"'DM Sans',sans-serif"}}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}`}</style>
       <div style={{width:"100%",maxWidth:360,textAlign:"center"}}>
         <div style={{marginBottom:20,fontSize:32,fontWeight:800}}><span style={{color:"#22c55e"}}>Zen</span><span style={{color:"white"}}>bat</span></div>
-        <h2 style={{color:"white",fontSize:20,fontWeight:700,marginBottom:8}}>Essais IA épuisés</h2>
-        <p style={{color:"#64748b",fontSize:13,marginBottom:24,lineHeight:1.6}}>Vos 2 générations gratuites ce mois sont utilisées.</p>
+        <h2 style={{color:"white",fontSize:20,fontWeight:700,marginBottom:8}}>{expired?"Période d'essai terminée":`Encore ${daysLeft} jour${daysLeft>1?"s":""} d'essai`}</h2>
+        <p style={{color:"#64748b",fontSize:13,marginBottom:24,lineHeight:1.6}}>{expired?"Votre essai gratuit de 30 jours est terminé. Passez à Zenbat Pro pour continuer à utiliser l'Agent IA, le PDF brandé et l'envoi en signature.":"Profitez de toutes les fonctionnalités gratuitement pendant votre essai. Passez à Pro à tout moment."}</p>
         <div style={{background:"white",borderRadius:24,padding:22,textAlign:"left",marginBottom:14,boxShadow:"0 24px 48px rgba(0,0,0,.3)"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
             <div><div style={{fontWeight:700,fontSize:16,color:"#0f172a"}}>Zenbat Pro</div><div style={{color:"#94a3b8",fontSize:11,marginTop:2}}>Pour artisans et entreprises BTP</div></div>
