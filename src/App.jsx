@@ -78,9 +78,9 @@ const TX = {
   aiAgent:"Agent IA — Créer un devis", aiDesc:"Décrivez les travaux, je génère le devis",
   signedCA:"CA signé HT", inProgress:"En cours", accepted:"Acceptés",
   saveQuote:"✓ Enregistrer le devis", clearQuote:"🗑 Effacer",
-  inputPlaceholder:"Ex : pose carrelage 25€/m² · 40m²  ou  peinture murs 12€/m²…",
+  inputPlaceholder:"Décris les travaux dans ta langue — réponse en français",
   inputHint:"Entrée pour envoyer · les lignes s'ajoutent en direct",
-  agentGreeting:"Bonjour 👋 Décrivez-moi les travaux ligne par ligne.\n\nEx : *Pose carrelage 25€/m² pour 40m², fourniture carrelage 18€/m²*",
+  agentGreeting:"Bonjour 👋 Décrivez-moi les travaux ligne par ligne, dans la langue de votre choix (français, arabe, darija, espagnol, anglais, portugais…). Je rédige systématiquement le devis en français professionnel.\n\nEx : *Pose carrelage 25€/m² pour 40m², fourniture carrelage 18€/m²*",
   errNetwork:"Pas de connexion internet. Vérifiez votre réseau et réessayez.",
   errApi:"L'assistant IA ne répond pas. Réessayez dans quelques secondes.",
   errGeneral:"Quelque chose s'est mal passé. Réessayez.",
@@ -959,10 +959,19 @@ function AgentIA({devis,setDevis,clients,plan,aiUsed,setAiUsed,onPaywall,setTab,
         body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,
           system:`Tu es un assistant expert BTP France intégré dans l'application Zenbat.
 
-LANGUE : Tu comprends toutes les langues (arabe, darija, espagnol, portugais, anglais, etc.) mais tu réponds TOUJOURS en français, sans exception. Si l'utilisateur écrit en arabe ou dans une autre langue, tu comprends ce qu'il dit et tu réponds en français. Le devis est toujours rédigé en français professionnel.
+LANGUE — RÈGLE ABSOLUE :
+1. Tu comprends TOUTES les langues : français, arabe littéraire, darija marocaine, kabyle, espagnol, portugais, anglais, roumain, polonais, turc, wolof, bambara, tamoul, ourdou, hindi, chinois, russe, ukrainien, italien, allemand, etc. Tu comprends aussi les mélanges de langues et le français phonétique.
+2. Tu réponds TOUJOURS en français professionnel, 100% du temps, SANS EXCEPTION, même si l'utilisateur écrit dans une autre langue. N'utilise JAMAIS un seul mot dans la langue d'origine de l'utilisateur.
+3. Tu TRADUIS systématiquement en français toutes les prestations décrites, quel que soit la langue d'entrée. Exemples :
+   - "zellige f l'7amam" (darija) → "Pose de zellige dans la salle de bain"
+   - "tile the bathroom floor" (anglais) → "Pose de carrelage au sol de la salle de bain"
+   - "pintar las paredes" (espagnol) → "Peinture des murs"
+   - "دهان الجدران" (arabe) → "Peinture des murs"
+4. Le JSON (objet, lots, désignations, unités) est TOUJOURS rédigé en français normé du bâtiment. Aucune trace de la langue d'origine ne doit apparaître. Utilise la terminologie technique française du BTP (ex : "cloison placo BA13", "chape de ravoirage", "enduit de finition").
+5. Le message conversationnel (hors balises <DEVIS>) est lui aussi 100% en français.
 
 TÂCHE : L'utilisateur décrit des travaux à devisser. TOUJOURS répondre avec un JSON entre <DEVIS></DEVIS> même si c'est une seule ligne.
-Si l'utilisateur donne un prix unitaire explicite, utilise-le EXACTEMENT.
+Si l'utilisateur donne un prix unitaire explicite, utilise-le EXACTEMENT (quelle que soit la langue dans laquelle il l'a écrit).
 
 Format strict : {"objet":"titre court en français","lignes":[
   {"type_ligne":"lot","designation":"NOM DU LOT EN FRANÇAIS"},
