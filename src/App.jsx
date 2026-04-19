@@ -519,17 +519,17 @@ function PDFViewer({d, cl, brand, onClose}) {
             </div>
           </div>
 
-          {/* Boxes MAÎTRE D'OUVRAGE / ENTREPRISE */}
+          {/* Boxes ENTREPRISE / MAÎTRE D'OUVRAGE */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
-            <div style={{border:"1px solid #d4d4d8",borderRadius:4,padding:"10px 12px",minHeight:110}}>
-              <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>MAÎTRE D'OUVRAGE</div>
-              <div style={{fontSize:13,fontWeight:700,color:"#111",marginBottom:4}}>{clientName}</div>
-              {clientLines.map((line,i)=>(<div key={i} style={{fontSize:10,color:"#4b5563",lineHeight:1.6}}>{line}</div>))}
-            </div>
             <div style={{border:"1px solid #d4d4d8",borderRadius:4,padding:"10px 12px",minHeight:110}}>
               <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>ENTREPRISE</div>
               <div style={{fontSize:13,fontWeight:700,color:"#111",marginBottom:4}}>{brand.companyName||"—"}</div>
               {companyLines.map((line,i)=>(<div key={i} style={{fontSize:10,color:"#4b5563",lineHeight:1.6}}>{line}</div>))}
+            </div>
+            <div style={{border:"1px solid #d4d4d8",borderRadius:4,padding:"10px 12px",minHeight:110}}>
+              <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>MAÎTRE D'OUVRAGE</div>
+              <div style={{fontSize:13,fontWeight:700,color:"#111",marginBottom:4}}>{clientName}</div>
+              {clientLines.map((line,i)=>(<div key={i} style={{fontSize:10,color:"#4b5563",lineHeight:1.6}}>{line}</div>))}
             </div>
           </div>
 
