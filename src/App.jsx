@@ -129,7 +129,7 @@ export default function App() {
   if (screen==="paywall")    return <PaywallScreen onBack={()=>setScreen("app")} onSubscribe={()=>{setPlan("pro");setScreen("app");}}/>;
 
   return (
-    <div style={{fontFamily:"'DM Sans',sans-serif",height:"100vh",display:"flex",flexDirection:"column",background:"#f8fafc",overflow:"hidden"}}>
+    <div style={{fontFamily:"'DM Sans',sans-serif",height:"100dvh",display:"flex",flexDirection:"column",background:"#f8fafc",overflow:"hidden"}}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700&family=Space+Grotesk:wght@400;600;700&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
@@ -903,7 +903,7 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
   const visibleLignes = lignes.slice(0,visibleCount);
 
   return (
-    <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 110px)",background:"#f8fafc"}}>
+    <div style={{display:"flex",flexDirection:"column",height:"100%",background:"#f8fafc"}}>
       <style>{`
         @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
         @keyframes slideIn{from{opacity:0;transform:translateX(-14px) scale(.97)}to{opacity:1;transform:translateX(0) scale(1)}}
