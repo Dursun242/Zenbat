@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useAuth } from "./lib/auth.jsx";
 
 const fmt  = n => new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR"}).format(n||0);
 const fmtD = d => d ? new Date(d).toLocaleDateString("fr-FR") : "—";
@@ -105,14 +106,18 @@ export default function App() {
   const [selC,   setSelC]   = useState(null);
   const [plan,   setPlan]   = useState("free");
   const TRIAL_DAYS = 30;
-  const [trialStart] = useState(() => {
+  const { user } = useAuth();
+  // L'essai démarre à la date de création du compte Supabase (auth.users.created_at).
+  // Fallback localStorage si pas encore d'utilisateur (rendu pendant le chargement de la session).
+  const trialStart = (() => {
+    if (user?.created_at) return new Date(user.created_at).getTime();
     if (typeof window === "undefined") return Date.now();
     const stored = localStorage.getItem("zenbat_trial_start");
     if (stored) return Number(stored);
     const now = Date.now();
     localStorage.setItem("zenbat_trial_start", String(now));
     return now;
-  });
+  })();
   const daysLeft = Math.max(0, TRIAL_DAYS - Math.floor((Date.now() - trialStart) / 86400000));
   const trialExpired = plan === "free" && daysLeft === 0;
 
