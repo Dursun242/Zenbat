@@ -396,6 +396,42 @@ function Field({dark,label,val,onChange,placeholder,type="text"}) {
 //  PDF LIVE VIEWER (simulé avec HTML)
 // ══════════════════════════════════════════════════════════
 function PDFViewer({d, cl, brand, onClose}) {
+  const MM_TO_PX = 3.7795275591;
+  const A4_PX = 210 * MM_TO_PX;
+  const wrapRef = useRef(null);
+  const pageRef = useRef(null);
+  const [fitScale, setFitScale] = useState(() => {
+    if (typeof window === "undefined") return 1;
+    const avail = Math.max(240, window.innerWidth - 32);
+    return Math.min(1, avail / A4_PX);
+  });
+  const [userZoom, setUserZoom] = useState(1);
+  const scale = fitScale * userZoom;
+  const [pageH, setPageH] = useState(null);
+
+  useEffect(() => {
+    if (!wrapRef.current) return;
+    const compute = () => {
+      const w = wrapRef.current?.clientWidth || (window.innerWidth - 32);
+      setFitScale(Math.min(1, w / A4_PX));
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(wrapRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!pageRef.current) return;
+    const measure = () => {
+      const h = pageRef.current?.offsetHeight || 0;
+      setPageH(h * scale);
+    };
+    measure();
+    const id = setTimeout(measure, 50);
+    return () => clearTimeout(id);
+  }, [scale, d.numero]);
+
   const lignes = d.lignes?.length ? d.lignes : DEMO_LIGNES;
   const ouvrages = lignes.filter(l=>l.type_ligne==="ouvrage");
   const rateOf = (l)=> Number(l.tva_rate ?? d.tva_rate ?? 20);
@@ -444,7 +480,8 @@ function PDFViewer({d, cl, brand, onClose}) {
           .pdf-modal { position: static !important; background: white !important; }
           .pdf-modal .pdf-toolbar { display: none !important; }
           .pdf-modal .pdf-scroll { overflow: visible !important; padding: 0 !important; background: white !important; }
-          .pdf-modal .pdf-page { box-shadow: none !important; margin: 0 !important; border-radius: 0 !important; width: 210mm !important; min-height: 297mm !important; max-width: none !important; }
+          .pdf-modal .pdf-page-wrap { width: auto !important; height: auto !important; }
+          .pdf-modal .pdf-page { transform: none !important; position: static !important; box-shadow: none !important; margin: 0 !important; border-radius: 0 !important; width: 210mm !important; min-height: 297mm !important; max-width: none !important; }
         }
       `}</style>
 
@@ -453,14 +490,20 @@ function PDFViewer({d, cl, brand, onClose}) {
           <div style={{color:"#22c55e"}}>{I.pdf}</div>
           <span style={{color:"white",fontSize:13,fontWeight:600}}>{d.numero}.pdf</span>
         </div>
-        <div style={{display:"flex",gap:8}}>
-          <button onClick={()=>window.print()} style={{background:"#22c55e",color:"white",border:"none",borderRadius:10,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>⬇ Télécharger</button>
-          <button onClick={onClose} style={{background:"#1e293b",color:"#94a3b8",border:"none",borderRadius:10,padding:"7px 12px",cursor:"pointer"}}>{I.x}</button>
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          <div style={{display:"flex",background:"#1e293b",borderRadius:10,overflow:"hidden"}}>
+            <button onClick={()=>setUserZoom(z=>Math.max(0.5, +(z-0.25).toFixed(2)))} style={{background:"none",border:"none",color:"#94a3b8",width:30,height:30,fontSize:16,cursor:"pointer",padding:0}} aria-label="Dézoomer">−</button>
+            <button onClick={()=>setUserZoom(1)} style={{background:"none",border:"none",color:"#94a3b8",padding:"0 8px",fontSize:11,fontWeight:600,cursor:"pointer",minWidth:44}} aria-label="Réinitialiser zoom">{Math.round(scale*100)}%</button>
+            <button onClick={()=>setUserZoom(z=>Math.min(3, +(z+0.25).toFixed(2)))} style={{background:"none",border:"none",color:"#94a3b8",width:30,height:30,fontSize:16,cursor:"pointer",padding:0}} aria-label="Zoomer">+</button>
+          </div>
+          <button onClick={()=>window.print()} style={{background:"#22c55e",color:"white",border:"none",borderRadius:10,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>⬇</button>
+          <button onClick={onClose} style={{background:"#1e293b",color:"#94a3b8",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer"}}>{I.x}</button>
         </div>
       </div>
 
-      <div className="pdf-scroll" style={{flex:1,overflowY:"auto",padding:"20px 16px calc(20px + env(safe-area-inset-bottom))",background:"#1e293b"}}>
-        <div className="pdf-page" style={{background:"white",width:"210mm",minHeight:"297mm",margin:"0 auto",boxShadow:"0 20px 60px rgba(0,0,0,.5)",padding:"15mm",fontFamily,color:"#1a1a1a",fontSize:11,lineHeight:1.5,boxSizing:"border-box"}}>
+      <div className="pdf-scroll" ref={wrapRef} style={{flex:1,overflow:"auto",padding:"16px 16px calc(20px + env(safe-area-inset-bottom))",background:"#1e293b"}}>
+        <div className="pdf-page-wrap" style={{width:`calc(210mm * ${scale})`,height:pageH?`${pageH}px`:"auto",margin:"0 auto",position:"relative"}}>
+        <div ref={pageRef} className="pdf-page" style={{background:"white",width:"210mm",minHeight:"297mm",boxShadow:"0 20px 60px rgba(0,0,0,.5)",padding:"15mm",fontFamily,color:"#1a1a1a",fontSize:11,lineHeight:1.5,boxSizing:"border-box",transform:`scale(${scale})`,transformOrigin:"top left",position:"absolute",top:0,left:0}}>
 
           {/* En-tête : n° devis + dates */}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:18,paddingBottom:12,borderBottom:`2px solid ${navy}`}}>
@@ -601,6 +644,7 @@ function PDFViewer({d, cl, brand, onClose}) {
             </div>
             <div style={{textAlign:"right"}}>Généré via Zenbat</div>
           </div>
+        </div>
         </div>
       </div>
     </div>
