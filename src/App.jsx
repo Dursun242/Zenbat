@@ -173,7 +173,7 @@ export default function App() {
         input,textarea,select,button{font-family:inherit}
       `}</style>
 
-      <header style={{background:"#0f172a",padding:"10px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+      <header style={{background:"#0f172a",padding:"calc(10px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 10px calc(18px + env(safe-area-inset-left))",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
         <Logo size={20} white/>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <button onClick={()=>setScreen("onboarding")}
@@ -187,7 +187,7 @@ export default function App() {
         </div>
       </header>
 
-      <div style={{flex:1,overflowY:"auto",paddingBottom:64}}>
+      <div style={{flex:1,overflowY:"auto",paddingBottom:"calc(64px + env(safe-area-inset-bottom))"}}>
         {tab==="dashboard"    && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}/>}
         {tab==="clients"      && <ClientsList clients={clients} goClient={goClient}/>}
         {tab==="client_detail"&& selC && <ClientDetail c={clients.find(x=>x.id===selC)} clientDevis={devis.filter(d=>d.client_id===selC)} onBack={()=>setTab("clients")} goDevis={goDevis}/>}
@@ -202,7 +202,7 @@ export default function App() {
 
       <HelpButton tab={tab}/>
 
-      <nav style={{position:"fixed",bottom:0,left:0,right:0,background:"#0f172a",borderTop:"1px solid rgba(255,255,255,.06)",display:"flex",zIndex:50}}>
+      <nav style={{position:"fixed",bottom:0,left:0,right:0,paddingBottom:"env(safe-area-inset-bottom)",background:"#0f172a",borderTop:"1px solid rgba(255,255,255,.06)",display:"flex",zIndex:50}}>
         {NAV.map(({id,label,icon})=>{
           const active=activeNav===id;
           return (
