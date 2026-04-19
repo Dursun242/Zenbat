@@ -208,8 +208,8 @@ export default function App() {
 
       <div style={{flex:1,overflowY:"auto",paddingBottom:"calc(64px + env(safe-area-inset-bottom))"}}>
         {tab==="dashboard"    && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}/>}
-        {tab==="clients"      && <ClientsList clients={clients} goClient={goClient}/>}
-        {tab==="client_detail"&& selC && <ClientDetail c={clients.find(x=>x.id===selC)} clientDevis={devis.filter(d=>d.client_id===selC)} onBack={()=>setTab("clients")} goDevis={goDevis}/>}
+        {tab==="clients"      && <ClientsList clients={clients} setClients={setClients} goClient={goClient}/>}
+        {tab==="client_detail"&& selC && <ClientDetail c={clients.find(x=>x.id===selC)} clientDevis={devis.filter(d=>d.client_id===selC)} onBack={()=>setTab("clients")} goDevis={goDevis} onUpdate={u=>setClients(cs=>cs.map(x=>x.id===selC?u:x))} onDelete={()=>{setClients(cs=>cs.filter(x=>x.id!==selC));setTab("clients");}}/>}
         {tab==="devis"        && <DevisList devis={devis} clients={clients} goDevis={goDevis} setTab={setTab}/>}
         {tab==="devis_detail" && selD && (
           <DevisDetail d={devis.find(x=>x.id===selD)} cl={clients.find(c=>c.id===devis.find(x=>x.id===selD)?.client_id)}
@@ -802,45 +802,274 @@ function Dashboard({stats,devis,clients,goDevis,setTab,brand}) {
 // ══════════════════════════════════════════════════════════
 //  CLIENTS
 // ══════════════════════════════════════════════════════════
-function ClientsList({clients,goClient}) {
+// ══════════════════════════════════════════════════════════
+//  CLIENTS — liste + import photo + édition + suppression
+// ══════════════════════════════════════════════════════════
+
+const emptyClient = () => ({
+  id: uid(),
+  type: "particulier",
+  raison_sociale: "",
+  nom: "", prenom: "",
+  email: "", telephone: "", telephone_fixe: "",
+  adresse: "", code_postal: "", ville: "",
+  siret: "", tva_intra: "",
+  activite: "", notes: "",
+});
+
+const displayName = (c) => c?.raison_sociale?.trim() || `${c?.prenom||""} ${c?.nom||""}`.trim() || "—";
+
+function ClientsList({clients,setClients,goClient}) {
+  const [query, setQuery] = useState("");
+  const [editing, setEditing] = useState(null); // client en cours d'édition / création
+  const [importing, setImporting] = useState(false); // "loading" pendant l'analyse photo
+  const [importError, setImportError] = useState("");
+  const fileRef = useRef(null);
+
+  const filtered = clients.filter(c => {
+    if (!query.trim()) return true;
+    const q = query.toLowerCase();
+    return [c.raison_sociale, c.nom, c.prenom, c.email, c.telephone, c.ville, c.siret, c.activite]
+      .filter(Boolean).some(v => String(v).toLowerCase().includes(q));
+  });
+
+  const onFile = async (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = ""; // reset pour permettre la même photo deux fois
+    if (!f) return;
+    setImportError("");
+    setImporting(true);
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(f);
+      });
+      const dataUrl = String(base64);
+      const [, mediaType, b64] = dataUrl.match(/^data:([^;]+);base64,(.+)$/) || [];
+      if (!b64) throw new Error("format_image");
+
+      const res = await fetch("/api/claude", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 800,
+          system: `Tu extrais les informations d'un contact BTP depuis une photo (carte de visite, capture d'écran, en-tête de courrier, annuaire Pappers, etc.).
+Renvoie UNIQUEMENT un JSON valide entre <CONTACT></CONTACT>, sans texte autour.
+Format strict :
+{"type":"particulier|entreprise|artisan","raison_sociale":"","nom":"","prenom":"","email":"","telephone":"","telephone_fixe":"","adresse":"","code_postal":"","ville":"","siret":"","tva_intra":"","activite":""}
+Règles :
+- "type" : "artisan" ou "entreprise" si SIRET/raison sociale, sinon "particulier".
+- Numéros français : format "06 XX XX XX XX" (mobile commence par 06/07, fixe par 01-05/09).
+- Sépare "code_postal" (5 chiffres) de "ville".
+- "activite" : description courte de l'activité (ex : "Maçonnerie générale et gros œuvre").
+- Si un champ est illisible ou absent, laisse une chaîne vide "".
+- Jamais d'autre clé que celles listées.`,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: mediaType, data: b64 } },
+              { type: "text", text: "Extrais les informations de contact de cette image." },
+            ],
+          }],
+        }),
+      });
+      if (!res.ok) throw new Error("api");
+      const data = await res.json();
+      const raw = data.content?.[0]?.text || "";
+      const match = raw.match(/<CONTACT>([\s\S]*?)<\/CONTACT>/) || raw.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error("parse");
+      const parsed = JSON.parse((match[1] || match[0]).trim());
+      setEditing({ ...emptyClient(), ...parsed, id: uid() });
+    } catch (err) {
+      setImportError("Impossible d'analyser l'image. Essayez une photo plus nette ou saisissez manuellement.");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const saveContact = (c) => {
+    setClients(prev => prev.some(x=>x.id===c.id) ? prev.map(x=>x.id===c.id?c:x) : [c, ...prev]);
+    setEditing(null);
+  };
+
+  const deleteContact = (id) => {
+    if (!window.confirm("Supprimer ce contact ?")) return;
+    setClients(prev => prev.filter(x => x.id !== id));
+  };
+
   return (
     <div style={{padding:18}} className="fu">
-      <div style={{marginBottom:16}}><h1 style={{fontSize:20,fontWeight:700,color:"#0f172a"}}>Clients</h1></div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:700,color:"#0f172a"}}>Contacts</h1>
+          <p style={{color:"#94a3b8",fontSize:12,marginTop:2}}>{clients.length} contact{clients.length>1?"s":""}</p>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:14}}>
+        <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{display:"none"}}/>
+        <button onClick={()=>fileRef.current?.click()} disabled={importing}
+          style={{background:"#eef2ff",border:"1.5px solid #c7d2fe",borderRadius:14,padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"center",gap:8,color:"#4338ca",fontSize:13,fontWeight:600,cursor:importing?"wait":"pointer"}}>
+          {importing
+            ? <><span style={{display:"inline-block",width:14,height:14,border:"2px solid #c7d2fe",borderTopColor:"#4338ca",borderRadius:"50%",animation:"spin .8s linear infinite"}}/> Analyse en cours…</>
+            : <>📷 Importer photo / capture</>
+          }
+        </button>
+        <button onClick={()=>setEditing(emptyClient())}
+          style={{background:"#0f172a",color:"white",border:"none",borderRadius:14,padding:"12px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>+ Nouveau contact</button>
+        {importError && <div style={{background:"#fef2f2",color:"#991b1b",border:"1px solid #fecaca",borderRadius:10,padding:"8px 12px",fontSize:12}}>{importError}</div>}
+      </div>
+
+      {/* Recherche */}
+      <div style={{marginBottom:12,position:"relative"}}>
+        <input value={query} onChange={e=>setQuery(e.target.value)}
+          placeholder="Rechercher nom, société, ville, email…"
+          style={{width:"100%",background:"#f1f5f9",border:"1px solid #e2e8f0",borderRadius:12,padding:"11px 14px 11px 36px",fontSize:13,color:"#0f172a",outline:"none"}}/>
+        <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:"#94a3b8",fontSize:14}}>🔍</span>
+      </div>
+
+      {/* Liste */}
       <div style={{background:"white",borderRadius:14,border:"1px solid #f1f5f9",overflow:"hidden"}}>
-        {clients.map(c=>(
-          <div key={c.id} onClick={()=>goClient(c.id)} style={{padding:"13px 16px",borderBottom:"1px solid #f8fafc",display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}
-            onMouseOver={e=>e.currentTarget.style.background="#fafafa"} onMouseOut={e=>e.currentTarget.style.background="white"}>
-            <div style={{width:40,height:40,borderRadius:12,background:"#f0fdf4",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,color:"#16a34a",fontSize:16,flexShrink:0}}>
-              {(c.raison_sociale||c.prenom||"?")[0]}
+        {filtered.length === 0 && (
+          <div style={{padding:"28px 16px",textAlign:"center",color:"#94a3b8",fontSize:12}}>Aucun contact trouvé</div>
+        )}
+        {filtered.map(c=>(
+          <div key={c.id} style={{padding:"13px 16px",borderBottom:"1px solid #f8fafc",display:"flex",alignItems:"center",gap:12}}>
+            <div onClick={()=>goClient(c.id)} style={{flex:1,display:"flex",alignItems:"center",gap:12,cursor:"pointer",minWidth:0}}>
+              <div style={{width:40,height:40,borderRadius:12,background:c.type==="particulier"?"#eff6ff":"#fef3c7",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,color:c.type==="particulier"?"#1d4ed8":"#b45309",fontSize:15,flexShrink:0}}>
+                {displayName(c).charAt(0).toUpperCase()}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:600,color:"#0f172a",display:"flex",alignItems:"center",gap:6}}>
+                  <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{displayName(c)}</span>
+                  <span style={{fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:10,flexShrink:0,background:c.type==="particulier"?"#dbeafe":"#fef3c7",color:c.type==="particulier"?"#1e40af":"#92400e"}}>{c.type==="particulier"?"Particulier":c.type==="artisan"?"Artisan":"Entreprise"}</span>
+                </div>
+                <div style={{fontSize:11,color:"#94a3b8",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                  {[c.email, c.telephone, c.ville].filter(Boolean).join(" · ") || "—"}
+                </div>
+              </div>
             </div>
-            <div style={{flex:1}}>
-              <div style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>{c.raison_sociale||`${c.prenom} ${c.nom}`}</div>
-              <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>{c.email} · {c.ville}</div>
+            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+              <button onClick={()=>setEditing(c)} aria-label="Modifier"
+                style={{background:"#f1f5f9",border:"none",borderRadius:8,width:32,height:32,cursor:"pointer",fontSize:14,color:"#475569"}}>✏️</button>
+              <button onClick={()=>deleteContact(c.id)} aria-label="Supprimer"
+                style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,width:32,height:32,cursor:"pointer",fontSize:14}}>🗑️</button>
             </div>
           </div>
         ))}
+      </div>
+
+      {editing && <ContactEditor c={editing} onSave={saveContact} onClose={()=>setEditing(null)}/>}
+    </div>
+  );
+}
+
+function ContactEditor({c, onSave, onClose}) {
+  const [form, setForm] = useState(c);
+  const set = (k,v) => setForm(f => ({...f, [k]:v}));
+  const isValid = form.raison_sociale?.trim() || (form.nom?.trim() || form.prenom?.trim());
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,.7)",zIndex:300,display:"flex",flexDirection:"column",fontFamily:"'DM Sans',sans-serif"}}>
+      <div style={{flex:1}} onClick={onClose}/>
+      <div style={{background:"white",borderTopLeftRadius:20,borderTopRightRadius:20,maxHeight:"90vh",display:"flex",flexDirection:"column",paddingBottom:"env(safe-area-inset-bottom)"}}>
+        <div style={{padding:"14px 18px",borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+          <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>{c.id && c.raison_sociale || c.nom ? "Modifier le contact" : "Nouveau contact"}</div>
+          <button onClick={onClose} style={{background:"#f1f5f9",border:"none",borderRadius:10,width:32,height:32,cursor:"pointer",fontSize:14,color:"#64748b"}}>✕</button>
+        </div>
+
+        <div style={{flex:1,overflowY:"auto",padding:16,display:"flex",flexDirection:"column",gap:12}}>
+          <div>
+            <label style={{display:"block",fontSize:11,fontWeight:600,color:"#64748b",marginBottom:6}}>TYPE</label>
+            <div style={{display:"flex",gap:6}}>
+              {[["particulier","Particulier"],["artisan","Artisan"],["entreprise","Entreprise"]].map(([id,lbl])=>(
+                <button key={id} onClick={()=>set("type",id)}
+                  style={{flex:1,padding:"8px",borderRadius:10,border:`1.5px solid ${form.type===id?"#0f172a":"#e2e8f0"}`,background:form.type===id?"#0f172a":"white",color:form.type===id?"white":"#475569",fontSize:12,fontWeight:600,cursor:"pointer"}}>{lbl}</button>
+              ))}
+            </div>
+          </div>
+
+          {form.type !== "particulier" && (
+            <Field label="Raison sociale *" val={form.raison_sociale} onChange={v=>set("raison_sociale",v)} placeholder="Ex : Dupont Maçonnerie SAS"/>
+          )}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <Field label={form.type==="particulier"?"Prénom *":"Prénom contact"} val={form.prenom} onChange={v=>set("prenom",v)}/>
+            <Field label={form.type==="particulier"?"Nom *":"Nom contact"} val={form.nom} onChange={v=>set("nom",v)}/>
+          </div>
+          <Field label="Email" type="email" val={form.email} onChange={v=>set("email",v)} placeholder="contact@exemple.fr"/>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <Field label="Mobile" type="tel" val={form.telephone} onChange={v=>set("telephone",v)} placeholder="06 12 34 56 78"/>
+            <Field label="Fixe" type="tel" val={form.telephone_fixe} onChange={v=>set("telephone_fixe",v)} placeholder="02 35 00 00 00"/>
+          </div>
+          <Field label="Adresse" val={form.adresse} onChange={v=>set("adresse",v)} placeholder="12 rue des Artisans"/>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 2fr",gap:10}}>
+            <Field label="Code postal" val={form.code_postal} onChange={v=>set("code_postal",v)} placeholder="76600"/>
+            <Field label="Ville" val={form.ville} onChange={v=>set("ville",v)} placeholder="Le Havre"/>
+          </div>
+          {form.type !== "particulier" && (
+            <>
+              <Field label="SIRET" val={form.siret} onChange={v=>set("siret",v)} placeholder="12345678900010"/>
+              <Field label="N° TVA intracommunautaire" val={form.tva_intra} onChange={v=>set("tva_intra",v)} placeholder="FR12345678901"/>
+              <Field label="Activité" val={form.activite} onChange={v=>set("activite",v)} placeholder="Ex : Maçonnerie générale et gros œuvre"/>
+            </>
+          )}
+          <div>
+            <label style={{display:"block",fontSize:11,fontWeight:600,color:"#64748b",marginBottom:6}}>NOTES</label>
+            <textarea value={form.notes||""} onChange={e=>set("notes",e.target.value)} rows={2}
+              style={{width:"100%",background:"white",border:"1px solid #e2e8f0",borderRadius:12,padding:"10px 14px",fontSize:13,color:"#0f172a",outline:"none",resize:"vertical",fontFamily:"inherit"}}/>
+          </div>
+        </div>
+
+        <div style={{padding:"12px 16px calc(12px + env(safe-area-inset-bottom))",borderTop:"1px solid #f1f5f9",display:"flex",gap:10,flexShrink:0}}>
+          <button onClick={onClose} style={{flex:1,background:"white",border:"1px solid #e2e8f0",borderRadius:12,padding:"12px",fontSize:13,fontWeight:600,color:"#475569",cursor:"pointer"}}>Annuler</button>
+          <button onClick={()=>isValid && onSave(form)} disabled={!isValid}
+            style={{flex:2,background:isValid?"#22c55e":"#cbd5e1",color:"white",border:"none",borderRadius:12,padding:"12px",fontSize:13,fontWeight:700,cursor:isValid?"pointer":"not-allowed"}}>Enregistrer</button>
+        </div>
       </div>
     </div>
   );
 }
 
-function ClientDetail({c,clientDevis,onBack,goDevis}) {
+function ClientDetail({c,clientDevis,onBack,goDevis,onUpdate,onDelete}) {
+  const [editing, setEditing] = useState(false);
+  const fields = [
+    ["Email",         c.email],
+    ["Mobile",        c.telephone],
+    ["Fixe",          c.telephone_fixe],
+    ["Adresse",       [c.adresse, [c.code_postal, c.ville].filter(Boolean).join(" ")].filter(Boolean).join(" — ")],
+    ["SIRET",         c.siret],
+    ["TVA intracom.", c.tva_intra],
+    ["Activité",      c.activite],
+    ["Notes",         c.notes],
+  ].filter(([,v])=>v);
+
   return (
     <div style={{padding:18}} className="fu">
       <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",color:"#64748b",fontSize:13,marginBottom:14,cursor:"pointer"}}>{I.back} Retour</button>
       <div style={{background:"white",borderRadius:14,border:"1px solid #f1f5f9",padding:18,marginBottom:12}}>
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
-          <div style={{width:46,height:46,borderRadius:14,background:"#f0fdf4",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,color:"#16a34a",fontSize:20}}>
-            {(c.raison_sociale||c.prenom||"?")[0]}
+          <div style={{width:46,height:46,borderRadius:14,background:c.type==="particulier"?"#eff6ff":"#fef3c7",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,color:c.type==="particulier"?"#1d4ed8":"#b45309",fontSize:20}}>
+            {displayName(c).charAt(0).toUpperCase()}
           </div>
-          <div><div style={{fontWeight:700,fontSize:16,color:"#0f172a"}}>{c.raison_sociale||`${c.prenom} ${c.nom}`}</div><div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>{c.type} · {c.ville}</div></div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:700,fontSize:16,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis"}}>{displayName(c)}</div>
+            <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>{c.type==="particulier"?"Particulier":c.type==="artisan"?"Artisan":"Entreprise"}{c.ville?` · ${c.ville}`:""}</div>
+          </div>
+          <button onClick={()=>setEditing(true)} style={{background:"#f1f5f9",border:"none",borderRadius:10,width:36,height:36,cursor:"pointer",fontSize:15,color:"#475569"}} aria-label="Modifier">✏️</button>
         </div>
-        {[["Email",c.email],["Ville",c.ville]].filter(([,v])=>v).map(([k,v])=>(
-          <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderTop:"1px solid #f8fafc"}}><span style={{fontSize:12,color:"#94a3b8"}}>{k}</span><span style={{fontSize:12,color:"#0f172a",fontWeight:500}}>{v}</span></div>
+        {fields.map(([k,v])=>(
+          <div key={k} style={{display:"flex",justifyContent:"space-between",gap:10,padding:"8px 0",borderTop:"1px solid #f8fafc"}}><span style={{fontSize:12,color:"#94a3b8",flexShrink:0}}>{k}</span><span style={{fontSize:12,color:"#0f172a",fontWeight:500,textAlign:"right",wordBreak:"break-word"}}>{v}</span></div>
         ))}
+        <button onClick={()=>{if(window.confirm("Supprimer définitivement ce contact ?"))onDelete();}}
+          style={{marginTop:12,width:"100%",background:"#fef2f2",color:"#b91c1c",border:"1px solid #fecaca",borderRadius:10,padding:"10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>🗑️ Supprimer le contact</button>
       </div>
       <div style={{background:"white",borderRadius:14,border:"1px solid #f1f5f9",overflow:"hidden"}}>
         <div style={{padding:"12px 16px",borderBottom:"1px solid #f8fafc",fontWeight:600,fontSize:13,color:"#0f172a"}}>Devis ({clientDevis.length})</div>
+        {clientDevis.length === 0 && <div style={{padding:"14px 16px",fontSize:12,color:"#94a3b8"}}>Aucun devis pour ce contact</div>}
         {clientDevis.map(d=>(
           <div key={d.id} onClick={()=>goDevis(d.id)} style={{padding:"12px 16px",borderBottom:"1px solid #f8fafc",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}
             onMouseOver={e=>e.currentTarget.style.background="#fafafa"} onMouseOut={e=>e.currentTarget.style.background="white"}>
@@ -849,6 +1078,8 @@ function ClientDetail({c,clientDevis,onBack,goDevis}) {
           </div>
         ))}
       </div>
+
+      {editing && <ContactEditor c={c} onSave={u=>{onUpdate(u);setEditing(false);}} onClose={()=>setEditing(false)}/>}
     </div>
   );
 }
