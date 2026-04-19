@@ -95,36 +95,6 @@ const TX = {
   help_agent:"💬 Décrivez les travaux en bas\nEx : pose carrelage 25€/m² pour 40m²\n📋 Les lignes apparaissent automatiquement\n✅ Enregistrez le devis une fois terminé",
 };
 
-function HelpButton({tab}) {
-  const [open, setOpen] = useState(false);
-  const helpKey = tab.startsWith("dashboard")?"help_dashboard":tab.startsWith("client")?"help_clients":tab.startsWith("devis")?"help_devis":"help_agent";
-  return (
-    <>
-      {open && (
-        <div style={{position:"fixed",bottom:80,right:16,zIndex:60,maxWidth:260,animation:"popIn .25s ease both"}}>
-          <div style={{background:"#0f172a",borderRadius:16,padding:16,boxShadow:"0 8px 30px rgba(0,0,0,.4)",border:"1px solid #334155"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-              <span style={{color:"#22c55e",fontWeight:700,fontSize:12}}>💡 Aide</span>
-              <button onClick={()=>setOpen(false)} style={{background:"none",border:"none",color:"#64748b",cursor:"pointer",fontSize:16,lineHeight:1}}>×</button>
-            </div>
-            {TX[helpKey].split("\n").map((line,i)=>(
-              <div key={i} style={{color:"#94a3b8",fontSize:12,lineHeight:1.7,marginBottom:2}}>{line}</div>
-            ))}
-          </div>
-          <div style={{position:"absolute",bottom:-7,right:20,width:14,height:14,background:"#0f172a",transform:"rotate(45deg)",border:"1px solid #334155",borderTop:"none",borderLeft:"none"}}/>
-        </div>
-      )}
-      <button onClick={()=>setOpen(o=>!o)}
-        style={{position:"fixed",bottom:72,right:14,zIndex:55,width:36,height:36,borderRadius:"50%",
-          background:open?"#334155":"#1e293b",color:open?"#22c55e":"#64748b",border:"1px solid #334155",
-          fontSize:16,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
-          boxShadow:"0 2px 8px rgba(0,0,0,.3)",transition:"all .2s"}}>
-        ?
-      </button>
-    </>
-  );
-}
-
 export default function App() {
   const [screen, setScreen] = useState("app");
   const [brand,  setBrand]  = useState({...DEFAULT_BRAND, companyName:"Maçonnerie Dupont SAS", city:"76600 Le Havre", phone:"02 35 12 34 56", email:"contact@dupont-maconnerie.fr", siret:"12345678900010", color:"#22c55e", fontStyle:"modern", paymentTerms:"Acompte 30% à la commande, solde à réception.", mentionsLegales:"Assurance décennale n°12345 — Garantie biennale incluse — TVA 20%", rib:"Crédit Mutuel Le Havre", iban:"FR76 1234 5678 9012 3456 7890 123", bic:"CMCIFRPP", validityDays:30});
@@ -199,8 +169,6 @@ export default function App() {
         )}
         {tab==="agent" && <AgentIA devis={devis} setDevis={setDevis} clients={clients} plan={plan} aiUsed={aiUsed} setAiUsed={setAiUsed} onPaywall={()=>setScreen("paywall")} setTab={setTab} brand={brand}/>}
       </div>
-
-      <HelpButton tab={tab}/>
 
       <nav style={{position:"fixed",bottom:0,left:0,right:0,paddingBottom:"env(safe-area-inset-bottom)",background:"#0f172a",borderTop:"1px solid rgba(255,255,255,.06)",display:"flex",zIndex:50}}>
         {NAV.map(({id,label,icon})=>{
