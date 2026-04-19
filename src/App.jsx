@@ -70,7 +70,41 @@ const DEFAULT_BRAND = {
   mentionsLegales:"", rib:"", iban:"", bic:"",
   paymentTerms:"Acompte 30% à la commande, solde à réception.",
   validityDays:30,
+  trades:[],
 };
+
+// Liste des métiers principaux du BTP en France.
+// L'utilisateur en sélectionne jusqu'à 5 pendant l'onboarding pour spécialiser
+// l'agent IA et éviter qu'il génère des devis hors-périmètre.
+const BTP_TRADES = [
+  { id:"maconnerie",      label:"Maçonnerie",                icon:"🧱" },
+  { id:"gros_oeuvre",     label:"Gros œuvre / Béton",        icon:"🏗️" },
+  { id:"terrassement",    label:"Terrassement / VRD",        icon:"🚜" },
+  { id:"charpente",       label:"Charpente",                 icon:"🪵" },
+  { id:"couverture",      label:"Couverture / Zinguerie",    icon:"🏠" },
+  { id:"etancheite",      label:"Étanchéité",                icon:"💧" },
+  { id:"facade",          label:"Façade / Ravalement",       icon:"🏛️" },
+  { id:"isolation",       label:"Isolation (ITE / ITI)",     icon:"🧊" },
+  { id:"platrerie",       label:"Plâtrerie / Cloisons",      icon:"📐" },
+  { id:"menuiserie_int",  label:"Menuiserie intérieure",     icon:"🚪" },
+  { id:"menuiserie_ext",  label:"Menuiserie ext. / Alu",     icon:"🪟" },
+  { id:"serrurerie",      label:"Serrurerie / Métallerie",   icon:"🔧" },
+  { id:"plomberie",       label:"Plomberie",                 icon:"🚰" },
+  { id:"sanitaire",       label:"Sanitaire / Salle de bain", icon:"🛁" },
+  { id:"chauffage",       label:"Chauffage / PAC",           icon:"🔥" },
+  { id:"climatisation",   label:"Climatisation / VMC",       icon:"❄️" },
+  { id:"electricite",     label:"Électricité",               icon:"⚡" },
+  { id:"domotique",       label:"Domotique / Courants faibles", icon:"📡" },
+  { id:"peinture",        label:"Peinture / Décoration",     icon:"🎨" },
+  { id:"carrelage",       label:"Carrelage / Faïence",       icon:"🟦" },
+  { id:"sol_souple",      label:"Sols souples / Parquet",    icon:"🟫" },
+  { id:"vitrerie",        label:"Vitrerie / Miroiterie",     icon:"🪞" },
+  { id:"cuisine",         label:"Cuisine / Agencement",      icon:"🍳" },
+  { id:"piscine",         label:"Piscine / Spa",             icon:"🏊" },
+  { id:"paysagiste",      label:"Paysagiste / Espaces verts",icon:"🌳" },
+  { id:"demolition",      label:"Démolition / Désamiantage", icon:"🧨" },
+];
+const tradesLabels = (ids=[]) => ids.map(id => BTP_TRADES.find(t=>t.id===id)?.label).filter(Boolean);
 
 const TX = {
   dashboard:"Accueil", clients:"Clients", devis:"Devis", agent:"Agent IA",
@@ -98,7 +132,7 @@ const TX = {
 
 export default function App() {
   const [screen, setScreen] = useState("app");
-  const [brand,  setBrand]  = useState({...DEFAULT_BRAND, companyName:"Maçonnerie Dupont SAS", city:"76600 Le Havre", phone:"02 35 12 34 56", email:"contact@dupont-maconnerie.fr", siret:"12345678900010", color:"#22c55e", fontStyle:"modern", paymentTerms:"Acompte 30% à la commande, solde à réception.", mentionsLegales:"Assurance décennale n°12345 — Garantie biennale incluse — TVA 20%", rib:"Crédit Mutuel Le Havre", iban:"FR76 1234 5678 9012 3456 7890 123", bic:"CMCIFRPP", validityDays:30});
+  const [brand,  setBrand]  = useState({...DEFAULT_BRAND, companyName:"Maçonnerie Dupont SAS", city:"76600 Le Havre", phone:"02 35 12 34 56", email:"contact@dupont-maconnerie.fr", siret:"12345678900010", color:"#22c55e", fontStyle:"modern", paymentTerms:"Acompte 30% à la commande, solde à réception.", mentionsLegales:"Assurance décennale n°12345 — Garantie biennale incluse — TVA 20%", rib:"Crédit Mutuel Le Havre", iban:"FR76 1234 5678 9012 3456 7890 123", bic:"CMCIFRPP", validityDays:30, trades:["maconnerie","gros_oeuvre","carrelage","platrerie","peinture"]});
   const [clients,setClients]= useState(DEMO_CLIENTS);
   const [devis,  setDevis]  = useState(DEMO_DEVIS);
   const [tab,    setTab]    = useState("dashboard");
@@ -227,11 +261,19 @@ function Onboarding({brand,setBrand,onDone}) {
   const COLORS = ["#22c55e","#3b82f6","#f97316","#8b5cf6","#ef4444","#0891b2","#0f172a","#d97706"];
 
   const STEPS = [
-    { title:"Votre identité", icon:"🏢" },
-    { title:"Coordonnées",    icon:"📍" },
-    { title:"Apparence PDF",  icon:"🎨" },
-    { title:"Informations légales", icon:"📋" },
+    { title:"Votre identité",          icon:"🏢" },
+    { title:"Vos métiers BTP",         icon:"🛠️" },
+    { title:"Coordonnées",             icon:"📍" },
+    { title:"Apparence PDF",           icon:"🎨" },
+    { title:"Informations légales",    icon:"📋" },
   ];
+
+  const toggleTrade = (id) => setLocal(b => {
+    const cur = b.trades || [];
+    if (cur.includes(id)) return {...b, trades: cur.filter(x=>x!==id)};
+    if (cur.length >= 5) return b;
+    return {...b, trades: [...cur, id]};
+  });
 
   const save = () => { setBrand(local); onDone(); };
 
@@ -284,8 +326,48 @@ function Onboarding({brand,setBrand,onDone}) {
           </div>
         )}
 
-        {/* STEP 1 — Coordonnées */}
+        {/* STEP 1 — Métiers BTP */}
         {step===1&&(
+          <div className="pop" style={{display:"flex",flexDirection:"column",gap:14}}>
+            <div style={{background:"#1e3a2f",border:"1px solid rgba(34,197,94,.3)",borderRadius:12,padding:"10px 14px"}}>
+              <div style={{color:"#86efac",fontSize:12,fontWeight:600,marginBottom:2}}>Choisissez jusqu'à 5 métiers</div>
+              <div style={{color:"#94a3b8",fontSize:11,lineHeight:1.5}}>L'agent IA générera uniquement des devis pour vos métiers. Hors-sujet refusé automatiquement.</div>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,color:"#64748b"}}>
+              <span>{(local.trades||[]).length} / 5 sélectionnés</span>
+              {(local.trades||[]).length>0 && <button onClick={()=>set("trades",[])} style={{background:"none",border:"none",color:"#64748b",fontSize:11,cursor:"pointer",textDecoration:"underline"}}>Réinitialiser</button>}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              {BTP_TRADES.map(t => {
+                const selected = (local.trades||[]).includes(t.id);
+                const disabled = !selected && (local.trades||[]).length >= 5;
+                return (
+                  <button key={t.id} onClick={()=>toggleTrade(t.id)} disabled={disabled}
+                    style={{
+                      background: selected ? "#1e3a2f" : "#1e293b",
+                      border: `1.5px solid ${selected ? "#22c55e" : "#334155"}`,
+                      borderRadius: 12,
+                      padding: "10px 8px",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 4,
+                      cursor: disabled ? "not-allowed" : "pointer",
+                      opacity: disabled ? 0.4 : 1,
+                      transition: "all .15s",
+                      minHeight: 64,
+                    }}>
+                    <span style={{fontSize:18}}>{t.icon}</span>
+                    <span style={{fontSize:10,fontWeight:600,color:selected?"#86efac":"#cbd5e1",textAlign:"center",lineHeight:1.2}}>{t.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* STEP 2 — Coordonnées */}
+        {step===2&&(
           <div className="pop" style={{display:"flex",flexDirection:"column",gap:14}}>
             <Field dark label="Adresse" val={local.address} onChange={v=>set("address",v)} placeholder="12 rue des Artisans"/>
             <Field dark label="Ville / Code postal" val={local.city} onChange={v=>set("city",v)} placeholder="76600 Le Havre"/>
@@ -295,8 +377,8 @@ function Onboarding({brand,setBrand,onDone}) {
           </div>
         )}
 
-        {/* STEP 2 — Apparence */}
-        {step===2&&(
+        {/* STEP 3 — Apparence */}
+        {step===3&&(
           <div className="pop" style={{display:"flex",flexDirection:"column",gap:20}}>
             {/* Couleur principale */}
             <div>
@@ -359,8 +441,8 @@ function Onboarding({brand,setBrand,onDone}) {
           </div>
         )}
 
-        {/* STEP 3 — Légal */}
-        {step===3&&(
+        {/* STEP 4 — Légal */}
+        {step===4&&(
           <div className="pop" style={{display:"flex",flexDirection:"column",gap:14}}>
             <Field dark label="RIB / Nom de la banque" val={local.rib} onChange={v=>set("rib",v)} placeholder="Crédit Mutuel — Agence Le Havre"/>
             <Field dark label="IBAN" val={local.iban} onChange={v=>set("iban",v)} placeholder="FR76 1234 5678 9012 3456 7890 123"/>
@@ -970,9 +1052,18 @@ function AgentIA({devis,setDevis,clients,plan,trialExpired,onPaywall,setTab,bran
     const newMsgs=[...msgs,userMsg];
     setMsgs(newMsgs); setInput(""); setLoading(true);
     try {
+      const tradeNames = tradesLabels(brand.trades);
+      const tradesBlock = tradeNames.length
+        ? `\n\nSPÉCIALISATION DE L'ENTREPRISE — RÈGLE ABSOLUE :
+L'entreprise est spécialisée UNIQUEMENT dans les métiers suivants : ${tradeNames.join(", ")}.
+- Tu génères UNIQUEMENT des devis pour ces métiers.
+- Si la demande sort de ce périmètre (ex : peinture demandée mais entreprise = plomberie), tu REFUSES poliment et tu ne renvoies AUCUNE balise <DEVIS>. Tu réponds en français : "Désolé, ${brand.companyName||"l'entreprise"} ne réalise pas ce type de travaux. Nous sommes spécialisés en : ${tradeNames.join(", ")}. Souhaitez-vous un devis dans l'un de ces domaines ?"
+- Pour les demandes mixtes (ex : rénovation salle de bain alors que l'entreprise fait plomberie + carrelage), tu génères uniquement les lignes qui correspondent à tes métiers et tu signales en une phrase courte ce qui n'a pas été inclus.
+- En cas de doute léger (ex : un travail à la frontière de l'un de tes métiers), accepte et précise-le brièvement.`
+        : "";
       const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,
-          system:`Tu es un assistant expert BTP France intégré dans l'application Zenbat.
+          system:`Tu es un assistant expert BTP France intégré dans l'application Zenbat.${tradesBlock}
 
 LANGUE — RÈGLE ABSOLUE :
 1. Tu comprends TOUTES les langues : français, arabe littéraire, darija marocaine, kabyle, espagnol, portugais, anglais, roumain, polonais, turc, wolof, bambara, tamoul, ourdou, hindi, chinois, russe, ukrainien, italien, allemand, etc. Tu comprends aussi les mélanges de langues et le français phonétique.
