@@ -448,7 +448,7 @@ function PDFViewer({d, cl, brand, onClose}) {
         }
       `}</style>
 
-      <div className="pdf-toolbar" style={{background:"#0f172a",padding:"12px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+      <div className="pdf-toolbar" style={{background:"#0f172a",padding:"calc(12px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 12px calc(18px + env(safe-area-inset-left))",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{color:"#22c55e"}}>{I.pdf}</div>
           <span style={{color:"white",fontSize:13,fontWeight:600}}>{d.numero}.pdf</span>
@@ -459,7 +459,7 @@ function PDFViewer({d, cl, brand, onClose}) {
         </div>
       </div>
 
-      <div className="pdf-scroll" style={{flex:1,overflowY:"auto",padding:"20px 16px",background:"#1e293b"}}>
+      <div className="pdf-scroll" style={{flex:1,overflowY:"auto",padding:"20px 16px calc(20px + env(safe-area-inset-bottom))",background:"#1e293b"}}>
         <div className="pdf-page" style={{background:"white",width:"210mm",minHeight:"297mm",margin:"0 auto",boxShadow:"0 20px 60px rgba(0,0,0,.5)",padding:"15mm",fontFamily,color:"#1a1a1a",fontSize:11,lineHeight:1.5,boxSizing:"border-box"}}>
 
           {/* En-tête : n° devis + dates */}
