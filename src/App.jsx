@@ -128,6 +128,17 @@ const TX = {
   quoteInProgress:"Devis en cours",
   linesAdded:"Lignes ajoutées au devis ✓",
   quoteSaved:"✅ Devis enregistré ! Retrouvez-le dans l'onglet Devis.\n\nNouvel autre chantier ?",
+  pickClientTitle:"À quel client associer ce devis ?",
+  pickClientHint:"Choisissez un client existant, créez-en un rapidement ou enregistrez sans client.",
+  searchClient:"Rechercher un client…",
+  noClientOpt:"Enregistrer sans client",
+  newClientInline:"+ Nouveau client",
+  newClientName:"Nom du client",
+  newClientEmail:"Email (recommandé pour la signature)",
+  newClientPhone:"Téléphone",
+  confirmPick:"Associer et enregistrer",
+  cancel:"Annuler",
+  noClientsYet:"Aucun client pour l'instant. Créez-en un ou enregistrez sans client.",
   viaPdf:"Voir le PDF du devis",
   sendOdoo:"Envoyer en signature Odoo Sign",
   help_dashboard:"👆 Appuyez sur un devis pour l'ouvrir\n📊 Les chiffres résument votre activité\n🤖 Le bouton vert lance l'agent IA pour créer un devis",
@@ -332,7 +343,7 @@ export default function App() {
             onBack={()=>setTab("devis")} brand={brand}
             onChange={onSaveDevis}/>
         )}
-        {tab==="agent" && <AgentIA devis={devis} onCreateDevis={onCreateDevis} clients={clients} plan={plan} trialExpired={trialExpired} onPaywall={()=>setScreen("paywall")} setTab={setTab} brand={brand}/>}
+        {tab==="agent" && <AgentIA devis={devis} onCreateDevis={onCreateDevis} clients={clients} onSaveClient={onSaveClient} plan={plan} trialExpired={trialExpired} onPaywall={()=>setScreen("paywall")} setTab={setTab} brand={brand}/>}
       </div>
 
       {toast && (
@@ -1570,7 +1581,7 @@ function DevisDetail({d,cl,onBack,brand,onChange}) {
 // ══════════════════════════════════════════════════════════
 //  AGENT IA — lignes qui pop une par une
 // ══════════════════════════════════════════════════════════
-function AgentIA({devis,onCreateDevis,clients,plan,trialExpired,onPaywall,setTab,brand}) {
+function AgentIA({devis,onCreateDevis,clients,onSaveClient,plan,trialExpired,onPaywall,setTab,brand}) {
   const greeting = TX.agentGreeting;
   const [msgs,    setMsgs]   = useState([{role:"assistant",content:TX.agentGreeting}]);
   const [input,   setInput]  = useState("");
@@ -1578,6 +1589,7 @@ function AgentIA({devis,onCreateDevis,clients,plan,trialExpired,onPaywall,setTab
   const [lignes,  setLignes] = useState([]);
   const [objet,   setObjet]  = useState("");
   const [visibleCount, setVisibleCount] = useState(0);
+  const [pickingClient, setPickingClient] = useState(false);
   const chatRef  = useRef(null);
   const inputRef = useRef(null);
   const ac = brand.color||"#22c55e";
@@ -1683,14 +1695,17 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
 
   const deleteLigne = id => setLignes(l=>l.filter(x=>x.id!==id));
 
-  const save = () => {
+  const save = () => { setPickingClient(true); };
+
+  const finalizeSave = (clientId) => {
     const ht2=lignes.filter(l=>l.type_ligne==="ouvrage").reduce((s,l)=>s+((l.quantite||0)*(l.prix_unitaire||0)),0);
+    const picked = clientId ? clients.find(c=>c.id===clientId) : null;
     onCreateDevis({
       id: uid(),
       numero: `DEV-2026-${String(devis.length+1).padStart(4,"0")}`,
       objet: objet || "Devis IA",
-      client_id: null,
-      ville_chantier: "",
+      client_id: clientId || null,
+      ville_chantier: picked?.ville || "",
       statut: "brouillon",
       montant_ht: ht2,
       tva_rate: 20,
@@ -1698,6 +1713,7 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
       lignes,
       odoo_sign_url: null,
     });
+    setPickingClient(false);
     setLignes([]); setObjet("");
     setMsgs([{role:"assistant",content:TX.quoteSaved}]);
     setTimeout(()=>setTab("devis"),2500);
@@ -1892,6 +1908,94 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
           </div>
           <div style={{textAlign:"center",fontSize:9,color:"#cbd5e1",marginTop:6}}>{TX.inputHint}</div>
         </div>
+      </div>
+
+      {pickingClient && (
+        <ClientPickerModal
+          clients={clients}
+          ac={ac}
+          fontFamily={fontFamily}
+          onSaveClient={onSaveClient}
+          onPick={finalizeSave}
+          onClose={()=>setPickingClient(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ClientPickerModal({clients, ac, fontFamily, onSaveClient, onPick, onClose}) {
+  const [q, setQ] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [newC, setNewC] = useState({nom:"", email:"", telephone:""});
+
+  const filtered = clients.filter(c => {
+    if (!q.trim()) return true;
+    const s = q.toLowerCase();
+    return (c.nom||"").toLowerCase().includes(s)
+      || (c.email||"").toLowerCase().includes(s)
+      || (c.ville||"").toLowerCase().includes(s);
+  });
+
+  const createAndPick = async () => {
+    if (!newC.nom.trim()) return;
+    const c = {
+      id: uid(),
+      nom: newC.nom.trim(),
+      email: newC.email.trim(),
+      telephone: newC.telephone.trim(),
+      type: "particulier",
+      ville: "",
+      adresse: "",
+      siret: "",
+      notes: "",
+    };
+    await onSaveClient(c);
+    onPick(c.id);
+  };
+
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(15,23,42,.6)",zIndex:2000,display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"fadeUp .2s ease"}}>
+      <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:520,background:"white",borderTopLeftRadius:18,borderTopRightRadius:18,padding:"18px 18px 22px",maxHeight:"85vh",overflowY:"auto",boxShadow:"0 -8px 30px rgba(0,0,0,.2)"}}>
+        <div style={{width:36,height:4,background:"#cbd5e1",borderRadius:2,margin:"0 auto 14px"}}/>
+        <div style={{fontFamily,fontSize:16,fontWeight:800,color:"#0f172a",marginBottom:4}}>{TX.pickClientTitle}</div>
+        <div style={{fontSize:12,color:"#64748b",marginBottom:14}}>{TX.pickClientHint}</div>
+
+        {!creating ? (
+          <>
+            <input
+              value={q} onChange={e=>setQ(e.target.value)} placeholder={TX.searchClient}
+              style={{width:"100%",padding:"10px 12px",border:"1px solid #e2e8f0",borderRadius:10,fontSize:13,marginBottom:10,boxSizing:"border-box"}}
+            />
+            <div style={{maxHeight:260,overflowY:"auto",border:"1px solid #f1f5f9",borderRadius:10,marginBottom:10}}>
+              {filtered.length === 0 ? (
+                <div style={{padding:"18px 14px",textAlign:"center",color:"#94a3b8",fontSize:12}}>{TX.noClientsYet}</div>
+              ) : filtered.map(c => (
+                <button key={c.id} onClick={()=>onPick(c.id)} style={{display:"flex",flexDirection:"column",alignItems:"flex-start",width:"100%",padding:"10px 14px",background:"none",border:"none",borderBottom:"1px solid #f1f5f9",cursor:"pointer",textAlign:"left"}}>
+                  <span style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>{c.nom}</span>
+                  <span style={{fontSize:11,color:"#64748b"}}>{[c.email, c.ville].filter(Boolean).join(" · ")||"—"}</span>
+                </button>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <button onClick={()=>setCreating(true)} style={{flex:1,minWidth:140,background:"#f1f5f9",color:"#0f172a",border:"none",borderRadius:10,padding:"11px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{TX.newClientInline}</button>
+              <button onClick={()=>onPick(null)} style={{flex:1,minWidth:140,background:"none",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:10,padding:"11px",fontSize:12,fontWeight:500,cursor:"pointer"}}>{TX.noClientOpt}</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <input value={newC.nom} onChange={e=>setNewC({...newC,nom:e.target.value})} placeholder={TX.newClientName} autoFocus
+              style={{width:"100%",padding:"10px 12px",border:"1px solid #e2e8f0",borderRadius:10,fontSize:13,marginBottom:8,boxSizing:"border-box"}}/>
+            <input value={newC.email} onChange={e=>setNewC({...newC,email:e.target.value})} placeholder={TX.newClientEmail} type="email"
+              style={{width:"100%",padding:"10px 12px",border:"1px solid #e2e8f0",borderRadius:10,fontSize:13,marginBottom:8,boxSizing:"border-box"}}/>
+            <input value={newC.telephone} onChange={e=>setNewC({...newC,telephone:e.target.value})} placeholder={TX.newClientPhone} type="tel"
+              style={{width:"100%",padding:"10px 12px",border:"1px solid #e2e8f0",borderRadius:10,fontSize:13,marginBottom:12,boxSizing:"border-box"}}/>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>{setCreating(false);setNewC({nom:"",email:"",telephone:""});}} style={{flex:1,background:"none",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:10,padding:"11px",fontSize:12,fontWeight:500,cursor:"pointer"}}>{TX.cancel}</button>
+              <button onClick={createAndPick} disabled={!newC.nom.trim()} style={{flex:2,background:newC.nom.trim()?ac:"#cbd5e1",color:"white",border:"none",borderRadius:10,padding:"11px",fontSize:13,fontWeight:700,cursor:newC.nom.trim()?"pointer":"not-allowed"}}>{TX.confirmPick}</button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
