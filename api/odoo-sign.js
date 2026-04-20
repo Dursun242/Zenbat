@@ -251,6 +251,45 @@ export default async function handler(req, res) {
       }
     }
 
+    // Override l'expéditeur sur les mails sortants générés par cette sign.request
+    // pour qu'ils apparaissent envoyés au nom de l'entreprise qui édite le devis.
+    if (company_email) {
+      const fromFormatted = company_name
+        ? `"${company_name.replace(/"/g, "'")}" <${company_email}>`
+        : company_email;
+      try {
+        const mailIds = await odooCall({
+          ...ctx,
+          model: "mail.mail",
+          method: "search",
+          args: [[
+            ["model", "=", "sign.request"],
+            ["res_id", "=", requestId],
+          ]],
+        });
+        if (mailIds?.length) {
+          await odooCall({
+            ...ctx,
+            model: "mail.mail",
+            method: "write",
+            args: [mailIds, {
+              email_from: fromFormatted,
+              reply_to: company_email,
+            }],
+          });
+          // Essaie de re-pousser les mails encore en file
+          try {
+            await odooCall({
+              ...ctx,
+              model: "mail.mail",
+              method: "send",
+              args: [mailIds],
+            });
+          } catch (_) { /* best effort */ }
+        }
+      } catch (_) { /* best effort */ }
+    }
+
     const items = await odooCall({
       ...ctx,
       model: "sign.request.item",
