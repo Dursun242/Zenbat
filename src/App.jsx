@@ -618,22 +618,22 @@ function Field({dark,label,val,onChange,placeholder,type="text"}) {
 // ══════════════════════════════════════════════════════════
 //  PDF LIVE VIEWER (simulé avec HTML)
 // ══════════════════════════════════════════════════════════
-function PDFViewer({d, cl, brand, onClose}) {
+function PDFViewer({d, cl, brand, onClose, hidden=false, onPageReady}) {
   const MM_TO_PX = 3.7795275591;
   const A4_PX = 210 * MM_TO_PX;
   const wrapRef = useRef(null);
   const pageRef = useRef(null);
   const [fitScale, setFitScale] = useState(() => {
-    if (typeof window === "undefined") return 1;
+    if (hidden || typeof window === "undefined") return 1;
     const avail = Math.max(240, window.innerWidth - 32);
     return Math.min(1, avail / A4_PX);
   });
   const [userZoom, setUserZoom] = useState(1);
-  const scale = fitScale * userZoom;
+  const scale = hidden ? 1 : fitScale * userZoom;
   const [pageH, setPageH] = useState(null);
 
   useEffect(() => {
-    if (!wrapRef.current) return;
+    if (hidden || !wrapRef.current) return;
     const compute = () => {
       const w = wrapRef.current?.clientWidth || (window.innerWidth - 32);
       setFitScale(Math.min(1, w / A4_PX));
@@ -642,10 +642,10 @@ function PDFViewer({d, cl, brand, onClose}) {
     const ro = new ResizeObserver(compute);
     ro.observe(wrapRef.current);
     return () => ro.disconnect();
-  }, []);
+  }, [hidden]);
 
   useEffect(() => {
-    if (!pageRef.current) return;
+    if (hidden || !pageRef.current) return;
     const measure = () => {
       const h = pageRef.current?.offsetHeight || 0;
       setPageH(h * scale);
@@ -653,7 +653,19 @@ function PDFViewer({d, cl, brand, onClose}) {
     measure();
     const id = setTimeout(measure, 50);
     return () => clearTimeout(id);
-  }, [scale, d.numero]);
+  }, [scale, d.numero, hidden]);
+
+  const firedReadyRef = useRef(false);
+  useEffect(() => {
+    if (!onPageReady || !pageRef.current || firedReadyRef.current) return;
+    const id = setTimeout(() => {
+      if (pageRef.current && !firedReadyRef.current) {
+        firedReadyRef.current = true;
+        onPageReady(pageRef.current);
+      }
+    }, 400);
+    return () => clearTimeout(id);
+  }, [onPageReady]);
 
   const lignes = d.lignes || [];
   const ouvrages = lignes.filter(l=>l.type_ligne==="ouvrage");
@@ -694,6 +706,150 @@ function PDFViewer({d, cl, brand, onClose}) {
     brand.siret && `SIRET : ${brand.siret}`,
   ].filter(Boolean);
 
+  const pageBody = (
+    <>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:18,paddingBottom:12,borderBottom:`2px solid ${navy}`}}>
+        <div>
+          {brand.logo && <img src={brand.logo} alt="" style={{height:44,maxWidth:180,objectFit:"contain",display:"block",marginBottom:6}}/>}
+          <div style={{fontWeight:800,fontSize:16,color:navy}}>{brand.companyName||"Votre Entreprise"}</div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{color:"#94a3b8",fontSize:10,fontWeight:600,letterSpacing:"2px"}}>DEVIS</div>
+          <div style={{color:navy,fontWeight:800,fontSize:20,marginTop:2}}>{d.numero}</div>
+          <div style={{color:"#64748b",fontSize:10,marginTop:6}}>Émis le <strong style={{color:"#1a1a1a"}}>{fmtD(d.date_emission)}</strong></div>
+          <div style={{color:"#64748b",fontSize:10}}>Valide jusqu'au <strong style={{color:"#1a1a1a"}}>{fmtD(validUntil.toISOString())}</strong></div>
+        </div>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+        <div style={{border:"1px solid #d4d4d8",borderRadius:4,padding:"10px 12px",minHeight:110}}>
+          <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>ENTREPRISE</div>
+          <div style={{fontSize:13,fontWeight:700,color:"#111",marginBottom:4}}>{brand.companyName||"—"}</div>
+          {companyLines.map((line,i)=>(<div key={i} style={{fontSize:10,color:"#4b5563",lineHeight:1.6}}>{line}</div>))}
+        </div>
+        <div style={{border:"1px solid #d4d4d8",borderRadius:4,padding:"10px 12px",minHeight:110}}>
+          <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>MAÎTRE D'OUVRAGE</div>
+          <div style={{fontSize:13,fontWeight:700,color:"#111",marginBottom:4}}>{clientName}</div>
+          {clientLines.map((line,i)=>(<div key={i} style={{fontSize:10,color:"#4b5563",lineHeight:1.6}}>{line}</div>))}
+        </div>
+      </div>
+
+      {(d.ville_chantier||d.objet)&&(
+        <div style={{background:"#f8f9fb",border:"1px solid #e5e7eb",borderRadius:4,padding:"8px 12px",marginBottom:14,fontSize:10,color:"#374151"}}>
+          {d.objet && <div><strong>Objet :</strong> {d.objet}</div>}
+          {d.ville_chantier && <div><strong>Chantier :</strong> {d.ville_chantier}</div>}
+        </div>
+      )}
+
+      <div style={{fontSize:11,fontWeight:700,color:navy,marginBottom:8}}>DÉTAIL DES PRESTATIONS</div>
+      <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,marginBottom:14}}>
+        <thead>
+          <tr style={{background:navy,color:"white"}}>
+            <th style={{textAlign:"left",padding:"8px 10px",fontWeight:600}}>Description</th>
+            <th style={{textAlign:"center",padding:"8px 6px",fontWeight:600,width:50}}>Unité</th>
+            <th style={{textAlign:"center",padding:"8px 6px",fontWeight:600,width:45}}>Qté</th>
+            <th style={{textAlign:"right",padding:"8px 8px",fontWeight:600,width:70}}>PU HT</th>
+            <th style={{textAlign:"center",padding:"8px 6px",fontWeight:600,width:50}}>TVA</th>
+            <th style={{textAlign:"right",padding:"8px 10px",fontWeight:600,width:80}}>Total HT</th>
+          </tr>
+        </thead>
+        <tbody>
+          {lignes.map((l,i)=>{
+            if(l.type_ligne==="lot") return (
+              <tr key={l.id}>
+                <td colSpan={6} style={{padding:"8px 10px",fontWeight:700,fontSize:10,color:navy,textTransform:"uppercase",letterSpacing:".5px",borderBottom:`1px solid ${navy}33`,background:"#eef2f7"}}>{l.designation}</td>
+              </tr>
+            );
+            const total = (l.quantite||0)*(l.prix_unitaire||0);
+            return (
+              <tr key={l.id} style={{background:i%2?"#f8f9fb":"white",borderBottom:"1px solid #e5e7eb"}}>
+                <td style={{padding:"7px 10px"}}>{l.designation}</td>
+                <td style={{padding:"7px 6px",textAlign:"center",color:"#6b7280"}}>{l.unite||"—"}</td>
+                <td style={{padding:"7px 6px",textAlign:"center"}}>{l.quantite}</td>
+                <td style={{padding:"7px 8px",textAlign:"right"}}>{fmt(l.prix_unitaire)}</td>
+                <td style={{padding:"7px 6px",textAlign:"center",color:"#6b7280"}}>{rateOf(l).toString().replace(".",",")}%</td>
+                <td style={{padding:"7px 10px",textAlign:"right",fontWeight:600}}>{fmt(total)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:16}}>
+        <table style={{fontSize:10,borderCollapse:"collapse",minWidth:260}}>
+          <tbody>
+            <tr><td style={{padding:"4px 10px",color:"#4b5563"}}>Total HT</td><td style={{padding:"4px 10px",textAlign:"right",fontWeight:600}}>{fmt(ht)}</td></tr>
+            {tvaRows.map(row=>(
+              <tr key={row.rate}>
+                <td style={{padding:"4px 10px",color:"#4b5563"}}>
+                  TVA {row.rate.toString().replace(".",",")}%
+                  <span style={{color:"#9ca3af",fontSize:9,marginLeft:4}}>(sur {fmt(row.base)})</span>
+                </td>
+                <td style={{padding:"4px 10px",textAlign:"right"}}>{fmt(row.montant)}</td>
+              </tr>
+            ))}
+            <tr style={{background:"#eef2f7",borderTop:`2px solid ${navy}`}}>
+              <td style={{padding:"8px 10px",fontWeight:800,color:navy,fontSize:11}}>TOTAL TTC</td>
+              <td style={{padding:"8px 10px",textAlign:"right",fontWeight:800,color:navy,fontSize:12}}>{fmt(ttc)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {(d.observations||brand.defaultObservations)&&(
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:11,fontWeight:700,color:navy,marginBottom:4}}>OBSERVATIONS</div>
+          <div style={{fontSize:10,color:"#374151",lineHeight:1.6}}>{d.observations||brand.defaultObservations}</div>
+        </div>
+      )}
+
+      {brand.paymentTerms&&(
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:11,fontWeight:700,color:navy,marginBottom:4}}>CONDITIONS</div>
+          <div style={{fontSize:10,color:"#374151",lineHeight:1.6}}>{brand.paymentTerms}</div>
+        </div>
+      )}
+
+      {brand.rib&&(
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:11,fontWeight:700,color:navy,marginBottom:4}}>COORDONNÉES BANCAIRES</div>
+          <div style={{fontSize:10,color:"#374151"}}>{brand.rib}</div>
+          {brand.iban&&<div style={{fontSize:9,color:"#4b5563",fontFamily:"monospace"}}>IBAN : {brand.iban}</div>}
+          {brand.bic&&<div style={{fontSize:9,color:"#4b5563",fontFamily:"monospace"}}>BIC : {brand.bic}</div>}
+        </div>
+      )}
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginTop:20,paddingTop:14,borderTop:"1px solid #d4d4d8"}}>
+        <div>
+          <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>SIGNATURE CLIENT · Bon pour accord</div>
+          <div style={{height:60,borderBottom:"1px solid #9ca3af"}}/>
+        </div>
+        <div>
+          <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>DATE</div>
+          <div style={{height:60,borderBottom:"1px solid #9ca3af"}}/>
+        </div>
+      </div>
+
+      <div style={{marginTop:18,paddingTop:10,borderTop:"1px solid #e5e7eb",display:"flex",justifyContent:"space-between",gap:10,fontSize:8,color:"#9ca3af",lineHeight:1.5}}>
+        <div style={{flex:1}}>
+          {brand.mentionsLegales}
+          {brand.siret && <div>SIRET {brand.siret}</div>}
+        </div>
+        <div style={{textAlign:"right"}}>Généré via Zenbat</div>
+      </div>
+    </>
+  );
+
+  if (hidden) {
+    return (
+      <div aria-hidden="true" style={{position:"fixed",left:-99999,top:0,pointerEvents:"none",opacity:0}}>
+        <div ref={pageRef} className="pdf-page" style={{background:"white",width:"210mm",minHeight:"297mm",padding:"15mm",fontFamily,color:"#1a1a1a",fontSize:11,lineHeight:1.5,boxSizing:"border-box"}}>
+          {pageBody}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",zIndex:200,display:"flex",flexDirection:"column"}} className="fu pdf-modal">
       <style>{`
@@ -727,146 +883,7 @@ function PDFViewer({d, cl, brand, onClose}) {
       <div className="pdf-scroll" ref={wrapRef} style={{flex:1,overflow:"auto",padding:"16px 16px calc(20px + env(safe-area-inset-bottom))",background:"#1e293b"}}>
         <div className="pdf-page-wrap" style={{width:`calc(210mm * ${scale})`,height:pageH?`${pageH}px`:"auto",margin:"0 auto",position:"relative"}}>
         <div ref={pageRef} className="pdf-page" style={{background:"white",width:"210mm",minHeight:"297mm",boxShadow:"0 20px 60px rgba(0,0,0,.5)",padding:"15mm",fontFamily,color:"#1a1a1a",fontSize:11,lineHeight:1.5,boxSizing:"border-box",transform:`scale(${scale})`,transformOrigin:"top left",position:"absolute",top:0,left:0}}>
-
-          {/* En-tête : n° devis + dates */}
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:18,paddingBottom:12,borderBottom:`2px solid ${navy}`}}>
-            <div>
-              {brand.logo && <img src={brand.logo} alt="" style={{height:44,maxWidth:180,objectFit:"contain",display:"block",marginBottom:6}}/>}
-              <div style={{fontWeight:800,fontSize:16,color:navy}}>{brand.companyName||"Votre Entreprise"}</div>
-            </div>
-            <div style={{textAlign:"right"}}>
-              <div style={{color:"#94a3b8",fontSize:10,fontWeight:600,letterSpacing:"2px"}}>DEVIS</div>
-              <div style={{color:navy,fontWeight:800,fontSize:20,marginTop:2}}>{d.numero}</div>
-              <div style={{color:"#64748b",fontSize:10,marginTop:6}}>Émis le <strong style={{color:"#1a1a1a"}}>{fmtD(d.date_emission)}</strong></div>
-              <div style={{color:"#64748b",fontSize:10}}>Valide jusqu'au <strong style={{color:"#1a1a1a"}}>{fmtD(validUntil.toISOString())}</strong></div>
-            </div>
-          </div>
-
-          {/* Boxes ENTREPRISE / MAÎTRE D'OUVRAGE */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
-            <div style={{border:"1px solid #d4d4d8",borderRadius:4,padding:"10px 12px",minHeight:110}}>
-              <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>ENTREPRISE</div>
-              <div style={{fontSize:13,fontWeight:700,color:"#111",marginBottom:4}}>{brand.companyName||"—"}</div>
-              {companyLines.map((line,i)=>(<div key={i} style={{fontSize:10,color:"#4b5563",lineHeight:1.6}}>{line}</div>))}
-            </div>
-            <div style={{border:"1px solid #d4d4d8",borderRadius:4,padding:"10px 12px",minHeight:110}}>
-              <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>MAÎTRE D'OUVRAGE</div>
-              <div style={{fontSize:13,fontWeight:700,color:"#111",marginBottom:4}}>{clientName}</div>
-              {clientLines.map((line,i)=>(<div key={i} style={{fontSize:10,color:"#4b5563",lineHeight:1.6}}>{line}</div>))}
-            </div>
-          </div>
-
-          {/* Chantier */}
-          {(d.ville_chantier||d.objet)&&(
-            <div style={{background:"#f8f9fb",border:"1px solid #e5e7eb",borderRadius:4,padding:"8px 12px",marginBottom:14,fontSize:10,color:"#374151"}}>
-              {d.objet && <div><strong>Objet :</strong> {d.objet}</div>}
-              {d.ville_chantier && <div><strong>Chantier :</strong> {d.ville_chantier}</div>}
-            </div>
-          )}
-
-          {/* Détail des prestations */}
-          <div style={{fontSize:11,fontWeight:700,color:navy,marginBottom:8}}>DÉTAIL DES PRESTATIONS</div>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,marginBottom:14}}>
-            <thead>
-              <tr style={{background:navy,color:"white"}}>
-                <th style={{textAlign:"left",padding:"8px 10px",fontWeight:600}}>Description</th>
-                <th style={{textAlign:"center",padding:"8px 6px",fontWeight:600,width:50}}>Unité</th>
-                <th style={{textAlign:"center",padding:"8px 6px",fontWeight:600,width:45}}>Qté</th>
-                <th style={{textAlign:"right",padding:"8px 8px",fontWeight:600,width:70}}>PU HT</th>
-                <th style={{textAlign:"center",padding:"8px 6px",fontWeight:600,width:50}}>TVA</th>
-                <th style={{textAlign:"right",padding:"8px 10px",fontWeight:600,width:80}}>Total HT</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lignes.map((l,i)=>{
-                if(l.type_ligne==="lot") return (
-                  <tr key={l.id}>
-                    <td colSpan={6} style={{padding:"8px 10px",fontWeight:700,fontSize:10,color:navy,textTransform:"uppercase",letterSpacing:".5px",borderBottom:`1px solid ${navy}33`,background:"#eef2f7"}}>{l.designation}</td>
-                  </tr>
-                );
-                const total = (l.quantite||0)*(l.prix_unitaire||0);
-                return (
-                  <tr key={l.id} style={{background:i%2?"#f8f9fb":"white",borderBottom:"1px solid #e5e7eb"}}>
-                    <td style={{padding:"7px 10px"}}>{l.designation}</td>
-                    <td style={{padding:"7px 6px",textAlign:"center",color:"#6b7280"}}>{l.unite||"—"}</td>
-                    <td style={{padding:"7px 6px",textAlign:"center"}}>{l.quantite}</td>
-                    <td style={{padding:"7px 8px",textAlign:"right"}}>{fmt(l.prix_unitaire)}</td>
-                    <td style={{padding:"7px 6px",textAlign:"center",color:"#6b7280"}}>{rateOf(l).toString().replace(".",",")}%</td>
-                    <td style={{padding:"7px 10px",textAlign:"right",fontWeight:600}}>{fmt(total)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          {/* Totaux */}
-          <div style={{display:"flex",justifyContent:"flex-end",marginBottom:16}}>
-            <table style={{fontSize:10,borderCollapse:"collapse",minWidth:260}}>
-              <tbody>
-                <tr><td style={{padding:"4px 10px",color:"#4b5563"}}>Total HT</td><td style={{padding:"4px 10px",textAlign:"right",fontWeight:600}}>{fmt(ht)}</td></tr>
-                {tvaRows.map(row=>(
-                  <tr key={row.rate}>
-                    <td style={{padding:"4px 10px",color:"#4b5563"}}>
-                      TVA {row.rate.toString().replace(".",",")}%
-                      <span style={{color:"#9ca3af",fontSize:9,marginLeft:4}}>(sur {fmt(row.base)})</span>
-                    </td>
-                    <td style={{padding:"4px 10px",textAlign:"right"}}>{fmt(row.montant)}</td>
-                  </tr>
-                ))}
-                <tr style={{background:"#eef2f7",borderTop:`2px solid ${navy}`}}>
-                  <td style={{padding:"8px 10px",fontWeight:800,color:navy,fontSize:11}}>TOTAL TTC</td>
-                  <td style={{padding:"8px 10px",textAlign:"right",fontWeight:800,color:navy,fontSize:12}}>{fmt(ttc)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Observations */}
-          {(d.observations||brand.defaultObservations)&&(
-            <div style={{marginBottom:14}}>
-              <div style={{fontSize:11,fontWeight:700,color:navy,marginBottom:4}}>OBSERVATIONS</div>
-              <div style={{fontSize:10,color:"#374151",lineHeight:1.6}}>{d.observations||brand.defaultObservations}</div>
-            </div>
-          )}
-
-          {/* Conditions */}
-          {brand.paymentTerms&&(
-            <div style={{marginBottom:14}}>
-              <div style={{fontSize:11,fontWeight:700,color:navy,marginBottom:4}}>CONDITIONS</div>
-              <div style={{fontSize:10,color:"#374151",lineHeight:1.6}}>{brand.paymentTerms}</div>
-            </div>
-          )}
-
-          {/* RIB */}
-          {brand.rib&&(
-            <div style={{marginBottom:14}}>
-              <div style={{fontSize:11,fontWeight:700,color:navy,marginBottom:4}}>COORDONNÉES BANCAIRES</div>
-              <div style={{fontSize:10,color:"#374151"}}>{brand.rib}</div>
-              {brand.iban&&<div style={{fontSize:9,color:"#4b5563",fontFamily:"monospace"}}>IBAN : {brand.iban}</div>}
-              {brand.bic&&<div style={{fontSize:9,color:"#4b5563",fontFamily:"monospace"}}>BIC : {brand.bic}</div>}
-            </div>
-          )}
-
-          {/* Signature */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginTop:20,paddingTop:14,borderTop:"1px solid #d4d4d8"}}>
-            <div>
-              <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>SIGNATURE CLIENT · Bon pour accord</div>
-              <div style={{height:60,borderBottom:"1px solid #9ca3af"}}/>
-            </div>
-            <div>
-              <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>DATE</div>
-              <div style={{height:60,borderBottom:"1px solid #9ca3af"}}/>
-            </div>
-          </div>
-
-          {/* Footer mentions + SIRET */}
-          <div style={{marginTop:18,paddingTop:10,borderTop:"1px solid #e5e7eb",display:"flex",justifyContent:"space-between",gap:10,fontSize:8,color:"#9ca3af",lineHeight:1.5}}>
-            <div style={{flex:1}}>
-              {brand.mentionsLegales}
-              {brand.siret && <div>SIRET {brand.siret}</div>}
-            </div>
-            <div style={{textAlign:"right"}}>Généré via Zenbat</div>
-          </div>
+          {pageBody}
         </div>
         </div>
       </div>
@@ -1399,6 +1416,7 @@ function DevisDetail({d,cl,onBack,brand,onChange}) {
   const [signUrl, setSignUrl] = useState(d.odoo_sign_url||null);
   const [log,     setLog]     = useState([]);
   const [showLog, setShowLog] = useState(false);
+  const [odooRendering, setOdooRendering] = useState(false);
   const lignes = d.lignes || [];
   const ht  = lignes.filter(l=>l.type_ligne==="ouvrage").reduce((s,l)=>s+((l.quantite||0)*(l.prix_unitaire||0)),0);
   const ac  = brand.color||"#22c55e";
@@ -1410,18 +1428,52 @@ function DevisDetail({d,cl,onBack,brand,onChange}) {
 
   const addLog = msg => setLog(l=>[...l,{t:new Date().toLocaleTimeString("fr-FR"),msg}]);
 
+  const signerEmail = cl?.email || "";
+  const signerName  = cl?.raison_sociale?.trim() || `${cl?.prenom||""} ${cl?.nom||""}`.trim() || "";
+
   const sendOdoo = async () => {
-    if(sending)return;
-    setSending(true);setLog([]);setShowLog(true);
-    addLog("Connexion à Odoo…");await new Promise(r=>setTimeout(r,700));
-    addLog("✓ Connecté");addLog("Génération PDF…");await new Promise(r=>setTimeout(r,900));
-    addLog(`✓ PDF généré : ${d.numero}.pdf`);addLog("Upload → Odoo (ir.attachment)…");
-    await new Promise(r=>setTimeout(r,700));addLog("✓ Document uploadé");
-    addLog(`Envoi demande à ${cl?.email||"client@email.fr"}…`);await new Promise(r=>setTimeout(r,800));
-    const url=`https://odoo.monentreprise.com/sign/document/1042/abc123`;
-    addLog("✓ Email envoyé");addLog("🎉 Devis en signature via Odoo Sign !");
-    setSignUrl(url);onChange({...d,statut:"en_signature",odoo_sign_url:url});
-    setSending(false);
+    if (sending) return;
+    if (!signerEmail) {
+      alert("Le contact de ce devis n'a pas d'email — impossible d'envoyer la signature.");
+      return;
+    }
+    setSending(true); setLog([]); setShowLog(true);
+    addLog("Préparation du PDF…");
+    setOdooRendering(true);
+  };
+
+  const onPdfPageReady = async (pageEl) => {
+    try {
+      const { renderElementToPdf } = await import("./lib/pdf.js");
+      const { base64 } = await renderElementToPdf(pageEl, { filename: `${d.numero}.pdf` });
+      addLog("✓ PDF généré");
+      addLog("Envoi vers Odoo Sign…");
+      const res = await fetch("/api/odoo-sign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pdf_base64: base64,
+          filename: `${d.numero}.pdf`,
+          reference: d.numero,
+          signer_email: signerEmail,
+          signer_name: signerName || signerEmail,
+          signer_phone: cl?.telephone || "",
+          subject: `Devis ${d.numero} à signer`,
+          message: `Bonjour,\n\nMerci de bien vouloir signer le devis ${d.numero}${d.objet?` (${d.objet})`:""}.\n\nCordialement.`,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.detail || data?.error || "Erreur Odoo");
+      addLog("✓ Demande de signature créée");
+      addLog(`🎉 Email envoyé à ${signerEmail}`);
+      setSignUrl(data.sign_url);
+      onChange({ ...d, statut: "en_signature", odoo_sign_url: data.sign_url, odoo_sign_id: String(data.request_id||"") });
+    } catch (err) {
+      addLog(`❌ ${err.message || err}`);
+    } finally {
+      setOdooRendering(false);
+      setSending(false);
+    }
   };
 
   const lotsResume=lignes.filter(l=>l.type_ligne==="ouvrage").reduce((a,l)=>{a[l.lot||"Divers"]=(a[l.lot||"Divers"]||0)+(l.quantite||0)*(l.prix_unitaire||0);return a;},{});
@@ -1429,6 +1481,7 @@ function DevisDetail({d,cl,onBack,brand,onChange}) {
   return (
     <>
       {showPDF&&<PDFViewer d={d} cl={cl} brand={brand} onClose={()=>setShowPDF(false)}/>}
+      {odooRendering && <PDFViewer d={d} cl={cl} brand={brand} hidden onPageReady={onPdfPageReady}/>}
 
       <div style={{minHeight:"100%",background:"#f8fafc"}} className="fu">
         <div style={{background:"white",borderBottom:"1px solid #f1f5f9",padding:"13px 18px"}}>
