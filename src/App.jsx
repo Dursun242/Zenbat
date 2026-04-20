@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "./lib/auth.jsx";
+import { startCheckout } from "./lib/stripe.js";
 
 const fmt  = n => new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR"}).format(n||0);
 const fmtD = d => d ? new Date(d).toLocaleDateString("fr-FR") : "—";
@@ -194,7 +195,7 @@ export default function App() {
 
   if (screen==="auth")       return <AuthScreen onEnter={co=>{setBrand(b=>({...b,companyName:co||""}));setScreen("onboarding");}}/>;
   if (screen==="onboarding") return <Onboarding brand={brand} setBrand={setBrand} onDone={()=>setScreen("app")}/>;
-  if (screen==="paywall")    return <PaywallScreen daysLeft={daysLeft} onBack={()=>setScreen("app")} onSubscribe={()=>{setPlan("pro");setScreen("app");}}/>;
+  if (screen==="paywall")    return <PaywallScreen daysLeft={daysLeft} onBack={()=>setScreen("app")}/>;
 
   return (
     <div style={{fontFamily:"'DM Sans',sans-serif",height:"100dvh",display:"flex",flexDirection:"column",background:"#f8fafc",overflow:"hidden"}}>
@@ -1415,8 +1416,15 @@ function AuthScreen({onEnter}) {
   );
 }
 
-function PaywallScreen({daysLeft=0,onBack,onSubscribe}) {
+function PaywallScreen({daysLeft=0,onBack}) {
   const expired = daysLeft <= 0;
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const subscribe = async () => {
+    setError(null); setLoading(true);
+    try { await startCheckout(); }
+    catch (e) { setError(e.message); setLoading(false); }
+  };
   return (
     <div style={{minHeight:"100vh",background:"#0f172a",display:"flex",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"'DM Sans',sans-serif"}}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}`}</style>
@@ -1427,7 +1435,7 @@ function PaywallScreen({daysLeft=0,onBack,onSubscribe}) {
         <div style={{background:"white",borderRadius:24,padding:22,textAlign:"left",marginBottom:14,boxShadow:"0 24px 48px rgba(0,0,0,.3)"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
             <div><div style={{fontWeight:700,fontSize:16,color:"#0f172a"}}>Zenbat Pro</div><div style={{color:"#94a3b8",fontSize:11,marginTop:2}}>Pour artisans et entreprises BTP</div></div>
-            <div style={{textAlign:"right"}}><div style={{fontSize:28,fontWeight:700,color:"#22c55e"}}>15€</div><div style={{color:"#94a3b8",fontSize:11}}>/mois HT</div></div>
+            <div style={{textAlign:"right"}}><div style={{fontSize:28,fontWeight:700,color:"#22c55e"}}>19€</div><div style={{color:"#94a3b8",fontSize:11}}>/mois TTC</div></div>
           </div>
           {["Agent IA illimité (voix + texte)","PDF brandé avec votre logo","Envoi Odoo Sign intégré","Identification SIRET via Pappers","Signature électronique eIDAS","Annulation à tout moment"].map(f=>(
             <div key={f} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
@@ -1435,7 +1443,10 @@ function PaywallScreen({daysLeft=0,onBack,onSubscribe}) {
               <span style={{fontSize:13,color:"#374151"}}>{f}</span>
             </div>
           ))}
-          <button onClick={onSubscribe} style={{width:"100%",background:"#22c55e",color:"white",border:"none",borderRadius:12,padding:"14px",fontSize:14,fontWeight:700,marginTop:14,cursor:"pointer"}}>S'abonner — 15€/mois</button>
+          <button onClick={subscribe} disabled={loading} style={{width:"100%",background:"#22c55e",color:"white",border:"none",borderRadius:12,padding:"14px",fontSize:14,fontWeight:700,marginTop:14,cursor:loading?"wait":"pointer",opacity:loading?0.7:1}}>
+            {loading ? "Redirection…" : "S'abonner — 19€/mois"}
+          </button>
+          {error && <div style={{background:"#fef2f2",color:"#991b1b",padding:10,borderRadius:10,fontSize:12,marginTop:10}}>{error}</div>}
         </div>
         <button onClick={onBack} style={{background:"none",border:"none",color:"#475569",fontSize:12,cursor:"pointer"}}>← Retour</button>
       </div>

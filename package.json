@@ -12,7 +12,8 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.103.3",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "stripe": "^22.0.2"
   },
   "devDependencies": {
     "@vite-pwa/assets-generator": "^1.0.2",
