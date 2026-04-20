@@ -1,5 +1,19 @@
 import { supabase } from './supabase'
 
+// Insère des lignes de devis avec fallback si tva_rate n'existe pas encore en DB
+async function insertLignesRows(rows) {
+  const { error } = await supabase.from('lignes_devis').insert(rows)
+  if (!error) return
+  // Colonne inconnue (migration 0002 non appliquée) → retry sans tva_rate
+  if (error.code === '42703' || error.message?.includes('tva_rate')) {
+    const fallback = rows.map(({ tva_rate, ...r }) => r)
+    const { error: e2 } = await supabase.from('lignes_devis').insert(fallback)
+    if (e2) throw e2
+    return
+  }
+  throw error
+}
+
 // =========================================================
 // PROFILES
 // =========================================================
@@ -77,12 +91,12 @@ export async function listDevis() {
 
 // Liste les devis + leurs lignes en 2 requêtes (évite N+1)
 export async function listDevisWithLignes() {
-  const [{ data: ds, error: e1 }, { data: ls, error: e2 }] = await Promise.all([
+  const [{ data: ds, error: e1 }, { data: ls }] = await Promise.all([
     supabase.from('devis').select('*').order('created_at', { ascending: false }),
     supabase.from('lignes_devis').select('*').order('position', { ascending: true }),
   ])
   if (e1) throw e1
-  if (e2) throw e2
+  // Si lignes échouent (ex: colonne manquante), on retourne quand même les devis
   const byDevis = new Map()
   for (const l of ls || []) {
     if (!byDevis.has(l.devis_id)) byDevis.set(l.devis_id, [])
@@ -124,8 +138,7 @@ export async function createDevis(devis, lignes = []) {
       prix_unitaire: l.prix_unitaire ?? 0,
       tva_rate: l.tva_rate ?? 20,
     }))
-    const { error: e2 } = await supabase.from('lignes_devis').insert(rows)
-    if (e2) throw e2
+    await insertLignesRows(rows)
   }
   return d
 }
@@ -154,9 +167,9 @@ export async function replaceLignes(devisId, lignes) {
     prix_unitaire: l.prix_unitaire ?? 0,
     tva_rate: l.tva_rate ?? 20,
   }))
-  const { data, error } = await supabase.from('lignes_devis').insert(rows).select()
-  if (error) throw error
-  return data
+  await insertLignesRows(rows)
+  const { data: inserted } = await supabase.from('lignes_devis').select('*').eq('devis_id', devisId).order('position')
+  return inserted || []
 }
 
 export async function deleteDevis(id) {
