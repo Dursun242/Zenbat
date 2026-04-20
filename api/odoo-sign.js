@@ -83,7 +83,7 @@ export default async function handler(req, res) {
     const uid = await odooLogin({ base, db: ODOO_DB, username: ODOO_USERNAME, password: ODOO_API_KEY });
     const ctx = { base, db: ODOO_DB, uid, password: ODOO_API_KEY };
 
-    // Introspecte sign.template pour détecter dynamiquement le champ attachment
+    // Introspecte sign.template
     const tmplFields = await odooCall({
       ...ctx,
       model: "sign.template",
@@ -92,43 +92,89 @@ export default async function handler(req, res) {
       kwargs: { attributes: ["type", "relation"] },
     });
 
-    // Cherche un champ qui pointe vers ir.attachment
-    const attachmentFieldEntry = Object.entries(tmplFields).find(
-      ([, def]) => def.relation === "ir.attachment"
+    // Stratégie 1 : champ direct vers ir.attachment (Odoo 16/17)
+    // Stratégie 2 : champ vers sign.document (Odoo SaaS récent) → chaîne ir.attachment → sign.document → sign.template
+    const directAttach = Object.entries(tmplFields).find(
+      ([, d]) => d.relation === "ir.attachment"
+    );
+    const docsFieldEntry = Object.entries(tmplFields).find(
+      ([, d]) => d.relation === "sign.document"
     );
 
-    if (!attachmentFieldEntry) {
+    let templateId;
+
+    if (directAttach) {
+      const [fieldName, def] = directAttach;
+      const isMany = ["many2many", "one2many"].includes(def.type);
+      const attId = await odooCall({
+        ...ctx,
+        model: "ir.attachment",
+        method: "create",
+        args: [{
+          name: filename,
+          datas: pdf_base64,
+          mimetype: "application/pdf",
+          res_model: "sign.template",
+          type: "binary",
+        }],
+      });
+      const payload = { name: reference || filename };
+      payload[fieldName] = isMany ? [[6, 0, [attId]]] : attId;
+      templateId = await odooCall({
+        ...ctx, model: "sign.template", method: "create", args: [payload],
+      });
+    } else if (docsFieldEntry) {
+      const [docsFieldName, docsFieldDef] = docsFieldEntry;
+      const docsIsMany = ["many2many", "one2many"].includes(docsFieldDef.type);
+
+      // Introspecte sign.document pour trouver son champ ir.attachment
+      const docFields = await odooCall({
+        ...ctx,
+        model: "sign.document",
+        method: "fields_get",
+        args: [],
+        kwargs: { attributes: ["type", "relation"] },
+      });
+      const docAttach = Object.entries(docFields).find(
+        ([, d]) => d.relation === "ir.attachment"
+      );
+      if (!docAttach) {
+        const names = Object.keys(docFields).sort().join(", ");
+        throw new Error(`sign.document n'a aucun champ ir.attachment. Champs : ${names}`);
+      }
+      const [docAttFieldName, docAttFieldDef] = docAttach;
+      const docAttIsMany = ["many2many", "one2many"].includes(docAttFieldDef.type);
+
+      const attId = await odooCall({
+        ...ctx,
+        model: "ir.attachment",
+        method: "create",
+        args: [{
+          name: filename,
+          datas: pdf_base64,
+          mimetype: "application/pdf",
+          res_model: "sign.document",
+          type: "binary",
+        }],
+      });
+
+      const docPayload = { name: filename };
+      docPayload[docAttFieldName] = docAttIsMany ? [[6, 0, [attId]]] : attId;
+      const docId = await odooCall({
+        ...ctx, model: "sign.document", method: "create", args: [docPayload],
+      });
+
+      const tmplPayload = { name: reference || filename };
+      tmplPayload[docsFieldName] = docsIsMany ? [[6, 0, [docId]]] : docId;
+      templateId = await odooCall({
+        ...ctx, model: "sign.template", method: "create", args: [tmplPayload],
+      });
+    } else {
       const allFields = Object.keys(tmplFields).sort().join(", ");
       throw new Error(
-        `Aucun champ ir.attachment trouvé sur sign.template. Champs disponibles : ${allFields}`
+        `Schéma sign.template non supporté. Champs disponibles : ${allFields}`
       );
     }
-
-    const [attachmentFieldName, attachmentFieldDef] = attachmentFieldEntry;
-    const isMany = ["many2many", "one2many"].includes(attachmentFieldDef.type);
-
-    const attachmentId = await odooCall({
-      ...ctx,
-      model: "ir.attachment",
-      method: "create",
-      args: [{
-        name: filename,
-        datas: pdf_base64,
-        mimetype: "application/pdf",
-        res_model: "sign.template",
-        type: "binary",
-      }],
-    });
-
-    const tmplPayload = { name: reference || filename };
-    tmplPayload[attachmentFieldName] = isMany ? [[6, 0, [attachmentId]]] : attachmentId;
-
-    const templateId = await odooCall({
-      ...ctx,
-      model: "sign.template",
-      method: "create",
-      args: [tmplPayload],
-    });
 
     let partnerId;
     const found = await odooCall({
