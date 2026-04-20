@@ -290,14 +290,20 @@ export default async function handler(req, res) {
 </div>`.trim();
 
       try {
-        // Cherche les mails liés à la sign.request OU à ses items (selon version Odoo)
+        // Ne touche QUE les mails encore en file (state='outgoing'), pour éviter
+        // de renvoyer un mail déjà parti (double email).
         const mailDomain = itemIds.length
           ? [
+              ["state", "=", "outgoing"],
               "|",
               "&", ["model", "=", "sign.request"], ["res_id", "=", requestId],
               "&", ["model", "=", "sign.request.item"], ["res_id", "in", itemIds],
             ]
-          : [["model", "=", "sign.request"], ["res_id", "=", requestId]];
+          : [
+              ["state", "=", "outgoing"],
+              ["model", "=", "sign.request"],
+              ["res_id", "=", requestId],
+            ];
         const mailIds = await odooCall({
           ...ctx,
           model: "mail.mail",
@@ -316,14 +322,9 @@ export default async function handler(req, res) {
               subject: subject,
             }],
           });
-          try {
-            await odooCall({
-              ...ctx,
-              model: "mail.mail",
-              method: "send",
-              args: [mailIds],
-            });
-          } catch (_) { /* best effort */ }
+          // Pas de mail.mail.send() ici : Odoo dispatche via son cron,
+          // un send manuel provoquerait un double envoi si le mail est
+          // déjà parti entre-temps.
         }
       } catch (_) { /* best effort */ }
     }
