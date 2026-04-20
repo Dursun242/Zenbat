@@ -124,8 +124,14 @@ export default async function handler(req, res) {
         ...ctx, model: "sign.template", method: "create", args: [payload],
       });
     } else if (docsFieldEntry) {
-      const [docsFieldName, docsFieldDef] = docsFieldEntry;
-      const docsIsMany = ["many2many", "one2many"].includes(docsFieldDef.type);
+      // sign.document a un template_id requis → on crée le template d'abord,
+      // puis le document qui pointe vers lui.
+      templateId = await odooCall({
+        ...ctx,
+        model: "sign.template",
+        method: "create",
+        args: [{ name: reference || filename }],
+      });
 
       // Introspecte sign.document pour trouver son champ ir.attachment
       const docFields = await odooCall({
@@ -158,16 +164,10 @@ export default async function handler(req, res) {
         }],
       });
 
-      const docPayload = { name: filename };
+      const docPayload = { template_id: templateId, name: filename };
       docPayload[docAttFieldName] = docAttIsMany ? [[6, 0, [attId]]] : attId;
-      const docId = await odooCall({
+      await odooCall({
         ...ctx, model: "sign.document", method: "create", args: [docPayload],
-      });
-
-      const tmplPayload = { name: reference || filename };
-      tmplPayload[docsFieldName] = docsIsMany ? [[6, 0, [docId]]] : docId;
-      templateId = await odooCall({
-        ...ctx, model: "sign.template", method: "create", args: [tmplPayload],
       });
     } else {
       const allFields = Object.keys(tmplFields).sort().join(", ");
