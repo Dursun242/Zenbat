@@ -221,12 +221,17 @@ export default async function handler(req, res) {
       }],
     });
 
-    await odooCall({
-      ...ctx,
-      model: "sign.request",
-      method: "action_sent",
-      args: [[requestId]],
-    });
+    // Essaie plusieurs noms de méthode pour l'envoi (varie selon version Odoo).
+    // Sur Odoo récent, la request est envoyée automatiquement à la création.
+    const sendCandidates = ["action_sent", "action_send", "send_signature_accesses"];
+    for (const method of sendCandidates) {
+      try {
+        await odooCall({ ...ctx, model: "sign.request", method, args: [[requestId]] });
+        break;
+      } catch (e) {
+        if (!/does not exist|Invalid method/i.test(String(e.message || ""))) throw e;
+      }
+    }
 
     const items = await odooCall({
       ...ctx,
