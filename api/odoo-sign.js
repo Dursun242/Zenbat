@@ -256,9 +256,10 @@ export default async function handler(req, res) {
       ...ctx,
       model: "sign.request.item",
       method: "search_read",
-      args: [[["sign_request_id", "=", requestId]], ["access_token", "partner_id"]],
+      args: [[["sign_request_id", "=", requestId]], ["id", "access_token", "partner_id"]],
     });
     const accessToken = items?.[0]?.access_token;
+    const itemIds = (items || []).map(i => i.id);
     const signUrl = accessToken
       ? `${base}/sign/document/${requestId}/${accessToken}`
       : `${base}/web#id=${requestId}&model=sign.request`;
@@ -280,23 +281,28 @@ export default async function handler(req, res) {
       const bodyHtml = `
 <div style="font-family:Arial,sans-serif;font-size:14px;color:#0f172a;line-height:1.6;max-width:600px">
   <p>Bonjour ${esc(signer_name || "")},</p>
-  <p><strong>${esc(company_name || "Notre entreprise")}</strong> vous prie de bien vouloir signer le devis <strong>${esc(reference || filename)}</strong>.</p>
+  <p>Votre devis <strong>${esc(reference || filename)}</strong> est prêt. <strong>${esc(company_name || "Notre entreprise")}</strong> vous invite à le consulter en ligne.</p>
   <p style="margin:24px 0">
-    <a href="${esc(signUrl)}" style="display:inline-block;background:#22c55e;color:white;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:700;font-size:15px">Signer le document</a>
+    <a href="${esc(signUrl)}" style="display:inline-block;background:#22c55e;color:white;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:700;font-size:15px">Consulter votre devis</a>
   </p>
   ${contactLine ? `<p>Pour toute question, n'hésitez pas à nous contacter ${contactLine}.</p>` : ""}
   <p>Cordialement,<br/><strong>${esc(company_name || "")}</strong></p>
 </div>`.trim();
 
       try {
+        // Cherche les mails liés à la sign.request OU à ses items (selon version Odoo)
+        const mailDomain = itemIds.length
+          ? [
+              "|",
+              "&", ["model", "=", "sign.request"], ["res_id", "=", requestId],
+              "&", ["model", "=", "sign.request.item"], ["res_id", "in", itemIds],
+            ]
+          : [["model", "=", "sign.request"], ["res_id", "=", requestId]];
         const mailIds = await odooCall({
           ...ctx,
           model: "mail.mail",
           method: "search",
-          args: [[
-            ["model", "=", "sign.request"],
-            ["res_id", "=", requestId],
-          ]],
+          args: [mailDomain],
         });
         if (mailIds?.length) {
           await odooCall({
