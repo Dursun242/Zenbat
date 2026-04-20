@@ -141,6 +141,25 @@ export default function App() {
   const [plan,   setPlan]   = useState("free");
   const TRIAL_DAYS = 30;
   const { user } = useAuth();
+
+  // Préremplissage du brand depuis les infos saisies à l'inscription (user_metadata Supabase).
+  // N'écrase que les champs laissés vides — on ne touche pas à ce que l'utilisateur a déjà personnalisé.
+  useEffect(() => {
+    const m = user?.user_metadata;
+    if (!m) return;
+    setBrand(b => {
+      const cityLine = [m.postal_code, m.city].filter(Boolean).join(" ").trim();
+      return {
+        ...b,
+        companyName: b.companyName || m.company_name || "",
+        siret:       b.siret       || m.siret        || "",
+        phone:       b.phone       || m.phone        || "",
+        city:        b.city        || cityLine       || "",
+        email:       b.email       || user.email     || "",
+      };
+    });
+  }, [user]);
+
   // L'essai démarre à la date de création du compte Supabase (auth.users.created_at).
   // Fallback localStorage si pas encore d'utilisateur (rendu pendant le chargement de la session).
   const trialStart = (() => {

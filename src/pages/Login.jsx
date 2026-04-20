@@ -12,9 +12,10 @@ const styles = {
   err:    { background:'#fef2f2', color:'#991b1b', padding:10, borderRadius:10, fontSize:13, marginTop:12 },
   switch: { textAlign:'center', marginTop:20, fontSize:13, color:'#64748b' },
   link:   { color:'#1d4ed8', background:'none', border:0, cursor:'pointer', fontWeight:600, padding:0 },
+  back:   { background:'none', border:0, color:'#64748b', fontSize:13, cursor:'pointer', padding:0, marginBottom:12 },
 }
 
-export default function Login({ onSwitchToSignup }) {
+export default function Login({ onSwitchToSignup, onBack }) {
   const { signInWithPassword } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -32,6 +33,7 @@ export default function Login({ onSwitchToSignup }) {
   return (
     <div style={styles.wrap}>
       <div style={styles.card}>
+        {onBack && <button type="button" style={styles.back} onClick={onBack}>← Retour</button>}
         <h1 style={styles.title}>Se connecter</h1>
         <p style={styles.sub}>Accédez à votre espace Zenbat.</p>
 
