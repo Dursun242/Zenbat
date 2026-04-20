@@ -83,25 +83,73 @@ export default async function handler(req, res) {
     const uid = await odooLogin({ base, db: ODOO_DB, username: ODOO_USERNAME, password: ODOO_API_KEY });
     const ctx = { base, db: ODOO_DB, uid, password: ODOO_API_KEY };
 
-    const attachmentId = await odooCall({
-      ...ctx,
-      model: "ir.attachment",
-      method: "create",
-      args: [{
-        name: filename,
-        datas: pdf_base64,
-        mimetype: "application/pdf",
-        res_model: "sign.template",
-        type: "binary",
-      }],
-    });
-
-    const templateId = await odooCall({
+    // Introspecte sign.template pour détecter le bon champ (selon version Odoo)
+    const tmplFields = await odooCall({
       ...ctx,
       model: "sign.template",
-      method: "create",
-      args: [{ name: reference || filename, attachment_id: attachmentId }],
+      method: "fields_get",
+      args: [],
+      kwargs: { attributes: ["type"] },
     });
+
+    let templateId;
+    let attachmentId = null;
+
+    if (tmplFields.attachment_id) {
+      // Odoo 16/17 classique
+      attachmentId = await odooCall({
+        ...ctx,
+        model: "ir.attachment",
+        method: "create",
+        args: [{
+          name: filename,
+          datas: pdf_base64,
+          mimetype: "application/pdf",
+          res_model: "sign.template",
+          type: "binary",
+        }],
+      });
+      templateId = await odooCall({
+        ...ctx,
+        model: "sign.template",
+        method: "create",
+        args: [{ name: reference || filename, attachment_id: attachmentId }],
+      });
+    } else if (tmplFields.attachment_ids) {
+      // Odoo 18+ (many2many)
+      attachmentId = await odooCall({
+        ...ctx,
+        model: "ir.attachment",
+        method: "create",
+        args: [{
+          name: filename,
+          datas: pdf_base64,
+          mimetype: "application/pdf",
+          res_model: "sign.template",
+          type: "binary",
+        }],
+      });
+      templateId = await odooCall({
+        ...ctx,
+        model: "sign.template",
+        method: "create",
+        args: [{
+          name: reference || filename,
+          attachment_ids: [[6, 0, [attachmentId]]],
+        }],
+      });
+    } else {
+      // Fallback : méthode haut-niveau qui gère l'attachment en interne
+      templateId = await odooCall({
+        ...ctx,
+        model: "sign.template",
+        method: "create_with_attachment_data",
+        args: [filename, pdf_base64, true],
+      });
+      if (!templateId) {
+        throw new Error("sign.template.create_with_attachment_data a échoué");
+      }
+    }
 
     let partnerId;
     const found = await odooCall({
