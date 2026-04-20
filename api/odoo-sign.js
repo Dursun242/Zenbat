@@ -251,12 +251,43 @@ export default async function handler(req, res) {
       }
     }
 
-    // Override l'expéditeur sur les mails sortants générés par cette sign.request
-    // pour qu'ils apparaissent envoyés au nom de l'entreprise qui édite le devis.
+    // Récupère l'access_token pour construire le lien de signature
+    const items = await odooCall({
+      ...ctx,
+      model: "sign.request.item",
+      method: "search_read",
+      args: [[["sign_request_id", "=", requestId]], ["access_token", "partner_id"]],
+    });
+    const accessToken = items?.[0]?.access_token;
+    const signUrl = accessToken
+      ? `${base}/sign/document/${requestId}/${accessToken}`
+      : `${base}/web#id=${requestId}&model=sign.request`;
+
+    // Réécrit entièrement les mails sortants : nouvel expéditeur (entreprise qui
+    // édite le devis) + corps HTML propre sans la mention Odoo du créateur.
     if (company_email) {
-      const fromFormatted = company_name
-        ? `"${company_name.replace(/"/g, "'")}" <${company_email}>`
+      const safeCompany = (company_name || "").replace(/"/g, "'");
+      const fromFormatted = safeCompany
+        ? `"${safeCompany}" <${company_email}>`
         : company_email;
+      const esc = (s) => String(s || "").replace(/[&<>"']/g, c => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      })[c]);
+      const contactLine = [
+        company_phone ? `au <strong>${esc(company_phone)}</strong>` : "",
+        company_email ? `ou par mail à <a href="mailto:${esc(company_email)}">${esc(company_email)}</a>` : "",
+      ].filter(Boolean).join(" ");
+      const bodyHtml = `
+<div style="font-family:Arial,sans-serif;font-size:14px;color:#0f172a;line-height:1.6;max-width:600px">
+  <p>Bonjour ${esc(signer_name || "")},</p>
+  <p><strong>${esc(company_name || "Notre entreprise")}</strong> vous prie de bien vouloir signer le devis <strong>${esc(reference || filename)}</strong>.</p>
+  <p style="margin:24px 0">
+    <a href="${esc(signUrl)}" style="display:inline-block;background:#22c55e;color:white;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:700;font-size:15px">Signer le document</a>
+  </p>
+  ${contactLine ? `<p>Pour toute question, n'hésitez pas à nous contacter ${contactLine}.</p>` : ""}
+  <p>Cordialement,<br/><strong>${esc(company_name || "")}</strong></p>
+</div>`.trim();
+
       try {
         const mailIds = await odooCall({
           ...ctx,
@@ -275,9 +306,10 @@ export default async function handler(req, res) {
             args: [mailIds, {
               email_from: fromFormatted,
               reply_to: company_email,
+              body_html: bodyHtml,
+              subject: subject,
             }],
           });
-          // Essaie de re-pousser les mails encore en file
           try {
             await odooCall({
               ...ctx,
@@ -289,17 +321,6 @@ export default async function handler(req, res) {
         }
       } catch (_) { /* best effort */ }
     }
-
-    const items = await odooCall({
-      ...ctx,
-      model: "sign.request.item",
-      method: "search_read",
-      args: [[["sign_request_id", "=", requestId]], ["access_token", "partner_id"]],
-    });
-    const accessToken = items?.[0]?.access_token;
-    const signUrl = accessToken
-      ? `${base}/sign/document/${requestId}/${accessToken}`
-      : `${base}/web#id=${requestId}&model=sign.request`;
 
     return res.status(200).json({
       request_id: requestId,
