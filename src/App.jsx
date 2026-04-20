@@ -1472,8 +1472,8 @@ function DevisDetail({d,cl,onBack,brand,onChange}) {
           company_name: brand.companyName || "",
           company_email: brand.email || "",
           company_phone: brand.phone || "",
-          subject: `${brand.companyName ? brand.companyName + " — " : ""}Devis ${d.numero} à signer`,
-          message: `Bonjour ${signerName || ""},\n\n${brand.companyName || "Notre entreprise"} vous prie de bien vouloir signer le devis ${d.numero}${d.objet?` (${d.objet})`:""}.\n\nPour toute question, n'hésitez pas à nous contacter${brand.phone?` au ${brand.phone}`:""}${brand.email?` ou par mail à ${brand.email}`:""}.\n\nCordialement,\n${brand.companyName || ""}`,
+          subject: `${brand.companyName ? brand.companyName + " — " : ""}Votre devis ${d.numero}`,
+          message: `Bonjour ${signerName || ""},\n\nVotre devis ${d.numero}${d.objet?` (${d.objet})`:""} est prêt. Vous pouvez le consulter et le signer en ligne.\n\n${brand.companyName || "Notre entreprise"} reste à votre disposition pour toute question${brand.phone?` au ${brand.phone}`:""}${brand.email?` ou par mail à ${brand.email}`:""}.\n\nCordialement,\n${brand.companyName || ""}`,
         }),
       });
       const data = await res.json();
