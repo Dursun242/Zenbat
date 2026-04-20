@@ -3,6 +3,7 @@ import { useAuth } from './lib/auth.jsx'
 import App from './App.jsx'
 import Login from './pages/Login.jsx'
 import Signup from './pages/Signup.jsx'
+import Landing from './pages/Landing.jsx'
 import AuthCallback from './pages/AuthCallback.jsx'
 
 const loader = {
@@ -11,7 +12,7 @@ const loader = {
 
 export default function Root() {
   const { session, loading } = useAuth()
-  const [mode, setMode] = useState('login')
+  const [view, setView] = useState('landing')
 
   if (typeof window !== 'undefined' && window.location.pathname === '/auth/callback') {
     return <AuthCallback />
@@ -22,9 +23,9 @@ export default function Root() {
   }
 
   if (!session) {
-    return mode === 'signup'
-      ? <Signup onSwitchToLogin={() => setMode('login')} />
-      : <Login  onSwitchToSignup={() => setMode('signup')} />
+    if (view === 'login')  return <Login  onSwitchToSignup={() => setView('signup')} onBack={() => setView('landing')} />
+    if (view === 'signup') return <Signup onSwitchToLogin={() => setView('login')} onBack={() => setView('landing')} />
+    return <Landing onSignup={() => setView('signup')} onLogin={() => setView('login')} />
   }
 
   return <App />
