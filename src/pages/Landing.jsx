@@ -264,9 +264,9 @@ export default function Landing({ onSignup, onLogin }) {
           <div style={styles.pricingCard}>
             <div style={styles.priceLabel}>Formule Pro</div>
             <div style={styles.priceAmount}>
-              29€<span style={styles.priceUnit}>/mois</span>
+              19€<span style={styles.priceUnit}>/mois</span>
             </div>
-            <div style={{ color: "#64748b", fontSize: 14 }}>HT, sans engagement</div>
+            <div style={{ color: "#64748b", fontSize: 14 }}>TTC, sans engagement</div>
             <ul style={styles.priceList}>
               <li style={styles.priceItem}><span style={styles.check}>✓</span> Devis illimités</li>
               <li style={styles.priceItem}><span style={styles.check}>✓</span> Agent IA multilingue</li>
