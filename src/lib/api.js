@@ -75,6 +75,22 @@ export async function listDevis() {
   return data
 }
 
+// Liste les devis + leurs lignes en 2 requêtes (évite N+1)
+export async function listDevisWithLignes() {
+  const [{ data: ds, error: e1 }, { data: ls, error: e2 }] = await Promise.all([
+    supabase.from('devis').select('*').order('created_at', { ascending: false }),
+    supabase.from('lignes_devis').select('*').order('position', { ascending: true }),
+  ])
+  if (e1) throw e1
+  if (e2) throw e2
+  const byDevis = new Map()
+  for (const l of ls || []) {
+    if (!byDevis.has(l.devis_id)) byDevis.set(l.devis_id, [])
+    byDevis.get(l.devis_id).push(l)
+  }
+  return (ds || []).map(d => ({ ...d, lignes: byDevis.get(d.id) || [] }))
+}
+
 export async function getDevis(id) {
   const { data, error } = await supabase
     .from('devis')
