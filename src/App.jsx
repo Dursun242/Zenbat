@@ -1,9 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "./lib/auth.jsx";
+import {
+  listClients, createClient as apiCreateClient, updateClient as apiUpdateClient, deleteClient as apiDeleteClient,
+  listDevisWithLignes, createDevis as apiCreateDevis, updateDevis as apiUpdateDevis, replaceLignes, deleteDevis as apiDeleteDevis,
+} from "./lib/api";
 
 const fmt  = n => new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR"}).format(n||0);
 const fmtD = d => d ? new Date(d).toLocaleDateString("fr-FR") : "—";
-const uid  = () => Math.random().toString(36).slice(2);
+const uid  = () => (typeof crypto !== "undefined" && crypto.randomUUID)
+  ? crypto.randomUUID()
+  : Math.random().toString(36).slice(2);
 
 const DEMO_CLIENTS = [
   { id:"c1", type:"entreprise",  raison_sociale:"Alcéane Bailleur Social", email:"contact@alceane.fr",   ville:"Le Havre" },
@@ -130,9 +136,25 @@ const TX = {
   help_agent:"💬 Décrivez les travaux en bas\nEx : pose carrelage 25€/m² pour 40m²\n📋 Les lignes apparaissent automatiquement\n✅ Enregistrez le devis une fois terminé",
 };
 
+const DEFAULT_DEMO_BRAND = {...DEFAULT_BRAND, companyName:"Maçonnerie Dupont SAS", city:"76600 Le Havre", phone:"02 35 12 34 56", email:"contact@dupont-maconnerie.fr", siret:"12345678900010", color:"#22c55e", fontStyle:"modern", paymentTerms:"Acompte 30% à la commande, solde à réception.", mentionsLegales:"Assurance décennale n°12345 — Garantie biennale incluse — TVA 20%", rib:"Crédit Mutuel Le Havre", iban:"FR76 1234 5678 9012 3456 7890 123", bic:"CMCIFRPP", validityDays:30, trades:["maconnerie","gros_oeuvre","carrelage","platrerie","peinture"]};
+
 export default function App() {
   const [screen, setScreen] = useState("app");
-  const [brand,  setBrand]  = useState({...DEFAULT_BRAND, companyName:"Maçonnerie Dupont SAS", city:"76600 Le Havre", phone:"02 35 12 34 56", email:"contact@dupont-maconnerie.fr", siret:"12345678900010", color:"#22c55e", fontStyle:"modern", paymentTerms:"Acompte 30% à la commande, solde à réception.", mentionsLegales:"Assurance décennale n°12345 — Garantie biennale incluse — TVA 20%", rib:"Crédit Mutuel Le Havre", iban:"FR76 1234 5678 9012 3456 7890 123", bic:"CMCIFRPP", validityDays:30, trades:["maconnerie","gros_oeuvre","carrelage","platrerie","peinture"]});
+  const [brand,  setBrandState]= useState(() => {
+    if (typeof window === "undefined") return DEFAULT_DEMO_BRAND;
+    try {
+      const stored = localStorage.getItem("zenbat_brand");
+      if (stored) return { ...DEFAULT_DEMO_BRAND, ...JSON.parse(stored) };
+    } catch {}
+    return DEFAULT_DEMO_BRAND;
+  });
+  const setBrand = (updater) => {
+    setBrandState(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      try { localStorage.setItem("zenbat_brand", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
   const [clients,setClients]= useState(DEMO_CLIENTS);
   const [devis,  setDevis]  = useState(DEMO_DEVIS);
   const [tab,    setTab]    = useState("dashboard");
@@ -151,6 +173,81 @@ export default function App() {
   const dismissToast = () => setToast(prev => { if (prev?.timer) clearTimeout(prev.timer); return null; });
   const TRIAL_DAYS = 30;
   const { user } = useAuth();
+
+  // ── Chargement initial depuis Supabase (une fois authentifié) ──────
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [cs, ds] = await Promise.all([listClients(), listDevisWithLignes()]);
+        if (cancelled) return;
+        setClients(cs.length ? cs : []);
+        setDevis(ds.length ? ds : []);
+      } catch (err) {
+        console.error("[Zenbat] chargement données :", err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  // ── Debounce pour sauvegarde devis (édition ligne par ligne) ──────
+  const saveTimers = useRef({});
+  const scheduleDevisSave = (d, immediate=false) => {
+    if (!user) return;
+    const run = async () => {
+      try {
+        const { lignes: dl, client, created_at, updated_at, ...fields } = d;
+        await apiUpdateDevis(d.id, fields);
+        await replaceLignes(d.id, (dl || []).map(({id, created_at, ...l}) => l));
+      } catch (err) { console.error("[save devis]", err); }
+    };
+    if (immediate) { run(); return; }
+    clearTimeout(saveTimers.current[d.id]);
+    saveTimers.current[d.id] = setTimeout(run, 800);
+  };
+
+  // ── CRUD helpers (optimistic UI + Supabase) ───────────────────────
+  const onSaveClient = async (c) => {
+    const isNew = !clients.some(x => x.id === c.id);
+    setClients(prev => isNew ? [c, ...prev] : prev.map(x => x.id === c.id ? c : x));
+    if (!user) return;
+    try {
+      const { created_at, updated_at, ...fields } = c;
+      if (isNew) await apiCreateClient(fields);
+      else await apiUpdateClient(c.id, fields);
+    } catch (err) { console.error("[save client]", err); }
+  };
+  const onDeleteClient = async (id) => {
+    const victim = clients.find(x => x.id === id);
+    const idx = clients.findIndex(x => x.id === id);
+    setClients(prev => prev.filter(x => x.id !== id));
+    if (user) apiDeleteClient(id).catch(e => console.error("[delete client]", e));
+    return { victim, idx };
+  };
+  const onRestoreClient = (victim, idx) => {
+    setClients(prev => { const n = [...prev]; n.splice(Math.min(idx, n.length), 0, victim); return n; });
+    if (user) {
+      const { created_at, updated_at, ...fields } = victim;
+      apiCreateClient(fields).catch(e => console.error("[restore client]", e));
+    }
+  };
+  const onSaveDevis = (d) => {
+    setDevis(prev => prev.map(x => x.id === d.id ? d : x));
+    scheduleDevisSave(d);
+  };
+  const onCreateDevis = async (d) => {
+    setDevis(prev => [d, ...prev]);
+    if (!user) return;
+    try {
+      const { lignes: dl, client, created_at, updated_at, ...fields } = d;
+      await apiCreateDevis(fields, (dl || []).map(({id, created_at, ...l}) => l));
+    } catch (err) { console.error("[create devis]", err); }
+  };
+  const onDeleteDevis = async (id) => {
+    setDevis(prev => prev.filter(x => x.id !== id));
+    if (user) apiDeleteDevis(id).catch(e => console.error("[delete devis]", e));
+  };
   // L'essai démarre à la date de création du compte Supabase (auth.users.created_at).
   // Fallback localStorage si pas encore d'utilisateur (rendu pendant le chargement de la session).
   const trialStart = (() => {
@@ -227,15 +324,15 @@ export default function App() {
 
       <div style={{flex:1,overflowY:"auto",paddingBottom:"calc(64px + env(safe-area-inset-bottom))"}}>
         {tab==="dashboard"    && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}/>}
-        {tab==="clients"      && <ClientsList clients={clients} setClients={setClients} goClient={goClient} showUndo={showUndo}/>}
-        {tab==="client_detail"&& selC && <ClientDetail c={clients.find(x=>x.id===selC)} clientDevis={devis.filter(d=>d.client_id===selC)} onBack={()=>setTab("clients")} goDevis={goDevis} onUpdate={u=>setClients(cs=>cs.map(x=>x.id===selC?u:x))} onDelete={()=>{setClients(cs=>cs.filter(x=>x.id!==selC));setTab("clients");}}/>}
+        {tab==="clients"      && <ClientsList clients={clients} onSave={onSaveClient} onDelete={onDeleteClient} onRestore={onRestoreClient} goClient={goClient} showUndo={showUndo}/>}
+        {tab==="client_detail"&& selC && <ClientDetail c={clients.find(x=>x.id===selC)} clientDevis={devis.filter(d=>d.client_id===selC)} onBack={()=>setTab("clients")} goDevis={goDevis} onUpdate={u=>onSaveClient(u)} onDelete={async()=>{await onDeleteClient(selC);setTab("clients");}}/>}
         {tab==="devis"        && <DevisList devis={devis} clients={clients} goDevis={goDevis} setTab={setTab}/>}
         {tab==="devis_detail" && selD && (
           <DevisDetail d={devis.find(x=>x.id===selD)} cl={clients.find(c=>c.id===devis.find(x=>x.id===selD)?.client_id)}
             onBack={()=>setTab("devis")} brand={brand}
-            onChange={u=>setDevis(ds=>ds.map(x=>x.id===selD?u:x))}/>
+            onChange={onSaveDevis}/>
         )}
-        {tab==="agent" && <AgentIA devis={devis} setDevis={setDevis} clients={clients} plan={plan} trialExpired={trialExpired} onPaywall={()=>setScreen("paywall")} setTab={setTab} brand={brand}/>}
+        {tab==="agent" && <AgentIA devis={devis} onCreateDevis={onCreateDevis} clients={clients} plan={plan} trialExpired={trialExpired} onPaywall={()=>setScreen("paywall")} setTab={setTab} brand={brand}/>}
       </div>
 
       {toast && (
@@ -848,7 +945,7 @@ const emptyClient = () => ({
 
 const displayName = (c) => c?.raison_sociale?.trim() || `${c?.prenom||""} ${c?.nom||""}`.trim() || "—";
 
-function ClientsList({clients,setClients,goClient,showUndo}) {
+function ClientsList({clients,onSave,onDelete,onRestore,goClient,showUndo}) {
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState(null); // client en cours d'édition / création
   const [importing, setImporting] = useState(false); // "loading" pendant l'analyse photo
@@ -920,23 +1017,15 @@ Règles :
     }
   };
 
-  const saveContact = (c) => {
-    setClients(prev => prev.some(x=>x.id===c.id) ? prev.map(x=>x.id===c.id?c:x) : [c, ...prev]);
+  const saveContact = async (c) => {
+    await onSave(c);
     setEditing(null);
   };
 
-  const deleteContact = (id) => {
-    const victim = clients.find(x => x.id === id);
+  const deleteContact = async (id) => {
+    const { victim, idx } = await onDelete(id);
     if (!victim) return;
-    const idx = clients.findIndex(x => x.id === id);
-    setClients(prev => prev.filter(x => x.id !== id));
-    showUndo?.(`Contact "${displayName(victim)}" supprimé`, () => {
-      setClients(prev => {
-        const next = [...prev];
-        next.splice(Math.min(idx, next.length), 0, victim);
-        return next;
-      });
-    });
+    showUndo?.(`Contact "${displayName(victim)}" supprimé`, () => onRestore(victim, idx));
   };
 
   return (
@@ -1428,7 +1517,7 @@ function DevisDetail({d,cl,onBack,brand,onChange}) {
 // ══════════════════════════════════════════════════════════
 //  AGENT IA — lignes qui pop une par une
 // ══════════════════════════════════════════════════════════
-function AgentIA({devis,setDevis,clients,plan,trialExpired,onPaywall,setTab,brand}) {
+function AgentIA({devis,onCreateDevis,clients,plan,trialExpired,onPaywall,setTab,brand}) {
   const greeting = TX.agentGreeting;
   const [msgs,    setMsgs]   = useState([{role:"assistant",content:TX.agentGreeting}]);
   const [input,   setInput]  = useState("");
@@ -1542,8 +1631,20 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
   const deleteLigne = id => setLignes(l=>l.filter(x=>x.id!==id));
 
   const save = () => {
-    const ht2=lignes.filter(l=>l.type_ligne==="ouvrage").reduce((s,l)=>s+(l.quantite*(l.prix_unitaire||0)),0);
-    setDevis(ds=>[...ds,{id:uid(),numero:`DEV-2026-${String(devis.length+1).padStart(4,"0")}`,objet:objet||"Devis IA",client_id:"",ville_chantier:"",statut:"brouillon",montant_ht:ht2,date_emission:new Date().toISOString().split("T")[0],lignes,odoo_sign_url:null}]);
+    const ht2=lignes.filter(l=>l.type_ligne==="ouvrage").reduce((s,l)=>s+((l.quantite||0)*(l.prix_unitaire||0)),0);
+    onCreateDevis({
+      id: uid(),
+      numero: `DEV-2026-${String(devis.length+1).padStart(4,"0")}`,
+      objet: objet || "Devis IA",
+      client_id: null,
+      ville_chantier: "",
+      statut: "brouillon",
+      montant_ht: ht2,
+      tva_rate: 20,
+      date_emission: new Date().toISOString().split("T")[0],
+      lignes,
+      odoo_sign_url: null,
+    });
     setLignes([]); setObjet("");
     setMsgs([{role:"assistant",content:TX.quoteSaved}]);
     setTimeout(()=>setTab("devis"),2500);
