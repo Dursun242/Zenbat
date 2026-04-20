@@ -113,7 +113,16 @@ export async function createDevis(devis, lignes = []) {
 
   if (lignes.length) {
     const rows = lignes.map((l, i) => ({
-      ...l, devis_id: d.id, owner_id: user.id, position: l.position ?? i,
+      devis_id: d.id,
+      owner_id: user.id,
+      position: l.position ?? i,
+      type_ligne: l.type_ligne,
+      lot: l.lot ?? null,
+      designation: l.designation,
+      unite: l.unite ?? null,
+      quantite: l.quantite ?? 0,
+      prix_unitaire: l.prix_unitaire ?? 0,
+      tva_rate: l.tva_rate ?? 20,
     }))
     const { error: e2 } = await supabase.from('lignes_devis').insert(rows)
     if (e2) throw e2
@@ -130,12 +139,20 @@ export async function updateDevis(id, patch) {
 
 export async function replaceLignes(devisId, lignes) {
   const { data: { user } } = await supabase.auth.getUser()
-  const { error: e1 } = await supabase
-    .from('lignes_devis').delete().eq('devis_id', devisId)
+  const { error: e1 } = await supabase.from('lignes_devis').delete().eq('devis_id', devisId)
   if (e1) throw e1
   if (!lignes.length) return []
   const rows = lignes.map((l, i) => ({
-    ...l, devis_id: devisId, owner_id: user.id, position: l.position ?? i,
+    devis_id: devisId,
+    owner_id: user.id,
+    position: l.position ?? i,
+    type_ligne: l.type_ligne,
+    lot: l.lot ?? null,
+    designation: l.designation,
+    unite: l.unite ?? null,
+    quantite: l.quantite ?? 0,
+    prix_unitaire: l.prix_unitaire ?? 0,
+    tva_rate: l.tva_rate ?? 20,
   }))
   const { data, error } = await supabase.from('lignes_devis').insert(rows).select()
   if (error) throw error

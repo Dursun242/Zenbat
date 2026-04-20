@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "./lib/auth.jsx";
 import {
   listClients, createClient as apiCreateClient, updateClient as apiUpdateClient, deleteClient as apiDeleteClient,
-  listDevisWithLignes, createDevis as apiCreateDevis, updateDevis as apiUpdateDevis, replaceLignes, deleteDevis as apiDeleteDevis,
+  listDevisWithLignes, getDevis, createDevis as apiCreateDevis, updateDevis as apiUpdateDevis, replaceLignes, deleteDevis as apiDeleteDevis,
 } from "./lib/api";
 
 const fmt  = n => new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR"}).format(n||0);
@@ -204,13 +204,15 @@ export default function App() {
 
   // ── Debounce pour sauvegarde devis (édition ligne par ligne) ──────
   const saveTimers = useRef({});
-  const scheduleDevisSave = (d, immediate=false) => {
+  const scheduleDevisSave = (d, immediate=false, saveLignes=false) => {
     if (!user) return;
     const run = async () => {
       try {
         const { lignes: dl, client, created_at, updated_at, ...fields } = d;
         await apiUpdateDevis(d.id, fields);
-        await replaceLignes(d.id, (dl || []).map(({id, created_at, ...l}) => l));
+        if (saveLignes) {
+          await replaceLignes(d.id, (dl || []).map(({id, created_at, ...l}) => l));
+        }
       } catch (err) { console.error("[save devis]", err); }
     };
     if (immediate) { run(); return; }
@@ -243,9 +245,9 @@ export default function App() {
       apiCreateClient(fields).catch(e => console.error("[restore client]", e));
     }
   };
-  const onSaveDevis = (d) => {
+  const onSaveDevis = (d, saveLignes=false) => {
     setDevis(prev => prev.map(x => x.id === d.id ? d : x));
-    scheduleDevisSave(d);
+    scheduleDevisSave(d, false, saveLignes);
   };
   const onCreateDevis = async (d) => {
     setDevis(prev => [d, ...prev]);
@@ -273,7 +275,16 @@ export default function App() {
   const daysLeft = Math.max(0, TRIAL_DAYS - Math.floor((Date.now() - trialStart) / 86400000));
   const trialExpired = plan === "free" && daysLeft === 0;
 
-  const goDevis  = id => { setSelD(id); setTab("devis_detail"); };
+  const goDevis = id => {
+    setSelD(id);
+    setTab("devis_detail");
+    if (!user) return;
+    getDevis(id)
+      .then(fresh => {
+        if (fresh) setDevis(prev => prev.map(x => x.id === id ? { ...x, lignes: fresh.lignes || [] } : x));
+      })
+      .catch(err => console.error("[goDevis reload]", err));
+  };
   const goClient = id => { setSelC(id); setTab("client_detail"); };
 
   const stats = {
@@ -1434,7 +1445,7 @@ function DevisDetail({d,cl,onBack,brand,onChange}) {
 
   const updateLignes = (newLignes) => {
     const newHt = newLignes.filter(l=>l.type_ligne==="ouvrage").reduce((s,l)=>s+((l.quantite||0)*(l.prix_unitaire||0)),0);
-    onChange({...d, lignes: newLignes, montant_ht: newHt});
+    onChange({...d, lignes: newLignes, montant_ht: newHt}, true);
   };
 
   const addLog = msg => setLog(l=>[...l,{t:new Date().toLocaleTimeString("fr-FR"),msg}]);
@@ -1481,7 +1492,7 @@ function DevisDetail({d,cl,onBack,brand,onChange}) {
       addLog("✓ Demande de signature créée");
       addLog(`🎉 Email envoyé à ${signerEmail}`);
       setSignUrl(data.sign_url);
-      onChange({ ...d, statut: "en_signature", odoo_sign_url: data.sign_url, odoo_sign_id: String(data.request_id||"") });
+      onChange({ ...d, statut: "en_signature", odoo_sign_url: data.sign_url, odoo_sign_id: String(data.request_id||"") }, false);
     } catch (err) {
       addLog(`❌ ${err.message || err}`);
     } finally {
