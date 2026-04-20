@@ -139,6 +139,16 @@ export default function App() {
   const [selD,   setSelD]   = useState(null);
   const [selC,   setSelC]   = useState(null);
   const [plan,   setPlan]   = useState("free");
+  const [toast,  setToast]  = useState(null); // {label, onUndo, timer}
+
+  const showUndo = useCallback((label, onUndo) => {
+    setToast(prev => {
+      if (prev?.timer) clearTimeout(prev.timer);
+      const timer = setTimeout(() => setToast(null), 6000);
+      return { label, onUndo, timer };
+    });
+  }, []);
+  const dismissToast = () => setToast(prev => { if (prev?.timer) clearTimeout(prev.timer); return null; });
   const TRIAL_DAYS = 30;
   const { user } = useAuth();
   // L'essai démarre à la date de création du compte Supabase (auth.users.created_at).
@@ -206,9 +216,18 @@ export default function App() {
         </div>
       </header>
 
+      {plan==="free" && daysLeft<=7 && (
+        <button onClick={()=>setScreen("paywall")}
+          style={{flexShrink:0,width:"100%",background:daysLeft===0?"#fef2f2":"#fff7ed",borderBottom:`1px solid ${daysLeft===0?"#fecaca":"#fed7aa"}`,padding:"8px 14px",display:"flex",alignItems:"center",justifyContent:"center",gap:8,cursor:"pointer",border:"none",color:daysLeft===0?"#991b1b":"#9a3412",fontSize:11,fontWeight:600}}>
+          {daysLeft===0
+            ? "⛔ Période d'essai terminée — passer en Pro"
+            : `⏳ Plus que ${daysLeft} jour${daysLeft>1?"s":""} d'essai — découvrir Pro`}
+        </button>
+      )}
+
       <div style={{flex:1,overflowY:"auto",paddingBottom:"calc(64px + env(safe-area-inset-bottom))"}}>
         {tab==="dashboard"    && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}/>}
-        {tab==="clients"      && <ClientsList clients={clients} setClients={setClients} goClient={goClient}/>}
+        {tab==="clients"      && <ClientsList clients={clients} setClients={setClients} goClient={goClient} showUndo={showUndo}/>}
         {tab==="client_detail"&& selC && <ClientDetail c={clients.find(x=>x.id===selC)} clientDevis={devis.filter(d=>d.client_id===selC)} onBack={()=>setTab("clients")} goDevis={goDevis} onUpdate={u=>setClients(cs=>cs.map(x=>x.id===selC?u:x))} onDelete={()=>{setClients(cs=>cs.filter(x=>x.id!==selC));setTab("clients");}}/>}
         {tab==="devis"        && <DevisList devis={devis} clients={clients} goDevis={goDevis} setTab={setTab}/>}
         {tab==="devis_detail" && selD && (
@@ -218,6 +237,16 @@ export default function App() {
         )}
         {tab==="agent" && <AgentIA devis={devis} setDevis={setDevis} clients={clients} plan={plan} trialExpired={trialExpired} onPaywall={()=>setScreen("paywall")} setTab={setTab} brand={brand}/>}
       </div>
+
+      {toast && (
+        <div style={{position:"fixed",bottom:`calc(72px + env(safe-area-inset-bottom))`,left:12,right:12,background:"#0f172a",color:"white",borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,boxShadow:"0 10px 30px rgba(0,0,0,.25)",zIndex:100,animation:"fadeUp .18s ease both"}}>
+          <span style={{fontSize:12,fontWeight:500}}>{toast.label}</span>
+          <div style={{display:"flex",gap:6}}>
+            <button onClick={()=>{ toast.onUndo?.(); dismissToast(); }} style={{background:"#22c55e",color:"white",border:"none",borderRadius:8,padding:"6px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>Annuler</button>
+            <button onClick={dismissToast} style={{background:"transparent",color:"#94a3b8",border:"none",fontSize:14,cursor:"pointer",padding:"2px 6px"}}>×</button>
+          </div>
+        </div>
+      )}
 
       <nav style={{position:"fixed",bottom:0,left:0,right:0,paddingBottom:"env(safe-area-inset-bottom)",background:"#0f172a",borderTop:"1px solid rgba(255,255,255,.06)",display:"flex",zIndex:50}}>
         {NAV.map(({id,label,icon})=>{
@@ -529,7 +558,7 @@ function PDFViewer({d, cl, brand, onClose}) {
     return () => clearTimeout(id);
   }, [scale, d.numero]);
 
-  const lignes = d.lignes?.length ? d.lignes : DEMO_LIGNES;
+  const lignes = d.lignes || [];
   const ouvrages = lignes.filter(l=>l.type_ligne==="ouvrage");
   const rateOf = (l)=> Number(l.tva_rate ?? d.tva_rate ?? 20);
   const ht  = ouvrages.reduce((s,l)=>s+((l.quantite||0)*(l.prix_unitaire||0)),0);
@@ -819,7 +848,7 @@ const emptyClient = () => ({
 
 const displayName = (c) => c?.raison_sociale?.trim() || `${c?.prenom||""} ${c?.nom||""}`.trim() || "—";
 
-function ClientsList({clients,setClients,goClient}) {
+function ClientsList({clients,setClients,goClient,showUndo}) {
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState(null); // client en cours d'édition / création
   const [importing, setImporting] = useState(false); // "loading" pendant l'analyse photo
@@ -897,8 +926,17 @@ Règles :
   };
 
   const deleteContact = (id) => {
-    if (!window.confirm("Supprimer ce contact ?")) return;
+    const victim = clients.find(x => x.id === id);
+    if (!victim) return;
+    const idx = clients.findIndex(x => x.id === id);
     setClients(prev => prev.filter(x => x.id !== id));
+    showUndo?.(`Contact "${displayName(victim)}" supprimé`, () => {
+      setClients(prev => {
+        const next = [...prev];
+        next.splice(Math.min(idx, next.length), 0, victim);
+        return next;
+      });
+    });
   };
 
   return (
@@ -1273,8 +1311,7 @@ function DevisDetail({d,cl,onBack,brand,onChange}) {
   const [log,     setLog]     = useState([]);
   const [showLog, setShowLog] = useState(false);
   const lignes = d.lignes || [];
-  const displayLignes = lignes.length ? lignes : DEMO_LIGNES;
-  const ht  = displayLignes.filter(l=>l.type_ligne==="ouvrage").reduce((s,l)=>s+(l.quantite*(l.prix_unitaire||0)),0);
+  const ht  = lignes.filter(l=>l.type_ligne==="ouvrage").reduce((s,l)=>s+((l.quantite||0)*(l.prix_unitaire||0)),0);
   const ac  = brand.color||"#22c55e";
 
   const updateLignes = (newLignes) => {
@@ -1298,7 +1335,7 @@ function DevisDetail({d,cl,onBack,brand,onChange}) {
     setSending(false);
   };
 
-  const lotsResume=displayLignes.filter(l=>l.type_ligne==="ouvrage").reduce((a,l)=>{a[l.lot||"Divers"]=(a[l.lot||"Divers"]||0)+l.quantite*(l.prix_unitaire||0);return a;},{});
+  const lotsResume=lignes.filter(l=>l.type_ligne==="ouvrage").reduce((a,l)=>{a[l.lot||"Divers"]=(a[l.lot||"Divers"]||0)+(l.quantite||0)*(l.prix_unitaire||0);return a;},{});
 
   return (
     <>
@@ -1328,23 +1365,25 @@ function DevisDetail({d,cl,onBack,brand,onChange}) {
             {I.pdf} Voir le PDF du devis
           </button>
 
-          {/* Récap lots */}
-          <div style={{background:"white",borderRadius:14,border:"1px solid #f1f5f9",overflow:"hidden",marginBottom:12}}>
-            <div style={{padding:"12px 16px",borderBottom:"1px solid #f8fafc",fontWeight:600,fontSize:13,color:"#0f172a"}}>Récapitulatif par lot</div>
-            {Object.entries(lotsResume).map(([lot,mt])=>(
-              <div key={lot} style={{padding:"10px 16px",borderBottom:"1px solid #f8fafc",display:"flex",justifyContent:"space-between"}}>
-                <span style={{fontSize:12,color:"#374151"}}>{lot}</span>
-                <span style={{fontSize:12,fontWeight:600,color:"#0f172a"}}>{fmt(mt)}</span>
-              </div>
-            ))}
-            <div style={{padding:"12px 16px",background:"#f8fafc",display:"flex",justifyContent:"space-between"}}>
-              <span style={{fontWeight:700,fontSize:13,color:"#0f172a"}}>Total HT</span>
-              <span style={{fontWeight:700,fontSize:14,color:ac}}>{fmt(ht)}</span>
-            </div>
-          </div>
-
-          {/* Éditeur lignes */}
+          {/* Éditeur lignes — en premier pour accès rapide */}
           <LignesEditor lignes={lignes} onChange={updateLignes} ac={ac}/>
+
+          {/* Récap lots */}
+          {Object.keys(lotsResume).length > 0 && (
+            <div style={{background:"white",borderRadius:14,border:"1px solid #f1f5f9",overflow:"hidden",marginBottom:12}}>
+              <div style={{padding:"12px 16px",borderBottom:"1px solid #f8fafc",fontWeight:600,fontSize:13,color:"#0f172a"}}>Récapitulatif par lot</div>
+              {Object.entries(lotsResume).map(([lot,mt])=>(
+                <div key={lot} style={{padding:"10px 16px",borderBottom:"1px solid #f8fafc",display:"flex",justifyContent:"space-between"}}>
+                  <span style={{fontSize:12,color:"#374151"}}>{lot}</span>
+                  <span style={{fontSize:12,fontWeight:600,color:"#0f172a"}}>{fmt(mt)}</span>
+                </div>
+              ))}
+              <div style={{padding:"12px 16px",background:"#f8fafc",display:"flex",justifyContent:"space-between"}}>
+                <span style={{fontWeight:700,fontSize:13,color:"#0f172a"}}>Total HT</span>
+                <span style={{fontWeight:700,fontSize:14,color:ac}}>{fmt(ht)}</span>
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
