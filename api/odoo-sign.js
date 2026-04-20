@@ -71,6 +71,7 @@ export default async function handler(req, res) {
     const {
       pdf_base64, filename, reference,
       signer_email, signer_name, signer_phone = "",
+      company_name = "", company_email = "", company_phone = "",
       subject = "Signature du devis",
       message = "Merci de signer le devis ci-joint.",
     } = req.body || {};
@@ -204,21 +205,38 @@ export default async function handler(req, res) {
     });
     const roleId = roleIds?.[0];
 
+    // Introspecte sign.request pour n'envoyer que les champs supportés
+    const reqFields = await odooCall({
+      ...ctx,
+      model: "sign.request",
+      method: "fields_get",
+      args: [],
+      kwargs: { attributes: ["type"] },
+    });
+
+    const reqPayload = {
+      template_id: templateId,
+      reference: reference || filename,
+      subject,
+      message,
+      request_item_ids: [[0, 0, {
+        partner_id: partnerId,
+        role_id: roleId,
+        mail_sent_order: 1,
+      }]],
+    };
+    // Bonus : pousse l'email de l'entreprise en reply_to si le champ existe
+    if (company_email && reqFields.reply_to) reqPayload.reply_to = company_email;
+    // Suffixe le sujet avec le nom d'entreprise pour maximiser la visibilité
+    if (company_name && !String(subject).includes(company_name)) {
+      reqPayload.subject = `${subject} [${company_name}]`;
+    }
+
     const requestId = await odooCall({
       ...ctx,
       model: "sign.request",
       method: "create",
-      args: [{
-        template_id: templateId,
-        reference: reference || filename,
-        subject,
-        message,
-        request_item_ids: [[0, 0, {
-          partner_id: partnerId,
-          role_id: roleId,
-          mail_sent_order: 1,
-        }]],
-      }],
+      args: [reqPayload],
     });
 
     // Essaie plusieurs noms de méthode pour l'envoi (varie selon version Odoo).
