@@ -84,7 +84,7 @@ export default async function handler(req, res) {
   const newLast7      = profiles?.filter(p => new Date(p.created_at) >= start7).length || 0
   const totalAiUsed   = profiles?.reduce((s, p) => s + (p.ai_used || 0), 0) || 0
   const activeUsers   = Object.keys(statsByOwner).length  // au moins 1 devis
-  const mrr           = proUsers * 15  // 15€/mois
+  const mrr           = proUsers * 19  // 19€/mois HT
 
   // Trial : utilisateurs dont l'essai se termine dans 7 jours
   const trialEndingSoon = (profiles || []).filter(p => {

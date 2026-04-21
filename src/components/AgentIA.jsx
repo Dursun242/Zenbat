@@ -3,6 +3,7 @@ import { CLAUDE_MODEL, TX } from "../lib/constants.js";
 import { fmt, uid } from "../lib/utils.js";
 import { tradesLabels } from "../lib/trades.js";
 import { buildDevisHistorySummary, formatHistoryPrompt } from "../lib/devisHistory.js";
+import { supabase } from "../lib/supabase.js";
 import { I } from "./ui/icons.jsx";
 import ClientPickerModal from "./ClientPickerModal.jsx";
 
@@ -215,6 +216,9 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
 
       const finalText = txt || (match ? TX.linesAdded : "Je n'ai pas compris, pouvez-vous reformuler ?");
       updateAssistant(finalText);
+
+      // Incrémente le compteur d'usage IA (best-effort, silencieux)
+      supabase.rpc("increment_ai_used").catch(() => {});
     } catch (e) {
       const msg = !navigator.onLine ? TX.errNetwork : e.message === "api" ? TX.errApi : TX.errGeneral;
       updateAssistant("❌ " + msg);
