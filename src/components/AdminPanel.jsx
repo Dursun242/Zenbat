@@ -1,19 +1,19 @@
 import { useState, useEffect } from "react"
-import { supabase } from "../lib/supabase.js"
+import { useAuth } from "../lib/auth.jsx"
 
 export default function AdminPanel({ onBack }) {
+  const { session } = useAuth()
   const [stats,      setStats]      = useState(null)
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState(null)
   const [userSearch, setUserSearch] = useState("")
   const [sortBy,     setSortBy]     = useState("joined")
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { if (session) load() }, [session?.access_token])
 
   const load = async () => {
     setLoading(true); setError(null)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch("/api/admin-stats", {
         headers: { Authorization: `Bearer ${session?.access_token}` },
       })
