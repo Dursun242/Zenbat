@@ -159,7 +159,7 @@ export default function Landing({ onLogin, onSignup }) {
             ['< 30s', 'Pour générer un devis'],
             ['100%', 'Conforme TVA France'],
             ['26+', 'Métiers BTP couverts'],
-            ['15€', 'Par mois tout inclus'],
+            ['19€', 'Par mois TTC tout inclus'],
           ].map(([stat, label]) => (
             <div key={stat} style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 32, fontWeight: 900, color: '#0f172a', letterSpacing: '-1px' }}>{stat}</div>
@@ -330,8 +330,8 @@ export default function Landing({ onLogin, onSignup }) {
               <div style={{ position: 'absolute', top: 16, right: 16, background: '#22c55e', color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 10, letterSpacing: '0.5px' }}>RECOMMANDÉ</div>
               <div style={{ fontSize: 14, fontWeight: 600, color: '#4ade80', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Pro</div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 4 }}>
-                <span style={{ fontSize: 42, fontWeight: 900, color: '#fff', letterSpacing: '-2px' }}>15€</span>
-                <span style={{ fontSize: 14, color: '#94a3b8' }}>/mois</span>
+                <span style={{ fontSize: 42, fontWeight: 900, color: '#fff', letterSpacing: '-2px' }}>19€</span>
+                <span style={{ fontSize: 14, color: '#94a3b8' }}>/mois TTC</span>
               </div>
               <div style={{ fontSize: 14, color: '#64748b', marginBottom: 24 }}>Sans engagement</div>
               <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
