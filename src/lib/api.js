@@ -1,17 +1,38 @@
 import { supabase } from './supabase'
 
-// Insère des lignes de devis avec fallback si tva_rate n'existe pas encore en DB
-async function insertLignesRows(rows) {
-  const { error } = await supabase.from('lignes_devis').insert(rows)
-  if (!error) return
-  // Colonne inconnue (migration 0002 non appliquée) → retry sans tva_rate
-  if (error.code === '42703' || error.message?.includes('tva_rate')) {
-    const fallback = rows.map(({ tva_rate, ...r }) => r)
-    const { error: e2 } = await supabase.from('lignes_devis').insert(fallback)
-    if (e2) throw e2
-    return
+// Normalise une ligne avant insertion (valeurs par défaut, champs requis)
+function normalizeRow(r) {
+  return {
+    ...r,
+    designation: r.designation || '—',
+    type_ligne:  r.type_ligne  || 'ouvrage',
   }
-  throw error
+}
+
+async function insertLignesRows(rows) {
+  const valid = rows.map(normalizeRow)
+
+  // Tentative 1 : insertion batch complète
+  const { error } = await supabase.from('lignes_devis').insert(valid)
+  if (!error) return
+
+  // Tentative 2 : colonne tva_rate manquante (migration 0002 non appliquée)
+  if (error.code === '42703' || error.message?.includes('tva_rate')) {
+    const noTva = valid.map(({ tva_rate, ...r }) => r)
+    const { error: e2 } = await supabase.from('lignes_devis').insert(noTva)
+    if (!e2) return
+  }
+
+  // Tentative 3 : insertion ligne par ligne pour sauver un maximum
+  let lastError = null
+  for (const row of valid) {
+    const { error: e } = await supabase.from('lignes_devis').insert(row)
+    if (!e) continue
+    const { tva_rate, ...rowNoTva } = row
+    const { error: e2 } = await supabase.from('lignes_devis').insert(rowNoTva)
+    if (e2) lastError = e2
+  }
+  if (lastError) throw lastError
 }
 
 // =========================================================

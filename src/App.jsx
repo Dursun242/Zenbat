@@ -210,7 +210,8 @@ export default function App() {
     if (!user) return;
     const run = async () => {
       try {
-        const { lignes: dl, client, created_at, updated_at, ...fields } = d;
+        // Retirer id (PK non modifiable) et champs techniques du patch
+        const { lignes: dl, client, created_at, updated_at, id: _id, ...fields } = d;
         await apiUpdateDevis(d.id, fields);
         if (saveLignes) {
           await replaceLignes(d.id, (dl || []).map(({id, created_at, ...l}) => l));
@@ -255,8 +256,18 @@ export default function App() {
     setDevis(prev => [d, ...prev]);
     if (!user) return;
     try {
-      const { lignes: dl, client, created_at, updated_at, ...fields } = d;
-      await apiCreateDevis(fields, (dl || []).map(({id, created_at, ...l}) => l));
+      const { lignes: dl, client, created_at, updated_at, id: _id, ...fields } = d;
+      const saved = await apiCreateDevis(fields, (dl || []).map(({id, created_at, ...l}) => l));
+      // Vérifier que les lignes ont bien été sauvegardées ; sinon réessayer
+      if (dl?.length) {
+        const fresh = await getDevis(saved.id);
+        if (fresh && !fresh.lignes?.length) {
+          await replaceLignes(saved.id, (dl || []).map(({id, created_at, ...l}) => l));
+        }
+        if (fresh?.lignes?.length) {
+          setDevis(prev => prev.map(x => x.id === d.id ? { ...x, lignes: fresh.lignes } : x));
+        }
+      }
     } catch (err) { console.error("[create devis]", err); }
   };
   const onDeleteDevis = async (id) => {
@@ -283,7 +294,23 @@ export default function App() {
     if (!user) return;
     getDevis(id)
       .then(fresh => {
-        if (fresh) setDevis(prev => prev.map(x => x.id === id ? { ...x, lignes: fresh.lignes || [] } : x));
+        if (!fresh) return;
+        setDevis(prev => prev.map(x => {
+          if (x.id !== id) return x;
+          const dbLignes    = fresh.lignes || [];
+          const stateLignes = x.lignes    || [];
+          if (dbLignes.length > 0) {
+            // DB fait autorité : utiliser ses lignes
+            return { ...x, lignes: dbLignes, montant_ht: fresh.montant_ht ?? x.montant_ht };
+          }
+          // DB vide mais état a des lignes : re-tenter la sauvegarde
+          if (stateLignes.length > 0) {
+            replaceLignes(id, stateLignes.map(({ id: _, created_at: __, ...l }) => l))
+              .catch(err => console.error("[goDevis] retry lignes:", err));
+            return x; // garder l'état courant
+          }
+          return { ...x, montant_ht: fresh.montant_ht ?? x.montant_ht };
+        }));
       })
       .catch(err => console.error("[goDevis reload]", err));
   };
