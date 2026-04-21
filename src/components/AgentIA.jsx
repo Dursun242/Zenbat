@@ -119,7 +119,21 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
 
     const userMsg = { role: "user", content: input };
     const newMsgs = [...msgs, userMsg];
-    setMsgs(newMsgs); setInput(""); setLoading(true);
+    setMsgs(newMsgs);
+    setInput(""); setLoading(true);
+
+    let assistantAdded = false;
+    const updateAssistant = (visibleText) => {
+      setMsgs(prev => {
+        if (!assistantAdded) {
+          assistantAdded = true;
+          return [...prev, { role: "assistant", content: visibleText }];
+        }
+        const next = [...prev];
+        next[next.length - 1] = { role: "assistant", content: visibleText };
+        return next;
+      });
+    };
 
     try {
       const res = await fetch("/api/claude", {
@@ -130,12 +144,42 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
           max_tokens: 4000,
           system: buildSystemPrompt(),
           messages: newMsgs.map(m => ({ role: m.role, content: m.content })),
+          stream: true,
         }),
       });
-      if (!res.ok) throw new Error("api");
+      if (!res.ok || !res.body) throw new Error("api");
 
-      const data = await res.json();
-      const raw  = data.content?.[0]?.text || "";
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let raw    = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let sep;
+        while ((sep = buffer.indexOf("\n\n")) !== -1) {
+          const event = buffer.slice(0, sep);
+          buffer = buffer.slice(sep + 2);
+          for (const line of event.split("\n")) {
+            if (!line.startsWith("data:")) continue;
+            const payload = line.slice(5).trim();
+            if (!payload || payload === "[DONE]") continue;
+            try {
+              const msg = JSON.parse(payload);
+              if (msg.type === "content_block_delta" && msg.delta?.type === "text_delta") {
+                raw += msg.delta.text || "";
+                const cut     = raw.indexOf("<DEVIS>");
+                const visible = (cut >= 0 ? raw.slice(0, cut) : raw).trim();
+                if (visible) updateAssistant(visible);
+              }
+            } catch { /* chunk partiel — on ignore */ }
+          }
+        }
+      }
+
       const match = raw.match(/<DEVIS>([\s\S]*?)<\/DEVIS>/) || raw.match(/<DEVIS>([\s\S]+)/);
       const txt   = raw.replace(/<DEVIS>[\s\S]*/g, "").trim();
 
@@ -150,10 +194,12 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
           });
         } catch { /* JSON mal formé — on ignore */ }
       }
-      setMsgs(m => [...m, { role: "assistant", content: txt || (match ? TX.linesAdded : "Je n'ai pas compris, pouvez-vous reformuler ?") }]);
+
+      const finalText = txt || (match ? TX.linesAdded : "Je n'ai pas compris, pouvez-vous reformuler ?");
+      updateAssistant(finalText);
     } catch (e) {
       const msg = !navigator.onLine ? TX.errNetwork : e.message === "api" ? TX.errApi : TX.errGeneral;
-      setMsgs(m => [...m, { role: "assistant", content: "❌ " + msg }]);
+      updateAssistant("❌ " + msg);
     }
     setLoading(false);
   };
@@ -433,7 +479,7 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
             </div>
           ))}
 
-          {loading && (
+          {loading && msgs[msgs.length - 1]?.role !== "assistant" && (
             <div style={{ display: "flex", alignItems: "flex-end", gap: 6 }}>
               <div style={{ width: 24, height: 24, borderRadius: "50%", background: ac + "22", border: `1px solid ${ac}44`, display: "flex", alignItems: "center", justifyContent: "center", color: ac, fontSize: 12 }}>✦</div>
               <div style={{ background: "white", border: "1px solid #f1f5f9", borderRadius: "16px 16px 16px 3px", padding: "10px 14px", display: "flex", gap: 4, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>

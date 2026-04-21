@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "ANTHROPIC_KEY non configurée côté serveur" });
   }
 
-  const { model, max_tokens, messages, system } = req.body || {};
+  const { model, max_tokens, messages, system, stream } = req.body || {};
   if (!model || typeof model !== "string")
     return res.status(400).json({ error: "Paramètre 'model' manquant ou invalide" });
   if (!max_tokens || typeof max_tokens !== "number" || max_tokens < 1 || max_tokens > 8000)
@@ -34,6 +34,7 @@ export default async function handler(req, res) {
 
   const payload = { model, max_tokens, messages };
   if (system && typeof system === "string") payload.system = system;
+  if (stream === true) payload.stream = true;
 
   try {
     const upstream = await fetch("https://api.anthropic.com/v1/messages", {
@@ -45,6 +46,27 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify(payload),
     });
+
+    if (stream === true && upstream.ok && upstream.body) {
+      res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache, no-transform");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.flushHeaders?.();
+
+      const reader = upstream.body.getReader();
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          res.write(value);
+          res.flush?.();
+        }
+      } catch {
+        // client abort or upstream error — end cleanly
+      }
+      return res.end();
+    }
 
     const data = await upstream.json();
     return res.status(upstream.status).json(data);
