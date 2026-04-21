@@ -518,72 +518,68 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
             </button>
           </div>
 
-          {/* Gros bouton micro central + sélecteur langue */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, marginTop: 10 }}>
+          {/* Bouton micro + sélecteur langue — layout compact horizontal */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 8, position: "relative" }}>
             <button
               onClick={toggleMic}
               disabled={!micSupported}
               title={micSupported ? (listening ? "Appuyez pour arrêter" : "Appuyez pour parler") : "Non supporté par ce navigateur"}
               style={{
-                width: 56, height: 56, borderRadius: "50%",
+                width: 44, height: 44, borderRadius: "50%",
                 background: listening ? "#ef4444" : (micSupported ? ac : "#cbd5e1"),
                 border: "none", cursor: micSupported ? "pointer" : "not-allowed",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 color: "white",
                 boxShadow: listening
-                  ? "0 0 0 0 rgba(239,68,68,.55), 0 6px 18px rgba(239,68,68,.45)"
-                  : `0 6px 16px ${ac}55`,
+                  ? "0 0 0 0 rgba(239,68,68,.55), 0 4px 12px rgba(239,68,68,.4)"
+                  : `0 4px 12px ${ac}55`,
                 transition: "background .2s, transform .15s",
                 animation: listening ? "micPulse 1.4s ease-out infinite" : "none",
-              }}
-              onMouseDown={e => { if (micSupported) e.currentTarget.style.transform = "scale(.95)"; }}
-              onMouseUp={e => { e.currentTarget.style.transform = "scale(1)"; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}>
+                flexShrink: 0,
+              }}>
               {listening ? (
-                <div style={{ display: "flex", gap: 3, alignItems: "center", height: 20 }}>
+                <div style={{ display: "flex", gap: 2, alignItems: "center", height: 16 }}>
                   {[0, 1, 2, 3, 4].map(i => (
-                    <div key={i} style={{ width: 3, height: 18, borderRadius: 2, background: "white", animation: `micWave .9s ease-in-out ${i * 0.12}s infinite` }}/>
+                    <div key={i} style={{ width: 2.5, height: 14, borderRadius: 2, background: "white", animation: `micWave .9s ease-in-out ${i * 0.12}s infinite` }}/>
                   ))}
                 </div>
-              ) : I.mic}
+              ) : <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 003-3V5a3 3 0 00-6 0v6a3 3 0 003 3z"/><path d="M19 11a1 1 0 10-2 0 5 5 0 01-10 0 1 1 0 10-2 0 7 7 0 006 6.92V20H8a1 1 0 100 2h8a1 1 0 100-2h-3v-2.08A7 7 0 0019 11z"/></svg>}
             </button>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "#64748b", position: "relative" }}>
-              <span style={{ fontWeight: 500 }}>
-                {listening ? "Parlez, je transcris en direct…" : (micSupported ? "Appuyez pour dicter" : "Vocal non dispo ici")}
-              </span>
-              <button
-                onClick={() => setLangMenu(v => !v)}
-                style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600, color: "#334155", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-                <span>{currentLang.flag}</span>
-                <span>{currentLang.label}</span>
-                <span style={{ fontSize: 9, color: "#94a3b8" }}>▾</span>
-              </button>
-              {langMenu && (
-                <>
-                  <div onClick={() => setLangMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }}/>
-                  <div style={{ position: "absolute", bottom: "calc(100% + 8px)", right: 0, background: "white", border: "1px solid #e2e8f0", borderRadius: 12, boxShadow: "0 10px 28px rgba(15,23,42,.18)", padding: 4, zIndex: 41, maxHeight: 260, overflowY: "auto", minWidth: 180 }}>
-                    {SR_LANGS.map(l => (
-                      <button key={l.code} onClick={() => pickLang(l.code)}
-                        style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: l.code === micLang ? "#f0fdf4" : "none", border: "none", padding: "8px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, color: "#0f172a", textAlign: "left" }}>
-                        <span style={{ fontSize: 14 }}>{l.flag}</span>
-                        <span style={{ fontWeight: l.code === micLang ? 700 : 500, flex: 1 }}>{l.label}</span>
-                        {l.code === micLang && <span style={{ color: ac, fontSize: 12 }}>✓</span>}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+            <span style={{ fontSize: 11, color: listening ? "#ef4444" : "#64748b", fontWeight: 500 }}>
+              {listening ? "Parlez, je transcris…" : (micSupported ? "Appuyez pour dicter" : "Vocal indisponible")}
+            </span>
 
-            {micError && (
-              <div style={{ fontSize: 11, color: "#991b1b", background: "#fef2f2", border: "1px solid #fecaca", padding: "5px 10px", borderRadius: 8, marginTop: 2 }}>
-                {micError}
-              </div>
+            <button
+              onClick={() => setLangMenu(v => !v)}
+              style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 20, padding: "3px 9px", fontSize: 11, fontWeight: 600, color: "#334155", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+              <span>{currentLang.flag}</span>
+              <span>{currentLang.label}</span>
+              <span style={{ fontSize: 9, color: "#94a3b8" }}>▾</span>
+            </button>
+
+            {langMenu && (
+              <>
+                <div onClick={() => setLangMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }}/>
+                <div style={{ position: "absolute", bottom: "calc(100% + 6px)", right: 0, background: "white", border: "1px solid #e2e8f0", borderRadius: 12, boxShadow: "0 10px 28px rgba(15,23,42,.18)", padding: 4, zIndex: 41, maxHeight: 260, overflowY: "auto", minWidth: 180 }}>
+                  {SR_LANGS.map(l => (
+                    <button key={l.code} onClick={() => pickLang(l.code)}
+                      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: l.code === micLang ? "#f0fdf4" : "none", border: "none", padding: "8px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, color: "#0f172a", textAlign: "left" }}>
+                      <span style={{ fontSize: 14 }}>{l.flag}</span>
+                      <span style={{ fontWeight: l.code === micLang ? 700 : 500, flex: 1 }}>{l.label}</span>
+                      {l.code === micLang && <span style={{ color: ac, fontSize: 12 }}>✓</span>}
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
           </div>
 
-          <div style={{ textAlign: "center", fontSize: 9, color: "#cbd5e1", marginTop: 8 }}>{TX.inputHint}</div>
+          {micError && (
+            <div style={{ fontSize: 11, color: "#991b1b", background: "#fef2f2", border: "1px solid #fecaca", padding: "5px 10px", borderRadius: 8, marginTop: 6, textAlign: "center" }}>
+              {micError}
+            </div>
+          )}
         </div>
       </div>
 
