@@ -123,10 +123,12 @@ MONNAIE — RÈGLE ABSOLUE :
 
 MONTANT GLOBAL DEMANDÉ — RÈGLE ABSOLUE :
 1. Si l'utilisateur impose un montant total (ex : "fais-moi un devis de 10 000 € pour...", "budget 15 000", "total 8000 €"), le devis DOIT respecter ce total EXACTEMENT au centime près, quel que soit le nombre de lignes.
-2. Méthode : décompose en lots/ouvrages réalistes, puis ajuste les quantités ET/OU les prix unitaires pour que la somme des (quantité × prix unitaire) des lignes "ouvrage" tombe EXACTEMENT sur le total demandé.
-3. Si l'utilisateur précise UN prix unitaire (ex : "50 € le m²"), tu conserves ce PU tel quel et tu ajustes la quantité pour atteindre le total.
-4. Si l'utilisateur donne une quantité ET un total (ex : "muret 200 m² à 50 €/m²"), tu vérifies que quantité × PU = total ; en cas de conflit, tu privilégies le PU × quantité tel qu'énoncé et tu signales en une phrase le total réel.
-5. Vérification mentale obligatoire AVANT d'émettre le JSON : fais la somme des lignes "ouvrage" et confirme qu'elle correspond exactement au montant demandé.
+2. Dans ce cas, tu DOIS ajouter le champ "target_total_ht": <nombre> dans le JSON racine avec le montant exact demandé par l'utilisateur (en euros, sans symbole, sans séparateur de milliers).
+3. Méthode : décompose en lots/ouvrages réalistes, puis ajuste les quantités ET/OU les prix unitaires pour que la somme des (quantité × prix unitaire) des lignes "ouvrage" tombe EXACTEMENT sur le total demandé.
+4. Si l'utilisateur précise UN prix unitaire (ex : "50 € le m²"), tu conserves ce PU tel quel et tu ajustes la quantité pour atteindre le total.
+5. Si l'utilisateur donne une quantité ET un total (ex : "muret 200 m² à 50 €/m²"), tu vérifies que quantité × PU = total ; en cas de conflit, tu privilégies le PU × quantité tel qu'énoncé et tu signales en une phrase le total réel.
+6. Vérification mentale obligatoire AVANT d'émettre le JSON : fais la somme des lignes "ouvrage" et confirme qu'elle correspond exactement au montant demandé.
+7. Si aucun montant global n'est imposé, N'AJOUTE PAS le champ "target_total_ht".
 
 TÂCHE : L'utilisateur décrit des travaux à devisser. TOUJOURS répondre avec un JSON entre <DEVIS></DEVIS> même si c'est une seule ligne.
 Si l'utilisateur donne un prix unitaire explicite, utilise-le EXACTEMENT.
@@ -219,6 +221,36 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
         try {
           const parsed    = JSON.parse(match[1].trim());
           const newLignes = (parsed.lignes || []).map(l => ({ ...l, id: uid() }));
+
+          // Filet de sécurité : si l'IA déclare un montant cible et que la somme
+          // des lignes ouvrage n'y correspond pas, on rescale les prix unitaires.
+          const target = Number(parsed.target_total_ht);
+          if (target > 0) {
+            const ouvrages = newLignes.filter(l => l.type_ligne === "ouvrage");
+            const sum = ouvrages.reduce(
+              (s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0
+            );
+            if (sum > 0 && Math.abs(sum - target) / target > 0.005) {
+              const ratio = target / sum;
+              for (const l of ouvrages) {
+                const pu = Number(l.prix_unitaire) || 0;
+                l.prix_unitaire = Math.round(pu * ratio * 100) / 100;
+              }
+              // Absorbe la dérive d'arrondi sur la dernière ligne ouvrage
+              const rescaled = ouvrages.reduce(
+                (s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0
+              );
+              const drift = target - rescaled;
+              const last  = ouvrages[ouvrages.length - 1];
+              if (last && Math.abs(drift) > 0.009) {
+                const q = Number(last.quantite) || 1;
+                last.prix_unitaire = Math.round(
+                  ((Number(last.prix_unitaire) || 0) + drift / q) * 100
+                ) / 100;
+              }
+            }
+          }
+
           if (parsed.objet && !objet) setObjet(parsed.objet);
           setLignes(prev => {
             const existingDesigs = new Set(prev.map(l => l.designation));
