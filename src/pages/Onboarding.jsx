@@ -1,5 +1,6 @@
 import { useState, useRef } from "react"
 import { BTP_TRADES } from "../lib/trades.js"
+import { brandCompleteness } from "../lib/brandCompleteness.js"
 
 const Icheck = <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>
 const Iimg   = <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
@@ -13,12 +14,16 @@ function Logo({ size=22, white=false }) {
   )
 }
 
-function Field({ dark, label, val, onChange, placeholder, type="text" }) {
+function Field({ dark, label, val, onChange, placeholder, type="text", hint, required, invalid }) {
+  const borderColor = invalid ? "#ef4444" : dark ? "#334155" : "#e2e8f0"
   return (
     <div>
-      <label style={{display:"block",fontSize:11,fontWeight:600,color:dark?"#94a3b8":"#64748b",marginBottom:6}}>{label}</label>
+      <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,fontWeight:600,color:dark?"#94a3b8":"#64748b",marginBottom:6}}>
+        <span>{label}{required && <span style={{color:"#ef4444",marginLeft:2}}>*</span>}</span>
+      </label>
       <input type={type} value={val||""} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
-        style={{width:"100%",background:dark?"#1e293b":"white",border:`1px solid ${dark?"#334155":"#e2e8f0"}`,borderRadius:12,padding:"10px 14px",fontSize:13,color:dark?"white":"#0f172a",outline:"none"}}/>
+        style={{width:"100%",background:dark?"#1e293b":"white",border:`1px solid ${borderColor}`,borderRadius:12,padding:"10px 14px",fontSize:13,color:dark?"white":"#0f172a",outline:"none"}}/>
+      {hint && <div style={{fontSize:10,color:invalid?"#fca5a5":"#64748b",marginTop:5,lineHeight:1.4}}>{invalid ? "⚠ " : "💡 "}{hint}</div>}
     </div>
   )
 }
@@ -40,8 +45,13 @@ const STEPS  = [
 export default function Onboarding({ brand, setBrand, onDone }) {
   const [step,  setStep]  = useState(0)
   const [local, setLocal] = useState({ ...brand })
+  const [tryNext, setTryNext] = useState(false)
   const fileRef = useRef(null)
   const set = (k, v) => setLocal(b => ({ ...b, [k]: v }))
+
+  const quality = brandCompleteness(local)
+  const step0Invalid = !local.companyName?.trim()
+  const canGoNext = step === 0 ? !step0Invalid : true
 
   const handleLogo = e => {
     const f = e.target.files[0]
@@ -68,7 +78,12 @@ export default function Onboarding({ brand, setBrand, onDone }) {
       <div style={{padding:"16px 20px 0"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
           <Logo size={18} white/>
-          <span style={{color:"#64748b",fontSize:11}}>{step+1} / {STEPS.length}</span>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:10,fontWeight:700,padding:"3px 8px",borderRadius:20,background:`${quality.level.color}22`,color:quality.level.color}}>
+              Qualité : {quality.level.label} · {quality.percent}%
+            </span>
+            <span style={{color:"#64748b",fontSize:11}}>{step+1} / {STEPS.length}</span>
+          </div>
         </div>
         <div style={{height:3,background:"#1e293b",borderRadius:2}}>
           <div style={{height:"100%",background:"#22c55e",borderRadius:2,transition:"width .4s ease",width:`${((step+1)/STEPS.length)*100}%`}}/>
@@ -98,9 +113,13 @@ export default function Onboarding({ brand, setBrand, onDone }) {
               <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleLogo}/>
             </div>
             {local.logo&&<button onClick={()=>set("logo",null)} style={{background:"none",border:"1px solid #334155",borderRadius:10,padding:"7px",color:"#94a3b8",fontSize:12,cursor:"pointer"}}>Supprimer le logo</button>}
-            <Field dark label="Nom de l'entreprise *" val={local.companyName} onChange={v=>set("companyName",v)} placeholder="Ex : Maçonnerie Dupont SAS"/>
-            <Field dark label="SIRET" val={local.siret} onChange={v=>set("siret",v)} placeholder="12345678900010"/>
-            <Field dark label="N° TVA intracommunautaire" val={local.tva} onChange={v=>set("tva",v)} placeholder="FR12345678901"/>
+            <Field dark required label="Nom de l'entreprise" val={local.companyName} onChange={v=>{set("companyName",v);setTryNext(false)}} placeholder="Ex : Maçonnerie Dupont SAS"
+              invalid={tryNext && step0Invalid}
+              hint={tryNext && step0Invalid ? "Le nom est obligatoire pour générer vos devis." : "Apparaît en en-tête de tous vos devis."}/>
+            <Field dark required label="SIRET" val={local.siret} onChange={v=>set("siret",v)} placeholder="12345678900010"
+              hint="Obligatoire sur un devis en France (art. L441-9 du code de commerce)."/>
+            <Field dark label="N° TVA intracommunautaire" val={local.tva} onChange={v=>set("tva",v)} placeholder="FR12345678901"
+              hint="Requis si vous êtes assujetti à la TVA."/>
           </div>
         )}
 
@@ -132,10 +151,13 @@ export default function Onboarding({ brand, setBrand, onDone }) {
 
         {step===2&&(
           <div className="pop" style={{display:"flex",flexDirection:"column",gap:14}}>
-            <Field dark label="Adresse" val={local.address} onChange={v=>set("address",v)} placeholder="12 rue des Artisans"/>
-            <Field dark label="Ville / Code postal" val={local.city} onChange={v=>set("city",v)} placeholder="76600 Le Havre"/>
-            <Field dark label="Téléphone" val={local.phone} onChange={v=>set("phone",v)} placeholder="02 35 00 00 00"/>
-            <Field dark label="Email professionnel" val={local.email} onChange={v=>set("email",v)} placeholder="contact@monentreprise.fr"/>
+            <Field dark required label="Adresse" val={local.address} onChange={v=>set("address",v)} placeholder="12 rue des Artisans"
+              hint="Obligatoire pour identifier l'émetteur du devis."/>
+            <Field dark required label="Ville / Code postal" val={local.city} onChange={v=>set("city",v)} placeholder="76600 Le Havre"/>
+            <Field dark required label="Téléphone" val={local.phone} onChange={v=>set("phone",v)} placeholder="02 35 00 00 00"
+              hint="Permet à vos clients de vous joindre depuis le devis."/>
+            <Field dark required label="Email professionnel" val={local.email} onChange={v=>set("email",v)} placeholder="contact@monentreprise.fr"
+              hint="Indispensable pour la signature électronique du devis."/>
             <Field dark label="Site web" val={local.website} onChange={v=>set("website",v)} placeholder="www.monentreprise.fr"/>
           </div>
         )}
@@ -199,7 +221,8 @@ export default function Onboarding({ brand, setBrand, onDone }) {
         {step===4&&(
           <div className="pop" style={{display:"flex",flexDirection:"column",gap:14}}>
             <Field dark label="RIB / Nom de la banque" val={local.rib} onChange={v=>set("rib",v)} placeholder="Crédit Mutuel — Agence Le Havre"/>
-            <Field dark label="IBAN" val={local.iban} onChange={v=>set("iban",v)} placeholder="FR76 1234 5678 9012 3456 7890 123"/>
+            <Field dark required label="IBAN" val={local.iban} onChange={v=>set("iban",v)} placeholder="FR76 1234 5678 9012 3456 7890 123"
+              hint="Sans IBAN, vos clients ne peuvent pas régler par virement."/>
             <Field dark label="BIC / SWIFT" val={local.bic} onChange={v=>set("bic",v)} placeholder="CMCIFRPP"/>
             <div>
               <label style={{display:"block",fontSize:11,fontWeight:600,color:"#94a3b8",marginBottom:6}}>CONDITIONS DE PAIEMENT</label>
@@ -207,10 +230,13 @@ export default function Onboarding({ brand, setBrand, onDone }) {
                 style={{width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:12,padding:"10px 14px",fontSize:13,color:"white",outline:"none",resize:"none"}}/>
             </div>
             <div>
-              <label style={{display:"block",fontSize:11,fontWeight:600,color:"#94a3b8",marginBottom:6}}>MENTIONS LÉGALES (pied de devis)</label>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,fontWeight:600,color:"#94a3b8",marginBottom:6}}>
+                MENTIONS LÉGALES (pied de devis)<span style={{color:"#ef4444"}}>*</span>
+              </label>
               <textarea value={local.mentionsLegales} onChange={e=>set("mentionsLegales",e.target.value)} rows={4}
                 placeholder="Ex : Assurance décennale n°... — TVA non applicable art. 293B..."
                 style={{width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:12,padding:"10px 14px",fontSize:13,color:"white",outline:"none",resize:"none"}}/>
+              <div style={{fontSize:10,color:"#64748b",marginTop:5,lineHeight:1.4}}>💡 L'assurance décennale (BTP) et le régime TVA sont obligatoires sur tous vos devis.</div>
             </div>
             <div>
               <label style={{display:"block",fontSize:11,fontWeight:600,color:"#94a3b8",marginBottom:6}}>VALIDITÉ DU DEVIS (jours)</label>
@@ -224,7 +250,10 @@ export default function Onboarding({ brand, setBrand, onDone }) {
       <div style={{position:"fixed",bottom:0,left:0,right:0,background:"#0f172a",borderTop:"1px solid #1e293b",padding:"14px 20px",display:"flex",gap:10}}>
         {step>0&&<button onClick={()=>setStep(s=>s-1)} style={{flex:1,background:"#1e293b",color:"#94a3b8",border:"none",borderRadius:14,padding:"13px",fontSize:13,fontWeight:600,cursor:"pointer"}}>← Retour</button>}
         {step<STEPS.length-1
-          ? <button onClick={()=>setStep(s=>s+1)} style={{flex:2,background:"#22c55e",color:"white",border:"none",borderRadius:14,padding:"13px",fontSize:14,fontWeight:700,cursor:"pointer"}}>Continuer →</button>
+          ? <button onClick={()=>{ if (!canGoNext) { setTryNext(true); return } setStep(s=>s+1) }}
+              style={{flex:2,background:canGoNext?"#22c55e":"#334155",color:canGoNext?"white":"#64748b",border:"none",borderRadius:14,padding:"13px",fontSize:14,fontWeight:700,cursor:canGoNext?"pointer":"not-allowed",transition:"all .15s"}}>
+              Continuer →
+            </button>
           : <button onClick={save} style={{flex:2,background:"#22c55e",color:"white",border:"none",borderRadius:14,padding:"13px",fontSize:14,fontWeight:700,cursor:"pointer"}}>✓ Enregistrer et commencer</button>
         }
       </div>

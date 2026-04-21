@@ -2,8 +2,10 @@ import { TX } from "../lib/constants.js";
 import { fmt } from "../lib/utils.js";
 import { I } from "./ui/icons.jsx";
 import Badge from "./ui/Badge.jsx";
+import ProfileCompletionCard from "./ProfileCompletionCard.jsx";
+import PWAInstallBanner from "./PWAInstallBanner.jsx";
 
-export default function Dashboard({ stats, devis, clients, goDevis, setTab, brand }) {
+export default function Dashboard({ stats, devis, clients, goDevis, setTab, brand, onOpenProfile, onOpenPWAInstall }) {
   const ac = brand.color || "#22c55e";
 
   return (
@@ -16,6 +18,9 @@ export default function Dashboard({ stats, devis, clients, goDevis, setTab, bran
           {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
         </p>
       </div>
+
+      <PWAInstallBanner onOpenInstall={onOpenPWAInstall}/>
+      <ProfileCompletionCard brand={brand} onOpenProfile={onOpenProfile}/>
 
       {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}>

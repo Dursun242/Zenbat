@@ -291,7 +291,9 @@ export default function App() {
 
       {/* Contenu principal */}
       <div style={{ flex: 1, overflowY: "auto", paddingBottom: "calc(64px + env(safe-area-inset-bottom))" }}>
-        {tab === "dashboard"     && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}/>}
+        {tab === "dashboard"     && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}
+                                       onOpenProfile={() => setScreen("onboarding")}
+                                       onOpenPWAInstall={() => setScreen("pwa_install")}/>}
         {tab === "clients"       && <ClientsList clients={clients} onSave={onSaveClient} onDelete={onDeleteClient} onRestore={onRestoreClient} goClient={goClient} showUndo={showUndo}/>}
         {tab === "client_detail" && selC && (
           <ClientDetail
