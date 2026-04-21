@@ -169,30 +169,29 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
       });
     };
 
-    try {
+    const body = {
+      model: CLAUDE_MODEL,
+      max_tokens: 4000,
+      system: buildSystemPrompt(),
+      messages: newMsgs.map(m => ({ role: m.role, content: m.content })),
+    };
+
+    let raw = "";
+
+    const streamResponse = async () => {
       const res = await fetch("/api/claude", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: CLAUDE_MODEL,
-          max_tokens: 4000,
-          system: buildSystemPrompt(),
-          messages: newMsgs.map(m => ({ role: m.role, content: m.content })),
-          stream: true,
-        }),
+        body: JSON.stringify({ ...body, stream: true }),
       });
       if (!res.ok || !res.body) throw new Error("api");
-
       const reader  = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let raw    = "";
-
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-
         let sep;
         while ((sep = buffer.indexOf("\n\n")) !== -1) {
           const event = buffer.slice(0, sep);
@@ -212,6 +211,32 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
             } catch { /* chunk partiel — on ignore */ }
           }
         }
+      }
+    };
+
+    const nonStreamResponse = async () => {
+      const res = await fetch("/api/claude", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("api");
+      const data = await res.json();
+      raw = (data?.content?.[0]?.text || "").toString();
+      const cut     = raw.indexOf("<DEVIS>");
+      const visible = (cut >= 0 ? raw.slice(0, cut) : raw).trim();
+      if (visible) updateAssistant(visible);
+    };
+
+    try {
+      try {
+        await streamResponse();
+        if (!raw) throw new Error("stream-empty");
+      } catch (streamErr) {
+        // Fallback non-streamé si le SSE casse (proxy, pare-feu, etc.)
+        console.warn("[AgentIA] streaming failed, falling back:", streamErr);
+        raw = "";
+        await nonStreamResponse();
       }
 
       const match = raw.match(/<DEVIS>([\s\S]*?)<\/DEVIS>/) || raw.match(/<DEVIS>([\s\S]+)/);
@@ -265,6 +290,7 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
       // Incrémente le compteur d'usage IA (best-effort, silencieux)
       supabase.rpc("increment_ai_used").catch(() => {});
     } catch (e) {
+      console.error("[AgentIA] send failed:", e);
       const msg = !navigator.onLine ? TX.errNetwork : e.message === "api" ? TX.errApi : TX.errGeneral;
       updateAssistant("❌ " + msg);
     }
