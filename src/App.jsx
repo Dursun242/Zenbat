@@ -66,6 +66,7 @@ const I = {
   img:   <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>,
   paint: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M2 13.5A9 9 0 0013.5 2"/><path d="M11 6l7 7-4 4-7-7"/><circle cx="18" cy="19" r="2"/></svg>,
   pdf:   <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><path d="M8 13h8M8 17h5"/></svg>,
+  logout:<svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
 };
 
 function Logo({size=22,white=false}) {
@@ -186,7 +187,7 @@ export default function App() {
   }, []);
   const dismissToast = () => setToast(prev => { if (prev?.timer) clearTimeout(prev.timer); return null; });
   const TRIAL_DAYS = 30;
-  const { user, session } = useAuth();
+  const { user, session, signOut } = useAuth();
   const isAdmin = user?.email === import.meta.env.VITE_ADMIN_EMAIL;
 
   // ── Chargement initial depuis Supabase (une fois authentifié) ──────
@@ -356,6 +357,13 @@ export default function App() {
             style={{background:"#1e293b",border:"1px solid #334155",borderRadius:8,padding:"5px 10px",display:"flex",alignItems:"center",gap:5,color:"#94a3b8",fontSize:11,fontWeight:500,cursor:"pointer"}}>
             {I.paint} Mon profil
           </button>
+          {user && (
+            <button onClick={()=>{ if(window.confirm("Se déconnecter ?")) signOut(); }}
+              title="Se déconnecter"
+              style={{background:"#1e293b",border:"1px solid #334155",borderRadius:8,padding:"5px 8px",display:"flex",alignItems:"center",color:"#ef4444",cursor:"pointer"}}>
+              {I.logout}
+            </button>
+          )}
           {plan==="pro"
             ? <span style={{background:"rgba(34,197,94,.15)",color:"#4ade80",fontSize:10,fontWeight:700,padding:"3px 8px",borderRadius:20,border:"1px solid rgba(34,197,94,.25)"}}>PRO</span>
             : <span style={{background:daysLeft<=7?"rgba(249,115,22,.15)":"#1e293b",color:daysLeft<=7?"#fb923c":"#94a3b8",fontSize:10,fontWeight:600,padding:"3px 8px",borderRadius:20,border:daysLeft<=7?"1px solid rgba(249,115,22,.25)":"none"}}>Essai · {daysLeft}j</span>
