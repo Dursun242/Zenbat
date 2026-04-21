@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "./lib/auth.jsx";
+import { supabase } from "./lib/supabase.js";
 import {
   listClients, createClient as apiCreateClient, updateClient as apiUpdateClient, deleteClient as apiDeleteClient,
   listDevisWithLignes, getDevis, createDevis as apiCreateDevis, updateDevis as apiUpdateDevis, replaceLignes, deleteDevis as apiDeleteDevis,
@@ -183,7 +184,8 @@ export default function App() {
   }, []);
   const dismissToast = () => setToast(prev => { if (prev?.timer) clearTimeout(prev.timer); return null; });
   const TRIAL_DAYS = 30;
-  const { user } = useAuth();
+  const { user, session } = useAuth();
+  const isAdmin = user?.email === import.meta.env.VITE_ADMIN_EMAIL;
 
   // ── Chargement initial depuis Supabase (une fois authentifié) ──────
   useEffect(() => {
@@ -324,6 +326,13 @@ export default function App() {
       <header style={{background:"#0f172a",padding:"calc(10px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 10px calc(18px + env(safe-area-inset-left))",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
         <Logo size={20} white/>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
+          {isAdmin && (
+            <button onClick={()=>setTab("admin")}
+              title="Panel Admin"
+              style={{background:"#1e293b",border:"1px solid #334155",borderRadius:8,padding:"5px 10px",display:"flex",alignItems:"center",gap:5,color:"#f59e0b",fontSize:11,fontWeight:600,cursor:"pointer"}}>
+              ⚙ Admin
+            </button>
+          )}
           <button onClick={()=>setScreen("onboarding")}
             style={{background:"#1e293b",border:"1px solid #334155",borderRadius:8,padding:"5px 10px",display:"flex",alignItems:"center",gap:5,color:"#94a3b8",fontSize:11,fontWeight:500,cursor:"pointer"}}>
             {I.paint} Mon profil
@@ -355,6 +364,7 @@ export default function App() {
             onChange={onSaveDevis}/>
         )}
         {tab==="agent" && <AgentIA devis={devis} onCreateDevis={onCreateDevis} clients={clients} onSaveClient={onSaveClient} plan={plan} trialExpired={trialExpired} onPaywall={()=>setScreen("paywall")} setTab={setTab} brand={brand}/>}
+        {tab==="admin" && isAdmin && <AdminPanel onBack={()=>setTab("dashboard")}/>}
       </div>
 
       {toast && (
@@ -2110,6 +2120,153 @@ function PaywallScreen({daysLeft=0,onBack,onSubscribe}) {
         </div>
         <button onClick={onBack} style={{background:"none",border:"none",color:"#475569",fontSize:12,cursor:"pointer"}}>← Retour</button>
       </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+//  ADMIN PANEL — accessible uniquement à l'administrateur
+// ══════════════════════════════════════════════════════════
+function AdminPanel({ onBack }) {
+  const [stats,   setStats]   = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(null);
+
+  useEffect(() => { load(); }, []);
+
+  const load = async () => {
+    setLoading(true); setError(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch("/api/admin-stats", {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Erreur serveur");
+      setStats(data);
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const fmtEur = n => new Intl.NumberFormat("fr-FR", { style:"currency", currency:"EUR" }).format(n||0);
+  const fmtD   = d => d ? new Date(d).toLocaleDateString("fr-FR") : "—";
+  const pct    = (a, b) => b ? Math.round((a / b) * 100) : 0;
+
+  const STATUT_COLORS = { brouillon:"#94a3b8", envoye:"#3b82f6", en_signature:"#f59e0b", accepte:"#22c55e", refuse:"#ef4444" };
+  const STATUT_LABELS = { brouillon:"Brouillon", envoye:"Envoyé", en_signature:"En signature", accepte:"Accepté", refuse:"Refusé" };
+
+  return (
+    <div style={{minHeight:"100%", background:"#f8fafc", paddingBottom:32}} className="fu">
+      <div style={{background:"#0f172a", padding:"14px 18px", display:"flex", alignItems:"center", gap:12}}>
+        <button onClick={onBack} style={{background:"none", border:"none", color:"#94a3b8", cursor:"pointer", padding:4}}>
+          <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12,5 5,12 12,19"/></svg>
+        </button>
+        <div style={{flex:1}}>
+          <div style={{color:"white", fontWeight:700, fontSize:16}}>Panel Admin</div>
+          <div style={{color:"#475569", fontSize:10}}>Vue globale Zenbat</div>
+        </div>
+        <button onClick={load} style={{background:"#1e293b", border:"1px solid #334155", borderRadius:8, padding:"5px 10px", color:"#94a3b8", fontSize:11, cursor:"pointer"}}>↻ Actualiser</button>
+      </div>
+
+      {loading && <div style={{padding:40, textAlign:"center", color:"#94a3b8", fontSize:13}}>Chargement…</div>}
+
+      {error && (
+        <div style={{margin:18, background:"#fef2f2", border:"1px solid #fecaca", borderRadius:12, padding:16, color:"#991b1b", fontSize:13}}>
+          ❌ {error}
+        </div>
+      )}
+
+      {stats && (
+        <div style={{padding:16}}>
+          {/* ── KPI Utilisateurs ── */}
+          <div style={{fontSize:10, fontWeight:700, color:"#94a3b8", letterSpacing:"0.5px", textTransform:"uppercase", marginBottom:8}}>Utilisateurs</div>
+          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:16}}>
+            {[
+              { label:"Total inscrits",  value:stats.users.total,          sub:`+${stats.users.newThisMonth} ce mois`,   color:"#0f172a" },
+              { label:"Abonnés Pro",     value:stats.users.pro,            sub:`${pct(stats.users.pro,stats.users.total)}% des users`, color:"#22c55e" },
+              { label:"Gratuit / Essai", value:stats.users.free,           sub:`+${stats.users.newLast7} ces 7 jours`,   color:"#64748b" },
+              { label:"Appels IA total", value:stats.users.totalAiUsed,    sub:`moy. ${stats.users.total?Math.round(stats.users.totalAiUsed/stats.users.total):0}/user`, color:"#7c3aed" },
+            ].map(k => (
+              <div key={k.label} style={{background:"white", borderRadius:14, padding:"14px 16px", boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
+                <div style={{fontSize:10, color:"#94a3b8", marginBottom:4}}>{k.label}</div>
+                <div style={{fontSize:22, fontWeight:800, color:k.color, lineHeight:1}}>{k.value.toLocaleString("fr-FR")}</div>
+                <div style={{fontSize:10, color:"#cbd5e1", marginTop:4}}>{k.sub}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* ── KPI Devis ── */}
+          <div style={{fontSize:10, fontWeight:700, color:"#94a3b8", letterSpacing:"0.5px", textTransform:"uppercase", marginBottom:8}}>Devis & CA</div>
+          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:16}}>
+            {[
+              { label:"Total devis",    value:stats.devis.total,             sub:`+${stats.devis.devisMonth} ce mois`,   color:"#0f172a", money:false },
+              { label:"Acceptés",       value:stats.devis.byStatut.accepte,  sub:`Taux ${stats.devis.txConversion}%`,    color:"#22c55e", money:false },
+              { label:"CA signé HT",    value:fmtEur(stats.devis.caAccepte), sub:"devis acceptés",                       color:"#0ea5e9", money:true  },
+              { label:"CA en cours HT", value:fmtEur(stats.devis.caEnCours), sub:"envoyés + signature",                  color:"#f59e0b", money:true  },
+            ].map(k => (
+              <div key={k.label} style={{background:"white", borderRadius:14, padding:"14px 16px", boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
+                <div style={{fontSize:10, color:"#94a3b8", marginBottom:4}}>{k.label}</div>
+                <div style={{fontSize:k.money?13:22, fontWeight:800, color:k.color, lineHeight:1}}>{typeof k.value==="number"?k.value.toLocaleString("fr-FR"):k.value}</div>
+                <div style={{fontSize:10, color:"#cbd5e1", marginTop:4}}>{k.sub}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Devis par statut ── */}
+          <div style={{background:"white", borderRadius:14, padding:16, marginBottom:16, boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
+            <div style={{fontWeight:700, fontSize:13, color:"#0f172a", marginBottom:12}}>Répartition des devis</div>
+            {Object.entries(stats.devis.byStatut).map(([s, n]) => (
+              <div key={s} style={{marginBottom:10}}>
+                <div style={{display:"flex", justifyContent:"space-between", marginBottom:3}}>
+                  <span style={{fontSize:12, color:"#374151"}}>{STATUT_LABELS[s]}</span>
+                  <span style={{fontSize:12, fontWeight:600, color:STATUT_COLORS[s]}}>{n} ({pct(n, stats.devis.total)}%)</span>
+                </div>
+                <div style={{height:6, background:"#f1f5f9", borderRadius:3, overflow:"hidden"}}>
+                  <div style={{height:"100%", width:`${pct(n, stats.devis.total)}%`, background:STATUT_COLORS[s], borderRadius:3, minWidth:n>0?4:0}}/>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Inscriptions récentes ── */}
+          <div style={{background:"white", borderRadius:14, overflow:"hidden", marginBottom:16, boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
+            <div style={{padding:"12px 16px", borderBottom:"1px solid #f1f5f9", fontWeight:700, fontSize:13, color:"#0f172a"}}>Inscriptions récentes</div>
+            {stats.recentUsers.map((u, i) => (
+              <div key={i} style={{padding:"10px 16px", borderBottom:"1px solid #f8fafc", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                <div>
+                  <div style={{fontSize:13, fontWeight:600, color:"#0f172a"}}>{u.name}</div>
+                  <div style={{fontSize:10, color:"#94a3b8", marginTop:1}}>{fmtD(u.joined)} · IA : {u.ai_used}×</div>
+                </div>
+                <span style={{fontSize:9, fontWeight:700, padding:"3px 8px", borderRadius:20, background:u.plan==="pro"?"rgba(34,197,94,.12)":"#f1f5f9", color:u.plan==="pro"?"#15803d":"#64748b"}}>
+                  {u.plan==="pro"?"PRO":"FREE"}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Top utilisateurs ── */}
+          <div style={{background:"white", borderRadius:14, overflow:"hidden", boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
+            <div style={{padding:"12px 16px", borderBottom:"1px solid #f1f5f9", fontWeight:700, fontSize:13, color:"#0f172a"}}>Top utilisateurs</div>
+            {stats.topUsers.length === 0 && <div style={{padding:20, textAlign:"center", color:"#94a3b8", fontSize:12}}>Aucune donnée</div>}
+            {stats.topUsers.map((u, i) => (
+              <div key={i} style={{padding:"10px 16px", borderBottom:"1px solid #f8fafc", display:"flex", alignItems:"center", gap:12}}>
+                <div style={{width:22, height:22, borderRadius:"50%", background:"#f1f5f9", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:700, color:"#64748b", flexShrink:0}}>{i+1}</div>
+                <div style={{flex:1, minWidth:0}}>
+                  <div style={{fontSize:13, fontWeight:600, color:"#0f172a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{u.name}</div>
+                  <div style={{fontSize:10, color:"#94a3b8"}}>IA : {u.ai_used}× · {u.devis} devis</div>
+                </div>
+                <span style={{fontSize:9, fontWeight:700, padding:"3px 8px", borderRadius:20, background:u.plan==="pro"?"rgba(34,197,94,.12)":"#f1f5f9", color:u.plan==="pro"?"#15803d":"#64748b"}}>
+                  {u.plan==="pro"?"PRO":"FREE"}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{marginTop:14, textAlign:"center", fontSize:10, color:"#cbd5e1"}}>
+            Données du {fmtD(stats.generatedAt)} à {new Date(stats.generatedAt).toLocaleTimeString("fr-FR")}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
