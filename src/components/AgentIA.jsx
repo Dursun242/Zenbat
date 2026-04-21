@@ -160,7 +160,7 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
       `}</style>
 
       {/* ═══ HAUT : aperçu devis en cours ═══════════════════ */}
-      <div style={{ flexShrink: 0, background: "white", borderBottom: "2px solid #f1f5f9", maxHeight: "52%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ flexShrink: 0, background: "white", borderBottom: "2px solid #f1f5f9", minHeight: 110, maxHeight: "45%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
         {/* En-tête branding */}
         <div style={{ background: ac, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
@@ -345,7 +345,7 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
             <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
               placeholder={TX.inputPlaceholder}
-              rows={1} style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 12, color: "#1e293b", resize: "none", fontFamily: "inherit", lineHeight: 1.5, maxHeight: 80, overflow: "auto" }}/>
+              rows={1} style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 16, color: "#1e293b", resize: "none", fontFamily: "inherit", lineHeight: 1.5, maxHeight: 80, overflow: "auto" }}/>
             <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
               <button title="Micro" style={{ width: 30, height: 30, borderRadius: 9, background: "#f1f5f9", border: "none", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", cursor: "pointer", fontSize: 13 }}>🎙</button>
               <button onClick={send} disabled={!input.trim() || loading}

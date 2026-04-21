@@ -240,6 +240,7 @@ export default function App() {
         .fu{animation:fadeUp .22s ease both}
         .pop{animation:popIn .28s cubic-bezier(.34,1.56,.64,1) both}
         input,textarea,select,button{font-family:inherit}
+        input,textarea,select{font-size:max(16px,1em) !important}
       `}</style>
 
       {/* Header */}
