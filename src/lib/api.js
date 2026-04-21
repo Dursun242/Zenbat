@@ -1,5 +1,15 @@
 import { supabase } from './supabase'
 
+async function withRetry(fn, retries = 2, delay = 700) {
+  try {
+    return await fn()
+  } catch (err) {
+    if (retries <= 0) throw err
+    await new Promise(r => setTimeout(r, delay))
+    return withRetry(fn, retries - 1, delay * 2)
+  }
+}
+
 // Normalise une ligne avant insertion (valeurs par défaut, champs requis)
 function normalizeRow(r) {
   return {
@@ -63,12 +73,14 @@ export async function updateMyProfile(patch) {
 // CLIENTS
 // =========================================================
 export async function listClients() {
-  const { data, error } = await supabase
-    .from('clients')
-    .select('*')
-    .order('updated_at', { ascending: false })
-  if (error) throw error
-  return data
+  return withRetry(async () => {
+    const { data, error } = await supabase
+      .from('clients')
+      .select('*')
+      .order('updated_at', { ascending: false })
+    if (error) throw error
+    return data
+  })
 }
 
 export async function createClient(client) {
@@ -127,14 +139,16 @@ export async function listDevisWithLignes() {
 }
 
 export async function getDevis(id) {
-  const { data, error } = await supabase
-    .from('devis')
-    .select('*, client:clients(*), lignes:lignes_devis(*)')
-    .eq('id', id)
-    .single()
-  if (error) throw error
-  data.lignes?.sort((a, b) => a.position - b.position)
-  return data
+  return withRetry(async () => {
+    const { data, error } = await supabase
+      .from('devis')
+      .select('*, client:clients(*), lignes:lignes_devis(*)')
+      .eq('id', id)
+      .single()
+    if (error) throw error
+    data.lignes?.sort((a, b) => a.position - b.position)
+    return data
+  })
 }
 
 export async function createDevis(devis, lignes = []) {
