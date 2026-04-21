@@ -21,7 +21,15 @@ const SR_LANGS = [
   { code: "ru-RU", label: "Русский",  flag: "🇷🇺" },
 ];
 
+const MIC_LANG_KEY = "zenbat_mic_lang";
+
 const pickInitialLang = () => {
+  if (typeof window !== "undefined") {
+    try {
+      const saved = localStorage.getItem(MIC_LANG_KEY);
+      if (saved && SR_LANGS.some(l => l.code === saved)) return saved;
+    } catch {}
+  }
   if (typeof navigator === "undefined") return "fr-FR";
   const nav = (navigator.language || "fr-FR").toLowerCase();
   const match = SR_LANGS.find(l => l.code.toLowerCase() === nav || l.code.toLowerCase().split("-")[0] === nav.split("-")[0]);
@@ -271,6 +279,7 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
 
   const pickLang = (code) => {
     setMicLang(code);
+    try { localStorage.setItem(MIC_LANG_KEY, code); } catch {}
     setLangMenu(false);
     if (listening) { stopListening(); setTimeout(startListening, 120); }
   };
