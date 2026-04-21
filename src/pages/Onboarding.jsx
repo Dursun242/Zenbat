@@ -35,11 +35,11 @@ const FONTS = [
 ]
 const COLORS = ["#22c55e","#3b82f6","#f97316","#8b5cf6","#ef4444","#0891b2","#0f172a","#d97706"]
 const STEPS  = [
-  { title:"Votre identité",       icon:"🏢" },
-  { title:"Vos métiers BTP",      icon:"🛠️" },
-  { title:"Coordonnées",          icon:"📍" },
-  { title:"Apparence PDF",        icon:"🎨" },
-  { title:"Informations légales", icon:"📋" },
+  { title:"Votre identité",       short:"Identité",  subtitle:"Informations qui apparaîtront en en-tête de tous vos devis." },
+  { title:"Vos métiers BTP",      short:"Métiers",   subtitle:"L'Agent IA adapte les devis à vos spécialités uniquement." },
+  { title:"Coordonnées",          short:"Contacts",  subtitle:"Comment vos clients peuvent vous joindre depuis un devis." },
+  { title:"Apparence PDF",        short:"Design",    subtitle:"Couleur, police et rendu visuel de vos devis." },
+  { title:"Informations légales", short:"Légal",     subtitle:"Mentions obligatoires et conditions de paiement." },
 ]
 
 export default function Onboarding({ brand, setBrand, onDone }) {
@@ -73,31 +73,59 @@ export default function Onboarding({ brand, setBrand, onDone }) {
 
   return (
     <div style={{minHeight:"100vh",background:"#0f172a",fontFamily:"'DM Sans',sans-serif",display:"flex",flexDirection:"column"}}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700&family=Space+Grotesk:wght@400;600;700&display=swap');*{box-sizing:border-box;margin:0;padding:0}input,select,textarea,button{font-family:inherit}@keyframes popIn{0%{opacity:0;transform:scale(.94)}100%{opacity:1;transform:scale(1)}}@keyframes spin{to{transform:rotate(360deg)}}.pop{animation:popIn .25s ease both}`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700&family=Space+Grotesk:wght@400;600;700&display=swap');*{box-sizing:border-box;margin:0;padding:0}input,select,textarea,button{font-family:inherit}@keyframes popIn{0%{opacity:0;transform:scale(.94)}100%{opacity:1;transform:scale(1)}}@keyframes spin{to{transform:rotate(360deg)}}.pop{animation:popIn .25s ease both}.noscroll::-webkit-scrollbar{display:none}`}</style>
 
-      <div style={{padding:"16px 20px 0"}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+      <div style={{padding:"calc(14px + env(safe-area-inset-top)) 20px 0"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
           <Logo size={18} white/>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <span style={{fontSize:10,fontWeight:700,padding:"3px 8px",borderRadius:20,background:`${quality.level.color}22`,color:quality.level.color}}>
-              Qualité : {quality.level.label} · {quality.percent}%
-            </span>
-            <span style={{color:"#64748b",fontSize:11}}>{step+1} / {STEPS.length}</span>
-          </div>
+          <span style={{color:"#64748b",fontSize:11,fontWeight:500}}>Étape {step+1} sur {STEPS.length}</span>
         </div>
-        <div style={{height:3,background:"#1e293b",borderRadius:2}}>
-          <div style={{height:"100%",background:"#22c55e",borderRadius:2,transition:"width .4s ease",width:`${((step+1)/STEPS.length)*100}%`}}/>
+
+        {/* Breadcrumb nommé cliquable (étapes précédentes seulement) */}
+        <div className="noscroll" style={{display:"flex",alignItems:"center",gap:4,marginBottom:14,overflowX:"auto",scrollbarWidth:"none"}}>
+          {STEPS.map((s,i)=>{
+            const done    = i < step
+            const current = i === step
+            const go      = () => { if (i <= step) setStep(i) }
+            return (
+              <button key={i} onClick={go} disabled={i > step}
+                style={{
+                  flex:"1 0 auto",
+                  background:"none",border:"none",padding:"4px 0",
+                  display:"flex",flexDirection:"column",alignItems:"center",gap:5,
+                  cursor:i<=step?"pointer":"default",minWidth:56
+                }}>
+                <div style={{
+                  width:22,height:22,borderRadius:"50%",
+                  background: current ? "#22c55e" : done ? "#166534" : "#1e293b",
+                  border: current ? "2px solid #86efac" : `1px solid ${done?"#22c55e":"#334155"}`,
+                  display:"flex",alignItems:"center",justifyContent:"center",
+                  fontSize:10,fontWeight:700,
+                  color: current || done ? "white" : "#64748b",
+                  transition:"all .2s",
+                  boxShadow: current ? "0 0 0 4px rgba(34,197,94,.15)" : "none"
+                }}>
+                  {done ? "✓" : i+1}
+                </div>
+                <span style={{
+                  fontSize:10, lineHeight:1.2, textAlign:"center",
+                  fontWeight: current ? 700 : 500,
+                  color: current ? "#22c55e" : done ? "#86efac" : "#475569"
+                }}>{s.short}</span>
+              </button>
+            )
+          })}
         </div>
-        <div style={{display:"flex",justifyContent:"space-between",marginTop:8}}>
-          {STEPS.map((s,i)=>(
-            <span key={i} style={{fontSize:10,color:i<=step?"#22c55e":"#475569",fontWeight:i===step?600:400}}>{s.icon}</span>
-          ))}
+
+        {/* Progress bar fine */}
+        <div style={{height:2,background:"#1e293b",borderRadius:2,overflow:"hidden"}}>
+          <div style={{height:"100%",background:"linear-gradient(90deg,#22c55e,#86efac)",borderRadius:2,transition:"width .4s ease",width:`${((step+1)/STEPS.length)*100}%`}}/>
         </div>
       </div>
 
-      <div style={{flex:1,padding:"20px 20px 100px",overflowY:"auto"}}>
-        <h2 style={{color:"white",fontSize:20,fontWeight:700,marginBottom:4}} className="pop">{STEPS[step].icon} {STEPS[step].title}</h2>
-        <p style={{color:"#64748b",fontSize:12,marginBottom:20}}>Votre devis PDF sera personnalisé automatiquement</p>
+      <div style={{flex:1,padding:"24px 20px 120px",overflowY:"auto"}}>
+        <h2 style={{color:"white",fontSize:24,fontWeight:800,marginBottom:6,letterSpacing:"-0.3px"}} className="pop">{STEPS[step].title}</h2>
+        <p style={{color:"#94a3b8",fontSize:13,marginBottom:24,lineHeight:1.5}}>{STEPS[step].subtitle}</p>
 
         {step===0&&(
           <div className="pop" style={{display:"flex",flexDirection:"column",gap:14}}>
@@ -247,15 +275,27 @@ export default function Onboarding({ brand, setBrand, onDone }) {
         )}
       </div>
 
-      <div style={{position:"fixed",bottom:0,left:0,right:0,background:"#0f172a",borderTop:"1px solid #1e293b",padding:"14px 20px",display:"flex",gap:10}}>
-        {step>0&&<button onClick={()=>setStep(s=>s-1)} style={{flex:1,background:"#1e293b",color:"#94a3b8",border:"none",borderRadius:14,padding:"13px",fontSize:13,fontWeight:600,cursor:"pointer"}}>← Retour</button>}
-        {step<STEPS.length-1
-          ? <button onClick={()=>{ if (!canGoNext) { setTryNext(true); return } setStep(s=>s+1) }}
-              style={{flex:2,background:canGoNext?"#22c55e":"#334155",color:canGoNext?"white":"#64748b",border:"none",borderRadius:14,padding:"13px",fontSize:14,fontWeight:700,cursor:canGoNext?"pointer":"not-allowed",transition:"all .15s"}}>
-              Continuer →
-            </button>
-          : <button onClick={save} style={{flex:2,background:"#22c55e",color:"white",border:"none",borderRadius:14,padding:"13px",fontSize:14,fontWeight:700,cursor:"pointer"}}>✓ Enregistrer et commencer</button>
-        }
+      <div style={{position:"fixed",bottom:0,left:0,right:0,background:"#0f172a",borderTop:"1px solid #1e293b",padding:"12px 20px calc(14px + env(safe-area-inset-bottom))"}}>
+        {/* Indicateur qualité discret */}
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+          <div style={{flex:1,height:4,background:"#1e293b",borderRadius:3,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${quality.percent}%`,background:quality.level.color,borderRadius:3,transition:"width .4s ease"}}/>
+          </div>
+          <span style={{fontSize:10,fontWeight:700,color:quality.level.color,whiteSpace:"nowrap"}}>
+            {quality.level.label} · {quality.percent}%
+          </span>
+        </div>
+
+        <div style={{display:"flex",gap:10}}>
+          {step>0&&<button onClick={()=>setStep(s=>s-1)} style={{flex:1,background:"#1e293b",color:"#94a3b8",border:"none",borderRadius:14,padding:"13px",fontSize:13,fontWeight:600,cursor:"pointer"}}>← Retour</button>}
+          {step<STEPS.length-1
+            ? <button onClick={()=>{ if (!canGoNext) { setTryNext(true); return } setStep(s=>s+1) }}
+                style={{flex:2,background:canGoNext?"#22c55e":"#334155",color:canGoNext?"white":"#64748b",border:"none",borderRadius:14,padding:"13px",fontSize:14,fontWeight:700,cursor:canGoNext?"pointer":"not-allowed",transition:"all .15s"}}>
+                Continuer →
+              </button>
+            : <button onClick={save} style={{flex:2,background:"#22c55e",color:"white",border:"none",borderRadius:14,padding:"13px",fontSize:14,fontWeight:700,cursor:"pointer"}}>✓ Enregistrer et commencer</button>
+          }
+        </div>
       </div>
     </div>
   )
