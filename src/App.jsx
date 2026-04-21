@@ -1685,7 +1685,7 @@ L'entreprise est spécialisée UNIQUEMENT dans les métiers suivants : ${tradeNa
 - En cas de doute léger (ex : un travail à la frontière de l'un de tes métiers), accepte et précise-le brièvement.`
         : "";
       const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,
           system:`Tu es un assistant expert BTP France intégré dans l'application Zenbat.${tradesBlock}
 
 LANGUE — RÈGLE ABSOLUE :
@@ -1721,8 +1721,9 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
       if(!res.ok) throw new Error("api");
       const data=await res.json();
       const raw=data.content?.[0]?.text||"";
-      const match=raw.match(/<DEVIS>([\s\S]*?)<\/DEVIS>/);
-      const txt=raw.replace(/<DEVIS>[\s\S]*?<\/DEVIS>/g,"").trim();
+      // Regex principale ; fallback si la réponse est tronquée (pas de </DEVIS>)
+      const match=raw.match(/<DEVIS>([\s\S]*?)<\/DEVIS>/) || raw.match(/<DEVIS>([\s\S]+)/);
+      const txt=raw.replace(/<DEVIS>[\s\S]*/g,"").trim();
       if(match){
         try{
           const parsed=JSON.parse(match[1].trim());
