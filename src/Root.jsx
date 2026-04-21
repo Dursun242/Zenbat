@@ -4,6 +4,7 @@ import App from './App.jsx'
 import Login from './pages/Login.jsx'
 import Signup from './pages/Signup.jsx'
 import AuthCallback from './pages/AuthCallback.jsx'
+import ResetPassword from './pages/ResetPassword.jsx'
 import Landing from './pages/Landing.jsx'
 
 const loader = {
@@ -11,12 +12,13 @@ const loader = {
 }
 
 export default function Root() {
-  const { session, loading } = useAuth()
+  const { session, loading, recovery } = useAuth()
   const [mode, setMode] = useState(null) // null = landing, 'login', 'signup'
 
-  if (typeof window !== 'undefined' && window.location.pathname === '/auth/callback') {
-    return <AuthCallback />
-  }
+  const path = typeof window !== 'undefined' ? window.location.pathname : '/'
+
+  if (path === '/auth/callback') return <AuthCallback />
+  if (path === '/reset-password' || recovery) return <ResetPassword />
 
   if (loading) {
     return <div style={loader.wrap}>Chargement…</div>
