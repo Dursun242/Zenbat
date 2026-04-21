@@ -677,7 +677,7 @@ function Field({dark,label,val,onChange,placeholder,type="text"}) {
 // ══════════════════════════════════════════════════════════
 //  PDF LIVE VIEWER (simulé avec HTML)
 // ══════════════════════════════════════════════════════════
-function PDFViewer({d, cl, brand, onClose, hidden=false, onPageReady}) {
+function PDFViewer({d, cl, brand, onClose, hidden=false, onPageReady, onSendOdoo, sending=false}) {
   const MM_TO_PX = 3.7795275591;
   const A4_PX = 210 * MM_TO_PX;
   const wrapRef = useRef(null);
@@ -939,13 +939,28 @@ function PDFViewer({d, cl, brand, onClose, hidden=false, onPageReady}) {
         </div>
       </div>
 
-      <div className="pdf-scroll" ref={wrapRef} style={{flex:1,overflow:"auto",padding:"16px 16px calc(20px + env(safe-area-inset-bottom))",background:"#1e293b"}}>
+      <div className="pdf-scroll" ref={wrapRef} style={{flex:1,overflow:"auto",padding:`16px 16px ${onSendOdoo?"80px":"calc(20px + env(safe-area-inset-bottom))"}`,background:"#1e293b"}}>
         <div className="pdf-page-wrap" style={{width:`calc(210mm * ${scale})`,height:pageH?`${pageH}px`:"auto",margin:"0 auto",position:"relative"}}>
         <div ref={pageRef} className="pdf-page" style={{background:"white",width:"210mm",minHeight:"297mm",boxShadow:"0 20px 60px rgba(0,0,0,.5)",padding:"15mm",fontFamily,color:"#1a1a1a",fontSize:11,lineHeight:1.5,boxSizing:"border-box",transform:`scale(${scale})`,transformOrigin:"top left",position:"absolute",top:0,left:0}}>
           {pageBody}
         </div>
         </div>
       </div>
+
+      {onSendOdoo && (
+        <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"12px 18px calc(12px + env(safe-area-inset-bottom))",background:"#0f172a",borderTop:"1px solid #1e293b",display:"flex",gap:10}}>
+          <button onClick={onClose} style={{background:"#1e293b",color:"#94a3b8",border:"none",borderRadius:12,padding:"12px 16px",fontSize:13,fontWeight:600,cursor:"pointer",flexShrink:0}}>
+            ← Retour
+          </button>
+          <button onClick={onSendOdoo} disabled={sending}
+            style={{flex:1,background:sending?"#4b3557":"#714B67",color:"white",border:"none",borderRadius:12,padding:"12px",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:8,cursor:sending?"default":"pointer",opacity:sending?0.8:1}}>
+            {sending
+              ? <><span style={{display:"inline-block",width:14,height:14,border:"2px solid white",borderTopColor:"transparent",borderRadius:"50%",animation:"spin 1s linear infinite"}}/> Envoi en cours…</>
+              : <>{I.odoo} Envoyer en signature Odoo Sign</>
+            }
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1542,7 +1557,9 @@ function DevisDetail({d,cl,onBack,brand,onChange}) {
 
   return (
     <>
-      {showPDF&&<PDFViewer d={d} cl={cl} brand={brand} onClose={()=>setShowPDF(false)}/>}
+      {showPDF&&<PDFViewer d={d} cl={cl} brand={brand} onClose={()=>setShowPDF(false)}
+        onSendOdoo={!["accepte","refuse"].includes(d.statut) ? sendOdoo : undefined}
+        sending={sending}/>}
       {odooRendering && <PDFViewer d={d} cl={cl} brand={brand} hidden onPageReady={onPdfPageReady}/>}
 
       <div style={{minHeight:"100%",background:"#f8fafc"}} className="fu">
@@ -1591,12 +1608,6 @@ function DevisDetail({d,cl,onBack,brand,onChange}) {
 
           {/* Actions */}
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {!["accepte","refuse"].includes(d.statut)&&(
-              <button onClick={sendOdoo} disabled={sending}
-                style={{width:"100%",background:sending?"#9ca3af":"#714B67",color:"white",border:"none",borderRadius:14,padding:"13px",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:10,cursor:"pointer"}}>
-                {sending?<><span style={{display:"inline-block",width:14,height:14,border:"2px solid white",borderTopColor:"transparent",borderRadius:"50%",animation:"spin 1s linear infinite"}}/> Envoi Odoo…</>:<>{I.odoo} Envoyer en signature Odoo Sign</>}
-              </button>
-            )}
             {signUrl&&(
               <div style={{background:"#faf5ff",border:"1px solid #e9d5ff",borderRadius:12,padding:"12px 14px"}}>
                 <div style={{fontSize:11,fontWeight:600,color:"#7c3aed",marginBottom:5,display:"flex",alignItems:"center",gap:5}}>{I.odoo} Lien de signature Odoo actif</div>
