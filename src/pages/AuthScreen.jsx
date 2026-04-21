@@ -67,9 +67,9 @@ export default function AuthScreen({ onEnter }) {
             <input type="email" placeholder="Email"
               style={{ width: "100%", border: "1px solid #e2e8f0", borderRadius: 12, padding: "10px 14px", fontSize: 13, outline: "none" }}/>
             <input type="password" placeholder="Mot de passe"
-              onKeyDown={e => e.key === "Enter" && onEnter(company?.nom || null)}
+              onKeyDown={e => e.key === "Enter" && onEnter(company?.nom || null, mode === "signup")}
               style={{ width: "100%", border: "1px solid #e2e8f0", borderRadius: 12, padding: "10px 14px", fontSize: 13, outline: "none" }}/>
-            <button onClick={() => onEnter(company?.nom || null)}
+            <button onClick={() => onEnter(company?.nom || null, mode === "signup")}
               style={{ width: "100%", background: "#22c55e", color: "white", border: "none", borderRadius: 12, padding: 13, fontSize: 13, fontWeight: 700, marginTop: 4, cursor: "pointer" }}>
               {mode === "login" ? "Se connecter →" : "Créer mon compte gratuit →"}
             </button>
@@ -81,7 +81,7 @@ export default function AuthScreen({ onEnter }) {
             <hr style={{ flex: 1, border: "none", borderTop: "1px solid #f1f5f9" }}/>
           </div>
 
-          <button onClick={() => onEnter(null)}
+          <button onClick={() => onEnter(null, false)}
             style={{ width: "100%", border: "1px solid #e2e8f0", borderRadius: 12, padding: 11, fontSize: 12, fontWeight: 600, background: "white", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: "#374151", cursor: "pointer" }}>
             <svg width="16" height="16" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>

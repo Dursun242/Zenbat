@@ -16,9 +16,10 @@ import DevisList   from "./components/DevisList.jsx";
 import DevisDetail from "./components/DevisDetail.jsx";
 import AgentIA     from "./components/AgentIA.jsx";
 import AdminPanel  from "./components/AdminPanel.jsx";
-import Onboarding  from "./pages/Onboarding.jsx";
-import AuthScreen  from "./pages/AuthScreen.jsx";
-import PaywallScreen from "./pages/PaywallScreen.jsx";
+import Onboarding       from "./pages/Onboarding.jsx";
+import AuthScreen       from "./pages/AuthScreen.jsx";
+import PaywallScreen    from "./pages/PaywallScreen.jsx";
+import PWAInstallScreen from "./pages/PWAInstallScreen.jsx";
 
 const TRIAL_DAYS = 30;
 
@@ -37,6 +38,8 @@ export default function App() {
   const [plan,   setPlan]     = useState("free");
   const [toast,  setToast]    = useState(null);
   const [loadingDevis, setLoadingDevis] = useState(new Set());
+  const [showPwa, setShowPwa] = useState(false);
+  const deferredPrompt = useRef(null);
 
   const [brand, setBrandState] = useState(() => {
     try {
@@ -77,6 +80,13 @@ export default function App() {
 
   const { user, signOut } = useAuth();
   const isAdmin = user?.email === import.meta.env.VITE_ADMIN_EMAIL;
+
+  // Capture l'événement beforeinstallprompt pour Android
+  useEffect(() => {
+    const handler = e => { e.preventDefault(); deferredPrompt.current = e; };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
 
   // Chargement initial depuis Supabase
   useEffect(() => {
@@ -223,8 +233,9 @@ export default function App() {
   const activeNav = NAV.find(n => tab.startsWith(n.id))?.id || "dashboard";
 
   // ── Écrans hors dashboard ─────────────────────────────────
-  if (screen === "auth")       return <AuthScreen onEnter={co => { setBrand(b => ({ ...b, companyName: co || "" })); setScreen("onboarding"); }}/>;
-  if (screen === "onboarding") return <Onboarding brand={brand} setBrand={setBrand} onDone={() => setScreen("app")}/>;
+  if (screen === "auth")       return <AuthScreen onEnter={(co, isSignup) => { setBrand(b => ({ ...b, companyName: co || "" })); setShowPwa(!!isSignup); setScreen("onboarding"); }}/>;
+  if (screen === "onboarding") return <Onboarding brand={brand} setBrand={setBrand} onDone={() => setScreen(showPwa ? "pwa_install" : "app")}/>;
+  if (screen === "pwa_install") return <PWAInstallScreen deferredPrompt={deferredPrompt.current} onDone={() => { setShowPwa(false); setScreen("app"); }}/>;
   if (screen === "paywall")    return <PaywallScreen daysLeft={daysLeft} onBack={() => setScreen("app")} onSubscribe={() => { setPlan("pro"); setScreen("app"); }}/>;
 
   return (
