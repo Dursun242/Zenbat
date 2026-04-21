@@ -1044,7 +1044,6 @@ function ClientsList({clients,onSave,onDelete,onRestore,goClient,showUndo}) {
   const [importing, setImporting] = useState(false); // "loading" pendant l'analyse photo
   const [importError, setImportError] = useState("");
   const fileRef = useRef(null);
-  const camRef  = useRef(null);
 
   const filtered = clients.filter(c => {
     if (!query.trim()) return true;
@@ -1133,22 +1132,15 @@ Règles :
       {/* Actions */}
       <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:14}}>
         <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{display:"none"}}/>
-        <input ref={camRef}  type="file" accept="image/*" capture="environment" onChange={onFile} style={{display:"none"}}/>
         {importing ? (
           <div style={{background:"#eef2ff",border:"1.5px solid #c7d2fe",borderRadius:14,padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"center",gap:8,color:"#4338ca",fontSize:13,fontWeight:600}}>
             <span style={{display:"inline-block",width:14,height:14,border:"2px solid #c7d2fe",borderTopColor:"#4338ca",borderRadius:"50%",animation:"spin .8s linear infinite"}}/> Analyse en cours…
           </div>
         ) : (
-          <div style={{display:"flex",gap:8}}>
-            <button onClick={()=>fileRef.current?.click()}
-              style={{flex:1,background:"#eef2ff",border:"1.5px solid #c7d2fe",borderRadius:14,padding:"12px 10px",display:"flex",alignItems:"center",justifyContent:"center",gap:6,color:"#4338ca",fontSize:12,fontWeight:600,cursor:"pointer"}}>
-              🖼️ Galerie
-            </button>
-            <button onClick={()=>camRef.current?.click()}
-              style={{flex:1,background:"#eef2ff",border:"1.5px solid #c7d2fe",borderRadius:14,padding:"12px 10px",display:"flex",alignItems:"center",justifyContent:"center",gap:6,color:"#4338ca",fontSize:12,fontWeight:600,cursor:"pointer"}}>
-              📷 Appareil photo
-            </button>
-          </div>
+          <button onClick={()=>fileRef.current?.click()}
+            style={{background:"#eef2ff",border:"1.5px solid #c7d2fe",borderRadius:14,padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"center",gap:6,color:"#4338ca",fontSize:13,fontWeight:600,cursor:"pointer",width:"100%"}}>
+            📷 Importer une photo
+          </button>
         )}
         <button onClick={()=>setEditing(emptyClient())}
           style={{background:"#0f172a",color:"white",border:"none",borderRadius:14,padding:"12px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>+ Nouveau contact</button>
