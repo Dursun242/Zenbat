@@ -12,7 +12,7 @@ const DEMO_CLIENTS = [
 const DEMO_LIGNES = [
   { id:"l1", type_ligne:"lot",     designation:"DÉMOLITION",           lot:""            },
   { id:"l2", type_ligne:"ouvrage", designation:"Dépose carrelage",     lot:"Démolition", unite:"m2", quantite:24, prix_unitaire:18   },
-  { id:"l3", type_ligne:"ouvrage", designation:"Évacuation gravats",   lot:"Démolition", unite:"fg", quantite:1,  prix_unitaire:320  },
+  { id:"l3", type_ligne:"ouvrage", designation:"Évacuation gravats",   lot:"Démolition", unite:"ft", quantite:1,  prix_unitaire:320  },
   { id:"l4", type_ligne:"lot",     designation:"REVÊTEMENTS",          lot:""            },
   { id:"l5", type_ligne:"ouvrage", designation:"Carrelage grès cérame",lot:"Revêtements",unite:"m2", quantite:24, prix_unitaire:55   },
   { id:"l6", type_ligne:"ouvrage", designation:"Faïence murale",       lot:"Revêtements",unite:"m2", quantite:18, prix_unitaire:48   },
@@ -888,7 +888,7 @@ Si l'utilisateur donne un prix unitaire explicite, utilise-le EXACTEMENT.
 
 Format strict : {"objet":"titre court en français","lignes":[
   {"type_ligne":"lot","designation":"NOM DU LOT EN FRANÇAIS"},
-  {"type_ligne":"ouvrage","lot":"nom lot","designation":"description en français","unite":"m2|ml|u|m3|fg|ens","quantite":10,"prix_unitaire":25}
+  {"type_ligne":"ouvrage","lot":"nom lot","designation":"description en français","unite":"m2|ml|u|m3|ft|ens","quantite":10,"prix_unitaire":25}
 ]}
 
 Règles : prix réalistes BTP France 2025, groupe par lots, désignations professionnelles en français.

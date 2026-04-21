@@ -73,7 +73,7 @@ Si l'utilisateur donne un prix unitaire explicite, utilise-le EXACTEMENT.
 
 Format strict : {"objet":"titre court en français","lignes":[
   {"type_ligne":"lot","designation":"NOM DU LOT EN FRANÇAIS"},
-  {"type_ligne":"ouvrage","lot":"nom lot","designation":"description en français","unite":"m2|ml|u|m3|fg|ens","quantite":10,"prix_unitaire":25,"tva_rate":20}
+  {"type_ligne":"ouvrage","lot":"nom lot","designation":"description en français","unite":"m2|ml|u|m3|ft|ens","quantite":10,"prix_unitaire":25,"tva_rate":20}
 ]}
 
 TVA : applique le taux correct par ouvrage selon la réglementation française :

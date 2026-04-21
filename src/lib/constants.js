@@ -1,6 +1,6 @@
 export const CLAUDE_MODEL = import.meta.env.VITE_CLAUDE_MODEL || "claude-sonnet-4-20250514";
 
-export const UNITES = ["m2", "ml", "u", "m3", "fg", "ens", "h", "j"];
+export const UNITES = ["m2", "ml", "u", "m3", "ft", "ens", "h", "j"];
 export const TVA_RATES = [20, 10, 5.5];
 
 // ── Statuts devis ─────────────────────────────────────────
@@ -51,7 +51,7 @@ export const DEMO_CLIENTS = [
 const DEMO_LIGNES = [
   { id: "l1", type_ligne: "lot",     designation: "DÉMOLITION",          lot: ""             },
   { id: "l2", type_ligne: "ouvrage", designation: "Dépose carrelage",    lot: "Démolition",  unite: "m2", quantite: 24, prix_unitaire: 18   },
-  { id: "l3", type_ligne: "ouvrage", designation: "Évacuation gravats",  lot: "Démolition",  unite: "fg", quantite: 1,  prix_unitaire: 320  },
+  { id: "l3", type_ligne: "ouvrage", designation: "Évacuation gravats",  lot: "Démolition",  unite: "ft", quantite: 1,  prix_unitaire: 320  },
   { id: "l4", type_ligne: "lot",     designation: "REVÊTEMENTS",         lot: ""             },
   { id: "l5", type_ligne: "ouvrage", designation: "Carrelage grès cérame", lot: "Revêtements", unite: "m2", quantite: 24, prix_unitaire: 55 },
   { id: "l6", type_ligne: "ouvrage", designation: "Faïence murale",      lot: "Revêtements", unite: "m2", quantite: 18, prix_unitaire: 48  },
