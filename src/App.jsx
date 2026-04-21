@@ -185,9 +185,26 @@ export default function App() {
       return { label, onUndo, timer };
     });
   }, []);
+  const showErr = useCallback((label) => {
+    setToast(prev => {
+      if (prev?.timer) clearTimeout(prev.timer);
+      const timer = setTimeout(() => setToast(null), 5000);
+      return { label, isError: true, timer };
+    });
+  }, []);
   const dismissToast = () => setToast(prev => { if (prev?.timer) clearTimeout(prev.timer); return null; });
   const TRIAL_DAYS = 30;
+  const [loadingDevis, setLoadingDevis] = useState(new Set());
   const { user, session, signOut } = useAuth();
+  const handleSignOut = () => {
+    if (!window.confirm("Se déconnecter ?")) return;
+    setClients([]);
+    setDevis([]);
+    setSelD(null);
+    setSelC(null);
+    setTab("dashboard");
+    signOut();
+  };
   const isAdmin = user?.email === import.meta.env.VITE_ADMIN_EMAIL;
 
   // ── Chargement initial depuis Supabase (une fois authentifié) ──────
@@ -202,6 +219,7 @@ export default function App() {
         setDevis(ds.length ? ds : []);
       } catch (err) {
         console.error("[Zenbat] chargement données :", err);
+        if (!cancelled) showErr("Erreur de chargement — vérifiez votre connexion");
       }
     })();
     return () => { cancelled = true; };
@@ -219,7 +237,7 @@ export default function App() {
         if (saveLignes) {
           await replaceLignes(d.id, (dl || []).map(({id, created_at, ...l}) => l));
         }
-      } catch (err) { console.error("[save devis]", err); }
+      } catch (err) { console.error("[save devis]", err); showErr("Impossible de sauvegarder le devis"); }
     };
     if (immediate) { run(); return; }
     clearTimeout(saveTimers.current[d.id]);
@@ -235,20 +253,20 @@ export default function App() {
       const { created_at, updated_at, ...fields } = c;
       if (isNew) await apiCreateClient(fields);
       else await apiUpdateClient(c.id, fields);
-    } catch (err) { console.error("[save client]", err); }
+    } catch (err) { console.error("[save client]", err); showErr("Impossible de sauvegarder le contact"); }
   };
   const onDeleteClient = async (id) => {
     const victim = clients.find(x => x.id === id);
     const idx = clients.findIndex(x => x.id === id);
     setClients(prev => prev.filter(x => x.id !== id));
-    if (user) apiDeleteClient(id).catch(e => console.error("[delete client]", e));
+    if (user) apiDeleteClient(id).catch(e => { console.error("[delete client]", e); showErr("Impossible de supprimer le contact"); });
     return { victim, idx };
   };
   const onRestoreClient = (victim, idx) => {
     setClients(prev => { const n = [...prev]; n.splice(Math.min(idx, n.length), 0, victim); return n; });
     if (user) {
       const { created_at, updated_at, ...fields } = victim;
-      apiCreateClient(fields).catch(e => console.error("[restore client]", e));
+      apiCreateClient(fields).catch(e => console.error("[restore client]", e)); // pas de toast : l'undo est déjà dans le toast
     }
   };
   const onSaveDevis = (d, saveLignes=false) => {
@@ -271,11 +289,11 @@ export default function App() {
           setDevis(prev => prev.map(x => x.id === d.id ? { ...x, lignes: fresh.lignes } : x));
         }
       }
-    } catch (err) { console.error("[create devis]", err); }
+    } catch (err) { console.error("[create devis]", err); showErr("Erreur lors de l'enregistrement du devis"); }
   };
   const onDeleteDevis = async (id) => {
     setDevis(prev => prev.filter(x => x.id !== id));
-    if (user) apiDeleteDevis(id).catch(e => console.error("[delete devis]", e));
+    if (user) apiDeleteDevis(id).catch(e => { console.error("[delete devis]", e); showErr("Impossible de supprimer le devis"); });
   };
   const trialStart = user?.created_at ? new Date(user.created_at).getTime() : null;
   const daysLeft = trialStart !== null ? Math.max(0, TRIAL_DAYS - Math.floor((Date.now() - trialStart) / 86400000)) : TRIAL_DAYS;
@@ -285,27 +303,31 @@ export default function App() {
     setSelD(id);
     setTab("devis_detail");
     if (!user) return;
+    setLoadingDevis(prev => { const n = new Set(prev); n.add(id); return n; });
     getDevis(id)
       .then(fresh => {
+        setLoadingDevis(prev => { const n = new Set(prev); n.delete(id); return n; });
         if (!fresh) return;
         setDevis(prev => prev.map(x => {
           if (x.id !== id) return x;
           const dbLignes    = fresh.lignes || [];
           const stateLignes = x.lignes    || [];
           if (dbLignes.length > 0) {
-            // DB fait autorité : utiliser ses lignes
             return { ...x, lignes: dbLignes, montant_ht: fresh.montant_ht ?? x.montant_ht };
           }
-          // DB vide mais état a des lignes : re-tenter la sauvegarde
           if (stateLignes.length > 0) {
             replaceLignes(id, stateLignes.map(({ id: _, created_at: __, ...l }) => l))
-              .catch(err => console.error("[goDevis] retry lignes:", err));
-            return x; // garder l'état courant
+              .catch(err => { console.error("[goDevis] retry lignes:", err); showErr("Erreur de synchronisation des lignes"); });
+            return x;
           }
           return { ...x, montant_ht: fresh.montant_ht ?? x.montant_ht };
         }));
       })
-      .catch(err => console.error("[goDevis reload]", err));
+      .catch(err => {
+        setLoadingDevis(prev => { const n = new Set(prev); n.delete(id); return n; });
+        console.error("[goDevis reload]", err);
+        showErr("Impossible de charger le devis — vérifiez votre connexion");
+      });
   };
   const goClient = id => { setSelC(id); setTab("client_detail"); };
 
@@ -358,7 +380,7 @@ export default function App() {
             {I.paint} Mon profil
           </button>
           {user && (
-            <button onClick={()=>{ if(window.confirm("Se déconnecter ?")) signOut(); }}
+            <button onClick={handleSignOut}
               title="Se déconnecter"
               style={{background:"#1e293b",border:"1px solid #334155",borderRadius:8,padding:"5px 8px",display:"flex",alignItems:"center",color:"#ef4444",cursor:"pointer"}}>
               {I.logout}
@@ -388,17 +410,17 @@ export default function App() {
         {tab==="devis_detail" && selD && (
           <DevisDetail d={devis.find(x=>x.id===selD)} cl={clients.find(c=>c.id===devis.find(x=>x.id===selD)?.client_id)}
             onBack={()=>setTab("devis")} brand={brand}
-            onChange={onSaveDevis}/>
+            onChange={onSaveDevis} loading={loadingDevis.has(selD)}/>
         )}
         {tab==="agent" && <AgentIA devis={devis} onCreateDevis={onCreateDevis} clients={clients} onSaveClient={onSaveClient} plan={plan} trialExpired={trialExpired} onPaywall={()=>setScreen("paywall")} setTab={setTab} brand={brand}/>}
         {tab==="admin" && isAdmin && <AdminPanel onBack={()=>setTab("dashboard")}/>}
       </div>
 
       {toast && (
-        <div style={{position:"fixed",bottom:`calc(72px + env(safe-area-inset-bottom))`,left:12,right:12,background:"#0f172a",color:"white",borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,boxShadow:"0 10px 30px rgba(0,0,0,.25)",zIndex:100,animation:"fadeUp .18s ease both"}}>
+        <div style={{position:"fixed",bottom:`calc(72px + env(safe-area-inset-bottom))`,left:12,right:12,background:toast.isError?"#7f1d1d":"#0f172a",color:"white",borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,boxShadow:"0 10px 30px rgba(0,0,0,.25)",zIndex:100,animation:"fadeUp .18s ease both"}}>
           <span style={{fontSize:12,fontWeight:500}}>{toast.label}</span>
           <div style={{display:"flex",gap:6}}>
-            <button onClick={()=>{ toast.onUndo?.(); dismissToast(); }} style={{background:"#22c55e",color:"white",border:"none",borderRadius:8,padding:"6px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>Annuler</button>
+            {!toast.isError && <button onClick={()=>{ toast.onUndo?.(); dismissToast(); }} style={{background:"#22c55e",color:"white",border:"none",borderRadius:8,padding:"6px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>Annuler</button>}
             <button onClick={dismissToast} style={{background:"transparent",color:"#94a3b8",border:"none",fontSize:14,cursor:"pointer",padding:"2px 6px"}}>×</button>
           </div>
         </div>
@@ -1478,7 +1500,17 @@ function LignesEditor({lignes, onChange, ac}) {
 // ══════════════════════════════════════════════════════════
 //  DEVIS DETAIL — avec bouton PDF live
 // ══════════════════════════════════════════════════════════
-function DevisDetail({d,cl,onBack,brand,onChange}) {
+function DevisDetail({d,cl,onBack,brand,onChange,loading}) {
+  if (loading) return (
+    <div style={{padding:18,animation:"fadeUp .2s ease both"}}>
+      <div style={{height:16,width:80,background:"#e2e8f0",borderRadius:8,marginBottom:20,animation:"pulse 1.5s ease infinite"}}/>
+      {[200,140,160,120].map((w,i)=>(
+        <div key={i} style={{height:i===0?28:14,width:`${w}px`,background:"#e2e8f0",borderRadius:8,marginBottom:i===0?8:14,animation:"pulse 1.5s ease infinite"}}/>
+      ))}
+      <div style={{height:44,background:"#e2e8f0",borderRadius:12,marginTop:24,animation:"pulse 1.5s ease infinite"}}/>
+      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}`}</style>
+    </div>
+  );
   const [showPDF, setShowPDF] = useState(false);
   const [sending, setSending] = useState(false);
   const [signUrl, setSignUrl] = useState(d.odoo_sign_url||null);

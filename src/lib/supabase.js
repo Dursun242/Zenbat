@@ -4,8 +4,7 @@ const url = import.meta.env.VITE_SUPABASE_URL
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 if (!url || !anonKey) {
-  // eslint-disable-next-line no-console
-  console.error(
+  throw new Error(
     '[Zenbat] VITE_SUPABASE_URL ou VITE_SUPABASE_ANON_KEY manquante. ' +
     'Vérifiez votre .env.local (dev) ou les Environment Variables Vercel (prod).'
   )

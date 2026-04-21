@@ -1,0 +1,41 @@
+import { Component } from 'react'
+
+export default class ErrorBoundary extends Component {
+  state = { error: null }
+
+  static getDerivedStateFromError(error) {
+    return { error }
+  }
+
+  componentDidCatch(error, info) {
+    console.error('[Zenbat] Crash React:', error, info?.componentStack)
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, background: '#f8fafc', fontFamily: 'system-ui, sans-serif', textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 20 }}>⚠️</div>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>
+            Une erreur inattendue s'est produite
+          </h2>
+          <p style={{ fontSize: 14, color: '#64748b', marginBottom: 28, maxWidth: 380 }}>
+            L'application a rencontré un problème. Vos données sont en sécurité.
+          </p>
+          <button
+            onClick={() => { this.setState({ error: null }); window.location.reload(); }}
+            style={{ padding: '12px 24px', borderRadius: 10, border: 0, background: '#0f172a', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+            Recharger l'application
+          </button>
+          <details style={{ marginTop: 24, maxWidth: 480, textAlign: 'left' }}>
+            <summary style={{ fontSize: 12, color: '#94a3b8', cursor: 'pointer' }}>Détails techniques</summary>
+            <pre style={{ marginTop: 8, fontSize: 11, color: '#64748b', whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: '#f1f5f9', padding: 12, borderRadius: 8 }}>
+              {this.state.error.message}
+            </pre>
+          </details>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
