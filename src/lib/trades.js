@@ -1,4 +1,7 @@
 export const BTP_TRADES = [
+  { id:"architecture",    label:"Architecture",              icon:"📐" },
+  { id:"ingenierie",      label:"Ingénierie / Bureau d'études", icon:"📊" },
+  { id:"moe",             label:"Maîtrise d'œuvre (MOE)",    icon:"👷" },
   { id:"maconnerie",      label:"Maçonnerie",                icon:"🧱" },
   { id:"gros_oeuvre",     label:"Gros œuvre / Béton",        icon:"🏗️" },
   { id:"terrassement",    label:"Terrassement / VRD",        icon:"🚜" },
@@ -7,7 +10,7 @@ export const BTP_TRADES = [
   { id:"etancheite",      label:"Étanchéité",                icon:"💧" },
   { id:"facade",          label:"Façade / Ravalement",       icon:"🏛️" },
   { id:"isolation",       label:"Isolation (ITE / ITI)",     icon:"🧊" },
-  { id:"platrerie",       label:"Plâtrerie / Cloisons",      icon:"📐" },
+  { id:"platrerie",       label:"Plâtrerie / Cloisons",      icon:"📏" },
   { id:"menuiserie_int",  label:"Menuiserie intérieure",     icon:"🚪" },
   { id:"menuiserie_ext",  label:"Menuiserie ext. / Alu",     icon:"🪟" },
   { id:"serrurerie",      label:"Serrurerie / Métallerie",   icon:"🔧" },
