@@ -939,7 +939,7 @@ function PDFViewer({d, cl, brand, onClose, hidden=false, onPageReady, onSendOdoo
         </div>
       </div>
 
-      <div className="pdf-scroll" ref={wrapRef} style={{flex:1,overflow:"auto",padding:`16px 16px ${onSendOdoo?"80px":"calc(20px + env(safe-area-inset-bottom))"}`,background:"#1e293b"}}>
+      <div className="pdf-scroll" ref={wrapRef} style={{flex:1,overflow:"auto",padding:"16px 16px calc(20px + env(safe-area-inset-bottom))",background:"#1e293b"}}>
         <div className="pdf-page-wrap" style={{width:`calc(210mm * ${scale})`,height:pageH?`${pageH}px`:"auto",margin:"0 auto",position:"relative"}}>
         <div ref={pageRef} className="pdf-page" style={{background:"white",width:"210mm",minHeight:"297mm",boxShadow:"0 20px 60px rgba(0,0,0,.5)",padding:"15mm",fontFamily,color:"#1a1a1a",fontSize:11,lineHeight:1.5,boxSizing:"border-box",transform:`scale(${scale})`,transformOrigin:"top left",position:"absolute",top:0,left:0}}>
           {pageBody}
@@ -948,7 +948,7 @@ function PDFViewer({d, cl, brand, onClose, hidden=false, onPageReady, onSendOdoo
       </div>
 
       {onSendOdoo && (
-        <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"12px 18px calc(12px + env(safe-area-inset-bottom))",background:"#0f172a",borderTop:"1px solid #1e293b",display:"flex",gap:10}}>
+        <div style={{flexShrink:0,padding:"12px 18px calc(12px + env(safe-area-inset-bottom))",background:"#0f172a",borderTop:"1px solid #1e293b",display:"flex",gap:10}}>
           <button onClick={onClose} style={{background:"#1e293b",color:"#94a3b8",border:"none",borderRadius:12,padding:"12px 16px",fontSize:13,fontWeight:600,cursor:"pointer",flexShrink:0}}>
             ← Retour
           </button>
