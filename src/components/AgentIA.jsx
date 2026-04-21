@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { CLAUDE_MODEL, TX } from "../lib/constants.js";
 import { fmt, uid } from "../lib/utils.js";
 import { tradesLabels } from "../lib/trades.js";
+import { buildDevisHistorySummary, formatHistoryPrompt } from "../lib/devisHistory.js";
 import { I } from "./ui/icons.jsx";
 import ClientPickerModal from "./ClientPickerModal.jsx";
 
@@ -18,6 +19,9 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
 
   const ac         = brand.color || "#22c55e";
   const fontFamily = brand.fontStyle === "elegant" ? "Playfair Display" : brand.fontStyle === "tech" ? "Space Grotesk" : "DM Sans";
+
+  // Résume l'historique pour contextualiser l'IA (recalculé quand devis change)
+  const historySummary = useMemo(() => buildDevisHistorySummary(devis), [devis]);
 
   useEffect(() => {
     chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
@@ -54,6 +58,8 @@ L'entreprise est spécialisée UNIQUEMENT dans les métiers suivants : ${tradeNa
 - Pour les demandes mixtes, tu génères uniquement les lignes qui correspondent à tes métiers et tu signales en une phrase ce qui n'a pas été inclus.`
       : "";
 
+    const historyBlock = formatHistoryPrompt(historySummary);
+
     return `Tu es un assistant expert BTP France intégré dans l'application Zenbat.${tradesBlock}
 
 LANGUE — RÈGLE ABSOLUE :
@@ -76,7 +82,7 @@ TVA : applique le taux correct par ouvrage selon la réglementation française :
 - 20% : neuf, gros œuvre, démolition/évacuation, locaux professionnels, fournitures sans pose.
 
 Règles : prix réalistes BTP France 2025, groupe par lots, désignations professionnelles en français.
-Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génère quand même un JSON partiel.`;
+Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génère quand même un JSON partiel.${historyBlock}`;
   };
 
   const send = async () => {
@@ -308,6 +314,13 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
 
         {/* Messages */}
         <div ref={chatRef} style={{ flex: 1, overflowY: "auto", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+          {historySummary && (
+            <div title="L'IA utilise vos devis passés pour proposer des tarifs cohérents avec votre historique"
+              style={{ alignSelf: "center", display: "flex", alignItems: "center", gap: 6, background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 20, padding: "4px 11px", fontSize: 10, fontWeight: 600, color: "#15803d", marginBottom: 4 }}>
+              <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+              Mémoire active · {historySummary.total} devis · {historySummary.topOuvrages.length} ouvrages référencés
+            </div>
+          )}
           {msgs.map((m, i) => (
             <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start", alignItems: "flex-end", gap: 6 }}>
               {m.role === "assistant" && (
