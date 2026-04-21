@@ -677,7 +677,7 @@ function Field({dark,label,val,onChange,placeholder,type="text"}) {
 // ══════════════════════════════════════════════════════════
 //  PDF LIVE VIEWER (simulé avec HTML)
 // ══════════════════════════════════════════════════════════
-function PDFViewer({d, cl, brand, onClose, hidden=false, onPageReady, onSendOdoo, sending=false}) {
+function PDFViewer({d, cl, brand, onClose, hidden=false, onPageReady, onSendOdoo, sending=false, sent=false}) {
   const MM_TO_PX = 3.7795275591;
   const A4_PX = 210 * MM_TO_PX;
   const wrapRef = useRef(null);
@@ -952,11 +952,13 @@ function PDFViewer({d, cl, brand, onClose, hidden=false, onPageReady, onSendOdoo
           <button onClick={onClose} style={{background:"#1e293b",color:"#94a3b8",border:"none",borderRadius:12,padding:"12px 16px",fontSize:13,fontWeight:600,cursor:"pointer",flexShrink:0}}>
             ← Retour
           </button>
-          <button onClick={onSendOdoo} disabled={sending}
-            style={{flex:1,background:sending?"#4b3557":"#714B67",color:"white",border:"none",borderRadius:12,padding:"12px",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:8,cursor:sending?"default":"pointer",opacity:sending?0.8:1}}>
-            {sending
-              ? <><span style={{display:"inline-block",width:14,height:14,border:"2px solid white",borderTopColor:"transparent",borderRadius:"50%",animation:"spin 1s linear infinite"}}/> Envoi en cours…</>
-              : <>{I.odoo} Envoyer en signature Odoo Sign</>
+          <button onClick={sent ? undefined : onSendOdoo} disabled={sending||sent}
+            style={{flex:1,background:sent?"#166534":sending?"#4b3557":"#714B67",color:"white",border:"none",borderRadius:12,padding:"12px",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:8,cursor:(sending||sent)?"default":"pointer",transition:"background .4s"}}>
+            {sent
+              ? <>✓ Envoyé !</>
+              : sending
+                ? <><span style={{display:"inline-block",width:14,height:14,border:"2px solid white",borderTopColor:"transparent",borderRadius:"50%",animation:"spin 1s linear infinite"}}/> Envoi en cours…</>
+                : <>{I.odoo} Envoyer en signature Odoo Sign</>
             }
           </button>
         </div>
@@ -1559,7 +1561,8 @@ function DevisDetail({d,cl,onBack,brand,onChange}) {
     <>
       {showPDF&&<PDFViewer d={d} cl={cl} brand={brand} onClose={()=>setShowPDF(false)}
         onSendOdoo={!["accepte","refuse"].includes(d.statut) ? sendOdoo : undefined}
-        sending={sending}/>}
+        sending={sending}
+        sent={!!signUrl || d.statut==="en_signature"}/>}
       {odooRendering && <PDFViewer d={d} cl={cl} brand={brand} hidden onPageReady={onPdfPageReady}/>}
 
       <div style={{minHeight:"100%",background:"#f8fafc"}} className="fu">
