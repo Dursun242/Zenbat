@@ -1,14 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#0f172a"/>
-      <stop offset="100%" stop-color="#1e40af"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" fill="url(#g)"/>
-  <g transform="translate(0,-20)" fill="none" stroke="#f8fafc" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M160 320 L256 200 L352 320"/>
-    <path d="M184 320 L184 372 L328 372 L328 320"/>
-    <path d="M228 372 L228 320 L284 320 L284 372"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Fond vert (zone safe maskable) -->
+  <rect width="512" height="512" fill="#22c55e"/>
+  <!-- Z blanc -->
+  <path d="M105 155 L390 155 L110 357 L405 357"
+        stroke="white" stroke-width="62" stroke-linecap="round"
+        stroke-linejoin="round" fill="none"/>
+  <!-- Carré blanc arrondi en haut à droite du Z -->
+  <rect x="355" y="108" width="102" height="102" rx="22" ry="22" fill="white"/>
 </svg>
