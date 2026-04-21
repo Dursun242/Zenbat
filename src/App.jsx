@@ -258,7 +258,7 @@ export default function App() {
     setDevis(prev => [d, ...prev]);
     if (!user) return;
     try {
-      const { lignes: dl, client, created_at, updated_at, id: _id, ...fields } = d;
+      const { lignes: dl, client, created_at, updated_at, ...fields } = d;
       const saved = await apiCreateDevis(fields, (dl || []).map(({id, created_at, ...l}) => l));
       // Vérifier que les lignes ont bien été sauvegardées ; sinon réessayer
       if (dl?.length) {
