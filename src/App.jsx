@@ -6,6 +6,8 @@ import {
   listDevisWithLignes, getDevis, createDevis as apiCreateDevis, updateDevis as apiUpdateDevis, replaceLignes, deleteDevis as apiDeleteDevis,
 } from "./lib/api";
 
+const CLAUDE_MODEL = import.meta.env.VITE_CLAUDE_MODEL || "claude-sonnet-4-20250514";
+
 const fmt  = n => new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR"}).format(n||0);
 const fmtD = d => d ? new Date(d).toLocaleDateString("fr-FR") : "—";
 const uid  = () => (typeof crypto !== "undefined" && crypto.randomUUID)
@@ -274,18 +276,8 @@ export default function App() {
     setDevis(prev => prev.filter(x => x.id !== id));
     if (user) apiDeleteDevis(id).catch(e => console.error("[delete devis]", e));
   };
-  // L'essai démarre à la date de création du compte Supabase (auth.users.created_at).
-  // Fallback localStorage si pas encore d'utilisateur (rendu pendant le chargement de la session).
-  const trialStart = (() => {
-    if (user?.created_at) return new Date(user.created_at).getTime();
-    if (typeof window === "undefined") return Date.now();
-    const stored = localStorage.getItem("zenbat_trial_start");
-    if (stored) return Number(stored);
-    const now = Date.now();
-    localStorage.setItem("zenbat_trial_start", String(now));
-    return now;
-  })();
-  const daysLeft = Math.max(0, TRIAL_DAYS - Math.floor((Date.now() - trialStart) / 86400000));
+  const trialStart = user?.created_at ? new Date(user.created_at).getTime() : null;
+  const daysLeft = trialStart !== null ? Math.max(0, TRIAL_DAYS - Math.floor((Date.now() - trialStart) / 86400000)) : TRIAL_DAYS;
   const trialExpired = plan === "free" && daysLeft === 0;
 
   const goDevis = id => {
@@ -1073,7 +1065,7 @@ function ClientsList({clients,onSave,onDelete,onRestore,goClient,showUndo}) {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
+          model: CLAUDE_MODEL,
           max_tokens: 800,
           system: `Tu extrais les informations d'un contact BTP depuis une photo (carte de visite, capture d'écran, en-tête de courrier, annuaire Pappers, etc.).
 Renvoie UNIQUEMENT un JSON valide entre <CONTACT></CONTACT>, sans texte autour.
@@ -1691,7 +1683,7 @@ L'entreprise est spécialisée UNIQUEMENT dans les métiers suivants : ${tradeNa
 - En cas de doute léger (ex : un travail à la frontière de l'un de tes métiers), accepte et précise-le brièvement.`
         : "";
       const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,
+        body:JSON.stringify({model:CLAUDE_MODEL,max_tokens:4000,
           system:`Tu es un assistant expert BTP France intégré dans l'application Zenbat.${tradesBlock}
 
 LANGUE — RÈGLE ABSOLUE :
