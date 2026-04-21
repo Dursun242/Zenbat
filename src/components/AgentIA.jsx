@@ -55,6 +55,16 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
   }, [msgs, loading]);
 
+  // Auto-grandit le textarea et suit la fin du texte (utile pendant la dictée)
+  useEffect(() => {
+    const ta = inputRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
+    ta.scrollTop = ta.scrollHeight;
+    ta.scrollLeft = ta.scrollWidth;
+  }, [input]);
+
   useEffect(() => {
     if (!lignes.length) return;
     setVisibleCount(0);
@@ -501,7 +511,7 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
             <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
               placeholder={listening ? "Écoute en cours…" : TX.inputPlaceholder}
-              rows={1} style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 16, color: "#1e293b", resize: "none", fontFamily: "inherit", lineHeight: 1.5, maxHeight: 80, overflow: "auto" }}/>
+              rows={1} style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 16, color: "#1e293b", resize: "none", fontFamily: "inherit", lineHeight: 1.5, maxHeight: 120, overflowY: "auto" }}/>
             <button onClick={send} disabled={!input.trim() || loading}
               style={{ width: 34, height: 34, borderRadius: 10, background: input.trim() && !loading ? ac : "#d1fae5", border: "none", display: "flex", alignItems: "center", justifyContent: "center", color: "white", cursor: "pointer", transition: "background .2s", flexShrink: 0 }}>
               {I.send}
