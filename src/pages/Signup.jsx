@@ -15,7 +15,7 @@ const styles = {
   link:   { color:'#1d4ed8', background:'none', border:0, cursor:'pointer', fontWeight:600, padding:0 },
 }
 
-export default function Signup({ onSwitchToLogin }) {
+export default function Signup({ onSwitchToLogin, onBack }) {
   const { signUpWithPassword } = useAuth()
   const [fullName, setFullName] = useState('')
   const [company, setCompany]   = useState('')
@@ -40,6 +40,7 @@ export default function Signup({ onSwitchToLogin }) {
   return (
     <div style={styles.wrap}>
       <div style={styles.card}>
+        {onBack && <button type="button" onClick={onBack} style={{background:'none',border:'none',color:'#94a3b8',fontSize:13,cursor:'pointer',padding:0,marginBottom:16,display:'flex',alignItems:'center',gap:4}}>← Retour</button>}
         <h1 style={styles.title}>Créer un compte</h1>
         <p style={styles.sub}>14 jours d'essai, aucune carte bancaire.</p>
 
