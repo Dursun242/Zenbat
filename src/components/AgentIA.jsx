@@ -6,6 +6,28 @@ import { buildDevisHistorySummary, formatHistoryPrompt } from "../lib/devisHisto
 import { I } from "./ui/icons.jsx";
 import ClientPickerModal from "./ClientPickerModal.jsx";
 
+const SR_LANGS = [
+  { code: "fr-FR", label: "Français", flag: "🇫🇷" },
+  { code: "ar-SA", label: "العربية",   flag: "🇸🇦" },
+  { code: "ar-MA", label: "الدارجة",   flag: "🇲🇦" },
+  { code: "en-US", label: "English",  flag: "🇬🇧" },
+  { code: "es-ES", label: "Español",  flag: "🇪🇸" },
+  { code: "pt-PT", label: "Português",flag: "🇵🇹" },
+  { code: "it-IT", label: "Italiano", flag: "🇮🇹" },
+  { code: "de-DE", label: "Deutsch",  flag: "🇩🇪" },
+  { code: "tr-TR", label: "Türkçe",   flag: "🇹🇷" },
+  { code: "ro-RO", label: "Română",   flag: "🇷🇴" },
+  { code: "pl-PL", label: "Polski",   flag: "🇵🇱" },
+  { code: "ru-RU", label: "Русский",  flag: "🇷🇺" },
+];
+
+const pickInitialLang = () => {
+  if (typeof navigator === "undefined") return "fr-FR";
+  const nav = (navigator.language || "fr-FR").toLowerCase();
+  const match = SR_LANGS.find(l => l.code.toLowerCase() === nav || l.code.toLowerCase().split("-")[0] === nav.split("-")[0]);
+  return match?.code || "fr-FR";
+};
+
 export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, plan, trialExpired, onPaywall, setTab, brand }) {
   const [msgs,         setMsgs]         = useState([{ role: "assistant", content: TX.agentGreeting }]);
   const [input,        setInput]        = useState("");
@@ -14,8 +36,14 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   const [objet,        setObjet]        = useState("");
   const [visibleCount, setVisibleCount] = useState(0);
   const [pickingClient, setPickingClient] = useState(false);
+  const [listening,    setListening]    = useState(false);
+  const [micLang,      setMicLang]      = useState(pickInitialLang);
+  const [langMenu,     setLangMenu]     = useState(false);
+  const [micError,     setMicError]     = useState(null);
   const chatRef  = useRef(null);
   const inputRef = useRef(null);
+  const recRef   = useRef(null);
+  const accumRef = useRef("");
 
   const ac         = brand.color || "#22c55e";
   const fontFamily = brand.fontStyle === "elegant" ? "Playfair Display" : brand.fontStyle === "tech" ? "Space Grotesk" : "DM Sans";
@@ -129,6 +157,69 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
     }
     setLoading(false);
   };
+
+  // ── Reconnaissance vocale (Web Speech API) ─────────────────
+  const SRClass = typeof window !== "undefined"
+    ? (window.SpeechRecognition || window.webkitSpeechRecognition)
+    : null;
+  const micSupported = !!SRClass;
+
+  useEffect(() => () => {
+    try { recRef.current?.stop(); } catch {}
+  }, []);
+
+  const stopListening = () => {
+    try { recRef.current?.stop(); } catch {}
+    setListening(false);
+  };
+
+  const startListening = () => {
+    if (!SRClass) { setMicError("La reconnaissance vocale n'est pas disponible sur ce navigateur."); return; }
+    setMicError(null);
+    accumRef.current = input && !input.endsWith(" ") ? input + " " : input;
+    const rec = new SRClass();
+    rec.lang = micLang;
+    rec.continuous     = true;
+    rec.interimResults = true;
+    rec.onresult = (e) => {
+      let interim = "", final = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) final += t + " ";
+        else interim += t;
+      }
+      if (final) accumRef.current += final;
+      setInput(accumRef.current + interim);
+    };
+    rec.onerror = (ev) => {
+      setListening(false);
+      if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
+        setMicError("Microphone refusé. Autorisez-le dans les réglages du navigateur.");
+      } else if (ev.error === "no-speech") {
+        setMicError(null);
+      } else {
+        setMicError("Problème de reconnaissance vocale. Réessayez.");
+      }
+    };
+    rec.onend = () => setListening(false);
+    try {
+      rec.start();
+      recRef.current = rec;
+      setListening(true);
+    } catch {
+      setListening(false);
+    }
+  };
+
+  const toggleMic = () => (listening ? stopListening() : startListening());
+
+  const pickLang = (code) => {
+    setMicLang(code);
+    setLangMenu(false);
+    if (listening) { stopListening(); setTimeout(startListening, 120); }
+  };
+
+  const currentLang = SR_LANGS.find(l => l.code === micLang) || SR_LANGS[0];
 
   const deleteLigne = id => setLignes(l => l.filter(x => x.id !== id));
 
@@ -353,21 +444,90 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
         </div>
 
         {/* Zone de saisie */}
-        <div style={{ padding: "10px 14px 12px", background: "white", borderTop: "1px solid #f1f5f9", flexShrink: 0 }}>
-          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: "#f8fafc", borderRadius: 14, border: `1.5px solid ${input.trim() ? ac : "#e2e8f0"}`, padding: "8px 10px", transition: "border-color .2s" }}>
+        <div style={{ padding: "10px 14px 12px", background: "white", borderTop: "1px solid #f1f5f9", flexShrink: 0, position: "relative" }}>
+          <style>{`
+            @keyframes micPulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,.55),0 6px 18px rgba(239,68,68,.45)}70%{box-shadow:0 0 0 16px rgba(239,68,68,0),0 6px 18px rgba(239,68,68,.45)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0),0 6px 18px rgba(239,68,68,.45)}}
+            @keyframes micWave{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
+          `}</style>
+
+          {/* Champ texte + envoyer */}
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: "#f8fafc", borderRadius: 14, border: `1.5px solid ${listening ? "#ef4444" : (input.trim() ? ac : "#e2e8f0")}`, padding: "8px 10px", transition: "border-color .2s" }}>
             <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-              placeholder={TX.inputPlaceholder}
+              placeholder={listening ? "Écoute en cours…" : TX.inputPlaceholder}
               rows={1} style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 16, color: "#1e293b", resize: "none", fontFamily: "inherit", lineHeight: 1.5, maxHeight: 80, overflow: "auto" }}/>
-            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-              <button title="Micro" style={{ width: 30, height: 30, borderRadius: 9, background: "#f1f5f9", border: "none", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", cursor: "pointer", fontSize: 13 }}>🎙</button>
-              <button onClick={send} disabled={!input.trim() || loading}
-                style={{ width: 30, height: 30, borderRadius: 9, background: input.trim() && !loading ? ac : "#d1fae5", border: "none", display: "flex", alignItems: "center", justifyContent: "center", color: "white", cursor: "pointer", transition: "background .2s" }}>
-                {I.send}
-              </button>
-            </div>
+            <button onClick={send} disabled={!input.trim() || loading}
+              style={{ width: 34, height: 34, borderRadius: 10, background: input.trim() && !loading ? ac : "#d1fae5", border: "none", display: "flex", alignItems: "center", justifyContent: "center", color: "white", cursor: "pointer", transition: "background .2s", flexShrink: 0 }}>
+              {I.send}
+            </button>
           </div>
-          <div style={{ textAlign: "center", fontSize: 9, color: "#cbd5e1", marginTop: 6 }}>{TX.inputHint}</div>
+
+          {/* Gros bouton micro central + sélecteur langue */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, marginTop: 10 }}>
+            <button
+              onClick={toggleMic}
+              disabled={!micSupported}
+              title={micSupported ? (listening ? "Appuyez pour arrêter" : "Appuyez pour parler") : "Non supporté par ce navigateur"}
+              style={{
+                width: 56, height: 56, borderRadius: "50%",
+                background: listening ? "#ef4444" : (micSupported ? ac : "#cbd5e1"),
+                border: "none", cursor: micSupported ? "pointer" : "not-allowed",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "white",
+                boxShadow: listening
+                  ? "0 0 0 0 rgba(239,68,68,.55), 0 6px 18px rgba(239,68,68,.45)"
+                  : `0 6px 16px ${ac}55`,
+                transition: "background .2s, transform .15s",
+                animation: listening ? "micPulse 1.4s ease-out infinite" : "none",
+              }}
+              onMouseDown={e => { if (micSupported) e.currentTarget.style.transform = "scale(.95)"; }}
+              onMouseUp={e => { e.currentTarget.style.transform = "scale(1)"; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}>
+              {listening ? (
+                <div style={{ display: "flex", gap: 3, alignItems: "center", height: 20 }}>
+                  {[0, 1, 2, 3, 4].map(i => (
+                    <div key={i} style={{ width: 3, height: 18, borderRadius: 2, background: "white", animation: `micWave .9s ease-in-out ${i * 0.12}s infinite` }}/>
+                  ))}
+                </div>
+              ) : I.mic}
+            </button>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "#64748b", position: "relative" }}>
+              <span style={{ fontWeight: 500 }}>
+                {listening ? "Parlez, je transcris en direct…" : (micSupported ? "Appuyez pour dicter" : "Vocal non dispo ici")}
+              </span>
+              <button
+                onClick={() => setLangMenu(v => !v)}
+                style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600, color: "#334155", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                <span>{currentLang.flag}</span>
+                <span>{currentLang.label}</span>
+                <span style={{ fontSize: 9, color: "#94a3b8" }}>▾</span>
+              </button>
+              {langMenu && (
+                <>
+                  <div onClick={() => setLangMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }}/>
+                  <div style={{ position: "absolute", bottom: "calc(100% + 8px)", right: 0, background: "white", border: "1px solid #e2e8f0", borderRadius: 12, boxShadow: "0 10px 28px rgba(15,23,42,.18)", padding: 4, zIndex: 41, maxHeight: 260, overflowY: "auto", minWidth: 180 }}>
+                    {SR_LANGS.map(l => (
+                      <button key={l.code} onClick={() => pickLang(l.code)}
+                        style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: l.code === micLang ? "#f0fdf4" : "none", border: "none", padding: "8px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, color: "#0f172a", textAlign: "left" }}>
+                        <span style={{ fontSize: 14 }}>{l.flag}</span>
+                        <span style={{ fontWeight: l.code === micLang ? 700 : 500, flex: 1 }}>{l.label}</span>
+                        {l.code === micLang && <span style={{ color: ac, fontSize: 12 }}>✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {micError && (
+              <div style={{ fontSize: 11, color: "#991b1b", background: "#fef2f2", border: "1px solid #fecaca", padding: "5px 10px", borderRadius: 8, marginTop: 2 }}>
+                {micError}
+              </div>
+            )}
+          </div>
+
+          <div style={{ textAlign: "center", fontSize: 9, color: "#cbd5e1", marginTop: 8 }}>{TX.inputHint}</div>
         </div>
       </div>
 
