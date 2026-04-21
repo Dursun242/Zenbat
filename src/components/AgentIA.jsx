@@ -518,8 +518,20 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
             </button>
           </div>
 
-          {/* Bouton micro + sélecteur langue — layout compact horizontal */}
+          {/* Sélecteur langue + bouton micro — layout compact horizontal */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 8, position: "relative" }}>
+            <button
+              onClick={() => setLangMenu(v => !v)}
+              style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 20, padding: "3px 9px", fontSize: 11, fontWeight: 600, color: "#334155", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+              <span>{currentLang.flag}</span>
+              <span>{currentLang.label}</span>
+              <span style={{ fontSize: 9, color: "#94a3b8" }}>▾</span>
+            </button>
+
+            <span style={{ fontSize: 11, color: listening ? "#ef4444" : "#64748b", fontWeight: 500 }}>
+              {listening ? "Parlez, je transcris…" : (micSupported ? "Appuyez pour dicter" : "Vocal indisponible")}
+            </span>
+
             <button
               onClick={toggleMic}
               disabled={!micSupported}
@@ -546,22 +558,10 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
               ) : <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 003-3V5a3 3 0 00-6 0v6a3 3 0 003 3z"/><path d="M19 11a1 1 0 10-2 0 5 5 0 01-10 0 1 1 0 10-2 0 7 7 0 006 6.92V20H8a1 1 0 100 2h8a1 1 0 100-2h-3v-2.08A7 7 0 0019 11z"/></svg>}
             </button>
 
-            <span style={{ fontSize: 11, color: listening ? "#ef4444" : "#64748b", fontWeight: 500 }}>
-              {listening ? "Parlez, je transcris…" : (micSupported ? "Appuyez pour dicter" : "Vocal indisponible")}
-            </span>
-
-            <button
-              onClick={() => setLangMenu(v => !v)}
-              style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 20, padding: "3px 9px", fontSize: 11, fontWeight: 600, color: "#334155", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-              <span>{currentLang.flag}</span>
-              <span>{currentLang.label}</span>
-              <span style={{ fontSize: 9, color: "#94a3b8" }}>▾</span>
-            </button>
-
             {langMenu && (
               <>
                 <div onClick={() => setLangMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }}/>
-                <div style={{ position: "absolute", bottom: "calc(100% + 6px)", right: 0, background: "white", border: "1px solid #e2e8f0", borderRadius: 12, boxShadow: "0 10px 28px rgba(15,23,42,.18)", padding: 4, zIndex: 41, maxHeight: 260, overflowY: "auto", minWidth: 180 }}>
+                <div style={{ position: "absolute", bottom: "calc(100% + 6px)", left: 0, background: "white", border: "1px solid #e2e8f0", borderRadius: 12, boxShadow: "0 10px 28px rgba(15,23,42,.18)", padding: 4, zIndex: 41, maxHeight: 260, overflowY: "auto", minWidth: 180 }}>
                   {SR_LANGS.map(l => (
                     <button key={l.code} onClick={() => pickLang(l.code)}
                       style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: l.code === micLang ? "#f0fdf4" : "none", border: "none", padding: "8px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, color: "#0f172a", textAlign: "left" }}>
