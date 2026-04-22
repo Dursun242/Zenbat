@@ -74,7 +74,8 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
   const ttc = ht + tva
   const fontFamily = brand.fontStyle==="elegant"?"Playfair Display":brand.fontStyle==="tech"?"Space Grotesk":"DM Sans"
   const navy = "#1e3a5f"
-  const validUntil = new Date(d.date_emission)
+  const baseDate = d.date_emission ? new Date(d.date_emission) : new Date()
+  const validUntil = isNaN(baseDate.getTime()) ? new Date() : baseDate
   validUntil.setDate(validUntil.getDate() + (brand.validityDays || 30))
   const clientName = cl?.raison_sociale || `${cl?.prenom||""} ${cl?.nom||""}`.trim() || "—"
 
