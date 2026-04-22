@@ -4,7 +4,7 @@ import {
   listClients, createClient as apiCreateClient, updateClient as apiUpdateClient, deleteClient as apiDeleteClient,
   listDevisWithLignes, getDevis, createDevis as apiCreateDevis, updateDevis as apiUpdateDevis, replaceLignes, deleteDevis as apiDeleteDevis,
   listInvoices, createInvoice as apiCreateInvoice, updateInvoice as apiUpdateInvoice, replaceInvoiceLignes, deleteInvoice as apiDeleteInvoice, nextInvoiceNumber,
-  updateMyProfile,
+  updateMyProfile, getMyProfile, saveBrandData,
 } from "./lib/api";
 import { uid } from "./lib/utils.js";
 import { DEFAULT_DEMO_BRAND, DEFAULT_BRAND, DEMO_CLIENTS, DEMO_DEVIS } from "./lib/constants.js";
@@ -55,19 +55,17 @@ export default function App() {
     return DEFAULT_DEMO_BRAND;
   });
 
+  const brandSaveTimer = useRef(null);
   const setBrand = useCallback((updater) => {
     setBrandState(prev => {
       const next = typeof updater === "function" ? updater(prev) : updater;
       try { localStorage.setItem("zenbat_brand", JSON.stringify(next)); } catch {}
-      // Sync identité côté serveur (best-effort, silencieux) : visible dans l'espace admin
-      const fullName = `${next.firstName || ""} ${next.lastName || ""}`.trim();
-      const prevFull = `${prev.firstName || ""} ${prev.lastName || ""}`.trim();
-      if (next.companyName !== prev.companyName || fullName !== prevFull) {
-        updateMyProfile({
-          company_name: next.companyName || null,
-          full_name:    fullName || null,
-        }).catch(err => console.warn("[profile sync]", err));
-      }
+      // Sync complète vers Supabase (debounce 600 ms pour ne pas surcharger en cas
+      // de saisie rapide dans l'onboarding) — remplace l'ancienne sync partielle.
+      clearTimeout(brandSaveTimer.current);
+      brandSaveTimer.current = setTimeout(() => {
+        saveBrandData(next).catch(err => console.warn("[brand sync]", err));
+      }, 600);
       return next;
     });
   }, []);
@@ -131,17 +129,45 @@ export default function App() {
     return () => { cancelled = true; };
   }, [user?.id]);
 
-  // Pré-remplissage prénom/nom depuis le "Nom complet" de l'inscription
-  // si le profil n'a pas encore été personnalisé.
+  // Chargement du profil brand depuis Supabase au login.
+  // Supabase est la source de vérité — écrase le localStorage pour que les
+  // données survivent à un changement de navigateur / appareil.
   useEffect(() => {
     if (!user) return;
-    const full = (user.user_metadata?.full_name || "").trim();
-    if (!full) return;
-    setBrand(prev => {
-      if (prev.firstName?.trim() || prev.lastName?.trim()) return prev;
-      const parts = full.split(/\s+/);
-      return { ...prev, firstName: parts[0] || "", lastName: parts.slice(1).join(" ") };
-    });
+    let cancelled = false;
+    getMyProfile()
+      .then(profile => {
+        if (cancelled) return;
+        if (profile?.brand_data && Object.keys(profile.brand_data).length > 0) {
+          const merged = { ...DEFAULT_BRAND, ...profile.brand_data };
+          setBrandState(merged);
+          try { localStorage.setItem("zenbat_brand", JSON.stringify(merged)); } catch {}
+        } else {
+          // Nouveau compte : pré-remplissage prénom/nom depuis les métadonnées d'inscription
+          const full = (user.user_metadata?.full_name || "").trim();
+          if (full) {
+            setBrand(prev => {
+              if (prev.firstName?.trim() || prev.lastName?.trim()) return prev;
+              const parts = full.split(/\s+/);
+              return { ...prev, firstName: parts[0] || "", lastName: parts.slice(1).join(" ") };
+            });
+          }
+        }
+      })
+      .catch(err => {
+        if (cancelled) return;
+        console.warn("[brand load]", err);
+        // Fallback : pré-remplissage depuis les métadonnées si Supabase échoue
+        const full = (user.user_metadata?.full_name || "").trim();
+        if (full) {
+          setBrand(prev => {
+            if (prev.firstName?.trim() || prev.lastName?.trim()) return prev;
+            const parts = full.split(/\s+/);
+            return { ...prev, firstName: parts[0] || "", lastName: parts.slice(1).join(" ") };
+          });
+        }
+      });
+    return () => { cancelled = true; };
   }, [user?.id, setBrand]);
 
   // Sauvegarde différée des devis

@@ -69,6 +69,18 @@ export async function updateMyProfile(patch) {
   return data
 }
 
+export async function saveBrandData(brandData) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+  const full_name    = `${brandData.firstName || ""} ${brandData.lastName || ""}`.trim() || null
+  const company_name = brandData.companyName || null
+  const { error } = await supabase
+    .from('profiles')
+    .update({ brand_data: brandData, full_name, company_name })
+    .eq('id', user.id)
+  if (error) throw error
+}
+
 // =========================================================
 // CLIENTS
 // =========================================================
