@@ -196,6 +196,28 @@ export default async function handler(req, res) {
       });
     }
 
+    // Partner "entreprise émettrice" (pour copie), distinct du signataire.
+    let companyPartnerId = null;
+    if (company_email && company_email !== signer_email) {
+      const foundCo = await odooCall({
+        ...ctx,
+        model: "res.partner",
+        method: "search_read",
+        args: [[["email", "=", company_email]], ["id"]],
+        kwargs: { limit: 1 },
+      });
+      if (foundCo?.length) {
+        companyPartnerId = foundCo[0].id;
+      } else {
+        companyPartnerId = await odooCall({
+          ...ctx,
+          model: "res.partner",
+          method: "create",
+          args: [{ name: company_name || company_email, email: company_email, phone: company_phone }],
+        });
+      }
+    }
+
     const roleIds = await odooCall({
       ...ctx,
       model: "sign.item.role",
@@ -225,6 +247,12 @@ export default async function handler(req, res) {
         mail_sent_order: 1,
       }]],
     };
+    // L'entreprise émettrice est ajoutée en COPIE, pas en tant que signataire.
+    // Selon la version d'Odoo, le champ peut s'appeler cc_partner_ids ou message_partner_ids.
+    if (companyPartnerId) {
+      const ccField = ["cc_partner_ids", "message_partner_ids"].find(f => reqFields[f]);
+      if (ccField) reqPayload[ccField] = [[6, 0, [companyPartnerId]]];
+    }
     // Bonus : pousse l'email de l'entreprise en reply_to si le champ existe
     if (company_email && reqFields.reply_to) reqPayload.reply_to = company_email;
     // Suffixe le sujet avec le nom d'entreprise pour maximiser la visibilité
@@ -238,6 +266,19 @@ export default async function handler(req, res) {
       method: "create",
       args: [reqPayload],
     });
+
+    // Abonne l'entreprise comme follower (reçoit les notifs : signé, refusé, etc.)
+    // sans être signataire. Fallback si cc_partner_ids n'est pas supporté.
+    if (companyPartnerId) {
+      try {
+        await odooCall({
+          ...ctx,
+          model: "sign.request",
+          method: "message_subscribe",
+          args: [[requestId], [companyPartnerId]],
+        });
+      } catch { /* best effort */ }
+    }
 
     // Essaie plusieurs noms de méthode pour l'envoi (varie selon version Odoo).
     // Sur Odoo récent, la request est envoyée automatiquement à la création.
