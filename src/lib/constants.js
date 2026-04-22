@@ -15,6 +15,7 @@ export const STATUT = {
 // ── Marque par défaut ─────────────────────────────────────
 export const DEFAULT_BRAND = {
   companyName: "", logo: null, siret: "", tva: "",
+  firstName: "", lastName: "",
   address: "", city: "", phone: "", email: "", website: "",
   color: "#22c55e", fontStyle: "modern",
   mentionsLegales: "", rib: "", iban: "", bic: "",
