@@ -36,7 +36,7 @@ export default async function handler(req, res) {
   // Vérification identité
   const { data: { user }, error: authErr } = await admin.auth.getUser(token)
   if (authErr || !user) return res.status(401).json({ error: 'Token invalide' })
-  if (adminEmail && user.email !== adminEmail)
+  if (!adminEmail || user.email !== adminEmail)
     return res.status(403).json({ error: "Accès réservé à l'administrateur" })
 
   // ── Récupération des données ─────────────────────────────────────────
@@ -52,6 +52,7 @@ export default async function handler(req, res) {
 
   if (pe) return res.status(500).json({ error: pe.message })
   if (de) return res.status(500).json({ error: de.message })
+  if (ae) return res.status(500).json({ error: ae.message })
 
   const now         = new Date()
   const startMonth  = new Date(now.getFullYear(), now.getMonth(), 1)

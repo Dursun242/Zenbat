@@ -87,7 +87,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
 
   const companyLines = [
     brand.address,
-    [brand.postalCode, brand.city].filter(Boolean).join(" ") || brand.city,
+    brand.city,
     brand.phone && `Tél : ${brand.phone}`,
     brand.email,
     brand.siret && `SIRET : ${brand.siret}`,

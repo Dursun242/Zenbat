@@ -220,7 +220,7 @@ function buildInvoicePayload({ inv, lignes, client, account }) {
       quantity:     Number(l.quantite) || 0,
       unit:         l.unite || "u",
       unit_price:   Number(l.prix_unitaire) || 0,
-      vat_rate:     Number(l.tva_rate) ?? 20,
+      vat_rate:     Number(l.tva_rate ?? 20),
       lot:          l.lot || undefined,
     })),
     total_ht:            Number(inv.montant_ht) || 0,

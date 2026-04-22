@@ -1,5 +1,5 @@
 // Webhook B2Brouter → met à jour le statut des factures dans Supabase.
-// Variable d'env optionnelle : B2B_WEBHOOK_SECRET (validation HMAC si fournie).
+// Variable d'env obligatoire : B2B_WEBHOOK_SECRET (validation HMAC).
 
 import { createClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
@@ -28,15 +28,19 @@ export default async function handler(req, res) {
 
   const raw = await readRawBody(req);
 
-  // Validation HMAC optionnelle
+  // Validation HMAC obligatoire
   const secret = process.env.B2B_WEBHOOK_SECRET;
-  if (secret) {
-    const sig = req.headers["x-b2b-signature"] || req.headers["x-b2brouter-signature"];
-    if (!sig) return res.status(401).json({ error: "signature manquante" });
-    const expected = crypto.createHmac("sha256", secret).update(raw).digest("hex");
-    if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(String(sig).replace(/^sha256=/, ""))))
-      return res.status(401).json({ error: "signature invalide" });
-  }
+  if (!secret) return res.status(500).json({ error: "B2B_WEBHOOK_SECRET non configuré" });
+
+  const sig = req.headers["x-b2b-signature"] || req.headers["x-b2brouter-signature"];
+  if (!sig) return res.status(401).json({ error: "signature manquante" });
+
+  const expected = crypto.createHmac("sha256", secret).update(raw).digest("hex");
+  const received = String(sig).replace(/^sha256=/, "");
+  const expectedBuf = Buffer.from(expected, "hex");
+  const receivedBuf = Buffer.from(received, "hex");
+  if (expectedBuf.length !== receivedBuf.length || !crypto.timingSafeEqual(expectedBuf, receivedBuf))
+    return res.status(401).json({ error: "signature invalide" });
 
   let event;
   try { event = JSON.parse(raw); } catch { return res.status(400).json({ error: "JSON invalide" }); }
