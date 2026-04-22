@@ -183,6 +183,7 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
     };
 
     let raw = "";
+    let apiError = null;
 
     const streamResponse = async () => {
       const res = await fetch("/api/claude", {
@@ -190,7 +191,12 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...body, stream: true }),
       });
-      if (!res.ok || !res.body) throw new Error("api");
+      if (!res.ok) {
+        const detail = await res.json().catch(() => null);
+        apiError = detail?.error || `HTTP ${res.status}`;
+        throw new Error("api");
+      }
+      if (!res.body) throw new Error("api");
       const reader  = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -213,6 +219,9 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
                 const cut     = raw.indexOf("<DEVIS>");
                 const visible = (cut >= 0 ? raw.slice(0, cut) : raw).trim();
                 if (visible) updateAssistant(visible);
+              } else if (msg.type === "error") {
+                apiError = msg.error?.message || "Erreur Anthropic";
+                throw new Error("api");
               }
             } catch { /* chunk partiel — on ignore */ }
           }
@@ -226,8 +235,11 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("api");
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        apiError = data?.error || `HTTP ${res.status}`;
+        throw new Error("api");
+      }
       raw = (data?.content?.[0]?.text || "").toString();
       const cut     = raw.indexOf("<DEVIS>");
       const visible = (cut >= 0 ? raw.slice(0, cut) : raw).trim();
@@ -303,8 +315,12 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
       // Incrémente le compteur d'usage IA (best-effort, silencieux)
       supabase.rpc("increment_ai_used").catch(() => {});
     } catch (e) {
-      console.error("[AgentIA] send failed:", e);
-      const msg = !navigator.onLine ? TX.errNetwork : e.message === "api" ? TX.errApi : TX.errGeneral;
+      console.error("[AgentIA] send failed:", e, apiError);
+      let msg;
+      if (!navigator.onLine)            msg = TX.errNetwork;
+      else if (apiError)                msg = "L'assistant IA a renvoyé une erreur : " + apiError;
+      else if (e.message === "api")     msg = TX.errApi;
+      else                              msg = (TX.errGeneral + " (" + (e.message || "inconnue") + ")");
       updateAssistant("❌ " + msg);
     }
     setLoading(false);
