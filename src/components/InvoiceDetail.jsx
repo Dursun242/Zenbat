@@ -35,15 +35,35 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
 
   const onPdfPageReady = async (pageEl) => {
     try {
-      const [{ renderElementToPdf }, { buildFacturXXML, embedFacturXInPdf, downloadBlob }] = await Promise.all([
+      const [{ renderElementToPdf }, { downloadBlob }] = await Promise.all([
         import("../lib/pdf.js"),
         import("../lib/facturx.js"),
       ]);
-      const { blob } = await renderElementToPdf(pageEl, { filename: `${invoice.numero}.pdf` });
-      const xml = buildFacturXXML({ invoice: { ...invoice, lignes }, client, brand });
-      const facturx = await embedFacturXInPdf(blob, xml, invoice);
-      downloadBlob(facturx, `${invoice.numero}-facturx.pdf`);
-      setExportMsg("✓ Factur-X téléchargé. Vous pouvez l'envoyer par email — le PDF contient l'XML structuré.");
+      const { base64 } = await renderElementToPdf(pageEl, { filename: `${invoice.numero}.pdf` });
+
+      // Appelle le serveur pour l'assemblage PDF/A-3 (OutputIntent, XMP, XML embed)
+      const res = await fetch("/api/facturx", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          pdf_base64: base64,
+          invoice:    { ...invoice, lignes },
+          client,
+          brand,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+
+      const pdfBytes = Uint8Array.from(atob(data.pdf_base64), c => c.charCodeAt(0));
+      const blob     = new Blob([pdfBytes], { type: "application/pdf" });
+      downloadBlob(blob, `${invoice.numero}-facturx.pdf`);
+
+      setExportMsg(
+        data.icc_applied
+          ? "✓ Factur-X PDF/A-3 téléchargé avec profil sRGB. Conformité maximale."
+          : "✓ Factur-X téléchargé. Pour la conformité PDF/A-3 stricte, ajoutez public/icc/sRGB.icc — voir public/icc/README.md."
+      );
     } catch (err) {
       console.error("[facturx]", err);
       setExportMsg("❌ Erreur génération Factur-X : " + (err.message || err));
