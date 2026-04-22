@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { fmt } from "../lib/utils.js";
-import { b2b } from "../lib/api.js";
 import Badge from "./ui/Badge.jsx";
 import LignesEditor from "./LignesEditor.jsx";
 import PDFViewer from "./PDFViewer.jsx";
 
 export default function InvoiceDetail({ invoice, client, brand, onBack, onChange, onDelete }) {
   const [showPDF, setShowPDF] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [error,   setError]   = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportMsg, setExportMsg] = useState(null);
+  const [renderFacturX, setRenderFacturX] = useState(false);
   const ac = brand.color || "#22c55e";
 
   const lignes = invoice.lignes || [];
@@ -27,31 +27,29 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
     }, true);
   };
 
-  const handleSend = async () => {
-    if (invoice.locked) return;
-    if (!confirm("Envoyer cette facture à la DGFiP via B2Brouter ? Cette action est irréversible — la facture sera verrouillée.")) return;
-    setSending(true); setError(null);
+  const handleFacturX = () => {
+    if (!lignes.length) { setExportMsg("Ajoutez au moins une ligne avant d'exporter."); return; }
+    setExporting(true); setExportMsg(null);
+    setRenderFacturX(true); // monte le PDFViewer caché, onPdfPageReady fera la suite
+  };
+
+  const onPdfPageReady = async (pageEl) => {
     try {
-      // S'assure qu'un compte B2Brouter existe
-      await b2b.ensureAccount({
-        siren: (brand.siret || "").slice(0, 9),
-        name:  brand.companyName,
-        email: brand.email,
-        address: brand.address,
-        city: brand.city?.replace(/^\d+\s*/, ""),
-        postal_code: (brand.city || "").match(/\d{5}/)?.[0],
-      });
-      const result = await b2b.sendInvoice(invoice.id);
-      onChange({
-        ...invoice,
-        locked: true,
-        statut: "envoyee",
-        b2brouter_invoice_id: result.b2brouter_id,
-      }, false);
-    } catch (e) {
-      setError(e.message || "Erreur B2Brouter");
+      const [{ renderElementToPdf }, { buildFacturXXML, embedFacturXInPdf, downloadBlob }] = await Promise.all([
+        import("../lib/pdf.js"),
+        import("../lib/facturx.js"),
+      ]);
+      const { blob } = await renderElementToPdf(pageEl, { filename: `${invoice.numero}.pdf` });
+      const xml = buildFacturXXML({ invoice: { ...invoice, lignes }, client, brand });
+      const facturx = await embedFacturXInPdf(blob, xml);
+      downloadBlob(facturx, `${invoice.numero}-facturx.pdf`);
+      setExportMsg("✓ Factur-X téléchargé. Vous pouvez l'envoyer par email — le PDF contient l'XML structuré.");
+    } catch (err) {
+      console.error("[facturx]", err);
+      setExportMsg("❌ Erreur génération Factur-X : " + (err.message || err));
     } finally {
-      setSending(false);
+      setExporting(false);
+      setRenderFacturX(false);
     }
   };
 
@@ -68,6 +66,9 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
       {showPDF && (
         <PDFViewer d={asDevisShape} cl={client} brand={brand} onClose={() => setShowPDF(false)} kind="facture"/>
       )}
+      {renderFacturX && (
+        <PDFViewer d={asDevisShape} cl={client} brand={brand} hidden onPageReady={onPdfPageReady} kind="facture"/>
+      )}
 
       <div style={{ background: "white", borderBottom: "1px solid #f1f5f9", padding: "14px 16px", display: "flex", alignItems: "center", gap: 10 }}>
         <button onClick={onBack} style={{ background: "none", border: "none", color: "#64748b", fontSize: 20, cursor: "pointer" }}>←</button>
@@ -79,13 +80,6 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
       </div>
 
       <div style={{ padding: 16 }}>
-        {invoice.locked && (
-          <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 12, padding: "10px 12px", marginBottom: 14, fontSize: 12, color: "#92400e" }}>
-            🔒 Facture verrouillée — envoyée à la DGFiP le {invoice.b2brouter_last_event ? new Date(invoice.b2brouter_last_event).toLocaleDateString("fr-FR") : "—"}.
-            {invoice.b2brouter_status && ` Statut brut : ${invoice.b2brouter_status}.`}
-          </div>
-        )}
-
         <button onClick={() => setShowPDF(true)}
           style={{ width: "100%", background: `linear-gradient(135deg,${ac}ee,${ac})`, color: "white", border: "none", borderRadius: 16, padding: 16, fontSize: 14, fontWeight: 700, cursor: "pointer", boxShadow: `0 6px 20px ${ac}44`, marginBottom: 12 }}>
           Voir le PDF de la facture
@@ -118,8 +112,7 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
           )}
         </div>
 
-        {!invoice.locked && (
-          <div style={{ background: "white", borderRadius: 14, border: "1px solid #f1f5f9", padding: 14, marginBottom: 12 }}>
+        <div style={{ background: "white", borderRadius: 14, border: "1px solid #f1f5f9", padding: 14, marginBottom: 12 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Spécificités BTP</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <div>
@@ -144,27 +137,32 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
               </div>
             </div>
           </div>
-        )}
 
-        {error && (
-          <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", padding: "10px 12px", borderRadius: 10, fontSize: 12, marginBottom: 12 }}>
-            ❌ {error}
+        {exportMsg && (
+          <div style={{
+            background: exportMsg.startsWith("❌") ? "#fef2f2" : "#ecfdf5",
+            border: `1px solid ${exportMsg.startsWith("❌") ? "#fecaca" : "#bbf7d0"}`,
+            color: exportMsg.startsWith("❌") ? "#991b1b" : "#065f46",
+            padding: "10px 12px", borderRadius: 10, fontSize: 12, marginBottom: 12, lineHeight: 1.4,
+          }}>
+            {exportMsg}
           </div>
         )}
 
         <div style={{ display: "flex", gap: 10 }}>
-          {!invoice.locked && (
-            <>
-              <button onClick={onDelete}
-                style={{ background: "white", border: "1px solid #fecaca", color: "#b91c1c", borderRadius: 12, padding: "12px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                Supprimer
-              </button>
-              <button onClick={handleSend} disabled={sending || !lignes.length}
-                style={{ flex: 1, background: sending || !lignes.length ? "#cbd5e1" : "#0f172a", color: "white", border: "none", borderRadius: 12, padding: "12px 16px", fontSize: 13, fontWeight: 700, cursor: sending || !lignes.length ? "not-allowed" : "pointer" }}>
-                {sending ? "Envoi à la DGFiP…" : "📨 Envoyer via B2Brouter (DGFiP)"}
-              </button>
-            </>
-          )}
+          <button onClick={onDelete}
+            style={{ background: "white", border: "1px solid #fecaca", color: "#b91c1c", borderRadius: 12, padding: "12px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+            Supprimer
+          </button>
+          <button onClick={handleFacturX} disabled={exporting || !lignes.length}
+            style={{ flex: 1, background: exporting || !lignes.length ? "#cbd5e1" : "#0f172a", color: "white", border: "none", borderRadius: 12, padding: "12px 16px", fontSize: 13, fontWeight: 700, cursor: exporting || !lignes.length ? "not-allowed" : "pointer" }}>
+            {exporting ? "Génération Factur-X…" : "⬇ Télécharger Factur-X (PDF + XML)"}
+          </button>
+        </div>
+
+        <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 10, lineHeight: 1.5, textAlign: "center" }}>
+          Le PDF Factur-X généré est légalement valide pour le B2B (art. 289 VII du CGI).
+          Le client peut l'importer automatiquement dans son logiciel comptable via l'XML embarqué.
         </div>
       </div>
     </div>
