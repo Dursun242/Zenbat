@@ -116,6 +116,19 @@ export default function App() {
     return () => { cancelled = true; };
   }, [user?.id]);
 
+  // Pré-remplissage prénom/nom depuis le "Nom complet" de l'inscription
+  // si le profil n'a pas encore été personnalisé.
+  useEffect(() => {
+    if (!user) return;
+    const full = (user.user_metadata?.full_name || "").trim();
+    if (!full) return;
+    setBrand(prev => {
+      if (prev.firstName?.trim() || prev.lastName?.trim()) return prev;
+      const parts = full.split(/\s+/);
+      return { ...prev, firstName: parts[0] || "", lastName: parts.slice(1).join(" ") };
+    });
+  }, [user?.id, setBrand]);
+
   // Sauvegarde différée des devis
   const saveTimers = useRef({});
   const scheduleDevisSave = (d, immediate = false, saveLignes = false) => {
