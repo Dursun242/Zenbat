@@ -216,14 +216,13 @@ export function buildFacturXXML({ invoice, client, brand }) {
       </ram:ActualDeliverySupplyChainEvent>
     </ram:ApplicableHeaderTradeDelivery>
     <ram:ApplicableHeaderTradeSettlement>
-      <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>${taxBlocks}
+      <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
       ${iban ? `
       <ram:SpecifiedTradeSettlementPaymentMeans>
         <ram:TypeCode>58</ram:TypeCode>
-        <ram:PayerPartyDebtorFinancialAccount><ram:IBANID>${esc(iban)}</ram:IBANID></ram:PayerPartyDebtorFinancialAccount>
+        <ram:PayeePartyCreditorFinancialAccount><ram:IBANID>${esc(iban)}</ram:IBANID></ram:PayeePartyCreditorFinancialAccount>
         ${bic ? `<ram:PayeeSpecifiedCreditorFinancialInstitution><ram:BICID>${esc(bic)}</ram:BICID></ram:PayeeSpecifiedCreditorFinancialInstitution>` : ""}
-      </ram:SpecifiedTradeSettlementPaymentMeans>` : ""}
-      ${due ? `<ram:SpecifiedTradePaymentTerms><ram:DueDateDateTime><udt:DateTimeString format="102">${due}</udt:DateTimeString></ram:DueDateDateTime></ram:SpecifiedTradePaymentTerms>` : ""}
+      </ram:SpecifiedTradeSettlementPaymentMeans>` : ""}${taxBlocks}
       ${retenue > 0 ? `
       <ram:SpecifiedTradeAllowanceCharge>
         <ram:ChargeIndicator><udt:Indicator>false</udt:Indicator></ram:ChargeIndicator>
@@ -231,6 +230,7 @@ export function buildFacturXXML({ invoice, client, brand }) {
         <ram:Reason>Retenue de garantie</ram:Reason>
         <ram:CategoryTradeTax><ram:TypeCode>VAT</ram:TypeCode><ram:CategoryCode>S</ram:CategoryCode><ram:RateApplicablePercent>0.00</ram:RateApplicablePercent></ram:CategoryTradeTax>
       </ram:SpecifiedTradeAllowanceCharge>` : ""}
+      ${due ? `<ram:SpecifiedTradePaymentTerms><ram:DueDateDateTime><udt:DateTimeString format="102">${due}</udt:DateTimeString></ram:DueDateDateTime></ram:SpecifiedTradePaymentTerms>` : ""}
       <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
         <ram:LineTotalAmount>${num(totalHT)}</ram:LineTotalAmount>
         <ram:TaxBasisTotalAmount>${num(totalHT)}</ram:TaxBasisTotalAmount>
