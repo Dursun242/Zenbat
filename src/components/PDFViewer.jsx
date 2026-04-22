@@ -231,18 +231,38 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
         </div>
       )}
 
-      {kind !== "facture" && (
-        <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14,marginTop:14,paddingTop:12,borderTop:"1px solid #d4d4d8"}}>
-          <div>
-            <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>SIGNATURE CLIENT · Bon pour accord</div>
-            <div style={{height:40,borderBottom:"1px solid #9ca3af"}}/>
+      {kind !== "facture" && (() => {
+        const isSigned = d.statut === "accepte" && d.signed_at
+        const signerDisplay = d.signed_by || clientName
+        const signedDate = d.signed_at ? fmtD(d.signed_at) : ""
+        return (
+          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14,marginTop:14,paddingTop:12,borderTop:`2px solid ${isSigned ? "#16a34a" : "#d4d4d8"}`}}>
+            <div>
+              <div style={{fontSize:9,color:isSigned?"#15803d":"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>
+                SIGNATURE CLIENT · Bon pour accord
+              </div>
+              {isSigned ? (
+                <div style={{height:40,display:"flex",flexDirection:"column",justifyContent:"center",borderBottom:"1px solid #16a34a"}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#15803d",fontFamily:"cursive",letterSpacing:"0.5px"}}>{signerDisplay}</div>
+                  <div style={{fontSize:8,color:"#16a34a",marginTop:2}}>✓ Signé électroniquement via Odoo Sign</div>
+                </div>
+              ) : (
+                <div style={{height:40,borderBottom:"1px solid #9ca3af"}}/>
+              )}
+            </div>
+            <div>
+              <div style={{fontSize:9,color:isSigned?"#15803d":"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>DATE</div>
+              {isSigned ? (
+                <div style={{height:40,display:"flex",alignItems:"center",borderBottom:"1px solid #16a34a"}}>
+                  <div style={{fontSize:11,fontWeight:600,color:"#15803d"}}>{signedDate}</div>
+                </div>
+              ) : (
+                <div style={{height:40,borderBottom:"1px solid #9ca3af"}}/>
+              )}
+            </div>
           </div>
-          <div>
-            <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>DATE</div>
-            <div style={{height:40,borderBottom:"1px solid #9ca3af"}}/>
-          </div>
-        </div>
-      )}
+        )
+      })()}
 
       <div style={{marginTop:14,paddingTop:8,borderTop:"1px solid #e5e7eb",display:"flex",justifyContent:"space-between",gap:10,fontSize:8,color:"#9ca3af",lineHeight:1.5}}>
         <div style={{flex:1}}>
