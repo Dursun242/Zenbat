@@ -313,7 +313,7 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
       updateAssistant(finalText);
 
       // Incrémente le compteur d'usage IA (best-effort, silencieux)
-      supabase.rpc("increment_ai_used").catch(() => {});
+      supabase.rpc("increment_ai_used").then(() => {}, () => {});
     } catch (e) {
       const detail = apiError || e.message || "unknown";
       console.error("[AgentIA] send failed:", e, apiError);
