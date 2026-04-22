@@ -1,4 +1,5 @@
-// Génère un PDF A4 à partir d'un élément DOM (la page de devis rendue).
+// Génère un PDF à partir d'un élément DOM (la page de devis rendue).
+// La page PDF a exactement la hauteur du contenu (pas de blanc en bas).
 // Retourne { blob, base64 } — base64 sans le préfixe data:.
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
@@ -15,50 +16,53 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
     logging: false,
   });
 
-  const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-  const pageW = A4_W_MM;
-  const pageH = A4_H_MM;
-  const ratio = canvas.height / canvas.width;
-  const drawH = pageW * ratio; // hauteur réelle du contenu en mm
+  const pageW  = A4_W_MM;
+  const ratio  = canvas.height / canvas.width;
+  const drawH  = pageW * ratio; // hauteur réelle du contenu en mm
 
-  if (drawH <= pageH) {
-    // Contenu plus court que A4 : centré verticalement (pas d'étirement)
-    const img = canvas.toDataURL("image/jpeg", 0.92);
-    pdf.addImage(img, "JPEG", 0, 0, pageW, drawH, undefined, "FAST");
-  } else if (drawH <= pageH * 1.5) {
-    // Contenu jusqu'à 1,5× A4 (~445mm) : on scale proportionnellement
-    // pour tout tenir sur une page. Maximum ~33% de réduction verticale.
-    const scale = pageH / drawH;           // ex: 0.85 pour un doc de 350mm
-    const scaledW = pageW * scale;
-    const marginX = (pageW - scaledW) / 2; // centré horizontalement
-    const img = canvas.toDataURL("image/jpeg", 0.92);
-    pdf.addImage(img, "JPEG", marginX, 0, scaledW, pageH, undefined, "FAST");
-  } else {
-    // Très long document (> 445mm) : multi-page propre
-    const pagePxH = Math.floor((pageH * canvas.width) / pageW);
-    const MIN_REMAINING_PX = Math.round((8 * canvas.width) / pageW); // ≈ 8mm
-    let y = 0;
-    while (y < canvas.height) {
-      const remaining = canvas.height - y;
-      // Si le reste est trop petit pour une page entière mais pas negligeable,
-      // on réduit la tranche précédente pour laisser plus de place au dernier bloc.
-      const sliceH = Math.min(pagePxH, remaining);
-      const slice = document.createElement("canvas");
-      slice.width = canvas.width;
-      slice.height = sliceH;
-      const ctx = slice.getContext("2d");
-      ctx.drawImage(canvas, 0, y, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-      const img = slice.toDataURL("image/jpeg", 0.92);
-      const thisH = (sliceH * pageW) / canvas.width;
-      pdf.addImage(img, "JPEG", 0, 0, pageW, thisH, undefined, "FAST");
-      y += sliceH;
-      if (canvas.height - y > MIN_REMAINING_PX) pdf.addPage();
-      else break;
+  if (drawH <= A4_H_MM * 1.5) {
+    // Contenu court ou moyen : 1 page à la hauteur exacte du contenu
+    // (jamais de blanc en bas), ou légèrement réduit pour tenir en A4.
+    const pageH = Math.min(drawH, A4_H_MM); // hauteur PDF = contenu ou A4 max
+    const pdf   = new jsPDF({ unit: "mm", format: [pageW, pageH], orientation: "portrait" });
+    const img   = canvas.toDataURL("image/jpeg", 0.92);
+
+    if (drawH <= A4_H_MM) {
+      // Contenu plus court que A4 : page à la taille exacte du contenu
+      pdf.addImage(img, "JPEG", 0, 0, pageW, drawH, undefined, "FAST");
+    } else {
+      // Contenu entre A4 et 1,5× A4 : réduit proportionnellement pour tenir en A4
+      const scale   = A4_H_MM / drawH;
+      const scaledW = pageW * scale;
+      const marginX = (pageW - scaledW) / 2;
+      pdf.addImage(img, "JPEG", marginX, 0, scaledW, A4_H_MM, undefined, "FAST");
     }
+
+    const blob    = pdf.output("blob");
+    const dataUri = pdf.output("datauristring");
+    return { blob, base64: dataUri.split(",")[1] || "", filename };
   }
 
-  const blob = pdf.output("blob");
+  // Très long document (> 445mm) : multi-page A4
+  const pdf      = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+  const pagePxH  = Math.floor((A4_H_MM * canvas.width) / pageW);
+  const MIN_REM  = Math.round((8 * canvas.width) / pageW); // ≈ 8mm en pixels
+  let y = 0;
+  while (y < canvas.height) {
+    const sliceH = Math.min(pagePxH, canvas.height - y);
+    const slice  = document.createElement("canvas");
+    slice.width  = canvas.width;
+    slice.height = sliceH;
+    slice.getContext("2d").drawImage(canvas, 0, y, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+    const img    = slice.toDataURL("image/jpeg", 0.92);
+    const thisH  = (sliceH * pageW) / canvas.width;
+    pdf.addImage(img, "JPEG", 0, 0, pageW, thisH, undefined, "FAST");
+    y += sliceH;
+    if (canvas.height - y > MIN_REM) pdf.addPage();
+    else break;
+  }
+
+  const blob    = pdf.output("blob");
   const dataUri = pdf.output("datauristring");
-  const base64 = dataUri.split(",")[1] || "";
-  return { blob, base64, filename };
+  return { blob, base64: dataUri.split(",")[1] || "", filename };
 }
