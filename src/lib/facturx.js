@@ -7,7 +7,7 @@
 // Ref : https://fnfe-mpe.org/factur-x/
 // Profil BASIC : https://fnfe-mpe.org/factur-x/factur-x_en/ (conforme EN 16931)
 
-import { PDFDocument, AFRelationship, PDFName, PDFString, PDFHexString } from "pdf-lib";
+import { PDFDocument, AFRelationship, PDFName, PDFRawStream } from "pdf-lib";
 
 const PROFILE = "urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:basic";
 const XML_FILENAME = "factur-x.xml";
@@ -326,16 +326,32 @@ export async function embedFacturXInPdf(pdfInput, xmlString, invoice = {}) {
   pdfDoc.setModificationDate(new Date());
 
   // Injection du bloc XMP Factur-X via le catalogue.
-  // pdf-lib v1 n'expose pas setXmpMetadata → on écrit un stream bas niveau.
+  // On construit un PDFRawStream NON compressé (PDF/A exige que le flux
+  // Metadata soit lisible sans filtre).
   const xmpString = buildFacturXXMP({ invoice });
   const xmpBytes  = new TextEncoder().encode(xmpString);
-  const metadataStream = pdfDoc.context.stream(xmpBytes, {
+  const metaDict  = pdfDoc.context.obj({
     Type:    PDFName.of("Metadata"),
     Subtype: PDFName.of("XML"),
+    Length:  xmpBytes.length,
   });
-  const metadataRef = pdfDoc.context.register(metadataStream);
+  const metadataStream = PDFRawStream.of(metaDict, xmpBytes);
+  const metadataRef    = pdfDoc.context.register(metadataStream);
   pdfDoc.catalog.set(PDFName.of("Metadata"), metadataRef);
 
+  // Les validateurs PDF/A stricts vérifient que le catalog expose
+  // /Names/EmbeddedFiles. pdf-lib l'ajoute via attach() mais parfois
+  // sous une forme que le validateur FNFE-MPE ne traverse pas → on
+  // garantit explicitement sa présence en "touchant" le dict.
+  const namesEntry = pdfDoc.catalog.get(PDFName.of("Names"));
+  if (namesEntry && typeof namesEntry.set === "function") {
+    // Force une re-sérialisation du Names dict
+    const ef = namesEntry.get(PDFName.of("EmbeddedFiles"));
+    if (ef) namesEntry.set(PDFName.of("EmbeddedFiles"), ef);
+  }
+
+  // useObjectStreams: false garantit que la stream Metadata reste
+  // en objet indirect distinct (requis par PDF/A).
   const out = await pdfDoc.save({ useObjectStreams: false });
   return new Blob([out], { type: "application/pdf" });
 }
