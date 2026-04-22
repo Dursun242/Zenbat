@@ -30,5 +30,10 @@ export const BTP_TRADES = [
   { id:"demolition",      label:"Démolition / Désamiantage", icon:"🧨" },
 ]
 
-export const tradesLabels = (ids = []) =>
-  ids.map(id => BTP_TRADES.find(t => t.id === id)?.label).filter(Boolean)
+// Rétrocompatibilité : accepte des IDs anciens (ex: "maconnerie") ou des
+// libellés libres (ex: "Maçonnerie"). Retourne toujours un tableau de strings.
+export const tradesLabels = (trades = []) =>
+  trades.map(t => BTP_TRADES.find(b => b.id === t)?.label ?? t).filter(Boolean)
+
+// Liste plate des libellés pour les suggestions de saisie.
+export const TRADE_SUGGESTIONS = BTP_TRADES.map(t => t.label)
