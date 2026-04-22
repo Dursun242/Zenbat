@@ -58,7 +58,17 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
   }, [onPageReady])
 
   const lignes = d.lignes || []
-  const ouvrages = lignes.filter(l => l.type_ligne === "ouvrage")
+
+  // Filtre les sections "lot" vides (sans ouvrage entre ce lot et le suivant)
+  const filteredLignes = lignes.filter((l, i) => {
+    if (l.type_ligne !== "lot") return true
+    const rest = lignes.slice(i + 1)
+    const nextLotIdx = rest.findIndex(x => x.type_ligne === "lot")
+    const group = nextLotIdx === -1 ? rest : rest.slice(0, nextLotIdx)
+    return group.some(x => x.type_ligne === "ouvrage")
+  })
+
+  const ouvrages = filteredLignes.filter(l => l.type_ligne === "ouvrage")
   const rateOf = (l) => Number(l.tva_rate ?? d.tva_rate ?? 20)
   const ht = ouvrages.reduce((s, l) => s + ((l.quantite||0) * (l.prix_unitaire||0)), 0)
   const tvaGroups = ouvrages.reduce((acc, l) => {
@@ -96,7 +106,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
 
   const pageBody = (
     <>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:18,paddingBottom:12,borderBottom:`2px solid ${navy}`}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12,paddingBottom:10,borderBottom:`2px solid ${navy}`}}>
         <div>
           {brand.logo && <img src={brand.logo} alt="" style={{height:44,maxWidth:180,objectFit:"contain",display:"block",marginBottom:6}}/>}
           <div style={{fontWeight:800,fontSize:16,color:navy}}>{brand.companyName||"Votre Entreprise"}</div>
@@ -112,73 +122,73 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
         </div>
       </div>
 
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
-        <div style={{border:"1px solid #d4d4d8",borderRadius:4,padding:"10px 12px",minHeight:110}}>
-          <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>ENTREPRISE</div>
-          <div style={{fontSize:13,fontWeight:700,color:"#111",marginBottom:4}}>{brand.companyName||"—"}</div>
-          {companyLines.map((line,i)=>(<div key={i} style={{fontSize:10,color:"#4b5563",lineHeight:1.6}}>{line}</div>))}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+        <div style={{border:"1px solid #d4d4d8",borderRadius:4,padding:"8px 10px"}}>
+          <div style={{fontSize:8.5,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:4,textTransform:"uppercase"}}>Entreprise</div>
+          <div style={{fontSize:12,fontWeight:700,color:"#111",marginBottom:3}}>{brand.companyName||"—"}</div>
+          {companyLines.map((line,i)=>(<div key={i} style={{fontSize:9.5,color:"#4b5563",lineHeight:1.55}}>{line}</div>))}
         </div>
-        <div style={{border:"1px solid #d4d4d8",borderRadius:4,padding:"10px 12px",minHeight:110}}>
-          <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>MAÎTRE D'OUVRAGE</div>
-          <div style={{fontSize:13,fontWeight:700,color:"#111",marginBottom:4}}>{clientName}</div>
-          {clientLines.map((line,i)=>(<div key={i} style={{fontSize:10,color:"#4b5563",lineHeight:1.6}}>{line}</div>))}
+        <div style={{border:"1px solid #d4d4d8",borderRadius:4,padding:"8px 10px"}}>
+          <div style={{fontSize:8.5,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:4,textTransform:"uppercase"}}>Maître d'ouvrage</div>
+          <div style={{fontSize:12,fontWeight:700,color:"#111",marginBottom:3}}>{clientName}</div>
+          {clientLines.map((line,i)=>(<div key={i} style={{fontSize:9.5,color:"#4b5563",lineHeight:1.55}}>{line}</div>))}
         </div>
       </div>
 
       {(d.ville_chantier||d.objet)&&(
-        <div style={{background:"#f8f9fb",border:"1px solid #e5e7eb",borderRadius:4,padding:"8px 12px",marginBottom:14,fontSize:10,color:"#374151"}}>
+        <div style={{background:"#f8f9fb",border:"1px solid #e5e7eb",borderRadius:4,padding:"6px 10px",marginBottom:10,fontSize:9.5,color:"#374151"}}>
           {d.objet && <div><strong>Objet :</strong> {d.objet}</div>}
           {d.ville_chantier && <div><strong>Chantier :</strong> {d.ville_chantier}</div>}
         </div>
       )}
 
-      <div style={{fontSize:11,fontWeight:700,color:navy,marginBottom:8}}>DÉTAIL DES PRESTATIONS</div>
-      <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,marginBottom:14}}>
+      <div style={{fontSize:10,fontWeight:700,color:navy,marginBottom:6,letterSpacing:"1px",textTransform:"uppercase"}}>Détail des prestations</div>
+      <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,marginBottom:12}}>
         <thead>
           <tr style={{background:navy,color:"white"}}>
-            <th style={{textAlign:"left",padding:"8px 10px",fontWeight:600}}>Description</th>
-            <th style={{textAlign:"center",padding:"8px 6px",fontWeight:600,width:50}}>Unité</th>
-            <th style={{textAlign:"center",padding:"8px 6px",fontWeight:600,width:45}}>Qté</th>
-            <th style={{textAlign:"right",padding:"8px 8px",fontWeight:600,width:70}}>PU HT</th>
-            <th style={{textAlign:"center",padding:"8px 6px",fontWeight:600,width:50}}>TVA</th>
-            <th style={{textAlign:"right",padding:"8px 10px",fontWeight:600,width:80}}>Total HT</th>
+            <th style={{textAlign:"left",padding:"6px 8px",fontWeight:600}}>Description</th>
+            <th style={{textAlign:"center",padding:"6px 5px",fontWeight:600,width:44}}>Unité</th>
+            <th style={{textAlign:"center",padding:"6px 5px",fontWeight:600,width:38}}>Qté</th>
+            <th style={{textAlign:"right",padding:"6px 6px",fontWeight:600,width:66}}>PU HT</th>
+            <th style={{textAlign:"center",padding:"6px 5px",fontWeight:600,width:44}}>TVA</th>
+            <th style={{textAlign:"right",padding:"6px 8px",fontWeight:600,width:72}}>Total HT</th>
           </tr>
         </thead>
         <tbody>
-          {lignes.map((l,i)=>{
+          {filteredLignes.map((l,i)=>{
             if(l.type_ligne==="lot") return (
               <tr key={l.id}>
-                <td colSpan={6} style={{padding:"8px 10px",fontWeight:700,fontSize:10,color:navy,textTransform:"uppercase",letterSpacing:".5px",borderBottom:`1px solid ${navy}33`,background:"#eef2f7"}}>{l.designation}</td>
+                <td colSpan={6} style={{padding:"6px 8px",fontWeight:700,fontSize:9.5,color:navy,textTransform:"uppercase",letterSpacing:".5px",borderBottom:`1px solid ${navy}33`,background:"#eef2f7"}}>{l.designation}</td>
               </tr>
             )
             const total = (l.quantite||0)*(l.prix_unitaire||0)
             return (
               <tr key={l.id} style={{background:i%2?"#f8f9fb":"white",borderBottom:"1px solid #e5e7eb"}}>
-                <td style={{padding:"7px 10px"}}>{l.designation}</td>
-                <td style={{padding:"7px 6px",textAlign:"center",color:"#6b7280"}}>{l.unite||"—"}</td>
-                <td style={{padding:"7px 6px",textAlign:"center"}}>{l.quantite}</td>
-                <td style={{padding:"7px 8px",textAlign:"right"}}>{fmt(l.prix_unitaire)}</td>
-                <td style={{padding:"7px 6px",textAlign:"center",color:"#6b7280"}}>{rateOf(l).toString().replace(".",",")}%</td>
-                <td style={{padding:"7px 10px",textAlign:"right",fontWeight:600}}>{fmt(total)}</td>
+                <td style={{padding:"5px 8px"}}>{l.designation}</td>
+                <td style={{padding:"5px 5px",textAlign:"center",color:"#6b7280"}}>{l.unite||"—"}</td>
+                <td style={{padding:"5px 5px",textAlign:"center"}}>{l.quantite}</td>
+                <td style={{padding:"5px 6px",textAlign:"right"}}>{fmt(l.prix_unitaire)}</td>
+                <td style={{padding:"5px 5px",textAlign:"center",color:"#6b7280"}}>{rateOf(l).toString().replace(".",",")}%</td>
+                <td style={{padding:"5px 8px",textAlign:"right",fontWeight:600}}>{fmt(total)}</td>
               </tr>
             )
           })}
         </tbody>
       </table>
 
-      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:16}}>
-        <table style={{fontSize:10,borderCollapse:"collapse",minWidth:260}}>
+      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
+        <table style={{fontSize:10,borderCollapse:"collapse",minWidth:240}}>
           <tbody>
-            <tr><td style={{padding:"4px 10px",color:"#4b5563"}}>Total HT</td><td style={{padding:"4px 10px",textAlign:"right",fontWeight:600}}>{fmt(ht)}</td></tr>
+            <tr><td style={{padding:"3px 8px",color:"#4b5563"}}>Total HT</td><td style={{padding:"3px 8px",textAlign:"right",fontWeight:600}}>{fmt(ht)}</td></tr>
             {tvaRows.map(row=>(
               <tr key={row.rate}>
-                <td style={{padding:"4px 10px",color:"#4b5563"}}>TVA {row.rate.toString().replace(".",",")}%<span style={{color:"#9ca3af",fontSize:9,marginLeft:4}}>(sur {fmt(row.base)})</span></td>
-                <td style={{padding:"4px 10px",textAlign:"right"}}>{fmt(row.montant)}</td>
+                <td style={{padding:"3px 8px",color:"#4b5563"}}>TVA {row.rate.toString().replace(".",",")}%<span style={{color:"#9ca3af",fontSize:8.5,marginLeft:4}}>(sur {fmt(row.base)})</span></td>
+                <td style={{padding:"3px 8px",textAlign:"right"}}>{fmt(row.montant)}</td>
               </tr>
             ))}
             <tr style={{background:"#eef2f7",borderTop:`2px solid ${navy}`}}>
-              <td style={{padding:"8px 10px",fontWeight:800,color:navy,fontSize:11}}>TOTAL TTC</td>
-              <td style={{padding:"8px 10px",textAlign:"right",fontWeight:800,color:navy,fontSize:12}}>{fmt(ttc)}</td>
+              <td style={{padding:"6px 8px",fontWeight:800,color:navy,fontSize:10.5}}>TOTAL TTC</td>
+              <td style={{padding:"6px 8px",textAlign:"right",fontWeight:800,color:navy,fontSize:11.5}}>{fmt(ttc)}</td>
             </tr>
             {kind === "facture" && Number(d.retenue_garantie_eur) > 0 && (<>
               <tr>
@@ -195,40 +205,46 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
       </div>
 
       {(d.observations||brand.defaultObservations)&&(
-        <div style={{marginBottom:14}}>
-          <div style={{fontSize:11,fontWeight:700,color:navy,marginBottom:4}}>OBSERVATIONS</div>
-          <div style={{fontSize:10,color:"#374151",lineHeight:1.6}}>{d.observations||brand.defaultObservations}</div>
+        <div style={{marginBottom:10}}>
+          <div style={{fontSize:9,fontWeight:700,color:navy,marginBottom:3,letterSpacing:"1px",textTransform:"uppercase"}}>Observations</div>
+          <div style={{fontSize:9.5,color:"#374151",lineHeight:1.55}}>{d.observations||brand.defaultObservations}</div>
         </div>
       )}
-      {brand.paymentTerms&&(
-        <div style={{marginBottom:14}}>
-          <div style={{fontSize:11,fontWeight:700,color:navy,marginBottom:4}}>CONDITIONS</div>
-          <div style={{fontSize:10,color:"#374151",lineHeight:1.6}}>{brand.paymentTerms}</div>
-        </div>
-      )}
-      {brand.rib&&(
-        <div style={{marginBottom:14}}>
-          <div style={{fontSize:11,fontWeight:700,color:navy,marginBottom:4}}>COORDONNÉES BANCAIRES</div>
-          <div style={{fontSize:10,color:"#374151"}}>{brand.rib}</div>
-          {brand.iban&&<div style={{fontSize:9,color:"#4b5563",fontFamily:"monospace"}}>IBAN : {brand.iban}</div>}
-          {brand.bic&&<div style={{fontSize:9,color:"#4b5563",fontFamily:"monospace"}}>BIC : {brand.bic}</div>}
+
+      {/* Conditions + Banque côte à côte */}
+      {(brand.paymentTerms || brand.iban || brand.rib) && (
+        <div style={{display:"grid",gridTemplateColumns:brand.paymentTerms&&(brand.rib||brand.iban)?"1fr 1fr":"1fr",gap:10,marginBottom:10}}>
+          {brand.paymentTerms && (
+            <div style={{background:"#f8f9fb",borderRadius:4,padding:"8px 10px",border:"1px solid #e5e7eb"}}>
+              <div style={{fontSize:9,fontWeight:700,color:navy,marginBottom:4,letterSpacing:"1px",textTransform:"uppercase"}}>Conditions</div>
+              <div style={{fontSize:9.5,color:"#374151",lineHeight:1.55}}>{brand.paymentTerms}</div>
+            </div>
+          )}
+          {(brand.rib||brand.iban) && (
+            <div style={{background:"#f8f9fb",borderRadius:4,padding:"8px 10px",border:"1px solid #e5e7eb"}}>
+              <div style={{fontSize:9,fontWeight:700,color:navy,marginBottom:4,letterSpacing:"1px",textTransform:"uppercase"}}>Coordonnées bancaires</div>
+              {brand.rib&&<div style={{fontSize:9.5,color:"#374151",marginBottom:2}}>{brand.rib}</div>}
+              {brand.iban&&<div style={{fontSize:9,color:"#4b5563",fontFamily:"monospace",lineHeight:1.5}}>IBAN : {brand.iban}</div>}
+              {brand.bic&&<div style={{fontSize:9,color:"#4b5563",fontFamily:"monospace"}}>BIC : {brand.bic}</div>}
+            </div>
+          )}
         </div>
       )}
 
       {kind !== "facture" && (
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginTop:20,paddingTop:14,borderTop:"1px solid #d4d4d8"}}>
+        <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14,marginTop:14,paddingTop:12,borderTop:"1px solid #d4d4d8"}}>
           <div>
             <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>SIGNATURE CLIENT · Bon pour accord</div>
-            <div style={{height:60,borderBottom:"1px solid #9ca3af"}}/>
+            <div style={{height:40,borderBottom:"1px solid #9ca3af"}}/>
           </div>
           <div>
             <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>DATE</div>
-            <div style={{height:60,borderBottom:"1px solid #9ca3af"}}/>
+            <div style={{height:40,borderBottom:"1px solid #9ca3af"}}/>
           </div>
         </div>
       )}
 
-      <div style={{marginTop:18,paddingTop:10,borderTop:"1px solid #e5e7eb",display:"flex",justifyContent:"space-between",gap:10,fontSize:8,color:"#9ca3af",lineHeight:1.5}}>
+      <div style={{marginTop:14,paddingTop:8,borderTop:"1px solid #e5e7eb",display:"flex",justifyContent:"space-between",gap:10,fontSize:8,color:"#9ca3af",lineHeight:1.5}}>
         <div style={{flex:1}}>
           {brand.vatRegime === "franchise" && !/(293\s*B|TVA\s+non\s+applicable)/i.test(brand.mentionsLegales || "") && (
             <div style={{fontWeight:600,color:"#6b7280",marginBottom:2}}>TVA non applicable, art. 293 B du CGI</div>
@@ -236,7 +252,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
           {brand.mentionsLegales}
           {brand.siret && <div>SIRET {brand.siret}</div>}
         </div>
-        <div style={{textAlign:"right"}}>Généré via Zenbat</div>
+        <div style={{textAlign:"right",flexShrink:0}}>Généré via Zenbat</div>
       </div>
     </>
   )
