@@ -22,9 +22,9 @@ export default function ContactEditor({ c, onSave, onClose }) {
   const isValid = form.raison_sociale?.trim() || form.nom?.trim() || form.prenom?.trim();
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.7)", zIndex: 300, display: "flex", flexDirection: "column", fontFamily: "'DM Sans',sans-serif" }}>
+    <div style={{ position: "fixed", inset: 0, height: "100dvh", background: "rgba(15,23,42,.7)", zIndex: 999, display: "flex", flexDirection: "column", fontFamily: "'DM Sans',sans-serif" }}>
       <div style={{ flex: 1 }} onClick={onClose}/>
-      <div style={{ background: "white", borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "90vh", display: "flex", flexDirection: "column", paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <div style={{ background: "white", borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "90dvh", display: "flex", flexDirection: "column" }}>
 
         <div style={{ padding: "14px 18px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
