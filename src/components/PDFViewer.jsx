@@ -260,7 +260,26 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
             <button onClick={()=>setUserZoom(1)} style={{background:"none",border:"none",color:"#94a3b8",padding:"0 8px",fontSize:11,fontWeight:600,cursor:"pointer",minWidth:44}} aria-label="Réinitialiser zoom">{Math.round(scale*100)}%</button>
             <button onClick={()=>setUserZoom(z=>Math.min(3,+(z+0.25).toFixed(2)))} style={{background:"none",border:"none",color:"#94a3b8",width:30,height:30,fontSize:16,cursor:"pointer",padding:0}} aria-label="Zoomer">+</button>
           </div>
-          <button onClick={()=>window.print()} style={{background:"#22c55e",color:"white",border:"none",borderRadius:10,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>⬇</button>
+          <button
+            onClick={async () => {
+              try {
+                const { renderElementToPdf } = await import("../lib/pdf.js")
+                const { blob } = await renderElementToPdf(pageRef.current, { filename: `${d.numero}.pdf` })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement("a")
+                a.href = url
+                a.download = `${d.numero}.pdf`
+                document.body.appendChild(a)
+                a.click()
+                document.body.removeChild(a)
+                setTimeout(() => URL.revokeObjectURL(url), 3000)
+              } catch (e) {
+                console.error("[pdf download]", e)
+                alert("Impossible de générer le PDF : " + (e.message || e))
+              }
+            }}
+            title="Télécharger le PDF"
+            style={{background:"#22c55e",color:"white",border:"none",borderRadius:10,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>⬇</button>
           <button onClick={onClose} style={{background:"#1e293b",color:"#94a3b8",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer"}}>{Ix.x}</button>
         </div>
       </div>
