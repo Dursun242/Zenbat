@@ -7,7 +7,8 @@ const Ix = {
   odoo: <svg width="15" height="15" viewBox="0 0 24 24" fill="#714B67"><circle cx="12" cy="12" r="3"/><circle cx="4" cy="12" r="3"/><circle cx="20" cy="12" r="3"/></svg>,
 }
 
-export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageReady, onSendOdoo, sending=false, sent=false }) {
+export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageReady, onSendOdoo, sending=false, sent=false, kind="devis" }) {
+  const docLabel = kind === "facture" ? "FACTURE" : "DEVIS";
   const MM_TO_PX = 3.7795275591
   const A4_PX = 210 * MM_TO_PX
   const wrapRef = useRef(null)
@@ -100,7 +101,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
           <div style={{fontWeight:800,fontSize:16,color:navy}}>{brand.companyName||"Votre Entreprise"}</div>
         </div>
         <div style={{textAlign:"right"}}>
-          <div style={{color:"#94a3b8",fontSize:10,fontWeight:600,letterSpacing:"2px"}}>DEVIS</div>
+          <div style={{color:"#94a3b8",fontSize:10,fontWeight:600,letterSpacing:"2px"}}>{docLabel}</div>
           <div style={{color:navy,fontWeight:800,fontSize:20,marginTop:2}}>{d.numero}</div>
           <div style={{color:"#64748b",fontSize:10,marginTop:6}}>Émis le <strong style={{color:"#1a1a1a"}}>{fmtD(d.date_emission)}</strong></div>
           <div style={{color:"#64748b",fontSize:10}}>Valide jusqu'au <strong style={{color:"#1a1a1a"}}>{fmtD(validUntil.toISOString())}</strong></div>

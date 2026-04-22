@@ -1,7 +1,8 @@
-import { STATUT } from "../../lib/constants.js";
+import { STATUT, STATUT_FACTURE } from "../../lib/constants.js";
 
-export default function Badge({ s }) {
-  const c = STATUT[s] || STATUT.brouillon;
+export default function Badge({ s, kind = "devis" }) {
+  const src = kind === "facture" ? STATUT_FACTURE : STATUT;
+  const c = src[s] || src.brouillon;
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 5,

@@ -213,6 +213,116 @@ export async function deleteDevis(id) {
 }
 
 // =========================================================
+// INVOICES (factures électroniques B2Brouter)
+// =========================================================
+export async function listInvoices() {
+  return withRetry(async () => {
+    const [{ data: inv, error: e1 }, { data: ls }] = await Promise.all([
+      supabase.from('invoices').select('*').order('created_at', { ascending: false }),
+      supabase.from('lignes_invoices').select('*').order('position'),
+    ])
+    if (e1) throw e1
+    const byInvoice = new Map()
+    for (const l of ls || []) {
+      if (!byInvoice.has(l.invoice_id)) byInvoice.set(l.invoice_id, [])
+      byInvoice.get(l.invoice_id).push(l)
+    }
+    return (inv || []).map(i => ({ ...i, lignes: byInvoice.get(i.id) || [] }))
+  })
+}
+
+export async function nextInvoiceNumber() {
+  const { data, error } = await supabase.rpc('next_invoice_number')
+  if (error) throw error
+  return data
+}
+
+export async function createInvoice(invoice, lignes = []) {
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: inv, error } = await supabase
+    .from('invoices')
+    .insert({ ...invoice, owner_id: user.id })
+    .select()
+    .single()
+  if (error) throw error
+  if (lignes.length) {
+    const rows = lignes.map((l, i) => ({
+      invoice_id:   inv.id,
+      owner_id:     user.id,
+      position:     l.position ?? i,
+      type_ligne:   l.type_ligne || 'ouvrage',
+      lot:          l.lot ?? null,
+      designation:  l.designation || '—',
+      unite:        l.unite ?? null,
+      quantite:     l.quantite ?? 0,
+      prix_unitaire:l.prix_unitaire ?? 0,
+      tva_rate:     l.tva_rate ?? 20,
+    }))
+    const { error: e2 } = await supabase.from('lignes_invoices').insert(rows)
+    if (e2) throw e2
+  }
+  return inv
+}
+
+export async function updateInvoice(id, patch) {
+  const { data, error } = await supabase
+    .from('invoices').update(patch).eq('id', id).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function replaceInvoiceLignes(invoiceId, lignes) {
+  const { data: { user } } = await supabase.auth.getUser()
+  const { error: e1 } = await supabase.from('lignes_invoices').delete().eq('invoice_id', invoiceId)
+  if (e1) throw e1
+  if (!lignes.length) return []
+  const rows = lignes.map((l, i) => ({
+    invoice_id:   invoiceId,
+    owner_id:     user.id,
+    position:     l.position ?? i,
+    type_ligne:   l.type_ligne || 'ouvrage',
+    lot:          l.lot ?? null,
+    designation:  l.designation || '—',
+    unite:        l.unite ?? null,
+    quantite:     l.quantite ?? 0,
+    prix_unitaire:l.prix_unitaire ?? 0,
+    tva_rate:     l.tva_rate ?? 20,
+  }))
+  const { error } = await supabase.from('lignes_invoices').insert(rows)
+  if (error) throw error
+  const { data: inserted } = await supabase.from('lignes_invoices').select('*').eq('invoice_id', invoiceId).order('position')
+  return inserted || []
+}
+
+export async function deleteInvoice(id) {
+  const { error } = await supabase.from('invoices').delete().eq('id', id)
+  if (error) throw error
+}
+
+// Appelle le proxy /api/b2brouter avec l'access_token courant.
+async function callB2B(action, payload = {}) {
+  const { data: { session } } = await supabase.auth.getSession()
+  const res = await fetch('/api/b2brouter', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session?.access_token || ''}`,
+    },
+    body: JSON.stringify({ action, payload }),
+  })
+  const data = await res.json().catch(() => null)
+  if (!res.ok) throw new Error(data?.error || `B2Brouter HTTP ${res.status}`)
+  return data
+}
+
+export const b2b = {
+  ensureAccount: (info) => callB2B('ensure_account', info),
+  sendInvoice:   (invoice_id) => callB2B('send_invoice', { invoice_id }),
+  getStatus:     (b2brouter_id) => callB2B('get_invoice_status', { b2brouter_id }),
+  listReceived:  () => callB2B('list_received'),
+}
+
+// =========================================================
 // STORAGE — PDF de devis (bucket privé devis-pdfs)
 // Path conventionnel : {user_id}/{devis_id}.pdf
 // =========================================================

@@ -3,6 +3,7 @@ import { useAuth } from "./lib/auth.jsx";
 import {
   listClients, createClient as apiCreateClient, updateClient as apiUpdateClient, deleteClient as apiDeleteClient,
   listDevisWithLignes, getDevis, createDevis as apiCreateDevis, updateDevis as apiUpdateDevis, replaceLignes, deleteDevis as apiDeleteDevis,
+  listInvoices, createInvoice as apiCreateInvoice, updateInvoice as apiUpdateInvoice, replaceInvoiceLignes, deleteInvoice as apiDeleteInvoice, nextInvoiceNumber,
   updateMyProfile,
 } from "./lib/api";
 import { uid } from "./lib/utils.js";
@@ -15,6 +16,8 @@ import ClientsList from "./components/ClientsList.jsx";
 import ClientDetail from "./components/ClientDetail.jsx";
 import DevisList   from "./components/DevisList.jsx";
 import DevisDetail from "./components/DevisDetail.jsx";
+import InvoicesList  from "./components/InvoicesList.jsx";
+import InvoiceDetail from "./components/InvoiceDetail.jsx";
 import AgentIA     from "./components/AgentIA.jsx";
 import AdminPanel  from "./components/AdminPanel.jsx";
 import Onboarding       from "./pages/Onboarding.jsx";
@@ -28,6 +31,7 @@ const NAV = [
   { id: "dashboard", label: "Accueil",  icon: I.trend },
   { id: "clients",   label: "Clients",  icon: I.users },
   { id: "devis",     label: "Devis",    icon: I.file  },
+  { id: "factures",  label: "Factures", icon: I.file  },
   { id: "agent",     label: "Agent IA", icon: I.spark },
 ];
 
@@ -68,8 +72,10 @@ export default function App() {
     });
   }, []);
 
-  const [clients, setClients] = useState(DEMO_CLIENTS);
-  const [devis,   setDevis]   = useState(DEMO_DEVIS);
+  const [clients,  setClients]  = useState(DEMO_CLIENTS);
+  const [devis,    setDevis]    = useState(DEMO_DEVIS);
+  const [invoices, setInvoices] = useState([]);
+  const [selI,     setSelI]     = useState(null);
 
   const showUndo = useCallback((label, onUndo) => {
     setToast(prev => {
@@ -112,6 +118,14 @@ export default function App() {
       } catch (err) {
         console.error("[Zenbat] chargement données :", err);
         if (!cancelled) showErr("Erreur de chargement — vérifiez votre connexion");
+      }
+      // Charge les factures séparément : si la migration 0005 n'est pas
+      // appliquée, on échoue silencieusement sans bloquer le reste.
+      try {
+        const inv = await listInvoices();
+        if (!cancelled) setInvoices(inv || []);
+      } catch (err) {
+        if (!cancelled) console.warn("[Zenbat] factures indisponibles :", err.message);
       }
     })();
     return () => { cancelled = true; };
@@ -203,6 +217,83 @@ export default function App() {
   const onDeleteDevis = async (id) => {
     setDevis(prev => prev.filter(x => x.id !== id));
     if (user) apiDeleteDevis(id).catch(e => { console.error("[delete devis]", e); showErr("Impossible de supprimer le devis"); });
+  };
+
+  // ── CRUD factures ────────────────────────────────────────
+  const goInvoice = id => { setSelI(id); setTab("factures_detail"); };
+
+  const onSaveInvoice = (inv, saveLignes = false) => {
+    setInvoices(prev => prev.map(x => x.id === inv.id ? inv : x));
+    if (!user) return;
+    const { lignes: il, created_at, updated_at, ...fields } = inv;
+    apiUpdateInvoice(inv.id, fields).catch(e => { console.error("[save invoice]", e); showErr("Impossible de sauvegarder la facture"); });
+    if (saveLignes) {
+      replaceInvoiceLignes(inv.id, (il || []).map(({ id, created_at, ...l }) => l))
+        .catch(e => { console.error("[save invoice lignes]", e); showErr("Erreur sauvegarde lignes facture"); });
+    }
+  };
+
+  const onCreateInvoiceFromDevis = async (devisId) => {
+    const d = devis.find(x => x.id === devisId);
+    if (!d) { showErr("Devis introuvable"); return; }
+    try {
+      const numero = await nextInvoiceNumber().catch(() => `FAC-${new Date().getFullYear()}-${String(invoices.length + 1).padStart(4, "0")}`);
+      const ouvrages = (d.lignes || []).filter(l => l.type_ligne === "ouvrage");
+      const ht  = ouvrages.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0);
+      const tva = ouvrages.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (Number(l.tva_rate) || 0) / 100, 0);
+      const saved = await apiCreateInvoice(
+        {
+          devis_id:       d.id,
+          client_id:      d.client_id,
+          numero,
+          objet:          d.objet,
+          operation_type: "service",
+          statut:         "brouillon",
+          montant_ht:     ht,
+          montant_tva:    tva,
+          montant_ttc:    ht + tva,
+          ville_chantier: d.ville_chantier,
+          date_emission:  new Date().toISOString().split("T")[0],
+          date_echeance:  new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
+        },
+        (d.lignes || []).map(({ id, created_at, ...l }) => l),
+      );
+      const full = { ...saved, lignes: d.lignes || [] };
+      setInvoices(prev => [full, ...prev]);
+      goInvoice(saved.id);
+    } catch (err) {
+      console.error("[create invoice from devis]", err);
+      showErr(err.message?.includes("does not exist") ? "Migration 0005 non appliquée côté Supabase" : "Impossible de créer la facture");
+    }
+  };
+
+  const onCreateEmptyInvoice = async () => {
+    try {
+      const numero = await nextInvoiceNumber().catch(() => `FAC-${new Date().getFullYear()}-${String(invoices.length + 1).padStart(4, "0")}`);
+      const saved = await apiCreateInvoice(
+        {
+          numero,
+          objet: "Nouvelle facture",
+          operation_type: "service",
+          statut: "brouillon",
+          montant_ht: 0, montant_tva: 0, montant_ttc: 0,
+          date_emission: new Date().toISOString().split("T")[0],
+          date_echeance: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
+        },
+        [],
+      );
+      setInvoices(prev => [{ ...saved, lignes: [] }, ...prev]);
+      goInvoice(saved.id);
+    } catch (err) {
+      console.error("[create empty invoice]", err);
+      showErr(err.message?.includes("does not exist") ? "Migration 0005 non appliquée côté Supabase" : "Impossible de créer la facture");
+    }
+  };
+
+  const onDeleteInvoice = async (id) => {
+    setInvoices(prev => prev.filter(x => x.id !== id));
+    if (user) apiDeleteInvoice(id).catch(e => { console.error("[delete invoice]", e); showErr("Impossible de supprimer la facture"); });
+    setTab("factures");
   };
 
   // Navigation vers un devis (rechargement depuis DB)
@@ -336,10 +427,25 @@ export default function App() {
             onBack={() => setTab("devis")}
             brand={brand}
             onChange={onSaveDevis}
+            onConvertToInvoice={() => onCreateInvoiceFromDevis(selD)}
             autoOpenPDF={autoOpenPDF === selD}
             onAutoOpenPDFConsumed={() => setAutoOpenPDF(null)}
             loading={loadingDevis.has(selD)}/>
         )}
+        {tab === "factures"         && <InvoicesList invoices={invoices} clients={clients} goInvoice={goInvoice} onCreateEmpty={onCreateEmptyInvoice}/>}
+        {tab === "factures_detail"   && selI && (() => {
+          const inv = invoices.find(x => x.id === selI);
+          if (!inv) return null;
+          return (
+            <InvoiceDetail
+              invoice={inv}
+              client={clients.find(c => c.id === inv.client_id)}
+              brand={brand}
+              onBack={() => setTab("factures")}
+              onChange={onSaveInvoice}
+              onDelete={() => { if (confirm("Supprimer cette facture ?")) onDeleteInvoice(inv.id); }}/>
+          );
+        })()}
         {tab === "agent"         && (
           <AgentIA
             devis={devis}

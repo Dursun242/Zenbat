@@ -5,7 +5,7 @@ import Badge from "./ui/Badge.jsx";
 import LignesEditor from "./LignesEditor.jsx";
 import PDFViewer from "./PDFViewer.jsx";
 
-export default function DevisDetail({ d, cl, onBack, brand, onChange, loading, autoOpenPDF, onAutoOpenPDFConsumed }) {
+export default function DevisDetail({ d, cl, onBack, brand, onChange, onConvertToInvoice, loading, autoOpenPDF, onAutoOpenPDFConsumed }) {
   if (loading) return <LoadingSkeleton/>;
 
   const [showPDF,       setShowPDF]       = useState(false);
@@ -132,6 +132,14 @@ export default function DevisDetail({ d, cl, onBack, brand, onChange, loading, a
             style={{ width: "100%", background: `linear-gradient(135deg,${ac}ee,${ac})`, color: "white", border: "none", borderRadius: 16, padding: 16, fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, cursor: "pointer", boxShadow: `0 6px 20px ${ac}44`, marginBottom: 12 }}>
             {I.pdf} Voir le PDF du devis
           </button>
+
+          {/* Conversion en facture (visible dès qu'il y a au moins une ligne) */}
+          {onConvertToInvoice && lignes.length > 0 && (
+            <button onClick={onConvertToInvoice}
+              style={{ width: "100%", background: "white", color: "#0f172a", border: "1.5px solid #0f172a", borderRadius: 14, padding: 13, fontSize: 13, fontWeight: 700, cursor: "pointer", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              📄 Convertir en facture électronique
+            </button>
+          )}
 
           {/* Éditeur de lignes */}
           <LignesEditor lignes={lignes} onChange={updateLignes} ac={ac} vatRegime={brand?.vatRegime}/>
