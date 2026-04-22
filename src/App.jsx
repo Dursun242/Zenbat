@@ -3,6 +3,7 @@ import { useAuth } from "./lib/auth.jsx";
 import {
   listClients, createClient as apiCreateClient, updateClient as apiUpdateClient, deleteClient as apiDeleteClient,
   listDevisWithLignes, getDevis, createDevis as apiCreateDevis, updateDevis as apiUpdateDevis, replaceLignes, deleteDevis as apiDeleteDevis,
+  updateMyProfile,
 } from "./lib/api";
 import { uid } from "./lib/utils.js";
 import { DEFAULT_DEMO_BRAND, DEFAULT_BRAND, DEMO_CLIENTS, DEMO_DEVIS } from "./lib/constants.js";
@@ -53,6 +54,15 @@ export default function App() {
     setBrandState(prev => {
       const next = typeof updater === "function" ? updater(prev) : updater;
       try { localStorage.setItem("zenbat_brand", JSON.stringify(next)); } catch {}
+      // Sync identité côté serveur (best-effort, silencieux) : visible dans l'espace admin
+      const fullName = `${next.firstName || ""} ${next.lastName || ""}`.trim();
+      const prevFull = `${prev.firstName || ""} ${prev.lastName || ""}`.trim();
+      if (next.companyName !== prev.companyName || fullName !== prevFull) {
+        updateMyProfile({
+          company_name: next.companyName || null,
+          full_name:    fullName || null,
+        }).catch(err => console.warn("[profile sync]", err));
+      }
       return next;
     });
   }, []);

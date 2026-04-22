@@ -128,6 +128,7 @@ export default async function handler(req, res) {
       return {
         id:           p.id,
         name:         p.company_name || p.full_name || '—',
+        fullName:     p.full_name || '',
         email:        auth?.email || '—',
         plan:         p.plan || 'free',
         ai_used:      p.ai_used || 0,

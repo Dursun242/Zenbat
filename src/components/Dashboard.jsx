@@ -12,7 +12,9 @@ export default function Dashboard({ stats, devis, clients, goDevis, setTab, bran
     <div style={{ padding: 18 }} className="fu">
       <div style={{ marginBottom: 18 }}>
         <h1 style={{ fontSize: 21, fontWeight: 700, color: "#0f172a" }}>
-          {brand.companyName ? "Bonjour, " + brand.companyName.split(" ")[0] : "Tableau de bord"}
+          {brand.firstName?.trim()
+            ? "Bonjour, " + brand.firstName.trim()
+            : brand.companyName ? "Bonjour, " + brand.companyName.split(" ")[0] : "Tableau de bord"}
         </h1>
         <p style={{ color: "#94a3b8", fontSize: 12, marginTop: 2 }}>
           {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
