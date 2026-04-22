@@ -213,62 +213,69 @@ export default function Onboarding({ brand, setBrand, onDone }) {
         )}
 
         {step===1&&(
-          <div className="pop" style={{display:"flex",flexDirection:"column",gap:14}}>
+          <div className="pop" style={{display:"flex",flexDirection:"column",gap:12}}>
             <div style={{background:"#1e3a2f",border:"1px solid rgba(34,197,94,.3)",borderRadius:12,padding:"10px 14px"}}>
-              <div style={{color:"#86efac",fontSize:12,fontWeight:600,marginBottom:2}}>Jusqu'à {MAX_TRADES} métiers libres</div>
-              <div style={{color:"#94a3b8",fontSize:11,lineHeight:1.5}}>Tapez votre métier et appuyez sur Entrée. L'IA s'adapte à vos spécialités.</div>
+              <div style={{color:"#86efac",fontSize:12,fontWeight:600,marginBottom:2}}>Jusqu'à {MAX_TRADES} métiers</div>
+              <div style={{color:"#94a3b8",fontSize:11,lineHeight:1.5}}>Tapez ou choisissez dans la liste. L'IA s'adapte à vos spécialités.</div>
             </div>
 
-            {/* Zone de tags + input */}
-            <div
-              onClick={()=>tradeRef.current?.focus()}
-              style={{background:"#1e293b",border:"1.5px solid #334155",borderRadius:12,padding:"8px 10px",minHeight:52,display:"flex",flexWrap:"wrap",gap:6,alignItems:"center",cursor:"text",position:"relative"}}
-            >
-              {currentTrades.map(t=>(
-                <span key={t} style={{display:"inline-flex",alignItems:"center",gap:5,background:"#1e3a2f",border:"1px solid #22c55e",borderRadius:8,padding:"3px 8px",fontSize:12,color:"#86efac",fontWeight:600}}>
-                  {t}
-                  <button onClick={e=>{e.stopPropagation();removeTrade(t)}}
-                    style={{background:"none",border:"none",color:"#4ade80",cursor:"pointer",fontSize:14,lineHeight:1,padding:0}}>×</button>
+            {/* Zone des tags sélectionnés */}
+            {currentTrades.length > 0 && (
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {currentTrades.map(t=>(
+                  <span key={t} style={{display:"inline-flex",alignItems:"center",gap:5,background:"#1e3a2f",border:"1px solid #22c55e",borderRadius:20,padding:"5px 10px",fontSize:12,color:"#86efac",fontWeight:600}}>
+                    ✓ {t}
+                    <button onClick={()=>removeTrade(t)}
+                      style={{background:"none",border:"none",color:"#4ade80",cursor:"pointer",fontSize:15,lineHeight:1,padding:0}}>×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Input de recherche / saisie libre */}
+            {currentTrades.length < MAX_TRADES && (
+              <div style={{position:"relative"}}>
+                <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"#64748b"}}>
+                  <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 </span>
-              ))}
-              {currentTrades.length < MAX_TRADES && (
                 <input
                   ref={tradeRef}
                   value={tradeInput}
                   onChange={e=>{setTradeInput(e.target.value);setShowSuggest(true)}}
                   onKeyDown={handleTradeKey}
-                  onFocus={()=>setShowSuggest(true)}
-                  onBlur={()=>setTimeout(()=>setShowSuggest(false),150)}
-                  placeholder={currentTrades.length===0?"ex: Maçonnerie, Électricité…":"Ajouter un métier…"}
-                  style={{flex:1,minWidth:120,background:"none",border:"none",outline:"none",color:"white",fontSize:13,padding:"2px 0"}}
+                  placeholder="Rechercher ou saisir un métier…"
+                  style={{width:"100%",background:"#1e293b",border:"1.5px solid #334155",borderRadius:10,padding:"10px 12px 10px 36px",fontSize:13,color:"white",outline:"none",boxSizing:"border-box"}}
                 />
-              )}
-            </div>
-
-            {/* Suggestions */}
-            {showSuggest && filteredSuggestions.length > 0 && (
-              <div style={{background:"#1e293b",border:"1px solid #334155",borderRadius:10,overflow:"hidden",marginTop:-8}}>
-                {filteredSuggestions.map(s=>(
-                  <button key={s} onMouseDown={()=>addTrade(s)}
-                    style={{width:"100%",background:"none",border:"none",padding:"9px 14px",textAlign:"left",color:"#cbd5e1",fontSize:13,cursor:"pointer",display:"block"}}
-                    onMouseEnter={e=>e.currentTarget.style.background="#334155"}
-                    onMouseLeave={e=>e.currentTarget.style.background="none"}>
-                    {s}
-                  </button>
-                ))}
-                {tradeInput.trim() && !TRADE_SUGGESTIONS.some(s=>s.toLowerCase()===tradeInput.trim().toLowerCase()) && (
-                  <button onMouseDown={()=>addTrade(tradeInput)}
-                    style={{width:"100%",background:"none",border:"none",borderTop:"1px solid #334155",padding:"9px 14px",textAlign:"left",color:"#22c55e",fontSize:13,cursor:"pointer",display:"block",fontWeight:600}}
-                    onMouseEnter={e=>e.currentTarget.style.background="#334155"}
-                    onMouseLeave={e=>e.currentTarget.style.background="none"}>
-                    + Ajouter « {tradeInput.trim()} »
-                  </button>
+                {tradeInput && (
+                  <button onClick={()=>setTradeInput("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#64748b",cursor:"pointer",fontSize:18,lineHeight:1}}>×</button>
                 )}
               </div>
             )}
 
+            {/* Chips de suggestions toujours visibles */}
+            <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+              {/* Option saisie libre si non trouvé dans la liste */}
+              {tradeInput.trim() && !TRADE_SUGGESTIONS.some(s=>s.toLowerCase()===tradeInput.trim().toLowerCase()) && currentTrades.length < MAX_TRADES && (
+                <button onMouseDown={()=>addTrade(tradeInput)}
+                  style={{background:"#1e293b",border:"1.5px solid #22c55e",borderRadius:20,padding:"6px 12px",fontSize:12,color:"#22c55e",fontWeight:700,cursor:"pointer"}}>
+                  + « {tradeInput.trim()} »
+                </button>
+              )}
+              {filteredSuggestions.map(s=>(
+                <button key={s} onClick={()=>addTrade(s)} disabled={currentTrades.length>=MAX_TRADES}
+                  style={{background:"#1e293b",border:"1.5px solid #334155",borderRadius:20,padding:"6px 12px",fontSize:12,color:"#cbd5e1",cursor:currentTrades.length>=MAX_TRADES?"not-allowed":"pointer",opacity:currentTrades.length>=MAX_TRADES?0.4:1,transition:"border-color .15s,color .15s"}}
+                  onMouseEnter={e=>{if(currentTrades.length<MAX_TRADES){e.currentTarget.style.borderColor="#22c55e";e.currentTarget.style.color="#86efac"}}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor="#334155";e.currentTarget.style.color="#cbd5e1"}}>
+                  {s}
+                </button>
+              ))}
+              {filteredSuggestions.length===0 && !tradeInput.trim() && currentTrades.length>=MAX_TRADES && (
+                <div style={{fontSize:11,color:"#64748b",padding:"4px 0"}}>Maximum {MAX_TRADES} métiers atteint</div>
+              )}
+            </div>
+
             <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#64748b"}}>
-              <span>{currentTrades.length} / {MAX_TRADES} métier{currentTrades.length!==1?"s":""}</span>
+              <span>{currentTrades.length} / {MAX_TRADES} sélectionné{currentTrades.length!==1?"s":""}</span>
               {currentTrades.length>0&&<button onClick={()=>set("trades",[])} style={{background:"none",border:"none",color:"#64748b",fontSize:11,cursor:"pointer",textDecoration:"underline"}}>Tout effacer</button>}
             </div>
           </div>
