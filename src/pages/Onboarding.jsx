@@ -1,5 +1,5 @@
 import { useState, useRef } from "react"
-import { TRADE_SUGGESTIONS, tradesLabels } from "../lib/trades.js"
+import { searchTrades, tradesLabels, TRADE_EXAMPLES } from "../lib/trades.js"
 import { brandCompleteness } from "../lib/brandCompleteness.js"
 
 const Icheck = <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>
@@ -53,13 +53,14 @@ export default function Onboarding({ brand, setBrand, onDone }) {
   const set = (k, v) => setLocal(b => ({ ...b, [k]: v }))
 
   const MAX_TRADES = 7
-  // Normalise les trades existants (IDs → libellés pour rétrocompat)
   const currentTrades = tradesLabels(local.trades || [])
+
+  const normalize = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
 
   const addTrade = (label) => {
     const trimmed = label.trim()
     if (!trimmed || currentTrades.length >= MAX_TRADES) return
-    if (currentTrades.some(t => t.toLowerCase() === trimmed.toLowerCase())) return
+    if (currentTrades.some(t => normalize(t) === normalize(trimmed))) return
     set("trades", [...currentTrades, trimmed])
     setTradeInput("")
     setShowSuggest(false)
@@ -70,16 +71,19 @@ export default function Onboarding({ brand, setBrand, onDone }) {
   const handleTradeKey = (e) => {
     if (e.key === "Enter" || e.key === ",") {
       e.preventDefault()
-      addTrade(tradeInput)
+      if (dropdownSuggestions.length > 0) addTrade(dropdownSuggestions[0])
+      else addTrade(tradeInput)
     } else if (e.key === "Backspace" && !tradeInput && currentTrades.length) {
       removeTrade(currentTrades[currentTrades.length - 1])
+    } else if (e.key === "Escape") {
+      setShowSuggest(false)
     }
   }
 
-  const filteredSuggestions = TRADE_SUGGESTIONS.filter(s =>
-    s.toLowerCase().includes(tradeInput.toLowerCase()) &&
-    !currentTrades.some(t => t.toLowerCase() === s.toLowerCase())
-  ).slice(0, 8)
+  const dropdownSuggestions = tradeInput.trim()
+    ? searchTrades(tradeInput).filter(s => !currentTrades.some(t => normalize(t) === normalize(s)))
+    : []
+  const showExact = tradeInput.trim() && !dropdownSuggestions.some(s => normalize(s) === normalize(tradeInput.trim()))
 
   const quality = brandCompleteness(local)
   const step0Invalid = !local.companyName?.trim()
@@ -92,13 +96,6 @@ export default function Onboarding({ brand, setBrand, onDone }) {
     reader.onload = ev => set("logo", ev.target.result)
     reader.readAsDataURL(f)
   }
-
-  const toggleTrade = id => setLocal(b => {
-    const cur = b.trades || []
-    if (cur.includes(id)) return { ...b, trades: cur.filter(x => x !== id) }
-    if (cur.length >= 5) return b
-    return { ...b, trades: [...cur, id] }
-  })
 
   const save = () => { setBrand(local); onDone() }
   const fontFamily = local.fontStyle==="elegant"?"Playfair Display":local.fontStyle==="tech"?"Space Grotesk":"DM Sans"
@@ -213,26 +210,26 @@ export default function Onboarding({ brand, setBrand, onDone }) {
         )}
 
         {step===1&&(
-          <div className="pop" style={{display:"flex",flexDirection:"column",gap:12}}>
-            <div style={{background:"#1e3a2f",border:"1px solid rgba(34,197,94,.3)",borderRadius:12,padding:"10px 14px"}}>
-              <div style={{color:"#86efac",fontSize:12,fontWeight:600,marginBottom:2}}>Jusqu'à {MAX_TRADES} métiers</div>
-              <div style={{color:"#94a3b8",fontSize:11,lineHeight:1.5}}>Tapez ou choisissez dans la liste. L'IA s'adapte à vos spécialités.</div>
-            </div>
+          <div className="pop" style={{display:"flex",flexDirection:"column",gap:14}}>
 
-            {/* Zone des tags sélectionnés */}
-            {currentTrades.length > 0 && (
+            {/* Tags sélectionnés */}
+            {currentTrades.length > 0 ? (
               <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                 {currentTrades.map(t=>(
-                  <span key={t} style={{display:"inline-flex",alignItems:"center",gap:5,background:"#1e3a2f",border:"1px solid #22c55e",borderRadius:20,padding:"5px 10px",fontSize:12,color:"#86efac",fontWeight:600}}>
-                    ✓ {t}
-                    <button onClick={()=>removeTrade(t)}
-                      style={{background:"none",border:"none",color:"#4ade80",cursor:"pointer",fontSize:15,lineHeight:1,padding:0}}>×</button>
+                  <span key={t} style={{display:"inline-flex",alignItems:"center",gap:5,background:"#1e3a2f",border:"1px solid #22c55e",borderRadius:20,padding:"5px 12px",fontSize:13,color:"#86efac",fontWeight:600}}>
+                    {t}
+                    <button onClick={()=>removeTrade(t)} style={{background:"none",border:"none",color:"#4ade80",cursor:"pointer",fontSize:16,lineHeight:1,padding:"0 0 0 2px"}}>×</button>
                   </span>
                 ))}
+                <button onClick={()=>set("trades",[])} style={{background:"none",border:"1px solid #334155",borderRadius:20,padding:"5px 10px",fontSize:11,color:"#64748b",cursor:"pointer"}}>Tout effacer</button>
+              </div>
+            ) : (
+              <div style={{color:"#475569",fontSize:12,lineHeight:1.6}}>
+                ex : <span style={{color:"#64748b"}}>{TRADE_EXAMPLES.slice(0,4).join(", ")}…</span>
               </div>
             )}
 
-            {/* Input de recherche / saisie libre */}
+            {/* Champ de saisie + dropdown */}
             {currentTrades.length < MAX_TRADES && (
               <div style={{position:"relative"}}>
                 <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"#64748b"}}>
@@ -243,40 +240,51 @@ export default function Onboarding({ brand, setBrand, onDone }) {
                   value={tradeInput}
                   onChange={e=>{setTradeInput(e.target.value);setShowSuggest(true)}}
                   onKeyDown={handleTradeKey}
-                  placeholder="Rechercher ou saisir un métier…"
-                  style={{width:"100%",background:"#1e293b",border:"1.5px solid #334155",borderRadius:10,padding:"10px 12px 10px 36px",fontSize:13,color:"white",outline:"none",boxSizing:"border-box"}}
+                  onFocus={()=>setShowSuggest(true)}
+                  onBlur={()=>setTimeout(()=>setShowSuggest(false),150)}
+                  placeholder="Tapez votre métier… (Électricité, Coiffure, Dev web…)"
+                  style={{width:"100%",background:"#1e293b",border:`1.5px solid ${showSuggest&&tradeInput?"#22c55e":"#334155"}`,borderRadius:showSuggest&&(dropdownSuggestions.length>0||showExact)?"10px 10px 0 0":"10px",padding:"11px 34px 11px 36px",fontSize:13,color:"white",outline:"none",boxSizing:"border-box",transition:"border-color .15s"}}
                 />
                 {tradeInput && (
-                  <button onClick={()=>setTradeInput("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#64748b",cursor:"pointer",fontSize:18,lineHeight:1}}>×</button>
+                  <button onMouseDown={e=>{e.preventDefault();setTradeInput("");setShowSuggest(false)}}
+                    style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#64748b",cursor:"pointer",fontSize:18,lineHeight:1}}>×</button>
+                )}
+
+                {/* Dropdown */}
+                {showSuggest && tradeInput.trim() && (dropdownSuggestions.length > 0 || showExact) && (
+                  <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#1e293b",border:"1.5px solid #22c55e",borderTop:"none",borderRadius:"0 0 10px 10px",overflow:"hidden",zIndex:100,boxShadow:"0 8px 24px rgba(0,0,0,.4)"}}>
+                    {dropdownSuggestions.map((s,i)=>(
+                      <button key={s} onMouseDown={()=>addTrade(s)}
+                        style={{width:"100%",background:"none",border:"none",padding:"10px 14px",textAlign:"left",color:"#cbd5e1",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:8,borderTop:i>0?"1px solid rgba(255,255,255,.05)":"none"}}
+                        onMouseEnter={e=>{e.currentTarget.style.background="#253448";e.currentTarget.style.color="white"}}
+                        onMouseLeave={e=>{e.currentTarget.style.background="none";e.currentTarget.style.color="#cbd5e1"}}>
+                        <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{color:"#475569",flexShrink:0}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        {s}
+                      </button>
+                    ))}
+                    {showExact && (
+                      <button onMouseDown={()=>addTrade(tradeInput)}
+                        style={{width:"100%",background:"#0f2318",border:"none",borderTop:"1px solid rgba(34,197,94,.2)",padding:"10px 14px",textAlign:"left",color:"#22c55e",fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:8}}
+                        onMouseEnter={e=>e.currentTarget.style.background="#1e3a2f"}
+                        onMouseLeave={e=>e.currentTarget.style.background="#0f2318"}>
+                        <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Ajouter « {tradeInput.trim()} »
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             )}
 
-            {/* Chips de suggestions toujours visibles */}
-            <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
-              {/* Option saisie libre si non trouvé dans la liste */}
-              {tradeInput.trim() && !TRADE_SUGGESTIONS.some(s=>s.toLowerCase()===tradeInput.trim().toLowerCase()) && currentTrades.length < MAX_TRADES && (
-                <button onMouseDown={()=>addTrade(tradeInput)}
-                  style={{background:"#1e293b",border:"1.5px solid #22c55e",borderRadius:20,padding:"6px 12px",fontSize:12,color:"#22c55e",fontWeight:700,cursor:"pointer"}}>
-                  + « {tradeInput.trim()} »
-                </button>
-              )}
-              {filteredSuggestions.map(s=>(
-                <button key={s} onClick={()=>addTrade(s)} disabled={currentTrades.length>=MAX_TRADES}
-                  style={{background:"#1e293b",border:"1.5px solid #334155",borderRadius:20,padding:"6px 12px",fontSize:12,color:"#cbd5e1",cursor:currentTrades.length>=MAX_TRADES?"not-allowed":"pointer",opacity:currentTrades.length>=MAX_TRADES?0.4:1,transition:"border-color .15s,color .15s"}}
-                  onMouseEnter={e=>{if(currentTrades.length<MAX_TRADES){e.currentTarget.style.borderColor="#22c55e";e.currentTarget.style.color="#86efac"}}}
-                  onMouseLeave={e=>{e.currentTarget.style.borderColor="#334155";e.currentTarget.style.color="#cbd5e1"}}>
-                  {s}
-                </button>
-              ))}
-              {filteredSuggestions.length===0 && !tradeInput.trim() && currentTrades.length>=MAX_TRADES && (
-                <div style={{fontSize:11,color:"#64748b",padding:"4px 0"}}>Maximum {MAX_TRADES} métiers atteint</div>
-              )}
-            </div>
+            {currentTrades.length === 0 && !tradeInput && (
+              <div style={{color:"#475569",fontSize:11,lineHeight:1.5}}>
+                BTP, artisanat, beauté, tech, transport… tous les métiers sont acceptés.
+              </div>
+            )}
 
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#64748b"}}>
-              <span>{currentTrades.length} / {MAX_TRADES} sélectionné{currentTrades.length!==1?"s":""}</span>
-              {currentTrades.length>0&&<button onClick={()=>set("trades",[])} style={{background:"none",border:"none",color:"#64748b",fontSize:11,cursor:"pointer",textDecoration:"underline"}}>Tout effacer</button>}
+            <div style={{fontSize:11,color:currentTrades.length>=MAX_TRADES?"#f59e0b":"#475569",textAlign:"right"}}>
+              {currentTrades.length} / {MAX_TRADES}
+              {currentTrades.length>=MAX_TRADES&&" — maximum atteint"}
             </div>
           </div>
         )}
