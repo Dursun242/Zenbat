@@ -22,11 +22,20 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
   const drawW = pageW;
   const drawH = pageW * ratio;
 
-  if (drawH <= pageH) {
+  // Tolérance : si la hauteur dépasse d'un poil (rendu CSS, arrondi html2canvas),
+  // on encaisse sur une seule page plutôt que de créer une 2e page quasi vide.
+  const SINGLE_PAGE_TOLERANCE_MM = 15;
+
+  if (drawH <= pageH + SINGLE_PAGE_TOLERANCE_MM) {
     const img = canvas.toDataURL("image/jpeg", 0.92);
-    pdf.addImage(img, "JPEG", 0, 0, drawW, drawH, undefined, "FAST");
+    // Si on déborde légèrement, on squeeze pour rester sur 1 page.
+    const h = Math.min(drawH, pageH);
+    pdf.addImage(img, "JPEG", 0, 0, drawW, h, undefined, "FAST");
   } else {
     const pagePxH = Math.floor((pageH * canvas.width) / pageW);
+    // Seuil en pixels canvas en dessous duquel on ne crée PAS de nouvelle page
+    // (évite les pages blanches ou presque quand le dernier slice est minuscule).
+    const MIN_REMAINING_PX = Math.round((5 * canvas.width) / pageW); // ≈ 5 mm
     let y = 0;
     while (y < canvas.height) {
       const sliceH = Math.min(pagePxH, canvas.height - y);
@@ -39,7 +48,8 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
       const thisH = (sliceH * pageW) / canvas.width;
       pdf.addImage(img, "JPEG", 0, 0, drawW, thisH, undefined, "FAST");
       y += sliceH;
-      if (y < canvas.height) pdf.addPage();
+      if (canvas.height - y > MIN_REMAINING_PX) pdf.addPage();
+      else break;
     }
   }
 
