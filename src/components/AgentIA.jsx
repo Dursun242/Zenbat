@@ -315,12 +315,16 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
       // Incrémente le compteur d'usage IA (best-effort, silencieux)
       supabase.rpc("increment_ai_used").catch(() => {});
     } catch (e) {
+      const detail = apiError || e.message || "unknown";
       console.error("[AgentIA] send failed:", e, apiError);
-      let msg;
-      if (!navigator.onLine)            msg = TX.errNetwork;
-      else if (apiError)                msg = "L'assistant IA a renvoyé une erreur : " + apiError;
-      else if (e.message === "api")     msg = TX.errApi;
-      else                              msg = (TX.errGeneral + " (" + (e.message || "inconnue") + ")");
+      // Log côté serveur pour consultation admin (best-effort, silencieux)
+      supabase.from("ia_error_logs").insert({
+        error:         detail,
+        user_message:  userMsg.content?.slice(0, 500) || null,
+        history_len:   newMsgs.length,
+        stream_tried:  true,
+      }).then(({ error }) => { if (error) console.warn("[log insert]", error.message); });
+      const msg = !navigator.onLine ? TX.errNetwork : e.message === "api" ? TX.errApi : TX.errGeneral;
       updateAssistant("❌ " + msg);
     }
     setLoading(false);
