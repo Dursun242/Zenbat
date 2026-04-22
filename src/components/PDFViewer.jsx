@@ -280,7 +280,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
   if (hidden) {
     return (
       <div aria-hidden="true" style={{position:"fixed",left:-99999,top:0,pointerEvents:"none",opacity:0}}>
-        <div ref={pageRef} className="pdf-page" style={{background:"white",width:"210mm",minHeight:"297mm",padding:"15mm",fontFamily,color:"#1a1a1a",fontSize:11,lineHeight:1.5,boxSizing:"border-box"}}>
+        <div ref={pageRef} className="pdf-page" style={{background:"white",width:"210mm",padding:"10mm",fontFamily,color:"#1a1a1a",fontSize:11,lineHeight:1.5,boxSizing:"border-box"}}>
           {pageBody}
         </div>
       </div>
@@ -338,7 +338,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
 
       <div className="pdf-scroll" ref={wrapRef} style={{flex:1,overflow:"auto",padding:"16px 16px calc(20px + env(safe-area-inset-bottom))",background:"#1e293b"}}>
         <div className="pdf-page-wrap" style={{width:`calc(210mm * ${scale})`,height:pageH?`${pageH}px`:"auto",margin:"0 auto",position:"relative"}}>
-          <div ref={pageRef} className="pdf-page" style={{background:"white",width:"210mm",minHeight:"297mm",boxShadow:"0 20px 60px rgba(0,0,0,.5)",padding:"15mm",fontFamily,color:"#1a1a1a",fontSize:11,lineHeight:1.5,boxSizing:"border-box",transform:`scale(${scale})`,transformOrigin:"top left",position:"absolute",top:0,left:0}}>
+          <div ref={pageRef} className="pdf-page" style={{background:"white",width:"210mm",minHeight:"297mm",boxShadow:"0 20px 60px rgba(0,0,0,.5)",padding:"10mm",fontFamily,color:"#1a1a1a",fontSize:11,lineHeight:1.5,boxSizing:"border-box",transform:`scale(${scale})`,transformOrigin:"top left",position:"absolute",top:0,left:0}}>
             {pageBody}
           </div>
         </div>
