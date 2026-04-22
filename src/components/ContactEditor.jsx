@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 
 // Composant champ de formulaire générique
 function Field({ label, val, onChange, type = "text", placeholder = "" }) {
@@ -21,10 +22,16 @@ export default function ContactEditor({ c, onSave, onClose }) {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const isValid = form.raison_sociale?.trim() || form.nom?.trim() || form.prenom?.trim();
 
-  return (
-    <div style={{ position: "fixed", inset: 0, height: "100dvh", background: "rgba(15,23,42,.7)", zIndex: 999, display: "flex", flexDirection: "column", fontFamily: "'DM Sans',sans-serif" }}>
-      <div style={{ flex: 1 }} onClick={onClose}/>
-      <div style={{ background: "white", borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "90dvh", display: "flex", flexDirection: "column" }}>
+  return createPortal(
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(15,23,42,.7)", zIndex: 9999, fontFamily: "'DM Sans',sans-serif" }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0 }}/>
+      <div style={{
+        position: "absolute", left: 0, right: 0, bottom: 0,
+        maxHeight: "92dvh", height: "92dvh",
+        background: "white",
+        borderTopLeftRadius: 20, borderTopRightRadius: 20,
+        display: "flex", flexDirection: "column",
+      }}>
 
         <div style={{ padding: "14px 18px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
@@ -33,7 +40,7 @@ export default function ContactEditor({ c, onSave, onClose }) {
           <button onClick={onClose} style={{ background: "#f1f5f9", border: "none", borderRadius: 10, width: 32, height: 32, cursor: "pointer", fontSize: 14, color: "#64748b" }}>✕</button>
         </div>
 
-        <div style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
           {/* Type */}
           <div>
             <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#64748b", marginBottom: 6 }}>TYPE</label>
@@ -96,6 +103,7 @@ export default function ContactEditor({ c, onSave, onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
