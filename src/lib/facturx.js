@@ -75,6 +75,8 @@ export function buildFacturXXML({ invoice, client, brand }) {
   const totalHT  = Number(invoice.montant_ht)  || ouvrages.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0);
   const totalTVA = Number(invoice.montant_tva) || Object.values(taxByRate).reduce((s, t) => s + t.montant, 0);
   const totalTTC = Number(invoice.montant_ttc) || totalHT + totalTVA;
+  const retenue  = Number(invoice.retenue_garantie_eur) || 0;
+  const duePayable = totalTTC - retenue;
 
   const sellerSiret = (brand.siret || "").replace(/\s+/g, "").slice(0, 14);
   const sellerSiren = sellerSiret.slice(0, 9);
@@ -151,8 +153,10 @@ export function buildFacturXXML({ invoice, client, brand }) {
     </ram:ApplicableTradeTax>`;
   }).join("");
 
-  const issue = fmtDate(invoice.date_emission || new Date());
-  const due   = fmtDate(invoice.date_echeance);
+  const issue    = fmtDate(invoice.date_emission || new Date());
+  const due      = fmtDate(invoice.date_echeance);
+  const iban     = (brand.iban || "").replace(/\s+/g, "");
+  const bic      = (brand.bic || "").trim();
 
   // Enregistrements fiscaux du vendeur :
   // - schemeID="VA" pour le n° de TVA intracom
@@ -213,13 +217,26 @@ export function buildFacturXXML({ invoice, client, brand }) {
     </ram:ApplicableHeaderTradeDelivery>
     <ram:ApplicableHeaderTradeSettlement>
       <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>${taxBlocks}
+      ${iban ? `
+      <ram:SpecifiedTradeSettlementPaymentMeans>
+        <ram:TypeCode>58</ram:TypeCode>
+        <ram:PayerPartyDebtorFinancialAccount><ram:IBANID>${esc(iban)}</ram:IBANID></ram:PayerPartyDebtorFinancialAccount>
+        ${bic ? `<ram:PayeeSpecifiedCreditorFinancialInstitution><ram:BICID>${esc(bic)}</ram:BICID></ram:PayeeSpecifiedCreditorFinancialInstitution>` : ""}
+      </ram:SpecifiedTradeSettlementPaymentMeans>` : ""}
       ${due ? `<ram:SpecifiedTradePaymentTerms><ram:DueDateDateTime><udt:DateTimeString format="102">${due}</udt:DateTimeString></ram:DueDateDateTime></ram:SpecifiedTradePaymentTerms>` : ""}
+      ${retenue > 0 ? `
+      <ram:SpecifiedTradeAllowanceCharge>
+        <ram:ChargeIndicator><udt:Indicator>false</udt:Indicator></ram:ChargeIndicator>
+        <ram:ActualAmount>${num(retenue)}</ram:ActualAmount>
+        <ram:Reason>Retenue de garantie</ram:Reason>
+        <ram:CategoryTradeTax><ram:TypeCode>VAT</ram:TypeCode><ram:CategoryCode>S</ram:CategoryCode><ram:RateApplicablePercent>0.00</ram:RateApplicablePercent></ram:CategoryTradeTax>
+      </ram:SpecifiedTradeAllowanceCharge>` : ""}
       <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
         <ram:LineTotalAmount>${num(totalHT)}</ram:LineTotalAmount>
         <ram:TaxBasisTotalAmount>${num(totalHT)}</ram:TaxBasisTotalAmount>
         <ram:TaxTotalAmount currencyID="EUR">${num(totalTVA)}</ram:TaxTotalAmount>
         <ram:GrandTotalAmount>${num(totalTTC)}</ram:GrandTotalAmount>
-        <ram:DuePayableAmount>${num(totalTTC)}</ram:DuePayableAmount>
+        <ram:DuePayableAmount>${num(duePayable)}</ram:DuePayableAmount>
       </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
     </ram:ApplicableHeaderTradeSettlement>
   </rsm:SupplyChainTradeTransaction>

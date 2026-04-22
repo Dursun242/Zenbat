@@ -105,7 +105,10 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
           <div style={{color:"#94a3b8",fontSize:10,fontWeight:600,letterSpacing:"2px"}}>{docLabel}</div>
           <div style={{color:navy,fontWeight:800,fontSize:20,marginTop:2}}>{d.numero}</div>
           <div style={{color:"#64748b",fontSize:10,marginTop:6}}>Émis le <strong style={{color:"#1a1a1a"}}>{fmtD(d.date_emission)}</strong></div>
-          <div style={{color:"#64748b",fontSize:10}}>Valide jusqu'au <strong style={{color:"#1a1a1a"}}>{fmtD(validUntil.toISOString())}</strong></div>
+          {kind === "facture"
+            ? d.date_echeance && <div style={{color:"#64748b",fontSize:10}}>Échéance <strong style={{color:"#1a1a1a"}}>{fmtD(d.date_echeance)}</strong></div>
+            : <div style={{color:"#64748b",fontSize:10}}>Valide jusqu'au <strong style={{color:"#1a1a1a"}}>{fmtD(validUntil.toISOString())}</strong></div>
+          }
         </div>
       </div>
 
@@ -177,6 +180,16 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
               <td style={{padding:"8px 10px",fontWeight:800,color:navy,fontSize:11}}>TOTAL TTC</td>
               <td style={{padding:"8px 10px",textAlign:"right",fontWeight:800,color:navy,fontSize:12}}>{fmt(ttc)}</td>
             </tr>
+            {kind === "facture" && Number(d.retenue_garantie_eur) > 0 && (<>
+              <tr>
+                <td style={{padding:"4px 10px",color:"#b45309"}}>Retenue de garantie {d.retenue_garantie_pct}%</td>
+                <td style={{padding:"4px 10px",textAlign:"right",color:"#b45309"}}>−{fmt(d.retenue_garantie_eur)}</td>
+              </tr>
+              <tr style={{background:"#fef9c3",borderTop:"1px solid #fde68a"}}>
+                <td style={{padding:"8px 10px",fontWeight:800,color:"#92400e",fontSize:11}}>NET À PAYER</td>
+                <td style={{padding:"8px 10px",textAlign:"right",fontWeight:800,color:"#92400e",fontSize:12}}>{fmt(ttc - Number(d.retenue_garantie_eur))}</td>
+              </tr>
+            </>)}
           </tbody>
         </table>
       </div>
@@ -202,16 +215,18 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
         </div>
       )}
 
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginTop:20,paddingTop:14,borderTop:"1px solid #d4d4d8"}}>
-        <div>
-          <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>SIGNATURE CLIENT · Bon pour accord</div>
-          <div style={{height:60,borderBottom:"1px solid #9ca3af"}}/>
+      {kind !== "facture" && (
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginTop:20,paddingTop:14,borderTop:"1px solid #d4d4d8"}}>
+          <div>
+            <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>SIGNATURE CLIENT · Bon pour accord</div>
+            <div style={{height:60,borderBottom:"1px solid #9ca3af"}}/>
+          </div>
+          <div>
+            <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>DATE</div>
+            <div style={{height:60,borderBottom:"1px solid #9ca3af"}}/>
+          </div>
         </div>
-        <div>
-          <div style={{fontSize:9,color:"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>DATE</div>
-          <div style={{height:60,borderBottom:"1px solid #9ca3af"}}/>
-        </div>
-      </div>
+      )}
 
       <div style={{marginTop:18,paddingTop:10,borderTop:"1px solid #e5e7eb",display:"flex",justifyContent:"space-between",gap:10,fontSize:8,color:"#9ca3af",lineHeight:1.5}}>
         <div style={{flex:1}}>
