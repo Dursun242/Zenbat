@@ -221,7 +221,6 @@ export function buildFacturXXML({ invoice, client, brand }) {
       <ram:SpecifiedTradeSettlementPaymentMeans>
         <ram:TypeCode>58</ram:TypeCode>
         <ram:PayeePartyCreditorFinancialAccount><ram:IBANID>${esc(iban)}</ram:IBANID></ram:PayeePartyCreditorFinancialAccount>
-        ${bic ? `<ram:PayeeSpecifiedCreditorFinancialInstitution><ram:BICID>${esc(bic)}</ram:BICID></ram:PayeeSpecifiedCreditorFinancialInstitution>` : ""}
       </ram:SpecifiedTradeSettlementPaymentMeans>` : ""}${taxBlocks}
       ${retenue > 0 ? `
       <ram:SpecifiedTradeAllowanceCharge>
