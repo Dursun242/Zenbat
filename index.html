@@ -20,6 +20,111 @@
       <h2 style="margin:0 0 12px;font-size:16px;">Zenbat — erreur de démarrage</h2>
       <pre id="boot-error-msg" style="white-space:pre-wrap;word-break:break-word;margin:0;"></pre>
     </div>
+    <!-- [APP_LOGGER] Telemetry bootstrap — runs before React -->
+    <script>
+      // [APP_LOGGER] Module de télémétrie centralisé — initialisé avant React
+      (function () {
+        var SESSION_ID;
+        // [APP_LOGGER] ID unique par session
+        try { SESSION_ID = crypto.randomUUID(); } catch (e) { SESSION_ID = Date.now() + '-' + Math.random().toString(36).slice(2); }
+
+        var SUPABASE_URL = '%VITE_SUPABASE_URL%';
+        var SUPABASE_ANON_KEY = '%VITE_SUPABASE_ANON_KEY%';
+        var PENDING_KEY = 'pending_logs';
+
+        // [APP_LOGGER] Envoi REST vers Supabase (sans SDK)
+        function sendToSupabase(payload) {
+          try {
+            if (!SUPABASE_URL || SUPABASE_URL.indexOf('%') === 0) return Promise.reject('no-config');
+            return fetch(SUPABASE_URL + '/rest/v1/app_logs', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+                'Prefer': 'return=minimal',
+              },
+              body: JSON.stringify(payload),
+            }).then(function (r) {
+              if (!r.ok) throw new Error('HTTP ' + r.status);
+            });
+          } catch (e) { return Promise.reject(e); }
+        }
+
+        // [APP_LOGGER] Fallback localStorage si Supabase échoue
+        function storePending(payload) {
+          try {
+            var list = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]');
+            list.push(payload);
+            if (list.length > 50) list = list.slice(-50);
+            localStorage.setItem(PENDING_KEY, JSON.stringify(list));
+          } catch (e) { /* storage unavailable */ }
+        }
+
+        // [APP_LOGGER] Renvoi des logs en attente (appelé au démarrage)
+        function flushPending() {
+          try {
+            var list = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]');
+            if (!list.length) return;
+            localStorage.removeItem(PENDING_KEY);
+            list.forEach(function (p) {
+              sendToSupabase(p).catch(function () { storePending(p); });
+            });
+          } catch (e) { /* ignore */ }
+        }
+
+        // [APP_LOGGER] Envoi effectif avec fallback
+        function send(level, message, stack, context) {
+          try {
+            var payload = {
+              level: level,
+              message: String(message).slice(0, 2000),
+              stack: stack ? String(stack).slice(0, 5000) : null,
+              context: Object.assign(
+                { session_id: SESSION_ID, url: location.href, ua: navigator.userAgent.slice(0, 200) },
+                context || {}
+              ),
+            };
+            sendToSupabase(payload).catch(function () { storePending(payload); });
+          } catch (e) { /* jamais de blocage UI */ }
+        }
+
+        // [APP_LOGGER] API publique exposée sur window
+        window.AppLogger = {
+          logError: function (message, stack, context) { try { send('error', message, stack, context); } catch (e) {} },
+          logInfo:  function (message, context)         { try { send('info',  message, null,  context); } catch (e) {} },
+          flushPending: flushPending,
+          sessionId: SESSION_ID,
+        };
+
+        // [APP_LOGGER] Capture automatique des erreurs JS non gérées
+        window.addEventListener('error', function (e) {
+          try {
+            window.AppLogger.logError(
+              e.message || 'JS Error',
+              e.error && e.error.stack ? e.error.stack : (e.filename + ':' + e.lineno),
+              { type: 'window.onerror', filename: e.filename, lineno: e.lineno }
+            );
+          } catch (ex) {}
+        });
+
+        // [APP_LOGGER] Capture automatique des promesses rejetées non gérées
+        window.addEventListener('unhandledrejection', function (e) {
+          try {
+            var reason = e.reason || {};
+            window.AppLogger.logError(
+              reason.message || String(e.reason) || 'Unhandled rejection',
+              reason.stack || null,
+              { type: 'unhandledrejection' }
+            );
+          } catch (ex) {}
+        });
+
+        // [APP_LOGGER] Renvoi immédiat des logs en attente du démarrage précédent
+        try { flushPending(); } catch (e) {}
+      })();
+    </script>
+
     <script>
       (function () {
         function format(err, fallback) {

@@ -43,3 +43,6 @@ Thumbs.db
 # Tests / coverage
 coverage/
 .nyc_output
+
+# Backup de l'agent d'inspection (ne pas commiter)
+index.html.bak

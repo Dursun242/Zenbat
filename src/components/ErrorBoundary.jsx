@@ -1,4 +1,5 @@
 import { Component } from 'react'
+import { logError } from '../lib/logger.js'
 
 export default class ErrorBoundary extends Component {
   state = { error: null }
@@ -9,6 +10,11 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error('[Zenbat] Crash React:', error, info?.componentStack)
+    logError(
+      error.message || 'React crash',
+      error.stack || null,
+      { type: 'react.componentDidCatch', componentStack: info?.componentStack?.slice(0, 1000) }
+    )
   }
 
   render() {
