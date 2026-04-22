@@ -126,7 +126,7 @@ export default function DevisDetail({ d, cl, onBack, brand, onChange, loading })
           </button>
 
           {/* Éditeur de lignes */}
-          <LignesEditor lignes={lignes} onChange={updateLignes} ac={ac}/>
+          <LignesEditor lignes={lignes} onChange={updateLignes} ac={ac} vatRegime={brand?.vatRegime}/>
 
           {/* Récapitulatif lots */}
           {Object.keys(lotsResume).length > 0 && (

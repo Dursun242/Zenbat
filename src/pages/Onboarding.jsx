@@ -150,8 +150,33 @@ export default function Onboarding({ brand, setBrand, onDone }) {
             </div>
             <Field dark required label="SIRET" val={local.siret} onChange={v=>set("siret",v)} placeholder="12345678900010"
               hint="Obligatoire sur un devis en France (art. L441-9 du code de commerce)."/>
-            <Field dark label="N° TVA intracommunautaire" val={local.tva} onChange={v=>set("tva",v)} placeholder="FR12345678901"
-              hint="Requis si vous êtes assujetti à la TVA."/>
+
+            <div>
+              <label style={{display:"block",fontSize:11,fontWeight:600,color:"#94a3b8",marginBottom:6}}>RÉGIME DE TVA</label>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                {[
+                  { id:"normal",    title:"Assujetti à la TVA", sub:"Société, SARL, SAS…" },
+                  { id:"franchise", title:"Franchise en base",  sub:"Auto-entrepreneur (art. 293 B)" },
+                ].map(opt => {
+                  const active = (local.vatRegime || "normal") === opt.id;
+                  return (
+                    <button key={opt.id} onClick={()=>set("vatRegime",opt.id)}
+                      style={{background:active?"#1e3a2f":"#1e293b",border:`1.5px solid ${active?"#22c55e":"#334155"}`,borderRadius:12,padding:"10px 12px",textAlign:"left",cursor:"pointer",transition:"all .15s"}}>
+                      <div style={{fontSize:12,fontWeight:700,color:active?"#86efac":"white"}}>{opt.title}</div>
+                      <div style={{fontSize:10,color:"#94a3b8",marginTop:2,lineHeight:1.3}}>{opt.sub}</div>
+                    </button>
+                  );
+                })}
+              </div>
+              {local.vatRegime === "franchise" && (
+                <div style={{fontSize:10,color:"#86efac",marginTop:6,lineHeight:1.4}}>💡 Tous les devis seront émis à TVA 0 % avec la mention "{`TVA non applicable, art. 293 B du CGI`}".</div>
+              )}
+            </div>
+
+            {local.vatRegime !== "franchise" && (
+              <Field dark label="N° TVA intracommunautaire" val={local.tva} onChange={v=>set("tva",v)} placeholder="FR12345678901"
+                hint="Requis si vous êtes assujetti à la TVA."/>
+            )}
           </div>
         )}
 

@@ -1,7 +1,8 @@
 import { UNITES, TVA_RATES } from "../lib/constants.js";
 import { fmt, uid } from "../lib/utils.js";
 
-export default function LignesEditor({ lignes, onChange, ac }) {
+export default function LignesEditor({ lignes, onChange, ac, vatRegime }) {
+  const franchise = vatRegime === "franchise";
   const update = (id, patch) => onChange(lignes.map(l => l.id === id ? { ...l, ...patch } : l));
   const remove = (id) => { if (confirm("Supprimer cette ligne ?")) onChange(lignes.filter(l => l.id !== id)); };
 
@@ -20,7 +21,7 @@ export default function LignesEditor({ lignes, onChange, ac }) {
       id: uid(), type_ligne: "ouvrage",
       designation: "Nouvelle prestation",
       lot: lastLot?.designation ? lastLot.designation.charAt(0) + lastLot.designation.slice(1).toLowerCase() : "Divers",
-      unite: "u", quantite: 1, prix_unitaire: 0, tva_rate: 20,
+      unite: "u", quantite: 1, prix_unitaire: 0, tva_rate: franchise ? 0 : 20,
     }]);
   };
 
@@ -103,10 +104,17 @@ export default function LignesEditor({ lignes, onChange, ac }) {
                 </div>
                 <div>
                   <div style={{ fontSize: 9, color: "#94a3b8", marginBottom: 2 }}>TVA</div>
-                  <select value={l.tva_rate ?? 20} onChange={e => update(l.id, { tva_rate: Number(e.target.value) })}
-                    style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 4px", fontSize: 12, color: "#0f172a", background: "white", boxSizing: "border-box" }}>
-                    {TVA_RATES.map(r => <option key={r} value={r}>{r}%</option>)}
-                  </select>
+                  {franchise ? (
+                    <div title="Franchise en base (art. 293 B du CGI)"
+                      style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 8px", fontSize: 12, color: "#64748b", background: "#f8fafc", boxSizing: "border-box", textAlign: "center" }}>
+                      0 %
+                    </div>
+                  ) : (
+                    <select value={l.tva_rate ?? 20} onChange={e => update(l.id, { tva_rate: Number(e.target.value) })}
+                      style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 4px", fontSize: 12, color: "#0f172a", background: "white", boxSizing: "border-box" }}>
+                      {TVA_RATES.map(r => <option key={r} value={r}>{r}%</option>)}
+                    </select>
+                  )}
                 </div>
               </div>
               <div style={{ textAlign: "right", fontSize: 11, color: "#475569" }}>

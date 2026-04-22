@@ -138,10 +138,16 @@ Format strict : {"objet":"titre court en français","lignes":[
   {"type_ligne":"ouvrage","lot":"nom lot","designation":"description en français","unite":"m2|ml|u|m3|ft|ens","quantite":10,"prix_unitaire":25,"tva_rate":20}
 ]}
 
-TVA : applique le taux correct par ouvrage selon la réglementation française :
+${brand.vatRegime === "franchise"
+  ? `TVA — RÈGLE ABSOLUE :
+L'entreprise est en FRANCHISE EN BASE DE TVA (auto-entrepreneur, art. 293 B du CGI).
+- TOUS les ouvrages ont "tva_rate": 0, SANS EXCEPTION.
+- Tu ne proposes jamais 5.5%, 10% ou 20%.
+- Tu ne mentionnes pas la TVA dans le chat (pas de "TVA incluse", "HT", etc.).`
+  : `TVA : applique le taux correct par ouvrage selon la réglementation française :
 - 5.5% : travaux d'amélioration de la qualité énergétique (isolation thermique, pompe à chaleur, fenêtres isolantes dans logement >2 ans).
 - 10% : travaux d'entretien/rénovation/amélioration dans logement d'habitation achevé depuis plus de 2 ans.
-- 20% : neuf, gros œuvre, démolition/évacuation, locaux professionnels, fournitures sans pose.
+- 20% : neuf, gros œuvre, démolition/évacuation, locaux professionnels, fournitures sans pose.`}
 
 Règles : prix réalistes BTP France 2025, groupe par lots, désignations professionnelles en français.
 Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génère quand même un JSON partiel.${historyBlock}`;
@@ -246,6 +252,13 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
         try {
           const parsed    = JSON.parse(match[1].trim());
           const newLignes = (parsed.lignes || []).map(l => ({ ...l, id: uid() }));
+
+          // Franchise en base de TVA : force tva_rate = 0 sur toutes les lignes.
+          if (brand.vatRegime === "franchise") {
+            for (const l of newLignes) {
+              if (l.type_ligne === "ouvrage") l.tva_rate = 0;
+            }
+          }
 
           // Filet de sécurité : si l'IA déclare un montant cible et que la somme
           // des lignes ouvrage n'y correspond pas, on rescale les prix unitaires.
@@ -460,14 +473,16 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
                           <span>{l.unite}</span>
                           <button
                             onClick={() => {
+                              if (brand.vatRegime === "franchise") return;
                               const cycle = [20, 10, 5.5];
                               const cur   = Number(l.tva_rate ?? 20);
                               const next  = cycle[(cycle.indexOf(cur) + 1) % cycle.length];
                               setLignes(prev => prev.map(x => x.id === l.id ? { ...x, tva_rate: next } : x));
                             }}
-                            title="Cliquer pour changer le taux de TVA"
-                            style={{ background: "#eef2f7", color: "#475569", border: "none", borderRadius: 4, padding: "1px 6px", fontSize: 9, fontWeight: 600, cursor: "pointer" }}>
-                            TVA {(l.tva_rate ?? 20).toString().replace(".", ",")}%
+                            disabled={brand.vatRegime === "franchise"}
+                            title={brand.vatRegime === "franchise" ? "Franchise en base (art. 293 B du CGI)" : "Cliquer pour changer le taux de TVA"}
+                            style={{ background: "#eef2f7", color: "#475569", border: "none", borderRadius: 4, padding: "1px 6px", fontSize: 9, fontWeight: 600, cursor: brand.vatRegime === "franchise" ? "default" : "pointer" }}>
+                            TVA {(l.tva_rate ?? (brand.vatRegime === "franchise" ? 0 : 20)).toString().replace(".", ",")}%
                           </button>
                         </div>
                       </td>

@@ -16,6 +16,7 @@ export const STATUT = {
 export const DEFAULT_BRAND = {
   companyName: "", logo: null, siret: "", tva: "",
   firstName: "", lastName: "",
+  vatRegime: "normal", // "normal" | "franchise" (auto-entrepreneur / art. 293 B)
   address: "", city: "", phone: "", email: "", website: "",
   color: "#22c55e", fontStyle: "modern",
   mentionsLegales: "", rib: "", iban: "", bic: "",
@@ -23,6 +24,8 @@ export const DEFAULT_BRAND = {
   validityDays: 30,
   trades: [],
 };
+
+export const FRANCHISE_MENTION = "TVA non applicable, art. 293 B du CGI";
 
 export const DEFAULT_DEMO_BRAND = {
   ...DEFAULT_BRAND,

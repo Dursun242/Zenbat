@@ -213,6 +213,9 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
 
       <div style={{marginTop:18,paddingTop:10,borderTop:"1px solid #e5e7eb",display:"flex",justifyContent:"space-between",gap:10,fontSize:8,color:"#9ca3af",lineHeight:1.5}}>
         <div style={{flex:1}}>
+          {brand.vatRegime === "franchise" && !/(293\s*B|TVA\s+non\s+applicable)/i.test(brand.mentionsLegales || "") && (
+            <div style={{fontWeight:600,color:"#6b7280",marginBottom:2}}>TVA non applicable, art. 293 B du CGI</div>
+          )}
           {brand.mentionsLegales}
           {brand.siret && <div>SIRET {brand.siret}</div>}
         </div>
