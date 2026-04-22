@@ -41,7 +41,7 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
       ]);
       const { blob } = await renderElementToPdf(pageEl, { filename: `${invoice.numero}.pdf` });
       const xml = buildFacturXXML({ invoice: { ...invoice, lignes }, client, brand });
-      const facturx = await embedFacturXInPdf(blob, xml);
+      const facturx = await embedFacturXInPdf(blob, xml, invoice);
       downloadBlob(facturx, `${invoice.numero}-facturx.pdf`);
       setExportMsg("✓ Factur-X téléchargé. Vous pouvez l'envoyer par email — le PDF contient l'XML structuré.");
     } catch (err) {
