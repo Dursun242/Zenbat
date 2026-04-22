@@ -242,13 +242,15 @@ function buildXMP({ invoice }) {
 <?xpacket end="w"?>`;
 }
 
-// Tente de charger le profil sRGB depuis public/icc/sRGB.icc. Retourne null
-// si absent — le reste du traitement continue quand même.
+// Profil sRGB IEC61966-2.1 minimal embarqué (fallback si le fichier disque est absent).
+// Généré avec les primaires sRGB Bradford-adaptées D50 et gamma 2.2.
+const SRGB_ICC_B64 = "AAAB7GxjbXMCEAAAbW50clJHQiBYWVogB9cABwAZAAAAAAAAYWNzcE1TRlQAAAAASUVDIHNSR0IAAAAAAAAAAAAAAAAAAPbcAAEAAAAA0zpsY21zAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKZGVzYwAAAPwAAAAoY3BydAAAASQAAAA0d3RwdAAAAVgAAAAUYmtwdAAAAWwAAAAUclhZWgAAAYAAAAAUZ1hZWgAAAZQAAAAUYlhZWgAAAagAAAAUclRSQwAAAbwAAAAQZ1RSQwAAAcwAAAAQYlRSQwAAAdwAAAAQZGVzYwAAAAAAAAASc1JHQiBJRUM2MTk2Ni0yLjEAAAAAAAAAAAAAAHRleHQAAAAAQ29weXJpZ2h0IChjKSAxOTk4IEhld2xldHQtUGFja2FyZCBDb21wYW55AABYWVogAAAAAAAA9twAAQAAAADTOlhZWiAAAAAAAAAAAAAAAAAAAAAAWFlaIAAAAAAAAG+jAAA49QAAA5FYWVogAAAAAAAAYpQAALeKAAAY3FhZWiAAAAAAAAAkoQAAD4YAALbUY3VydgAAAAAAAAABAjMAAGN1cnYAAAAAAAAAAQIzAABjdXJ2AAAAAAAAAAECMwAA";
+
+// Charge le profil sRGB : d'abord le fichier disque, puis le fallback embarqué.
 async function loadSRGBProfile() {
   const candidates = [
     join(process.cwd(), "public", "icc", "sRGB.icc"),
     join(process.cwd(), "public", "icc", "srgb.icc"),
-    join(process.cwd(), "public", "icc", "sRGB_IEC61966-2-1_black_scaled.icc"),
   ];
   for (const path of candidates) {
     try {
@@ -256,7 +258,8 @@ async function loadSRGBProfile() {
       return new Uint8Array(bytes);
     } catch { /* next */ }
   }
-  return null;
+  // Fallback : profil embarqué en base64
+  return new Uint8Array(Buffer.from(SRGB_ICC_B64, "base64"));
 }
 
 // Ajoute un OutputIntent sRGB au catalogue PDF (nécessaire pour PDF/A-3).
