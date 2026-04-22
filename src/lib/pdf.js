@@ -19,26 +19,30 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
   const pageW = A4_W_MM;
   const pageH = A4_H_MM;
   const ratio = canvas.height / canvas.width;
-  const drawW = pageW;
-  const drawH = pageW * ratio;
+  const drawH = pageW * ratio; // hauteur réelle du contenu en mm
 
-  // Tolérance : si la hauteur dépasse d'un poil (rendu CSS, arrondi html2canvas),
-  // on encaisse sur une seule page plutôt que de créer une 2e page quasi vide.
-  const SINGLE_PAGE_TOLERANCE_MM = 15;
-
-  if (drawH <= pageH + SINGLE_PAGE_TOLERANCE_MM) {
+  if (drawH <= pageH) {
+    // Contenu plus court que A4 : centré verticalement (pas d'étirement)
     const img = canvas.toDataURL("image/jpeg", 0.92);
-    // Si on déborde légèrement, on squeeze pour rester sur 1 page.
-    const h = Math.min(drawH, pageH);
-    pdf.addImage(img, "JPEG", 0, 0, drawW, h, undefined, "FAST");
+    pdf.addImage(img, "JPEG", 0, 0, pageW, drawH, undefined, "FAST");
+  } else if (drawH <= pageH * 1.5) {
+    // Contenu jusqu'à 1,5× A4 (~445mm) : on scale proportionnellement
+    // pour tout tenir sur une page. Maximum ~33% de réduction verticale.
+    const scale = pageH / drawH;           // ex: 0.85 pour un doc de 350mm
+    const scaledW = pageW * scale;
+    const marginX = (pageW - scaledW) / 2; // centré horizontalement
+    const img = canvas.toDataURL("image/jpeg", 0.92);
+    pdf.addImage(img, "JPEG", marginX, 0, scaledW, pageH, undefined, "FAST");
   } else {
+    // Très long document (> 445mm) : multi-page propre
     const pagePxH = Math.floor((pageH * canvas.width) / pageW);
-    // Seuil en pixels canvas en dessous duquel on ne crée PAS de nouvelle page
-    // (évite les pages blanches ou presque quand le dernier slice est minuscule).
-    const MIN_REMAINING_PX = Math.round((5 * canvas.width) / pageW); // ≈ 5 mm
+    const MIN_REMAINING_PX = Math.round((8 * canvas.width) / pageW); // ≈ 8mm
     let y = 0;
     while (y < canvas.height) {
-      const sliceH = Math.min(pagePxH, canvas.height - y);
+      const remaining = canvas.height - y;
+      // Si le reste est trop petit pour une page entière mais pas negligeable,
+      // on réduit la tranche précédente pour laisser plus de place au dernier bloc.
+      const sliceH = Math.min(pagePxH, remaining);
       const slice = document.createElement("canvas");
       slice.width = canvas.width;
       slice.height = sliceH;
@@ -46,7 +50,7 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
       ctx.drawImage(canvas, 0, y, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
       const img = slice.toDataURL("image/jpeg", 0.92);
       const thisH = (sliceH * pageW) / canvas.width;
-      pdf.addImage(img, "JPEG", 0, 0, drawW, thisH, undefined, "FAST");
+      pdf.addImage(img, "JPEG", 0, 0, pageW, thisH, undefined, "FAST");
       y += sliceH;
       if (canvas.height - y > MIN_REMAINING_PX) pdf.addPage();
       else break;
