@@ -218,9 +218,11 @@ export default function AdminPanel({ onBack }) {
               <div key={u.id} style={{padding:"12px 16px", borderBottom:"1px solid #f8fafc", background:i%2===0?"white":"#fafbfc"}}>
                 <div style={{display:"flex", alignItems:"center", gap:8, marginBottom:6}}>
                   <div style={{flex:1, minWidth:0}}>
-                    <div style={{fontSize:13, fontWeight:700, color:"#0f172a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{u.name}</div>
-                    {u.fullName && u.fullName !== u.name && (
-                      <div style={{fontSize:11, color:"#475569", fontWeight:500, marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{u.fullName}</div>
+                    <div style={{fontSize:13, fontWeight:700, color:"#0f172a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
+                      {u.fullName || u.name}
+                    </div>
+                    {u.fullName && u.name && u.fullName !== u.name && (
+                      <div style={{fontSize:11, color:"#475569", fontWeight:500, marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{u.name}</div>
                     )}
                     <div style={{fontSize:10, color:"#94a3b8", marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{u.email}</div>
                   </div>

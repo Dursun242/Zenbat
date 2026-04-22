@@ -125,10 +125,12 @@ export default async function handler(req, res) {
       const stats   = statsByOwner[p.id] || { total: 0, accepte: 0, ca: 0, lastDevis: null }
       const created = new Date(auth?.created_at || p.created_at)
       const daysLeft = Math.max(0, TRIAL_DAYS - Math.floor((now - created) / 86400000))
+      const metaFull = (auth?.user_metadata?.full_name || '').trim()
+      const fullName = (p.full_name || metaFull || '').trim()
       return {
         id:           p.id,
-        name:         p.company_name || p.full_name || '—',
-        fullName:     p.full_name || '',
+        name:         p.company_name || fullName || '—',
+        fullName,
         email:        auth?.email || '—',
         plan:         p.plan || 'free',
         ai_used:      p.ai_used || 0,
