@@ -37,7 +37,7 @@ const pickInitialLang = () => {
   return match?.code || "fr-FR";
 };
 
-export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, plan, trialExpired, onPaywall, setTab, brand }) {
+export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, plan, trialExpired, onPaywall, setTab, onOpenDevisPDF, brand }) {
   const [msgs,         setMsgs]         = useState([{ role: "assistant", content: TX.agentGreeting }]);
   const [input,        setInput]        = useState("");
   const [loading,      setLoading]      = useState(false);
@@ -397,10 +397,11 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
   const deleteLigne = id => setLignes(l => l.filter(x => x.id !== id));
 
   const finalizeSave = (clientId) => {
-    const ht2    = lignes.filter(l => l.type_ligne === "ouvrage").reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0), 0);
-    const picked = clientId ? clients.find(c => c.id === clientId) : null;
+    const ht2     = lignes.filter(l => l.type_ligne === "ouvrage").reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0), 0);
+    const picked  = clientId ? clients.find(c => c.id === clientId) : null;
+    const newId   = uid();
     onCreateDevis({
-      id: uid(),
+      id: newId,
       numero: `DEV-2026-${String(devis.length + 1).padStart(4, "0")}`,
       objet: objet || "Devis IA",
       client_id: clientId || null,
@@ -415,7 +416,9 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
     setPickingClient(false);
     setLignes([]); setObjet("");
     setMsgs([{ role: "assistant", content: TX.quoteSaved }]);
-    setTimeout(() => setTab("devis"), 2500);
+    // Ouvre directement la vue PDF du devis fraîchement enregistré
+    if (onOpenDevisPDF) onOpenDevisPDF(newId);
+    else setTimeout(() => setTab("devis"), 2500);
   };
 
   const visibleLignes = lignes.slice(0, visibleCount);

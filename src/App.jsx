@@ -39,6 +39,7 @@ export default function App() {
   const [plan,   setPlan]     = useState("free");
   const [toast,  setToast]    = useState(null);
   const [loadingDevis, setLoadingDevis] = useState(new Set());
+  const [autoOpenPDF,  setAutoOpenPDF]  = useState(null); // devis id à ouvrir en PDF
   const [showPwa, setShowPwa] = useState(false);
   const deferredPrompt = useRef(null);
 
@@ -335,6 +336,8 @@ export default function App() {
             onBack={() => setTab("devis")}
             brand={brand}
             onChange={onSaveDevis}
+            autoOpenPDF={autoOpenPDF === selD}
+            onAutoOpenPDFConsumed={() => setAutoOpenPDF(null)}
             loading={loadingDevis.has(selD)}/>
         )}
         {tab === "agent"         && (
@@ -347,6 +350,7 @@ export default function App() {
             trialExpired={trialExpired}
             onPaywall={() => setScreen("paywall")}
             setTab={setTab}
+            onOpenDevisPDF={(id) => { setAutoOpenPDF(id); setSelD(id); setTab("devis_detail"); }}
             brand={brand}/>
         )}
         {tab === "admin"         && isAdmin && <AdminPanel onBack={() => setTab("dashboard")}/>}

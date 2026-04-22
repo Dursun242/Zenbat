@@ -1,14 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { fmt } from "../lib/utils.js";
 import { I } from "./ui/icons.jsx";
 import Badge from "./ui/Badge.jsx";
 import LignesEditor from "./LignesEditor.jsx";
 import PDFViewer from "./PDFViewer.jsx";
 
-export default function DevisDetail({ d, cl, onBack, brand, onChange, loading }) {
+export default function DevisDetail({ d, cl, onBack, brand, onChange, loading, autoOpenPDF, onAutoOpenPDFConsumed }) {
   if (loading) return <LoadingSkeleton/>;
 
   const [showPDF,       setShowPDF]       = useState(false);
+
+  // Ouvre automatiquement le PDF quand on arrive depuis l'Agent IA après save
+  useEffect(() => {
+    if (autoOpenPDF) {
+      setShowPDF(true);
+      onAutoOpenPDFConsumed?.();
+    }
+  }, [autoOpenPDF]);
   const [sending,       setSending]       = useState(false);
   const [signUrl,       setSignUrl]       = useState(d.odoo_sign_url || null);
   const [log,           setLog]           = useState([]);
