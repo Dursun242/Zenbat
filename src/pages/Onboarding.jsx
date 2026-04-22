@@ -46,6 +46,7 @@ export default function Onboarding({ brand, setBrand, onDone }) {
   const [step,  setStep]  = useState(0)
   const [local, setLocal] = useState({ ...brand })
   const [tryNext, setTryNext] = useState(false)
+  const [tradeSearch, setTradeSearch] = useState("")
   const fileRef = useRef(null)
   const set = (k, v) => setLocal(b => ({ ...b, [k]: v }))
 
@@ -190,8 +191,22 @@ export default function Onboarding({ brand, setBrand, onDone }) {
               <span>{(local.trades||[]).length} / 5 sélectionnés</span>
               {(local.trades||[]).length>0&&<button onClick={()=>set("trades",[])} style={{background:"none",border:"none",color:"#64748b",fontSize:11,cursor:"pointer",textDecoration:"underline"}}>Réinitialiser</button>}
             </div>
+            <div style={{position:"relative"}}>
+              <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"#64748b"}}>
+                <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </span>
+              <input
+                value={tradeSearch}
+                onChange={e=>setTradeSearch(e.target.value)}
+                placeholder="Rechercher un métier…"
+                style={{width:"100%",background:"#1e293b",border:"1.5px solid #334155",borderRadius:10,padding:"9px 12px 9px 36px",fontSize:13,color:"white",outline:"none",boxSizing:"border-box"}}
+              />
+              {tradeSearch && (
+                <button onClick={()=>setTradeSearch("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#64748b",cursor:"pointer",fontSize:16,lineHeight:1}}>×</button>
+              )}
+            </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              {BTP_TRADES.map(t=>{
+              {BTP_TRADES.filter(t=>t.label.toLowerCase().includes(tradeSearch.toLowerCase())).map(t=>{
                 const selected=(local.trades||[]).includes(t.id)
                 const disabled=!selected&&(local.trades||[]).length>=5
                 return (
@@ -202,6 +217,11 @@ export default function Onboarding({ brand, setBrand, onDone }) {
                   </button>
                 )
               })}
+              {BTP_TRADES.filter(t=>t.label.toLowerCase().includes(tradeSearch.toLowerCase())).length===0&&(
+                <div style={{gridColumn:"1/-1",textAlign:"center",color:"#475569",fontSize:12,padding:"20px 0"}}>
+                  Aucun métier trouvé pour « {tradeSearch} »
+                </div>
+              )}
             </div>
           </div>
         )}
