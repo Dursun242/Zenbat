@@ -13,8 +13,9 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
 
   const lignes = invoice.lignes || [];
   const ouvrages = lignes.filter(l => l.type_ligne === "ouvrage");
+  const franchise = brand.vatRegime === "franchise";
   const ht   = ouvrages.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0);
-  const tva  = ouvrages.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (Number(l.tva_rate) || 0) / 100, 0);
+  const tva  = ouvrages.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * Number(l.tva_rate ?? (franchise ? 0 : 20)) / 100, 0);
   const ttc  = ht + tva;
   const retenue = Number(invoice.retenue_garantie_eur) || 0;
   const netAPayer = ttc - retenue;

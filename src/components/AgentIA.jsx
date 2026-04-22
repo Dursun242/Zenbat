@@ -402,7 +402,7 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
     const newId   = uid();
     onCreateDevis({
       id: newId,
-      numero: `DEV-2026-${String(devis.length + 1).padStart(4, "0")}`,
+      numero: `DEV-${new Date().getFullYear()}-${String(devis.length + 1).padStart(4, "0")}`,
       objet: objet || "Devis IA",
       client_id: clientId || null,
       ville_chantier: picked?.ville || "",

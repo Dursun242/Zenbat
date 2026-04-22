@@ -302,11 +302,12 @@ export async function deleteInvoice(id) {
 // Appelle le proxy /api/b2brouter avec l'access_token courant.
 async function callB2B(action, payload = {}) {
   const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) throw new Error('Session expirée — reconnectez-vous')
   const res = await fetch('/api/b2brouter', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${session?.access_token || ''}`,
+      Authorization: `Bearer ${session.access_token}`,
     },
     body: JSON.stringify({ action, payload }),
   })

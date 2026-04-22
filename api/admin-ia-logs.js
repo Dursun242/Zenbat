@@ -35,7 +35,7 @@ export default async function handler(req, res) {
 
   const { data: { user }, error: authErr } = await admin.auth.getUser(token)
   if (authErr || !user) return res.status(401).json({ error: 'Token invalide' })
-  if (adminEmail && user.email !== adminEmail)
+  if (!adminEmail || user.email !== adminEmail)
     return res.status(403).json({ error: "Accès réservé à l'administrateur" })
 
   const [
@@ -49,6 +49,8 @@ export default async function handler(req, res) {
   ])
 
   if (le) return res.status(500).json({ error: le.message })
+  if (pe) return res.status(500).json({ error: pe.message })
+  if (ae) return res.status(500).json({ error: ae.message })
 
   const profById = new Map((profiles || []).map(p => [p.id, p]))
   const authById = new Map((authUsers || []).map(u => [u.id, u]))

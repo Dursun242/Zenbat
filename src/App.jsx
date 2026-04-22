@@ -239,8 +239,9 @@ export default function App() {
     try {
       const numero = await nextInvoiceNumber().catch(() => `FAC-${new Date().getFullYear()}-${String(invoices.length + 1).padStart(4, "0")}`);
       const ouvrages = (d.lignes || []).filter(l => l.type_ligne === "ouvrage");
+      const franchise = brand.vatRegime === "franchise";
       const ht  = ouvrages.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0);
-      const tva = ouvrages.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (Number(l.tva_rate) || 0) / 100, 0);
+      const tva = ouvrages.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * Number(l.tva_rate ?? (franchise ? 0 : 20)) / 100, 0);
       const saved = await apiCreateInvoice(
         {
           devis_id:       d.id,
@@ -341,7 +342,7 @@ export default function App() {
   const stats = {
     clients:  clients.length,
     acceptes: devis.filter(d => d.statut === "accepte").length,
-    ca:       devis.filter(d => d.statut === "accepte").reduce((s, d) => s + d.montant_ht, 0),
+    ca:       devis.filter(d => d.statut === "accepte").reduce((s, d) => s + (Number(d.montant_ht) || 0), 0),
     enCours:  devis.filter(d => ["envoye", "en_signature"].includes(d.statut)).length,
   };
 
