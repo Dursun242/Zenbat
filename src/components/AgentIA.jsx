@@ -233,11 +233,21 @@ Tu rédiges chaque devis avec la rigueur, le niveau de détail et le ton d'un pr
       : `Tu es un assistant devis professionnel capable de t'adapter à n'importe quel métier déclaré par l'utilisateur. Adopte systématiquement le ton, le vocabulaire technique et les prix du marché français 2025 du métier concerné.`;
 
     const tradesBlock = hasTrades
-      ? `\n\nSPÉCIALISATION DE L'ENTREPRISE — RÈGLE ABSOLUE :
-L'entreprise est spécialisée UNIQUEMENT dans les métiers suivants : ${tradeNames.join(", ")}.
-- Tu génères UNIQUEMENT des devis pour ces métiers.
-- Si la demande sort de ce périmètre, tu REFUSES poliment et tu ne renvoies AUCUNE balise <DEVIS>. Tu réponds : "Désolé, ${brand.companyName || "l'entreprise"} ne réalise pas ce type de ${vocab}. Nous sommes spécialisés en : ${tradeNames.join(", ")}."
-- Pour les demandes mixtes, tu génères uniquement les lignes qui correspondent à tes métiers et tu signales en une phrase ce qui n'a pas été inclus.`
+      ? `\n\nSPÉCIALISATION DE L'ENTREPRISE — RÈGLE SOUPLE (gestion du hors-périmètre en 3 temps) :
+L'entreprise est déclarée dans les métiers suivants : ${tradeNames.join(", ")}.
+Par défaut, tu proposes des devis dans ces métiers.
+
+Si la demande sort CLAIREMENT de ce périmètre (ex : métiers totalement étrangers), tu suis ce flux en 3 étapes — en t'appuyant sur l'historique des messages pour compter les tentatives de l'utilisateur sur la MÊME prestation hors périmètre :
+
+1. 1ʳᵉ demande hors périmètre : NE PAS refuser sèchement. Tu poses UNE question courte, en français, pour vérifier l'intention. PAS de balise <DEVIS>. Exemple : « Cette demande (X) sort de vos métiers déclarés (${tradeNames.slice(0,3).join(", ")}…). Voulez-vous quand même que je rédige un devis pour cette prestation ? »
+
+2. 2ᵈᵉ demande (l'utilisateur insiste ou reformule la même chose) : tu redemandes confirmation en une phrase ET tu mentionnes qu'il peut ajouter ce métier à son profil. PAS de balise <DEVIS>. Exemple : « D'accord, je peux le faire. Voulez-vous que je génère le devis maintenant ? Pensez à ajouter « X » à vos métiers dans Mon profil pour les prochains devis. »
+
+3. 3ᵉ demande ou dès que l'utilisateur confirme explicitement ("oui", "vas-y", "fais-le", "confirme") : tu GÉNÈRES le devis normalement avec <DEVIS> et tu ajoutes en tête de ta réponse visible, avant la balise, cette phrase : « 💡 Pensez à ajouter « X » à vos métiers dans Mon profil (étape Métiers) — vos futurs devis seront plus précis. »
+
+Demandes MIXTES (partie métier + partie hors périmètre) : tu génères TOUTES les lignes utiles sans bloquer, et tu signales en UNE phrase les lignes hors périmètre + la même astuce "pensez à ajouter X au profil".
+
+Tu NE refuses jamais sèchement. Tu ne dis jamais "Désolé, nous ne réalisons pas" sauf si l'utilisateur, après les 3 étapes, annule explicitement lui-même.`
       : "";
 
     // Si le métier n'entre dans aucun secteur pré-câblé, on fait confiance à
@@ -458,7 +468,8 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
       // Détection best-effort des interactions "négatives" pour analyse admin.
       // - Refus IA : pas de <DEVIS> émis + vocabulaire de refus dans la réponse.
       // - Utilisateur mécontent : marqueurs de frustration dans le message.
-      const refusalRe  = /désol[ée]|ne r[ée]alis(e|ons)|ne fait pas|pas (ma|notre|de) sp[ée]cialit[ée]|hors (de notre )?p[ée]rim[èe]tre|ne propos(e|ons) pas/i;
+      // Refus "dur" uniquement (pas les questions polies du flux soft hors-périmètre).
+      const refusalRe  = /ne r[ée]alis(ons|e|ent) pas|ne fais(ons|ent)? pas|ne propos(ons|e|ent) pas|ne traitons pas|pas (notre|de) sp[ée]cialit[ée]/i;
       const negUserRe  = /\b(nul|nulle|pourri|pourrie|merdique|d[ée]bile|stupide|inutile|ne sert à rien|marche pas|fonctionne pas|ne comprend[s]? rien|ça bug|bug[ué]|ça beug|arrête de|n'importe quoi|t'es mauvais|mauvaise r[ée]ponse)\b/i;
       const isRefusal     = !match && refusalRe.test(finalText);
       const isUserNegative= negUserRe.test(userMsg.content || "");
