@@ -173,7 +173,7 @@ export default function DevisDetail({ d, cl, onBack, brand, onChange, onConvertT
             )}
             {d.statut === "en_signature" && (
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => onChange({ ...d, statut: "accepte", signed_at: new Date().toISOString(), signed_by: signerName || clientName })}
+                <button onClick={() => onChange({ ...d, statut: "accepte", signed_at: new Date().toISOString(), signed_by: signerName || signerEmail || "" })}
                   style={{ flex: 1, background: "#ecfdf5", color: "#065f46", border: "1px solid #a7f3d0", borderRadius: 12, padding: 10, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                   ✓ Accepté
                 </button>

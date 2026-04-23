@@ -5,9 +5,12 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
 
 function cors(req, res) {
   const origin = req.headers.origin || ''
-  const allowed = process.env.VERCEL_ENV !== 'production'
-    ? (origin || '*')
-    : ALLOWED_ORIGINS.includes(origin) ? origin : (ALLOWED_ORIGINS[0] || '')
+  // Jamais de wildcard, même en preview : en dev on reflète l'origine appelante
+  // (si présente), en prod on whitelist strictement.
+  const isProd  = process.env.VERCEL_ENV === 'production'
+  const allowed = isProd
+    ? (ALLOWED_ORIGINS.includes(origin) ? origin : (ALLOWED_ORIGINS[0] || ''))
+    : origin
   if (allowed) res.setHeader('Access-Control-Allow-Origin', allowed)
   res.setHeader('Vary', 'Origin')
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
@@ -36,7 +39,8 @@ export default async function handler(req, res) {
   // Vérification identité
   const { data: { user }, error: authErr } = await admin.auth.getUser(token)
   if (authErr || !user) return res.status(401).json({ error: 'Token invalide' })
-  if (!adminEmail || user.email !== adminEmail)
+  const norm = (s) => String(s || '').trim().toLowerCase()
+  if (!adminEmail || norm(user.email) !== norm(adminEmail))
     return res.status(403).json({ error: "Accès réservé à l'administrateur" })
 
   // ── Récupération des données ─────────────────────────────────────────

@@ -14,9 +14,10 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "")
 
 function cors(req, res) {
   const origin = req.headers.origin || "";
-  const allowed = process.env.VERCEL_ENV !== "production"
-    ? (origin || "*")
-    : ALLOWED_ORIGINS.includes(origin) ? origin : (ALLOWED_ORIGINS[0] || "");
+  const isProd  = process.env.VERCEL_ENV === "production";
+  const allowed = isProd
+    ? (ALLOWED_ORIGINS.includes(origin) ? origin : (ALLOWED_ORIGINS[0] || ""))
+    : origin;
   if (allowed) res.setHeader("Access-Control-Allow-Origin", allowed);
   res.setHeader("Vary", "Origin");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");

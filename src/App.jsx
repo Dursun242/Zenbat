@@ -94,7 +94,8 @@ export default function App() {
   const dismissToast = () => setToast(prev => { if (prev?.timer) clearTimeout(prev.timer); return null; });
 
   const { user, signOut } = useAuth();
-  const isAdmin = user?.email === import.meta.env.VITE_ADMIN_EMAIL;
+  const isAdmin = !!user?.email && !!import.meta.env.VITE_ADMIN_EMAIL &&
+    user.email.trim().toLowerCase() === import.meta.env.VITE_ADMIN_EMAIL.trim().toLowerCase();
 
   // Capture l'événement beforeinstallprompt pour Android
   useEffect(() => {

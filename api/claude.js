@@ -5,7 +5,8 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "")
 
 function resolveOrigin(req) {
   const origin = req.headers.origin || "";
-  if (process.env.VERCEL_ENV !== "production") return origin || "*";
+  // Pas de wildcard : en prod on whitelist, sinon on reflète l'origine connue.
+  if (process.env.VERCEL_ENV !== "production") return origin;
   if (ALLOWED_ORIGINS.includes(origin)) return origin;
   return ALLOWED_ORIGINS[0] || "";
 }

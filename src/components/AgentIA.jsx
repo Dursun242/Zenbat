@@ -46,7 +46,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   const [visibleCount, setVisibleCount] = useState(0);
   const [pickingClient, setPickingClient] = useState(false);
   const [listening,    setListening]    = useState(false);
-  const [micLang,      setMicLang]      = useState(pickInitialLang);
+  const [micLang,      setMicLang]      = useState(() => pickInitialLang());
   const [langMenu,     setLangMenu]     = useState(false);
   const [micError,     setMicError]     = useState(null);
   const chatRef  = useRef(null);
@@ -265,38 +265,41 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
           const parsed    = JSON.parse(match[1].trim());
           const newLignes = (parsed.lignes || []).map(l => ({ ...l, id: uid() }));
 
-          // Franchise en base de TVA : force tva_rate = 0 sur toutes les lignes.
-          if (brand.vatRegime === "franchise") {
-            for (const l of newLignes) {
-              if (l.type_ligne === "ouvrage") l.tva_rate = 0;
-            }
-          }
+          // Franchise en base de TVA : force tva_rate = 0 sur toutes les lignes
+          // (remap immuable — jamais de mutation in-place).
+          let finalLignes = brand.vatRegime === "franchise"
+            ? newLignes.map(l => l.type_ligne === "ouvrage" ? { ...l, tva_rate: 0 } : l)
+            : newLignes;
 
           // Filet de sécurité : si l'IA déclare un montant cible et que la somme
           // des lignes ouvrage n'y correspond pas, on rescale les prix unitaires.
           const target = Number(parsed.target_total_ht);
           if (target > 0) {
-            const ouvrages = newLignes.filter(l => l.type_ligne === "ouvrage");
-            const sum = ouvrages.reduce(
-              (s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0
-            );
+            const sum = finalLignes
+              .filter(l => l.type_ligne === "ouvrage")
+              .reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0);
             if (sum > 0 && Math.abs(sum - target) / target > 0.005) {
               const ratio = target / sum;
-              for (const l of ouvrages) {
-                const pu = Number(l.prix_unitaire) || 0;
-                l.prix_unitaire = Math.round(pu * ratio * 100) / 100;
-              }
-              // Absorbe la dérive d'arrondi sur la dernière ligne ouvrage
-              const rescaled = ouvrages.reduce(
-                (s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0
-              );
+              // 1ère passe : rescale proportionnel sur chaque ligne ouvrage
+              finalLignes = finalLignes.map(l => l.type_ligne === "ouvrage"
+                ? { ...l, prix_unitaire: Math.round((Number(l.prix_unitaire) || 0) * ratio * 100) / 100 }
+                : l);
+              // 2ème passe : absorbe la dérive d'arrondi sur la dernière ligne ouvrage
+              const rescaled = finalLignes
+                .filter(l => l.type_ligne === "ouvrage")
+                .reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0);
               const drift = target - rescaled;
-              const last  = ouvrages[ouvrages.length - 1];
-              if (last && Math.abs(drift) > 0.009) {
-                const q = Number(last.quantite) || 1;
-                last.prix_unitaire = Math.round(
-                  ((Number(last.prix_unitaire) || 0) + drift / q) * 100
-                ) / 100;
+              if (Math.abs(drift) > 0.009) {
+                let fixed = false;
+                finalLignes = [...finalLignes].reverse().map(l => {
+                  if (!fixed && l.type_ligne === "ouvrage") {
+                    fixed = true;
+                    const q  = Number(l.quantite) || 1;
+                    const pu = (Number(l.prix_unitaire) || 0) + drift / q;
+                    return { ...l, prix_unitaire: Math.round(pu * 100) / 100 };
+                  }
+                  return l;
+                }).reverse();
               }
             }
           }
@@ -304,7 +307,7 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
           if (parsed.objet && !objet) setObjet(parsed.objet);
           setLignes(prev => {
             const existingDesigs = new Set(prev.map(l => l.designation));
-            return [...prev, ...newLignes.filter(l => !existingDesigs.has(l.designation))];
+            return [...prev, ...finalLignes.filter(l => !existingDesigs.has(l.designation))];
           });
         } catch { /* JSON mal formé — on ignore */ }
       }
@@ -317,13 +320,18 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
     } catch (e) {
       const detail = apiError || e.message || "unknown";
       console.error("[AgentIA] send failed:", e, apiError);
-      // Log côté serveur pour consultation admin (best-effort, silencieux)
+      // Log côté serveur pour consultation admin (best-effort, silencieux).
+      // Supabase ne rejette jamais .then() → on gère l'error dans onFulfilled
+      // et les vraies erreurs réseau dans onRejected.
       supabase.from("ia_error_logs").insert({
         error:         detail,
         user_message:  userMsg.content?.slice(0, 500) || null,
         history_len:   newMsgs.length,
         stream_tried:  true,
-      }).then(({ error }) => { if (error) console.warn("[log insert]", error.message); });
+      }).then(
+        ({ error: dbErr }) => { if (dbErr) console.warn("[log insert/db]", dbErr.message); },
+        (netErr)           => { console.warn("[log insert/net]", netErr?.message || netErr); },
+      );
       const msg = !navigator.onLine ? TX.errNetwork : e.message === "api" ? TX.errApi : TX.errGeneral;
       updateAssistant("❌ " + msg);
     }

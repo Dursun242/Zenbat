@@ -193,8 +193,17 @@ export async function createDevis(devis, lignes = []) {
 export async function updateDevis(id, patch) {
   const { data, error } = await supabase
     .from('devis').update(patch).eq('id', id).select().single()
-  if (error) throw error
-  return data
+  if (!error) return data
+  // Fallback : colonne inexistante (migration 0007 pas appliquée). On retire
+  // les champs optionnels ajoutés tardivement et on retente.
+  if (error.code === '42703') {
+    const { signed_at, signed_by, odoo_sign_url, odoo_sign_id, ...safe } = patch
+    const { data: d2, error: e2 } = await supabase
+      .from('devis').update(safe).eq('id', id).select().single()
+    if (!e2) return d2
+    throw e2
+  }
+  throw error
 }
 
 export async function replaceLignes(devisId, lignes) {
