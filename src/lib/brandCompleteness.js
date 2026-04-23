@@ -18,7 +18,7 @@ const RECOMMENDED_FIELDS = [
   { key: "tva",       label: "N° TVA intra",   step: 0, impact: "Requis si vous êtes assujetti à la TVA." },
   { key: "website",   label: "Site web",       step: 2, impact: "Rassure vos clients sur votre professionnalisme." },
   { key: "bic",       label: "BIC / SWIFT",    step: 4, impact: "Complète l'IBAN pour les virements internationaux." },
-  { key: "trades",    label: "Métiers BTP",    step: 1, impact: "L'Agent IA génère des devis plus précis avec vos métiers." },
+  { key: "trades",    label: "Métiers / spécialités", step: 1, impact: "L'Agent IA génère des devis plus précis avec vos métiers." },
 ];
 
 const isFilled = (v) => {

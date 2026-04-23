@@ -36,7 +36,7 @@ const FONTS = [
 const COLORS = ["#22c55e","#3b82f6","#f97316","#8b5cf6","#ef4444","#0891b2","#0f172a","#d97706"]
 const STEPS  = [
   { title:"Votre identité",       short:"Identité",  subtitle:"Informations qui apparaîtront en en-tête de tous vos devis." },
-  { title:"Vos métiers BTP",      short:"Métiers",   subtitle:"L'Agent IA adapte les devis à vos spécialités uniquement." },
+  { title:"Vos métiers",          short:"Métiers",   subtitle:"BTP, artisanat, beauté, tech, santé… L'Agent IA adapte les devis à vos spécialités." },
   { title:"Coordonnées",          short:"Contacts",  subtitle:"Comment vos clients peuvent vous joindre depuis un devis." },
   { title:"Apparence PDF",        short:"Design",    subtitle:"Couleur, police et rendu visuel de vos devis." },
   { title:"Informations légales", short:"Légal",     subtitle:"Mentions obligatoires et conditions de paiement." },
@@ -376,7 +376,7 @@ export default function Onboarding({ brand, setBrand, onDone }) {
               <textarea value={local.mentionsLegales} onChange={e=>set("mentionsLegales",e.target.value)} rows={4}
                 placeholder="Ex : Assurance décennale n°... — TVA non applicable art. 293B..."
                 style={{width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:12,padding:"10px 14px",fontSize:13,color:"white",outline:"none",resize:"none"}}/>
-              <div style={{fontSize:10,color:"#64748b",marginTop:5,lineHeight:1.4}}>💡 L'assurance décennale (BTP) et le régime TVA sont obligatoires sur tous vos devis.</div>
+              <div style={{fontSize:10,color:"#64748b",marginTop:5,lineHeight:1.4}}>💡 L'assurance professionnelle (décennale BTP, RC pro…) et le régime TVA sont obligatoires sur tous vos devis.</div>
             </div>
             <div>
               <label style={{display:"block",fontSize:11,fontWeight:600,color:"#94a3b8",marginBottom:6}}>VALIDITÉ DU DEVIS (jours)</label>
