@@ -83,13 +83,25 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
   };
 
   return (
-    <div style={{ background: "#f8fafc", minHeight: "100%" }}>
+    <>
+      <style>{`
+        @media (min-width:1024px){
+          .detail-shell{height:100%;min-height:unset !important;overflow:hidden}
+          .detail-row{height:100%}
+          .detail-editor{overflow-y:auto}
+          .detail-preview{display:flex !important;flex-direction:column;width:46%;flex-shrink:0;border-left:1px solid #e2e8f0;overflow-y:auto}
+          .detail-pdf-btn{display:none !important}
+        }
+      `}</style>
       {showPDF && (
         <PDFViewer d={asDevisShape} cl={client} brand={brand} onClose={() => setShowPDF(false)} kind="facture" noDownload={invoice.statut === "brouillon"}/>
       )}
       {renderFacturX && (
         <PDFViewer d={asDevisShape} cl={client} brand={brand} hidden onPageReady={onPdfPageReady} kind="facture"/>
       )}
+      <div className="detail-shell" style={{ background: "#f8fafc", minHeight: "100%", display: "flex", flexDirection: "column" }}>
+        <div className="detail-row" style={{ flex: 1, display: "flex" }}>
+          <div className="detail-editor" style={{ flex: 1, minWidth: 0 }}>
 
       <div style={{ background: "white", borderBottom: "1px solid #f1f5f9", padding: "14px 16px", display: "flex", alignItems: "center", gap: 10 }}>
         <button onClick={onBack} style={{ background: "none", border: "none", color: "#64748b", fontSize: 20, cursor: "pointer" }}>←</button>
@@ -101,7 +113,7 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
       </div>
 
       <div style={{ padding: 16 }}>
-        <button onClick={() => setShowPDF(true)}
+        <button className="detail-pdf-btn" onClick={() => setShowPDF(true)}
           style={{ width: "100%", background: `linear-gradient(135deg,${ac}ee,${ac})`, color: "white", border: "none", borderRadius: 16, padding: 16, fontSize: 14, fontWeight: 700, cursor: "pointer", boxShadow: `0 6px 20px ${ac}44`, marginBottom: 12 }}>
           {invoice.statut === "brouillon" ? "👁 Aperçu brouillon" : "Voir le PDF de la facture"}
         </button>
@@ -186,6 +198,15 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
           Le client peut l'importer automatiquement dans son logiciel comptable via l'XML embarqué.
         </div>
       </div>
-    </div>
+          </div>{/* end detail-editor */}
+
+          {/* Aperçu PDF live — desktop uniquement */}
+          <div className="detail-preview" style={{ display: "none", background: "#dde1e7" }}>
+            <PDFViewer d={asDevisShape} cl={client} brand={brand} inline kind="facture" noDownload={invoice.statut === "brouillon"}/>
+          </div>
+
+        </div>{/* end detail-row */}
+      </div>{/* end detail-shell */}
+    </>
   );
 }

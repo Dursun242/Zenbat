@@ -277,6 +277,18 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
     </>
   )
 
+  if (inline) {
+    return (
+      <div ref={wrapRef} style={{ background: "#dde1e7", padding: "20px 14px", overflowY: "auto", height: "100%", boxSizing: "border-box" }}>
+        <div style={{ position: "relative", width: `calc(210mm * ${fitScale})`, height: pageH ? `${pageH}px` : "auto", margin: "0 auto" }}>
+          <div ref={pageRef} className="pdf-page" style={{ background: "white", width: "210mm", minHeight: "297mm", boxShadow: "0 4px 24px rgba(0,0,0,.22)", padding: "10mm", fontFamily, color: "#1a1a1a", fontSize: 11, lineHeight: 1.5, boxSizing: "border-box", transform: `scale(${fitScale})`, transformOrigin: "top left", position: "absolute", top: 0, left: 0 }}>
+            {pageBody}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (hidden) {
     return (
       <div aria-hidden="true" style={{position:"fixed",left:-99999,top:0,pointerEvents:"none",opacity:0}}>
