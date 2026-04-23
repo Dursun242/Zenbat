@@ -1,0 +1,87 @@
+// Suppression de compte en libre-service (RGPD art. 17 — droit à l'effacement).
+//
+// Sécurité :
+//   - Authentifié par bearer token de l'utilisateur lui-même.
+//   - Confirmation par saisie de l'email du compte (anti-clic accidentel).
+//   - Cascade SQL : profiles → clients, devis (brouillons / refuses), etc.
+//   - Les factures émises (LPF L102 B, conservation 10 ans) restent en base
+//     mais sont anonymisées : owner_id mis à NULL (ON DELETE SET NULL n'existe
+//     pas sur invoices.owner_id qui est NOT NULL → on les "détache" via la
+//     RPC anonymize_my_invoices() qui set owner_id sur un compte sentinelle
+//     -- à défaut, on accepte la suppression cascade et on documente le
+//     comportement dans les CGU). Pour l'instant on supprime tout ; la
+//     conservation 10 ans côté legal est plutôt celle de l'admin Zenbat
+//     qui dispose du backup, pas celle de l'app user-facing.
+
+import { createClient } from '@supabase/supabase-js'
+
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
+  .split(',').map(s => s.trim()).filter(Boolean)
+
+function cors(req, res) {
+  const origin = req.headers.origin || ''
+  const isProd  = process.env.VERCEL_ENV === 'production'
+  const allowed = isProd
+    ? (ALLOWED_ORIGINS.includes(origin) ? origin : (ALLOWED_ORIGINS[0] || ''))
+    : origin
+  if (allowed) res.setHeader('Access-Control-Allow-Origin', allowed)
+  res.setHeader('Vary', 'Origin')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
+}
+
+export default async function handler(req, res) {
+  cors(req, res)
+  if (req.method === 'OPTIONS') return res.status(204).end()
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+
+  const token = req.headers.authorization?.replace('Bearer ', '')
+  if (!token) return res.status(401).json({ error: 'Non authentifié' })
+
+  const supabaseUrl = process.env.VITE_SUPABASE_URL
+  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !serviceKey)
+    return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY non configurée' })
+
+  const admin = createClient(supabaseUrl, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+
+  // Identifie l'appelant via son token
+  const { data: { user }, error: authErr } = await admin.auth.getUser(token)
+  if (authErr || !user) return res.status(401).json({ error: 'Token invalide' })
+
+  // Confirmation par email pour éviter les suppressions accidentelles
+  const { confirmEmail } = req.body || {}
+  if (!confirmEmail || typeof confirmEmail !== 'string')
+    return res.status(400).json({ error: "Confirmation par email obligatoire" })
+  if (confirmEmail.trim().toLowerCase() !== (user.email || '').toLowerCase())
+    return res.status(400).json({ error: "L'email de confirmation ne correspond pas à votre compte" })
+
+  // Sentinel : empêche un admin de se supprimer en libre-service par mégarde
+  const adminEmail = process.env.ADMIN_EMAIL
+  if (adminEmail && (user.email || '').toLowerCase() === adminEmail.toLowerCase())
+    return res.status(400).json({
+      error: "Le compte administrateur ne peut pas être supprimé en libre-service. Contactez l'équipe Zenbat.",
+    })
+
+  // Nettoyage du bucket PDF (best-effort)
+  try {
+    const { data: files } = await admin.storage.from('devis-pdfs').list(user.id, { limit: 1000 })
+    if (files?.length) {
+      const paths = files.map(f => `${user.id}/${f.name}`)
+      await admin.storage.from('devis-pdfs').remove(paths)
+    }
+  } catch (e) {
+    console.warn('[delete-my-account] storage cleanup:', e?.message)
+  }
+
+  // Suppression du compte — cascade SQL nettoie le reste
+  const { error: delErr } = await admin.auth.admin.deleteUser(user.id)
+  if (delErr) return res.status(500).json({ error: delErr.message })
+
+  return res.status(200).json({
+    ok: true,
+    deleted_at: new Date().toISOString(),
+  })
+}

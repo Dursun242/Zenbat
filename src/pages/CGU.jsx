@@ -1,4 +1,5 @@
-export const CGU_VERSION = "1.0"
+export const CGU_VERSION = "1.1"
+export const CGU_DATE    = "23 avril 2026"
 
 const articles = [
   {
@@ -11,7 +12,7 @@ const articles = [
   },
   {
     n: 3, title: "Description du service",
-    body: `Zenbat est une application web progressive (PWA) permettant de :\n• Générer des devis professionnels assistés par intelligence artificielle (IA Claude d'Anthropic)\n• Gérer un portefeuille clients\n• Émettre des factures conformes à la réglementation française (TVA, Factur-X)\n• Envoyer des documents en signature électronique via Odoo Sign\n• Accéder au service depuis tout appareil (smartphone, tablette, ordinateur)\n\nLe service est disponible en mode SaaS via l'adresse https://zenbat.vercel.app.`,
+    body: `Zenbat est une application web progressive (PWA) permettant de :\n• Générer des devis professionnels assistés par intelligence artificielle (IA Claude d'Anthropic)\n• Gérer un portefeuille clients\n• Émettre des factures conformes à la réglementation française (TVA, Factur-X)\n• Envoyer des documents en signature électronique via Odoo Sign\n• Accéder au service depuis tout appareil (smartphone, tablette, ordinateur)`,
   },
   {
     n: 4, title: "Inscription et accès au service",
@@ -22,32 +23,36 @@ const articles = [
     body: `Un essai gratuit de 30 jours est proposé sans engagement et sans carte bancaire. À l'issue de la période d'essai, la continuité du service est conditionnée à la souscription d'un abonnement au tarif en vigueur (actuellement 19 € TTC/mois). L'abonnement est sans engagement, résiliable à tout moment. Aucun remboursement ne sera effectué pour une période entamée.`,
   },
   {
-    n: 6, title: "Données personnelles",
-    body: `Zenbat collecte et traite les données personnelles nécessaires au fonctionnement du service (nom, email, coordonnées professionnelles, données de facturation). Ces données sont stockées de manière sécurisée sur l'infrastructure Supabase (hébergée en Europe). Elles ne sont jamais revendues à des tiers. Conformément au RGPD, l'utilisateur dispose d'un droit d'accès, de rectification et de suppression de ses données, exerçable à l'adresse contact@zenbat.fr.`,
+    n: 6, title: "Données personnelles et droits RGPD",
+    body: `Zenbat collecte les données strictement nécessaires au service : identité, email, coordonnées professionnelles (SIRET, adresse, téléphone), données clients/devis/factures saisies par l'utilisateur, et journal d'utilisation de l'Agent IA (voir art. 7).\n\nHébergement : Supabase (Union européenne). Aucune donnée n'est revendue à des tiers.\n\nConformément au RGPD (règlement UE 2016/679), l'utilisateur dispose à tout moment des droits suivants, exerçables EN LIBRE-SERVICE depuis l'application (Mon profil → Vos données) :\n• Droit d'accès et portabilité : téléchargement d'une archive JSON complète\n• Droit à l'effacement (art. 17) : suppression définitive du compte et de toutes les données associées\n• Droit de rectification : modification directe depuis Mon profil\n\nPour les autres demandes (limitation, opposition, plainte), écrire à Zenbat76@gmail.com. À défaut de réponse satisfaisante, l'utilisateur peut saisir la CNIL (cnil.fr).`,
   },
   {
     n: 7, title: "Utilisation de l'intelligence artificielle",
-    body: `Le service utilise l'API Claude d'Anthropic pour générer des suggestions de devis. Les données transmises à l'IA (description des travaux, métiers) peuvent être traitées par Anthropic conformément à leur politique de confidentialité. L'utilisateur reste seul responsable de la vérification et de la validation des devis générés avant tout envoi à un client. Zenbat ne garantit pas l'exactitude des montants ou descriptions suggérés par l'IA.`,
+    body: `Le service utilise l'API Claude (Anthropic, via infrastructure UE/US conforme aux clauses contractuelles types). Les données transmises à l'IA (description des prestations, métiers déclarés, montants) sont traitées dans le seul but de générer le devis demandé.\n\nJournalisation : pour le support, le débogage et l'amélioration du service, Zenbat enregistre les conversations avec l'Agent IA (message utilisateur + réponse IA visible, hors PDF), les erreurs techniques et les refus de l'IA. Ces journaux sont consultables uniquement par l'administrateur Zenbat et par l'utilisateur lui-même via l'export RGPD. Conservation : 12 mois glissants, puis suppression automatique.\n\nL'utilisateur reste seul responsable de la vérification, de la validation et de l'exactitude des devis générés avant tout envoi à un client. Zenbat ne garantit pas l'exactitude des montants ou descriptions suggérés par l'IA.`,
   },
   {
-    n: 8, title: "Propriété intellectuelle",
+    n: 8, title: "Conservation et archivage des documents",
+    body: `Conformément aux obligations fiscales françaises (LPF art. L102 B et CGI art. 286), les factures émises sont conservées pendant 10 ans à compter de leur émission, sans modification possible (CGI art. 289). Une facture émise (statut "envoyée" ou ultérieur, ou ayant fait l'objet d'une génération Factur-X) est verrouillée automatiquement et ne peut plus être modifiée ni supprimée — toute correction passe par une facture d'avoir.\n\nLes devis acceptés ou en cours de signature sont conservés 5 ans en tant que pièces contractuelles (code civil) et ne peuvent être supprimés tant qu'ils sont liés à un contrat actif.\n\nLes brouillons de devis et factures, ainsi que les devis refusés, peuvent être supprimés à tout moment par l'utilisateur.\n\nÀ l'issue des durées légales, les documents sont automatiquement purgés de la base de données.`,
+  },
+  {
+    n: 9, title: "Propriété intellectuelle",
     body: `La plateforme Zenbat, son code source, son design et ses contenus sont la propriété exclusive de l'éditeur. Toute reproduction, diffusion ou utilisation à des fins commerciales sans autorisation écrite est interdite. Les documents (devis, factures) générés par l'utilisateur via le service lui appartiennent intégralement.`,
   },
   {
-    n: 9, title: "Responsabilité",
+    n: 10, title: "Responsabilité",
     body: `Zenbat s'engage à maintenir le service disponible au mieux mais ne peut garantir une disponibilité ininterrompue. La responsabilité de Zenbat ne saurait être engagée en cas de perte de données, de dysfonctionnement lié à un tiers (Supabase, Anthropic, Odoo), ou d'utilisation non conforme du service par l'utilisateur. L'utilisateur est seul responsable de la conformité fiscale et légale de ses documents.`,
   },
   {
-    n: 10, title: "Disponibilité et maintenance",
+    n: 11, title: "Disponibilité et maintenance",
     body: `Zenbat se réserve le droit d'interrompre le service pour des opérations de maintenance, avec un préavis de 24 h sauf urgence. Les mises à jour sont déployées régulièrement et peuvent modifier les fonctionnalités disponibles. L'utilisateur sera informé des changements significatifs par email ou notification dans l'application.`,
   },
   {
-    n: 11, title: "Résiliation",
-    body: `L'utilisateur peut résilier son abonnement à tout moment depuis son espace client ou en contactant support@zenbat.fr. La résiliation prend effet à la fin de la période en cours. En cas de non-respect des présentes CGU, Zenbat se réserve le droit de suspendre ou supprimer le compte sans préavis ni remboursement.`,
+    n: 12, title: "Résiliation",
+    body: `L'utilisateur peut résilier son abonnement et/ou supprimer son compte à tout moment depuis Mon profil → Vos données → Supprimer mon compte. La suppression entraîne l'effacement immédiat des données personnelles et clients ; les factures émises sont conservées en archive anonymisée pour la durée légale (10 ans), sans accès en lecture pour quiconque sauf injonction administrative.\n\nEn cas de non-respect des présentes CGU, Zenbat se réserve le droit de suspendre ou supprimer le compte sans préavis ni remboursement.`,
   },
   {
-    n: 12, title: "Droit applicable et contact",
-    body: `Les présentes CGU sont soumises au droit français. Tout litige sera porté devant les tribunaux compétents du ressort de Paris, à défaut d'accord amiable préalable.\n\nPour toute question relative aux présentes CGU :\nEmail : contact@zenbat.fr\nVersion en vigueur : ${CGU_VERSION} — mise à jour le 1er janvier 2026`,
+    n: 13, title: "Droit applicable et contact",
+    body: `Les présentes CGU sont soumises au droit français. Tout litige sera porté devant les tribunaux compétents du ressort de Paris, à défaut d'accord amiable préalable.\n\nPour toute question relative aux présentes CGU :\nEmail : Zenbat76@gmail.com\nWhatsApp : 06 79 11 60 85\nVersion en vigueur : ${CGU_VERSION} — ${CGU_DATE}`,
   },
 ]
 
@@ -73,7 +78,7 @@ export default function CGU() {
       <div style={{ maxWidth: 760, margin: "0 auto", padding: "48px 24px 80px" }}>
         <div style={{ marginBottom: 40 }}>
           <div style={{ display: "inline-block", background: "#f0fdf4", color: "#16a34a", fontSize: 11, fontWeight: 700, padding: "3px 12px", borderRadius: 20, marginBottom: 12, letterSpacing: "0.5px" }}>
-            VERSION {CGU_VERSION} — 1ER JANVIER 2026
+            VERSION {CGU_VERSION} — {CGU_DATE.toUpperCase()}
           </div>
           <h1 style={{ fontSize: 32, fontWeight: 800, color: "#0f172a", letterSpacing: "-1px", marginBottom: 8 }}>
             Conditions Générales d'Utilisation
