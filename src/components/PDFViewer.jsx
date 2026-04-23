@@ -287,7 +287,23 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
             <div style={{fontWeight:600,color:"#6b7280",marginBottom:2}}>TVA non applicable, art. 293 B du CGI</div>
           )}
           {brand.mentionsLegales}
-          {brand.siret && <div>SIRET {brand.siret}</div>}
+          {(() => {
+            // Ligne identité légale consolidée : forme juridique + capital + SIRET + RCS + TVA intra
+            const parts = [
+              brand.companyName && brand.legalForm ? `${brand.companyName} — ${brand.legalForm}` : (brand.legalForm || ""),
+              brand.capital ? `au capital de ${brand.capital}` : "",
+              brand.siret ? `SIRET ${brand.siret}` : "",
+              brand.rcs   ? brand.rcs : "",
+              brand.tva && brand.vatRegime !== "franchise" ? `TVA ${brand.tva}` : "",
+            ].filter(Boolean).join(" · ");
+            return parts ? <div>{parts}</div> : (brand.siret ? <div>SIRET {brand.siret}</div> : null);
+          })()}
+          {kind === "facture" && brand.paymentPenalties && (
+            <div style={{marginTop:3}}>{brand.paymentPenalties}</div>
+          )}
+          {kind === "facture" && brand.escompte && (
+            <div>{brand.escompte}</div>
+          )}
         </div>
         <div style={{textAlign:"right",flexShrink:0}}>Généré via Zenbat</div>
       </div>

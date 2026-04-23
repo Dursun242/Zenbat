@@ -57,6 +57,7 @@ export default async function handler(req, res) {
     iaConvR,
     iaErrR,
     iaNegR,
+    activityR,
   ] = await Promise.all([
     admin.from('profiles').select('*').eq('id', owner_id).maybeSingle(),
     admin.from('clients').select('*').eq('owner_id', owner_id),
@@ -67,6 +68,7 @@ export default async function handler(req, res) {
     admin.from('ia_conversations').select('*').eq('owner_id', owner_id),
     admin.from('ia_error_logs').select('*').eq('owner_id', owner_id),
     admin.from('ia_negative_logs').select('*').eq('owner_id', owner_id),
+    admin.from('activity_log').select('*').eq('owner_id', owner_id).order('created_at', { ascending: false }).limit(5000),
   ])
 
   // Liste des PDFs stockés (pas le contenu — juste l'inventaire)
@@ -95,6 +97,7 @@ export default async function handler(req, res) {
     ia_conversations:  iaConvR.data || [],
     ia_error_logs:     iaErrR.data || [],
     ia_negative_logs:  iaNegR.data || [],
+    activity_log:      activityR.data || [],
     pdf_files:         pdfFiles,
   }
 

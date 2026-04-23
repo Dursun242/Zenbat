@@ -504,6 +504,35 @@ export default function Onboarding({ brand, setBrand, onDone }) {
                 style={{width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:12,padding:"10px 14px",fontSize:13,color:"white",outline:"none"}}/>
             </div>
 
+            {/* Mentions facture obligatoires (CGI 242 nonies A + C. com. L441-10) */}
+            <div style={{background:"#1e293b",border:"1px solid #334155",borderRadius:12,padding:14}}>
+              <div style={{fontSize:11,fontWeight:700,color:"#3b82f6",marginBottom:8,letterSpacing:"0.5px",textTransform:"uppercase"}}>
+                Mentions facture
+              </div>
+              <div style={{fontSize:10,color:"#64748b",lineHeight:1.5,marginBottom:12}}>
+                Obligatoires sur toute facture B2B (art. 242 nonies A du CGI).
+              </div>
+              <Field dark label="Forme juridique" val={local.legalForm} onChange={v=>set("legalForm",v)} placeholder="SAS, SARL, EI, auto-entrepreneur…"/>
+              <div style={{height:8}}/>
+              <Field dark label="RCS (si commerçant)" val={local.rcs} onChange={v=>set("rcs",v)} placeholder="RCS Le Havre 123 456 789"
+                hint="Numéro d'inscription au Registre du Commerce et des Sociétés + ville du greffe."/>
+              <div style={{height:8}}/>
+              <Field dark label="Capital social (sociétés uniquement)" val={local.capital} onChange={v=>set("capital",v)} placeholder="Ex : 10 000 €"/>
+              <div style={{height:8}}/>
+              <div>
+                <label style={{display:"block",fontSize:11,fontWeight:600,color:"#94a3b8",marginBottom:6}}>PÉNALITÉS DE RETARD</label>
+                <textarea value={local.paymentPenalties||""} onChange={e=>set("paymentPenalties",e.target.value)} rows={2}
+                  style={{width:"100%",background:"#0f172a",border:"1px solid #334155",borderRadius:10,padding:"9px 12px",fontSize:12,color:"white",outline:"none",resize:"none"}}/>
+                <div style={{fontSize:10,color:"#64748b",marginTop:5,lineHeight:1.4}}>Mention obligatoire (L441-10 C. com.) — taux + indemnité forfaitaire 40 €.</div>
+              </div>
+              <div style={{height:8}}/>
+              <div>
+                <label style={{display:"block",fontSize:11,fontWeight:600,color:"#94a3b8",marginBottom:6}}>ESCOMPTE POUR PAIEMENT ANTICIPÉ</label>
+                <textarea value={local.escompte||""} onChange={e=>set("escompte",e.target.value)} rows={2}
+                  style={{width:"100%",background:"#0f172a",border:"1px solid #334155",borderRadius:10,padding:"9px 12px",fontSize:12,color:"white",outline:"none",resize:"none"}}/>
+              </div>
+            </div>
+
             {/* Mentions BTP obligatoires (décret 2017-1809) */}
             <div style={{background:"#1e293b",border:"1px solid #334155",borderRadius:12,padding:14}}>
               <div style={{fontSize:11,fontWeight:700,color:"#22c55e",marginBottom:8,letterSpacing:"0.5px",textTransform:"uppercase"}}>

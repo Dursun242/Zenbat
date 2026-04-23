@@ -38,6 +38,13 @@ export const DEFAULT_BRAND = {
   devisGratuit: true,          // caractère gratuit du devis (ou payant)
   devisTarif:   "",            // tarif si devis payant (ex : "50 €")
   travelFees:   "",            // frais de déplacement (ex : "Gratuits dans un rayon de 30 km")
+  // Mentions facture avancées (CGI art. 242 nonies A + C. com. L441-10)
+  // Affichées sur tout PDF facture + devis si renseignées.
+  legalForm:         "",       // forme juridique (SAS, SARL, EI, auto-entrepreneur, etc.)
+  rcs:               "",       // "RCS Le Havre 123 456 789"
+  capital:           "",       // capital social (libellé libre, ex : "10 000 €")
+  paymentPenalties:  "Pénalités de retard : taux d'intérêt légal majoré de 10 points. Indemnité forfaitaire pour frais de recouvrement : 40 € (art. L441-10 code de commerce).",
+  escompte:          "Aucun escompte consenti pour paiement anticipé.",
 };
 
 export const FRANCHISE_MENTION = "TVA non applicable, art. 293 B du CGI";
