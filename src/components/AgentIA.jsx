@@ -432,6 +432,24 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
       const finalText = txt || (match ? TX.linesAdded : "Je n'ai pas compris, pouvez-vous reformuler ?");
       updateAssistant(finalText);
 
+      // Détection best-effort des interactions "négatives" pour analyse admin.
+      // - Refus IA : pas de <DEVIS> émis + vocabulaire de refus dans la réponse.
+      // - Utilisateur mécontent : marqueurs de frustration dans le message.
+      const refusalRe  = /désol[ée]|ne r[ée]alis(e|ons)|ne fait pas|pas (ma|notre|de) sp[ée]cialit[ée]|hors (de notre )?p[ée]rim[èe]tre|ne propos(e|ons) pas/i;
+      const negUserRe  = /\b(nul|nulle|pourri|pourrie|merdique|d[ée]bile|stupide|inutile|ne sert à rien|marche pas|fonctionne pas|ne comprend[s]? rien|ça bug|bug[ué]|ça beug|arrête de|n'importe quoi|t'es mauvais|mauvaise r[ée]ponse)\b/i;
+      const isRefusal     = !match && refusalRe.test(finalText);
+      const isUserNegative= negUserRe.test(userMsg.content || "");
+      if (isRefusal || isUserNegative) {
+        supabase.from("ia_negative_logs").insert({
+          kind:         isRefusal ? "ai_refusal" : "user_negative",
+          user_message: userMsg.content?.slice(0, 500) || null,
+          ai_response:  isRefusal ? (finalText?.slice(0, 500) || null) : null,
+        }).then(
+          ({ error: dbErr }) => { if (dbErr) console.warn("[negative log/db]", dbErr.message); },
+          (netErr)           => { console.warn("[negative log/net]", netErr?.message || netErr); },
+        );
+      }
+
       // Incrémente le compteur d'usage IA (best-effort, silencieux)
       supabase.rpc("increment_ai_used").then(() => {}, () => {});
     } catch (e) {
