@@ -124,9 +124,20 @@ export default function DevisDetail({ d, cl, onBack, brand, onChange, onConvertT
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div>
               <div style={{ fontSize: 10, color: "#94a3b8", fontFamily: "monospace", marginBottom: 3 }}>{d.numero}</div>
-              <div style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", lineHeight: 1.3 }}>{d.objet}</div>
-              <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
-                {cl?.raison_sociale || `${cl?.prenom || ""} ${cl?.nom || ""}`.trim() || "—"} · {d.ville_chantier}
+              <input
+                value={d.objet || ""}
+                onChange={e => onChange({ ...d, objet: e.target.value })}
+                placeholder="Objet du devis"
+                style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", lineHeight: 1.3, border: "none", background: "transparent", outline: "none", width: "100%", padding: 0, fontFamily: "inherit" }}
+              />
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 4, display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                <span>{cl?.raison_sociale || `${cl?.prenom || ""} ${cl?.nom || ""}`.trim() || "—"} ·</span>
+                <input
+                  value={d.ville_chantier || ""}
+                  onChange={e => onChange({ ...d, ville_chantier: e.target.value })}
+                  placeholder="Ville / chantier"
+                  style={{ fontSize: 12, color: "#64748b", border: "none", background: "transparent", outline: "none", padding: 0, fontFamily: "inherit", minWidth: 80 }}
+                />
               </div>
             </div>
             <div style={{ textAlign: "right" }}>
