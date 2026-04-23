@@ -374,9 +374,9 @@ export default function Onboarding({ brand, setBrand, onDone }) {
                 MENTIONS LÉGALES (pied de devis)<span style={{color:"#ef4444"}}>*</span>
               </label>
               <textarea value={local.mentionsLegales} onChange={e=>set("mentionsLegales",e.target.value)} rows={4}
-                placeholder="Ex : Assurance décennale n°... — TVA non applicable art. 293B..."
+                placeholder="Ex : Assurance RC pro n°... — TVA non applicable art. 293B..."
                 style={{width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:12,padding:"10px 14px",fontSize:13,color:"white",outline:"none",resize:"none"}}/>
-              <div style={{fontSize:10,color:"#64748b",marginTop:5,lineHeight:1.4}}>💡 L'assurance professionnelle (décennale BTP, RC pro…) et le régime TVA sont obligatoires sur tous vos devis.</div>
+              <div style={{fontSize:10,color:"#64748b",marginTop:5,lineHeight:1.4}}>💡 L'assurance RC pro et le régime TVA sont obligatoires sur tous vos devis.</div>
             </div>
             <div>
               <label style={{display:"block",fontSize:11,fontWeight:600,color:"#94a3b8",marginBottom:6}}>VALIDITÉ DU DEVIS (jours)</label>

@@ -10,7 +10,7 @@ const CRITICAL_FIELDS = [
   { key: "phone",          label: "Téléphone",            step: 2, impact: "Vos clients ne pourront pas vous joindre depuis le devis." },
   { key: "email",          label: "Email professionnel",  step: 2, impact: "Indispensable pour la signature électronique." },
   { key: "iban",           label: "IBAN",                 step: 4, impact: "Sans IBAN, vos clients ne peuvent pas régler par virement." },
-  { key: "mentionsLegales",label: "Mentions légales",     step: 4, impact: "L'assurance décennale et le régime TVA sont obligatoires." },
+  { key: "mentionsLegales",label: "Mentions légales",     step: 4, impact: "L'assurance RC pro et le régime TVA sont obligatoires." },
 ];
 
 const RECOMMENDED_FIELDS = [
