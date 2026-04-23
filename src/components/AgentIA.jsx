@@ -131,8 +131,33 @@ const buildSectorContext = (sectors, vatRegime) => {
   return { expertDomain, units, pricing, vocab, tvaContext };
 };
 
+const SECTOR_GREETING_EXAMPLE = {
+  btp:           "Ex : *Pose carrelage 40m² à 25€/m², fourniture incluse*",
+  beaute:        "Ex : *Coupe + couleur femme 80€, soin visage 60€*",
+  sante:         "Ex : *Séance kiné 45€ × 4, bilan posture 90€*",
+  tech:          "Ex : *Site vitrine 5j × 500€/j, maintenance 2h/mois × 80€*",
+  alimentaire:   "Ex : *Buffet cocktail 35€/pers × 50 pers, livraison 80€*",
+  transport:     "Ex : *Déménagement T2 Paris–Lyon forfait 650€, emballage 80€*",
+  communication: "Ex : *Reportage photo 8h × 120€, retouches forfait 200€*",
+  evenementiel:  "Ex : *DJ soirée 6h 800€, sono & lumières forfait 400€*",
+  education:     "Ex : *Cours de maths 2h/sem × 35€/h, bilan pédagogique 90€*",
+  nettoyage:     "Ex : *Nettoyage bureaux 80m² × 18€/m², vitrerie 20m² × 5€/m²*",
+  animaux:       "Ex : *Toilettage golden 65€, bain + séchage 30€*",
+  immobilier:    "Ex : *Gestion locative 6 mois × 120€/mois, état des lieux 180€*",
+  mode:          "Ex : *Ourlet pantalon 20€ × 3, retouche robe de soirée 60€*",
+  general:       "Ex : *Prestation 2h × 60€/h, fourniture matériel forfait 120€*",
+};
+
+const buildAgentGreeting = (brand) => {
+  const tradeNames = tradesLabels(brand?.trades || []);
+  const sectors = detectSectors(tradeNames);
+  const { expertDomain } = buildSectorContext(sectors, brand?.vatRegime);
+  const example = SECTOR_GREETING_EXAMPLE[sectors[0]] || SECTOR_GREETING_EXAMPLE.general;
+  return `Bonjour 👋 Je suis votre assistant spécialisé en **${expertDomain}**.\n\nDécrivez votre besoin ligne par ligne, dans la langue de votre choix (français, arabe, darija, espagnol, anglais, portugais…). Je rédige le devis en français professionnel.\n\n${example}`;
+};
+
 export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, plan, trialExpired, onPaywall, setTab, onOpenDevisPDF, brand }) {
-  const [msgs,         setMsgs]         = useState([{ role: "assistant", content: TX.agentGreeting }]);
+  const [msgs,         setMsgs]         = useState(() => [{ role: "assistant", content: buildAgentGreeting(brand) }]);
   const [input,        setInput]        = useState("");
   const [loading,      setLoading]      = useState(false);
   const [lignes,       setLignes]       = useState([]);
@@ -565,7 +590,7 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
             <div style={{ padding: "20px 16px", textAlign: "center" }}>
               <div style={{ fontSize: 24, marginBottom: 8 }}>📋</div>
               <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>Les lignes du devis apparaîtront ici</div>
-              <div style={{ fontSize: 11, color: "#cbd5e1", marginTop: 4 }}>Décrivez les travaux ci-dessous</div>
+              <div style={{ fontSize: 11, color: "#cbd5e1", marginTop: 4 }}>Décrivez votre besoin ci-dessous</div>
             </div>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>

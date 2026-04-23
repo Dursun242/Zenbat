@@ -151,8 +151,8 @@ export function formatHistoryPrompt(summary) {
     "",
     "RÈGLE D'USAGE :",
     "- Utilise ces tarifs médians comme référence pour rester cohérent avec les prix pratiqués par l'entreprise.",
-    "- Si la demande actuelle correspond à un ouvrage déjà facturé, reprends le prix médian sauf indication contraire de l'utilisateur.",
-    "- Réutilise les libellés et lots existants pour harmoniser le style des devis.",
+    "- Si la demande actuelle correspond à une prestation déjà facturée, reprends le prix médian sauf indication contraire de l'utilisateur.",
+    "- Réutilise les libellés et catégories existants pour harmoniser le style des devis.",
     "═══════════════════════════════════════════════════════════",
   )
 
