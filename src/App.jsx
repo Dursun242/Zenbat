@@ -395,6 +395,15 @@ export default function App() {
         .pop{animation:popIn .28s cubic-bezier(.34,1.56,.64,1) both}
         input,textarea,select,button{font-family:inherit}
         input,textarea,select{font-size:max(16px,1em) !important}
+        @media (min-width:1024px){
+          .app-sidebar{display:flex !important}
+          .app-bottom-nav{display:none !important}
+          .app-content{padding-bottom:0 !important}
+          .app-toast{bottom:24px !important;left:auto !important;right:24px !important;max-width:380px}
+        }
+        @media (max-width:1023px){.app-sidebar{display:none !important}}
+        .app-sidebar button:hover{background:rgba(255,255,255,.05) !important;color:#94a3b8 !important}
+        .app-sidebar button.active-nav:hover{background:rgba(34,197,94,.15) !important;color:#22c55e !important}
       `}</style>
 
       {/* Header */}
@@ -432,8 +441,31 @@ export default function App() {
         </button>
       )}
 
-      {/* Contenu principal */}
-      <div style={{ flex: 1, overflowY: "auto", paddingBottom: "calc(64px + env(safe-area-inset-bottom))" }}>
+      {/* Body : sidebar (desktop) + contenu */}
+      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+
+        {/* Sidebar desktop */}
+        <nav className="app-sidebar" style={{ display: "none", width: 220, flexDirection: "column", background: "#0f172a", borderRight: "1px solid rgba(255,255,255,.06)", flexShrink: 0, paddingTop: 8, overflowY: "auto" }}>
+          {NAV.map(({ id, label, icon }) => {
+            const active = activeNav === id;
+            return (
+              <button key={id} onClick={() => setTab(id)}
+                className={active ? "active-nav" : ""}
+                style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", background: active ? "rgba(34,197,94,.1)" : "transparent", border: "none", borderLeft: `3px solid ${active ? "#22c55e" : "transparent"}`, color: active ? "#22c55e" : "#64748b", cursor: "pointer", width: "100%", textAlign: "left", fontSize: 14, fontWeight: active ? 600 : 400, transition: "all .15s", position: "relative" }}>
+                {icon}
+                <span>{label}</span>
+                {id === "agent" && plan === "free" && daysLeft <= 7 && (
+                  <span style={{ marginLeft: "auto", background: daysLeft === 0 ? "#ef4444" : "#f97316", color: "white", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 10 }}>
+                    {daysLeft === 0 ? "!" : `${daysLeft}j`}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Contenu principal */}
+        <div className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "calc(64px + env(safe-area-inset-bottom))" }}>
         {tab === "dashboard"     && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}
                                        onOpenProfile={() => setScreen("onboarding")}
                                        onOpenPWAInstall={() => setScreen("pwa_install")}/>}
@@ -488,11 +520,12 @@ export default function App() {
             brand={brand}/>
         )}
         {tab === "admin"         && isAdmin && <AdminPanel onBack={() => setTab("dashboard")}/>}
-      </div>
+        </div>{/* end app-content */}
+      </div>{/* end body */}
 
       {/* Toast */}
       {toast && (
-        <div style={{ position: "fixed", bottom: "calc(72px + env(safe-area-inset-bottom))", left: 12, right: 12, background: toast.isError ? "#7f1d1d" : "#0f172a", color: "white", borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, boxShadow: "0 10px 30px rgba(0,0,0,.25)", zIndex: 100, animation: "fadeUp .18s ease both" }}>
+        <div className="app-toast" style={{ position: "fixed", bottom: "calc(72px + env(safe-area-inset-bottom))", left: 12, right: 12, background: toast.isError ? "#7f1d1d" : "#0f172a", color: "white", borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, boxShadow: "0 10px 30px rgba(0,0,0,.25)", zIndex: 100, animation: "fadeUp .18s ease both" }}>
           <span style={{ fontSize: 12, fontWeight: 500 }}>{toast.label}</span>
           <div style={{ display: "flex", gap: 6 }}>
             {!toast.isError && (
@@ -506,8 +539,8 @@ export default function App() {
         </div>
       )}
 
-      {/* Navigation bas */}
-      <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, paddingBottom: "env(safe-area-inset-bottom)", background: "#0f172a", borderTop: "1px solid rgba(255,255,255,.06)", display: "flex", zIndex: 50 }}>
+      {/* Navigation bas (mobile) */}
+      <nav className="app-bottom-nav" style={{ position: "fixed", bottom: 0, left: 0, right: 0, paddingBottom: "env(safe-area-inset-bottom)", background: "#0f172a", borderTop: "1px solid rgba(255,255,255,.06)", display: "flex", zIndex: 50 }}>
         {NAV.map(({ id, label, icon }) => {
           const active = activeNav === id;
           return (
