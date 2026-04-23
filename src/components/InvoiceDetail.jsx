@@ -103,26 +103,26 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
         <div className="detail-row" style={{ flex: 1, display: "flex" }}>
           <div className="detail-editor" style={{ flex: 1, minWidth: 0 }}>
 
-      <div style={{ background: "white", borderBottom: "1px solid #f1f5f9", padding: "14px 16px", display: "flex", alignItems: "center", gap: 10 }}>
-        <button onClick={onBack} style={{ background: "none", border: "none", color: "#64748b", fontSize: 20, cursor: "pointer" }}>←</button>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace", marginBottom: 6 }}>{invoice.numero}</div>
-          <label style={{ display: "block", fontSize: 10, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>OBJET</label>
-          <input
-            value={invoice.objet || ""}
-            onChange={e => onChange({ ...invoice, objet: e.target.value })}
-            placeholder="Objet de la facture"
-            style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc", outline: "none", width: "100%", padding: "6px 10px", fontFamily: "inherit", marginBottom: 6 }}
-          />
-          <label style={{ display: "block", fontSize: 10, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>CHANTIER</label>
-          <input
-            value={invoice.ville_chantier || ""}
-            onChange={e => onChange({ ...invoice, ville_chantier: e.target.value })}
-            placeholder="Ville / chantier"
-            style={{ fontSize: 12, color: "#64748b", border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc", outline: "none", width: "100%", padding: "6px 10px", fontFamily: "inherit" }}
-          />
+      <div style={{ background: "white", borderBottom: "1px solid #f1f5f9", padding: "14px 16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+          <button onClick={onBack} style={{ background: "none", border: "none", color: "#64748b", fontSize: 20, cursor: "pointer", flexShrink: 0 }}>←</button>
+          <div style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace", flex: 1 }}>{invoice.numero}</div>
+          <Badge s={invoice.statut} kind="facture"/>
         </div>
-        <Badge s={invoice.statut} kind="facture"/>
+        <label style={{ display: "block", fontSize: 10, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>OBJET</label>
+        <input
+          value={invoice.objet || ""}
+          onChange={e => onChange({ ...invoice, objet: e.target.value })}
+          placeholder="Objet de la facture"
+          style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box" }}
+        />
+        <label style={{ display: "block", fontSize: 10, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>CHANTIER</label>
+        <input
+          value={invoice.ville_chantier || ""}
+          onChange={e => onChange({ ...invoice, ville_chantier: e.target.value })}
+          placeholder="Ville / chantier"
+          style={{ fontSize: 13, color: "#64748b", border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", boxSizing: "border-box" }}
+        />
       </div>
 
       <div style={{ padding: 16 }}>

@@ -121,30 +121,28 @@ export default function DevisDetail({ d, cl, onBack, brand, onChange, onConvertT
           <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#64748b", fontSize: 13, marginBottom: 12, cursor: "pointer" }}>
             {I.back} Retour
           </button>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div>
-              <div style={{ fontSize: 10, color: "#94a3b8", fontFamily: "monospace", marginBottom: 6 }}>{d.numero}</div>
-              <label style={{ display: "block", fontSize: 10, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>OBJET</label>
-              <input
-                value={d.objet || ""}
-                onChange={e => onChange({ ...d, objet: e.target.value })}
-                placeholder="Objet du devis"
-                style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc", outline: "none", width: "100%", padding: "6px 10px", fontFamily: "inherit", marginBottom: 6 }}
-              />
-              <label style={{ display: "block", fontSize: 10, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>CHANTIER</label>
-              <input
-                value={d.ville_chantier || ""}
-                onChange={e => onChange({ ...d, ville_chantier: e.target.value })}
-                placeholder="Ville / chantier"
-                style={{ fontSize: 13, color: "#64748b", border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc", outline: "none", width: "100%", padding: "6px 10px", fontFamily: "inherit" }}
-              />
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: "#0f172a" }}>{fmt(ht)}</div>
-              <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 5 }}>HT</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div style={{ fontSize: 10, color: "#94a3b8", fontFamily: "monospace" }}>{d.numero}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>{fmt(ht)}</span>
+              <span style={{ fontSize: 10, color: "#94a3b8" }}>HT</span>
               <Badge s={d.statut}/>
             </div>
           </div>
+          <label style={{ display: "block", fontSize: 10, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>OBJET</label>
+          <input
+            value={d.objet || ""}
+            onChange={e => onChange({ ...d, objet: e.target.value })}
+            placeholder="Objet du devis"
+            style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box" }}
+          />
+          <label style={{ display: "block", fontSize: 10, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>CHANTIER</label>
+          <input
+            value={d.ville_chantier || ""}
+            onChange={e => onChange({ ...d, ville_chantier: e.target.value })}
+            placeholder="Ville / chantier"
+            style={{ fontSize: 13, color: "#64748b", border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", boxSizing: "border-box" }}
+          />
         </div>
 
         <div style={{ padding: 18 }}>
