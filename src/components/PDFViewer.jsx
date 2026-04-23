@@ -278,11 +278,35 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
   )
 
   if (inline) {
+    const download = async () => {
+      try {
+        const { renderElementToPdf } = await import("../lib/pdf.js")
+        const { blob } = await renderElementToPdf(pageRef.current, { filename: `${d.numero}.pdf` })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url; a.download = `${d.numero}.pdf`
+        document.body.appendChild(a); a.click(); document.body.removeChild(a)
+        setTimeout(() => URL.revokeObjectURL(url), 3000)
+      } catch (e) { alert("Impossible de générer le PDF : " + (e.message || e)) }
+    }
     return (
-      <div ref={wrapRef} style={{ background: "#dde1e7", padding: "20px 14px", overflowY: "auto", height: "100%", boxSizing: "border-box" }}>
-        <div style={{ position: "relative", width: `calc(210mm * ${fitScale})`, height: pageH ? `${pageH}px` : "auto", margin: "0 auto" }}>
-          <div ref={pageRef} className="pdf-page" style={{ background: "white", width: "210mm", minHeight: "297mm", boxShadow: "0 4px 24px rgba(0,0,0,.22)", padding: "10mm", fontFamily, color: "#1a1a1a", fontSize: 11, lineHeight: 1.5, boxSizing: "border-box", transform: `scale(${fitScale})`, transformOrigin: "top left", position: "absolute", top: 0, left: 0 }}>
-            {pageBody}
+      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        {/* Toolbar inline */}
+        <div style={{ background: "#0f172a", padding: "8px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <span style={{ color: "#94a3b8", fontSize: 12, fontWeight: 500 }}>{d.numero}.pdf</span>
+          {!noDownload && (
+            <button onClick={download}
+              style={{ background: "#22c55e", color: "white", border: "none", borderRadius: 8, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+              ⬇ Télécharger
+            </button>
+          )}
+        </div>
+        {/* PDF scroll */}
+        <div ref={wrapRef} style={{ background: "#dde1e7", padding: "20px 14px", overflowY: "auto", flex: 1, boxSizing: "border-box" }}>
+          <div style={{ position: "relative", width: `calc(210mm * ${fitScale})`, height: pageH ? `${pageH}px` : "auto", margin: "0 auto" }}>
+            <div ref={pageRef} className="pdf-page" style={{ background: "white", width: "210mm", minHeight: "297mm", boxShadow: "0 4px 24px rgba(0,0,0,.22)", padding: "10mm", fontFamily, color: "#1a1a1a", fontSize: 11, lineHeight: 1.5, boxSizing: "border-box", transform: `scale(${fitScale})`, transformOrigin: "top left", position: "absolute", top: 0, left: 0 }}>
+              {pageBody}
+            </div>
           </div>
         </div>
       </div>
