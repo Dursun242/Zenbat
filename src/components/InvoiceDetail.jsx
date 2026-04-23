@@ -19,8 +19,12 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
   const ttc  = ht + tva;
   const retenue = Number(invoice.retenue_garantie_eur) || 0;
   const netAPayer = ttc - retenue;
+  // Conformité fiscale : une facture émise est immuable (CGI art. 289).
+  // Le verrou est posé côté serveur par le trigger autolock_invoice_on_emission().
+  const isLocked = !!invoice.locked || invoice.statut !== "brouillon";
 
   const updateLignes = (newLignes) => {
+    if (isLocked) return;
     onChange({
       ...invoice,
       lignes: newLignes,
@@ -60,10 +64,21 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
       const blob     = new Blob([pdfBytes], { type: "application/pdf" });
       downloadBlob(blob, `${invoice.numero}-facturx.pdf`);
 
+      // Conformité : la génération Factur-X est l'émission de la facture.
+      // On bascule statut → 'envoyee' ; le trigger Postgres pose locked=true.
+      if (invoice.statut === "brouillon") {
+        try {
+          onChange({ ...invoice, statut: "envoyee", locked: true }, false);
+        } catch (lockErr) {
+          console.warn("[facturx/lock]", lockErr);
+        }
+      }
+
       setExportMsg(
-        data.icc_applied
+        (data.icc_applied
           ? "✓ Factur-X PDF/A-3 téléchargé avec profil sRGB. Conformité maximale."
-          : "✓ Factur-X téléchargé. Pour la conformité PDF/A-3 stricte, ajoutez public/icc/sRGB.icc — voir public/icc/README.md."
+          : "✓ Factur-X téléchargé. Pour la conformité PDF/A-3 stricte, ajoutez public/icc/sRGB.icc — voir public/icc/README.md.")
+        + " La facture est maintenant verrouillée (immuable)."
       );
     } catch (err) {
       console.error("[facturx]", err);
@@ -109,19 +124,27 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
           <div style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace", flex: 1 }}>{invoice.numero}</div>
           <Badge s={invoice.statut} kind="facture"/>
         </div>
+        {isLocked && (
+          <div style={{ background: "#fef3c7", border: "1px solid #fde68a", color: "#92400e", padding: "8px 10px", borderRadius: 10, fontSize: 11, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 14 }}>🔒</span>
+            <span><strong>Facture verrouillée</strong> — émise et immuable (CGI art. 289). Pour corriger, créez une facture d'avoir.</span>
+          </div>
+        )}
         <label style={{ display: "block", fontSize: 10, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>OBJET</label>
         <input
           value={invoice.objet || ""}
           onChange={e => onChange({ ...invoice, objet: e.target.value })}
+          disabled={isLocked}
           placeholder="Objet de la facture"
-          style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box" }}
+          style={{ fontSize: 14, fontWeight: 700, color: isLocked ? "#94a3b8" : "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, background: isLocked ? "#f1f5f9" : "#f8fafc", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box", cursor: isLocked ? "not-allowed" : "text" }}
         />
         <label style={{ display: "block", fontSize: 10, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>CHANTIER</label>
         <input
           value={invoice.ville_chantier || ""}
           onChange={e => onChange({ ...invoice, ville_chantier: e.target.value })}
+          disabled={isLocked}
           placeholder="Ville / chantier"
-          style={{ fontSize: 13, color: "#64748b", border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", boxSizing: "border-box" }}
+          style={{ fontSize: 13, color: "#64748b", border: "1px solid #e2e8f0", borderRadius: 8, background: isLocked ? "#f1f5f9" : "#f8fafc", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", boxSizing: "border-box", cursor: isLocked ? "not-allowed" : "text" }}
         />
       </div>
 
@@ -165,7 +188,8 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
                 <div style={{ fontSize: 10, color: "#64748b", marginBottom: 4 }}>Type d'opération</div>
                 <select value={invoice.operation_type || "service"}
                   onChange={e => onChange({ ...invoice, operation_type: e.target.value }, false)}
-                  style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "7px 8px", fontSize: 12, background: "white" }}>
+                  disabled={isLocked}
+                  style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "7px 8px", fontSize: 12, background: isLocked ? "#f1f5f9" : "white", cursor: isLocked ? "not-allowed" : "pointer" }}>
                   <option value="service">Prestation de service</option>
                   <option value="vente">Vente de biens</option>
                   <option value="mixte">Mixte</option>
@@ -179,7 +203,8 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
                     const pct = Number(e.target.value) || 0;
                     onChange({ ...invoice, retenue_garantie_pct: pct, retenue_garantie_eur: Math.round(ttc * pct) / 100 }, false);
                   }}
-                  style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "7px 8px", fontSize: 12 }}/>
+                  disabled={isLocked}
+                  style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "7px 8px", fontSize: 12, background: isLocked ? "#f1f5f9" : "white", cursor: isLocked ? "not-allowed" : "text" }}/>
               </div>
             </div>
           </div>
@@ -196,13 +221,21 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
         )}
 
         <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={onDelete}
-            style={{ background: "white", border: "1px solid #fecaca", color: "#b91c1c", borderRadius: 12, padding: "12px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-            Supprimer
-          </button>
+          {!isLocked ? (
+            <button onClick={onDelete}
+              style={{ background: "white", border: "1px solid #fecaca", color: "#b91c1c", borderRadius: 12, padding: "12px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              Supprimer
+            </button>
+          ) : (
+            <button onClick={onDelete}
+              title="Une facture émise ne peut être que masquée (conservée 10 ans en base, art. L102 B LPF)."
+              style={{ background: "white", border: "1px solid #e2e8f0", color: "#64748b", borderRadius: 12, padding: "12px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              Masquer
+            </button>
+          )}
           <button onClick={handleFacturX} disabled={exporting || !lignes.length}
             style={{ flex: 1, background: exporting || !lignes.length ? "#cbd5e1" : "#0f172a", color: "white", border: "none", borderRadius: 12, padding: "12px 16px", fontSize: 13, fontWeight: 700, cursor: exporting || !lignes.length ? "not-allowed" : "pointer" }}>
-            {exporting ? "Génération Factur-X…" : "⬇ Télécharger Factur-X (PDF + XML)"}
+            {exporting ? "Génération Factur-X…" : (isLocked ? "⬇ Re-télécharger Factur-X" : "⬇ Télécharger Factur-X (PDF + XML)")}
           </button>
         </div>
 

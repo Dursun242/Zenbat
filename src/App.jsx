@@ -242,8 +242,17 @@ export default function App() {
   };
 
   const onDeleteDevis = async (id) => {
-    setDevis(prev => prev.filter(x => x.id !== id));
-    if (user) apiDeleteDevis(id).catch(e => { console.error("[delete devis]", e); showErr("Impossible de supprimer le devis"); });
+    if (!user) {
+      setDevis(prev => prev.filter(x => x.id !== id));
+      return;
+    }
+    try {
+      await apiDeleteDevis(id);
+      setDevis(prev => prev.filter(x => x.id !== id));
+    } catch (e) {
+      console.error("[delete devis]", e);
+      showErr(e?.message || "Impossible de supprimer le devis");
+    }
   };
 
   // ── CRUD factures ────────────────────────────────────────
@@ -319,9 +328,19 @@ export default function App() {
   };
 
   const onDeleteInvoice = async (id) => {
-    setInvoices(prev => prev.filter(x => x.id !== id));
-    if (user) apiDeleteInvoice(id).catch(e => { console.error("[delete invoice]", e); showErr("Impossible de supprimer la facture"); });
-    setTab("factures");
+    if (!user) {
+      setInvoices(prev => prev.filter(x => x.id !== id));
+      setTab("factures");
+      return;
+    }
+    try {
+      await apiDeleteInvoice(id);
+      setInvoices(prev => prev.filter(x => x.id !== id));
+      setTab("factures");
+    } catch (e) {
+      console.error("[delete invoice]", e);
+      showErr(e?.message || "Impossible de supprimer la facture");
+    }
   };
 
   // Navigation vers un devis (rechargement depuis DB)

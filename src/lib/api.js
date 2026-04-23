@@ -129,6 +129,7 @@ export async function listDevis() {
   const { data, error } = await supabase
     .from('devis')
     .select('*, client:clients(*)')
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
   if (error) throw error
   return data
@@ -137,7 +138,7 @@ export async function listDevis() {
 // Liste les devis + leurs lignes en 2 requêtes (évite N+1)
 export async function listDevisWithLignes() {
   const [{ data: ds, error: e1 }, { data: ls }] = await Promise.all([
-    supabase.from('devis').select('*').order('created_at', { ascending: false }),
+    supabase.from('devis').select('*').is('deleted_at', null).order('created_at', { ascending: false }),
     supabase.from('lignes_devis').select('*').order('position', { ascending: true }),
   ])
   if (e1) throw e1
@@ -229,6 +230,25 @@ export async function replaceLignes(devisId, lignes) {
 }
 
 export async function deleteDevis(id) {
+  // Conformité : un devis 'accepte' ou 'en_signature' = contrat (code civ.).
+  // On lit d'abord le statut pour choisir hard-delete ou soft-delete.
+  const { data: row, error: readErr } = await supabase
+    .from('devis').select('statut').eq('id', id).maybeSingle()
+  if (readErr) throw readErr
+  if (!row) return // déjà supprimé / introuvable
+
+  if (row.statut === 'accepte' || row.statut === 'en_signature') {
+    throw new Error("Ce devis est lié à un contrat en cours et ne peut pas être supprimé. Marquez-le comme 'refusé' pour pouvoir le supprimer ensuite.")
+  }
+
+  if (row.statut === 'envoye') {
+    // Soft-delete : trace conservée pour litiges / audit.
+    const { error } = await supabase.rpc('soft_delete_devis', { p_id: id })
+    if (error) throw error
+    return
+  }
+
+  // brouillon / refuse → hard-delete (pas de valeur juridique).
   const { error } = await supabase.from('devis').delete().eq('id', id)
   if (error) throw error
 }
@@ -239,7 +259,7 @@ export async function deleteDevis(id) {
 export async function listInvoices() {
   return withRetry(async () => {
     const [{ data: inv, error: e1 }, { data: ls }] = await Promise.all([
-      supabase.from('invoices').select('*').order('created_at', { ascending: false }),
+      supabase.from('invoices').select('*').is('deleted_at', null).order('created_at', { ascending: false }),
       supabase.from('lignes_invoices').select('*').order('position'),
     ])
     if (e1) throw e1
@@ -316,7 +336,22 @@ export async function replaceInvoiceLignes(invoiceId, lignes) {
 }
 
 export async function deleteInvoice(id) {
-  const { error } = await supabase.from('invoices').delete().eq('id', id)
+  // Conformité fiscale FR : conservation 10 ans (LPF art. L102 B).
+  // Une facture émise / verrouillée ne peut JAMAIS être hard-supprimée.
+  // Un brouillon → hard-delete OK. Sinon → soft-delete via RPC.
+  const { data: row, error: readErr } = await supabase
+    .from('invoices').select('statut, locked').eq('id', id).maybeSingle()
+  if (readErr) throw readErr
+  if (!row) return
+
+  if (row.statut === 'brouillon' && !row.locked) {
+    const { error } = await supabase.from('invoices').delete().eq('id', id)
+    if (error) throw error
+    return
+  }
+
+  // Toute facture émise est immuable. On la masque (soft-delete) sans la purger.
+  const { error } = await supabase.rpc('soft_delete_invoice', { p_id: id })
   if (error) throw error
 }
 
