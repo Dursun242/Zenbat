@@ -38,7 +38,7 @@ export default function Landing({ onLogin, onSignup }) {
             <span style={{ color: '#22c55e' }}>Zen</span><span style={{ color: '#fff' }}>bat</span>
           </span>
           <div className="nav-links" style={{ display: 'flex', gap: 24 }}>
-            {[['#features', 'Fonctionnalités'], ['#how', 'Comment ça marche'], ['#pricing', 'Tarifs']].map(([href, label]) => (
+            {[['#features', 'Fonctionnalités'], ['#how', 'Comment ça marche'], ['#pricing', 'Tarifs'], ['/aide', 'Aide']].map(([href, label]) => (
               <a key={href} href={href} style={{ color: '#94a3b8', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}
                 onMouseOver={e => e.target.style.color = '#fff'} onMouseOut={e => e.target.style.color = '#94a3b8'}>
                 {label}
@@ -392,9 +392,17 @@ export default function Landing({ onLogin, onSignup }) {
           </span>
           <span style={{ color: '#334155', fontSize: 13 }}>© 2026 Zenbat — SaaS de devis & facturation</span>
           <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+            <a href="/aide" style={{ color: '#475569', fontSize: 13, textDecoration: 'none' }}
+              onMouseOver={e => e.target.style.color = '#94a3b8'} onMouseOut={e => e.target.style.color = '#475569'}>
+              Aide
+            </a>
             <a href="/cgu" style={{ color: '#475569', fontSize: 13, textDecoration: 'none' }}
               onMouseOver={e => e.target.style.color = '#94a3b8'} onMouseOut={e => e.target.style.color = '#475569'}>
               CGU
+            </a>
+            <a href="mailto:Zenbat76@gmail.com" style={{ color: '#475569', fontSize: 13, textDecoration: 'none' }}
+              onMouseOver={e => e.target.style.color = '#94a3b8'} onMouseOut={e => e.target.style.color = '#475569'}>
+              Contact
             </a>
             <button onClick={onLogin} style={{ background: 'none', border: 'none', color: '#475569', fontSize: 13, cursor: 'pointer' }}
               onMouseOver={e => e.target.style.color = '#94a3b8'} onMouseOut={e => e.target.style.color = '#475569'}>
