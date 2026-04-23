@@ -9,7 +9,7 @@ export default function Dashboard({ stats, devis, clients, goDevis, setTab, bran
   const ac = brand.color || "#22c55e";
 
   return (
-    <div style={{ padding: 18 }} className="fu">
+    <div className="dash-wrapper fu" style={{ padding: 18 }}>
       <div style={{ marginBottom: 18 }}>
         <h1 style={{ fontSize: 21, fontWeight: 700, color: "#0f172a" }}>
           {brand.firstName?.trim()
@@ -22,10 +22,9 @@ export default function Dashboard({ stats, devis, clients, goDevis, setTab, bran
       </div>
 
       <PWAInstallBanner onOpenInstall={onOpenPWAInstall}/>
-      <ProfileCompletionCard brand={brand} onOpenProfile={onOpenProfile}/>
 
-      {/* KPIs */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}>
+      {/* KPIs — 2 colonnes sur mobile, 4 sur desktop */}
+      <div className="kpi-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}>
         {[
           { l: TX.clients,    v: stats.clients,        dot: "#3b82f6" },
           { l: TX.inProgress, v: stats.enCours,         dot: "#f59e0b" },
@@ -40,32 +39,36 @@ export default function Dashboard({ stats, devis, clients, goDevis, setTab, bran
         ))}
       </div>
 
-      {/* Devis récents */}
-      <div style={{ background: "white", borderRadius: 14, border: "1px solid #f1f5f9", overflow: "hidden", marginBottom: 14 }}>
-        <div style={{ padding: "12px 16px", borderBottom: "1px solid #f8fafc", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>{TX.recentQuotes}</span>
-          <button onClick={() => setTab("devis")} style={{ background: "none", border: "none", color: ac, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>{TX.seeAll}</button>
-        </div>
-        {devis.slice(0, 3).map(d => {
-          const cl = clients.find(c => c.id === d.client_id);
-          return (
-            <div key={d.id} onClick={() => goDevis(d.id)}
-              style={{ padding: "11px 16px", borderBottom: "1px solid #f8fafc", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
-              onMouseOver={e => e.currentTarget.style.background = "#fafafa"}
-              onMouseOut={e => e.currentTarget.style.background = "white"}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{d.objet}</div>
-                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
-                  {cl?.raison_sociale || `${cl?.prenom || ""} ${cl?.nom || ""}`.trim() || "—"}
+      {/* Profil entreprise + Devis récents — empilés sur mobile, côte à côte sur desktop */}
+      <div className="dash-cols" style={{ marginBottom: 14 }}>
+        <ProfileCompletionCard brand={brand} onOpenProfile={onOpenProfile}/>
+
+        <div style={{ background: "white", borderRadius: 14, border: "1px solid #f1f5f9", overflow: "hidden" }}>
+          <div style={{ padding: "12px 16px", borderBottom: "1px solid #f8fafc", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>{TX.recentQuotes}</span>
+            <button onClick={() => setTab("devis")} style={{ background: "none", border: "none", color: ac, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>{TX.seeAll}</button>
+          </div>
+          {devis.slice(0, 3).map(d => {
+            const cl = clients.find(c => c.id === d.client_id);
+            return (
+              <div key={d.id} onClick={() => goDevis(d.id)}
+                style={{ padding: "11px 16px", borderBottom: "1px solid #f8fafc", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
+                onMouseOver={e => e.currentTarget.style.background = "#fafafa"}
+                onMouseOut={e => e.currentTarget.style.background = "white"}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{d.objet}</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
+                    {cl?.raison_sociale || `${cl?.prenom || ""} ${cl?.nom || ""}`.trim() || "—"}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{fmt(d.montant_ht)}</div>
+                  <div style={{ marginTop: 4 }}><Badge s={d.statut}/></div>
                 </div>
               </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{fmt(d.montant_ht)}</div>
-                <div style={{ marginTop: 4 }}><Badge s={d.statut}/></div>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       {/* Bouton Agent IA */}

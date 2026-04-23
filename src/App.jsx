@@ -11,6 +11,7 @@ import { DEFAULT_DEMO_BRAND, DEFAULT_BRAND, DEMO_CLIENTS, DEMO_DEVIS } from "./l
 
 import Logo        from "./components/ui/Logo.jsx";
 import { I }       from "./components/ui/icons.jsx";
+import Sidebar     from "./components/Sidebar.jsx";
 import Dashboard   from "./components/Dashboard.jsx";
 import ClientsList from "./components/ClientsList.jsx";
 import ClientDetail from "./components/ClientDetail.jsx";
@@ -381,7 +382,7 @@ export default function App() {
   if (screen === "paywall")    return <PaywallScreen daysLeft={daysLeft} onBack={() => setScreen("app")} onSubscribe={() => { setPlan("pro"); setScreen("app"); }}/>;
 
   return (
-    <div style={{ fontFamily: "'DM Sans',sans-serif", height: "100dvh", display: "flex", flexDirection: "column", background: "#f8fafc", overflow: "hidden" }}>
+    <div className="app-shell" style={{ fontFamily: "'DM Sans',sans-serif", height: "100dvh", display: "flex", flexDirection: "column", background: "#f8fafc", overflow: "hidden" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700&family=Space+Grotesk:wght@400;600;700&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
@@ -394,10 +395,34 @@ export default function App() {
         .pop{animation:popIn .28s cubic-bezier(.34,1.56,.64,1) both}
         input,textarea,select,button{font-family:inherit}
         input,textarea,select{font-size:max(16px,1em) !important}
+        @media(min-width:1024px){
+          .app-shell{flex-direction:row!important}
+          .app-sidebar{display:flex!important}
+          .mobile-header{display:none!important}
+          .bottom-nav{display:none!important}
+          .main-content{padding-bottom:0!important}
+          .dash-wrapper{padding:32px 40px!important}
+          .kpi-grid{grid-template-columns:repeat(4,1fr)!important}
+          .dash-cols{display:grid!important;grid-template-columns:1fr 2fr;gap:20px;align-items:start}
+        }
       `}</style>
 
-      {/* Header */}
-      <header style={{ background: "#0f172a", padding: "calc(10px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 10px calc(18px + env(safe-area-inset-left))", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+      <Sidebar
+        tab={tab}
+        setTab={setTab}
+        isAdmin={isAdmin}
+        plan={plan}
+        daysLeft={daysLeft}
+        onAdmin={() => setTab("admin")}
+        onProfile={() => setScreen("onboarding")}
+        onSignOut={handleSignOut}
+      />
+
+      {/* Colonne droite (mobile: pleine largeur, desktop: flex:1) */}
+      <div className="app-right" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
+
+      {/* Header (masqué sur desktop) */}
+      <header className="mobile-header" style={{ background: "#0f172a", padding: "calc(10px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 10px calc(18px + env(safe-area-inset-left))", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
         <Logo size={20} white/>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {isAdmin && (
@@ -432,7 +457,7 @@ export default function App() {
       )}
 
       {/* Contenu principal */}
-      <div style={{ flex: 1, overflowY: "auto", paddingBottom: "calc(64px + env(safe-area-inset-bottom))" }}>
+      <div className="main-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "calc(64px + env(safe-area-inset-bottom))" }}>
         {tab === "dashboard"     && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}
                                        onOpenProfile={() => setScreen("onboarding")}
                                        onOpenPWAInstall={() => setScreen("pwa_install")}/>}
@@ -505,8 +530,8 @@ export default function App() {
         </div>
       )}
 
-      {/* Navigation bas */}
-      <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, paddingBottom: "env(safe-area-inset-bottom)", background: "#0f172a", borderTop: "1px solid rgba(255,255,255,.06)", display: "flex", zIndex: 50 }}>
+      {/* Navigation bas (masquée sur desktop) */}
+      <nav className="bottom-nav" style={{ position: "fixed", bottom: 0, left: 0, right: 0, paddingBottom: "env(safe-area-inset-bottom)", background: "#0f172a", borderTop: "1px solid rgba(255,255,255,.06)", display: "flex", zIndex: 50 }}>
         {NAV.map(({ id, label, icon }) => {
           const active = activeNav === id;
           return (
@@ -526,6 +551,8 @@ export default function App() {
           );
         })}
       </nav>
+
+      </div>{/* fin app-right */}
     </div>
   );
 }
