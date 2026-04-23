@@ -37,6 +37,100 @@ const pickInitialLang = () => {
   return match?.code || "fr-FR";
 };
 
+// ── Détection de la famille de métiers ───────────────────────────────────────
+const SECTOR_KEYWORDS = {
+  btp:          ["maçonnerie","plomberie","électricité","charpente","couverture","isolation","carrelage","peinture","menuiserie","façade","étanchéité","terrassement","gros œuvre","chauffage","climatisation","serrurerie","sols souples","vitrerie","piscine","paysagiste","démolition","domotique","sanitaire","architecture","maîtrise d'œuvre","bureau d'études","cuisine / agencement","zinguerie","vrd","béton"],
+  beaute:       ["coiffure","barbier","esthétique","onglerie","maquillage","massage","tatouage","piercing","bien-être"],
+  sante:        ["kinésithérapie","ostéopathie","naturopathie","diététique","coach sportif","psychologie","opticien","audioprothésiste","nutrition","personal trainer"],
+  tech:         ["développement web","développement mobile","informatique","cybersécurité","graphisme","ux","ui design","seo","sea","community management","création de contenu","développement logiciel","réseaux"],
+  alimentaire:  ["boulangerie","pâtisserie","boucherie","charcuterie","traiteur","restauration","chocolatier","confiseur","glacier","sommellerie","cave"],
+  transport:    ["mécanique automobile","carrosserie","vitrage auto","moto","vélo","déménagement","transport","livraison","vtc","taxi"],
+  communication:["photographie","vidéographie","montage","drone","rédaction","copywriting","traduction","illustration","impression","signalétique","publicité","marketing"],
+  evenementiel: ["événements","dj","animation musicale","traiteur événementiel","décoration événementielle","son / lumière","scène"],
+  education:    ["cours particuliers","formation professionnelle","auto-école"],
+  nettoyage:    ["nettoyage","pressing","blanchisserie","ramonage","entretien cheminée","désinfection","dératisation"],
+  animaux:      ["toilettage animal","vétérinaire","dog-sitting","pet-sitting","dressage","éducation canine"],
+  immobilier:   ["agent immobilier","gestionnaire de patrimoine","comptabilité","expertise comptable","juridique","conseil"],
+  mode:         ["couture","retouche","maroquinerie","cordonnerie","teinturerie"],
+};
+
+const detectSectors = (tradeNames) => {
+  const t = tradeNames.join(" ").toLowerCase();
+  const found = Object.entries(SECTOR_KEYWORDS)
+    .filter(([, kws]) => kws.some(kw => t.includes(kw)))
+    .map(([sector]) => sector);
+  return found.length ? found : ["general"];
+};
+
+// ── Contexte adapté au secteur ────────────────────────────────────────────────
+const SECTOR_LABELS = {
+  btp: "BTP et travaux du bâtiment", beaute: "beauté et bien-être", sante: "santé et paramédical",
+  tech: "tech et numérique", alimentaire: "artisanat alimentaire et restauration",
+  transport: "transport et automobile", communication: "communication et créatif",
+  evenementiel: "événementiel et animation", education: "enseignement et formation",
+  nettoyage: "nettoyage et entretien", animaux: "services animaliers",
+  immobilier: "immobilier et conseil", mode: "mode et textile", general: "prestations de services",
+};
+
+const SECTOR_UNITS = {
+  btp:           "m², ml, m³, u, ens, h",
+  beaute:        "u (prestation), forfait, h, min",
+  sante:         "u (séance), forfait, h",
+  tech:          "j (jour/homme), h, forfait, u",
+  alimentaire:   "u, kg, pers, pièce, lot, kg",
+  transport:     "km, h, j, forfait, u",
+  communication: "j, h, forfait, u",
+  evenementiel:  "h, j, forfait, pers, u",
+  education:     "h, j, session, forfait",
+  nettoyage:     "h, m², forfait, j",
+  animaux:       "u, h, j, forfait",
+  immobilier:    "h, j, forfait, u",
+  mode:          "u, h, pièce, forfait",
+  general:       "u, h, j, forfait, ens",
+};
+
+const SECTOR_PRICING = {
+  btp:           "Prix réalistes BTP France 2025. Ex : main-d'œuvre élec 45-65 €/h, pose carrelage 30-50 €/m², isolation combles 20-40 €/m².",
+  beaute:        "Tarifs beauté France 2025. Ex : coupe femme 35-80 €, soin visage 60-120 €, pose ongles 40-80 €, épilation 20-60 €.",
+  sante:         "Tarifs paramédicaux France 2025. Ex : séance kiné 40-70 €, ostéo 60-90 €, coaching sportif 50-100 €/h, consultation diét. 60-80 €.",
+  tech:          "TJM tech France 2025. Ex : dev web junior 350-500 €/j, senior 600-900 €/j, graphiste 300-600 €/j, chef de projet 500-800 €/j.",
+  alimentaire:   "Tarifs artisanat alimentaire France 2025. Ex : plateau repas traiteur 15-35 €/pers, buffet cocktail 25-55 €/pers, gâteau sur-mesure 4-8 €/part.",
+  transport:     "Tarifs transport France 2025. Ex : déménagement studio 400-800 €, VTC aéroport 40-80 €, dépannage moto 80-150 €, livraison express 15-40 €.",
+  communication: "Tarifs comm/créatif France 2025. Ex : reportage photo demi-journée 400-800 €, vidéo institutionnelle 1 500-5 000 €, logo 500-2 000 €.",
+  evenementiel:  "Tarifs événementiel France 2025. Ex : DJ soirée 400-1 200 €, photographe événement 600-1 500 €, animation musicale 300-800 €.",
+  education:     "Tarifs formation France 2025. Ex : cours particulier 25-60 €/h, formation pro 500-1 500 €/jour, auto-école forfait 1 200-2 000 €.",
+  nettoyage:     "Tarifs nettoyage France 2025. Ex : ménage domicile 15-25 €/h, nettoyage bureaux 18-30 €/h, vitres 3-8 €/m².",
+  animaux:       "Tarifs animaliers France 2025. Ex : toilettage chien 40-80 €, pension journalière 20-40 €, dressage 50-80 €/séance.",
+  immobilier:    "Honoraires France 2025. Ex : gestion locative 5-10%/mois, expertise comptable 80-200 €/h, consultant juridique 150-400 €/h.",
+  mode:          "Tarifs couture France 2025. Ex : retouche simple 10-30 €, ourlet 15-25 €, robe sur-mesure 200-800 €.",
+  general:       "Tarifs du marché France 2025. Adapte les prix au secteur d'activité déclaré.",
+};
+
+const SECTOR_TVA = {
+  btp: `TVA : applique le taux correct par ouvrage selon la réglementation française :
+- 5.5% : travaux d'amélioration énergétique (isolation, PAC, fenêtres dans logement >2 ans).
+- 10% : entretien/rénovation/amélioration dans logement d'habitation >2 ans.
+- 20% : neuf, gros œuvre, locaux professionnels, fournitures sans pose.`,
+  alimentaire: `TVA :
+- 5.5% : produits alimentaires de base (pain, épicerie, pâtisserie non luxe).
+- 10% : restauration, plats cuisinés, traiteur.
+- 20% : boissons alcoolisées, confiseries, chocolat.`,
+  sante: `TVA : 20% pour les soins non remboursés (coaching, naturopathie, nutrition). Actes paramédicaux conventionnés : tva_rate 0. En cas de doute, applique 20%.`,
+  nettoyage: `TVA : 10% pour les services à la personne à domicile (résidence principale). 20% pour locaux professionnels.`,
+  default: `TVA : 20% par défaut pour les prestations de services en France.`,
+};
+
+const buildSectorContext = (sectors, vatRegime) => {
+  const expertDomain = sectors.map(s => SECTOR_LABELS[s] || s).join(" et ");
+  const units = [...new Set(sectors.flatMap(s => (SECTOR_UNITS[s] || SECTOR_UNITS.general).split(", ")))].join(", ");
+  const pricing = sectors.map(s => SECTOR_PRICING[s] || SECTOR_PRICING.general).join("\n");
+  const vocab = sectors.includes("btp") ? "travaux / ouvrages" : "prestations / services";
+  const tvaContext = vatRegime === "franchise"
+    ? `TVA — RÈGLE ABSOLUE : franchise en base (art. 293 B). TOUS les ouvrages ont "tva_rate": 0. Ne propose jamais d'autre taux. Ne mentionne pas la TVA dans le chat.`
+    : (SECTOR_TVA[sectors.find(s => SECTOR_TVA[s])] || SECTOR_TVA.default);
+  return { expertDomain, units, pricing, vocab, tvaContext };
+};
+
 export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, plan, trialExpired, onPaywall, setTab, onOpenDevisPDF, brand }) {
   const [msgs,         setMsgs]         = useState([{ role: "assistant", content: TX.agentGreeting }]);
   const [input,        setInput]        = useState("");
@@ -97,23 +191,26 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
 
   const buildSystemPrompt = () => {
     const tradeNames = tradesLabels(brand.trades);
+    const sectors = detectSectors(tradeNames);
+    const { expertDomain, units, pricing, vocab, tvaContext } = buildSectorContext(sectors, brand.vatRegime);
+
     const tradesBlock = tradeNames.length
       ? `\n\nSPÉCIALISATION DE L'ENTREPRISE — RÈGLE ABSOLUE :
 L'entreprise est spécialisée UNIQUEMENT dans les métiers suivants : ${tradeNames.join(", ")}.
 - Tu génères UNIQUEMENT des devis pour ces métiers.
-- Si la demande sort de ce périmètre, tu REFUSES poliment et tu ne renvoies AUCUNE balise <DEVIS>. Tu réponds : "Désolé, ${brand.companyName || "l'entreprise"} ne réalise pas ce type de travaux. Nous sommes spécialisés en : ${tradeNames.join(", ")}."
+- Si la demande sort de ce périmètre, tu REFUSES poliment et tu ne renvoies AUCUNE balise <DEVIS>. Tu réponds : "Désolé, ${brand.companyName || "l'entreprise"} ne réalise pas ce type de ${vocab}. Nous sommes spécialisés en : ${tradeNames.join(", ")}."
 - Pour les demandes mixtes, tu génères uniquement les lignes qui correspondent à tes métiers et tu signales en une phrase ce qui n'a pas été inclus.`
       : "";
 
     const historyBlock = formatHistoryPrompt(historySummary);
 
-    return `Tu es un assistant expert BTP France intégré dans l'application Zenbat.${tradesBlock}
+    return `Tu es un assistant expert en ${expertDomain} intégré dans l'application Zenbat.${tradesBlock}
 
 LANGUE — RÈGLE ABSOLUE :
 1. Tu comprends TOUTES les langues : français, arabe littéraire, darija marocaine, kabyle, espagnol, portugais, anglais, roumain, polonais, turc, wolof, bambara, tamoul, ourdou, hindi, chinois, russe, ukrainien, italien, allemand, etc.
 2. Tu réponds TOUJOURS en français professionnel, 100% du temps, SANS EXCEPTION.
 3. Tu TRADUIS systématiquement en français toutes les prestations décrites, quel que soit la langue d'entrée.
-4. Le JSON (objet, lots, désignations, unités) est TOUJOURS rédigé en français normé du bâtiment.
+4. Le JSON (objet, lots, désignations, unités) est TOUJOURS rédigé en français normé.
 
 MONNAIE — RÈGLE ABSOLUE :
 1. Toutes les valeurs monétaires sont TOUJOURS en euros (€), sans exception.
@@ -124,32 +221,27 @@ MONNAIE — RÈGLE ABSOLUE :
 MONTANT GLOBAL DEMANDÉ — RÈGLE ABSOLUE :
 1. Si l'utilisateur impose un montant total (ex : "fais-moi un devis de 10 000 € pour...", "budget 15 000", "total 8000 €"), le devis DOIT respecter ce total EXACTEMENT au centime près, quel que soit le nombre de lignes.
 2. Dans ce cas, tu DOIS ajouter le champ "target_total_ht": <nombre> dans le JSON racine avec le montant exact demandé par l'utilisateur (en euros, sans symbole, sans séparateur de milliers).
-3. Méthode : décompose en lots/ouvrages réalistes, puis ajuste les quantités ET/OU les prix unitaires pour que la somme des (quantité × prix unitaire) des lignes "ouvrage" tombe EXACTEMENT sur le total demandé.
+3. Méthode : décompose en lots/${vocab} réalistes, puis ajuste les quantités ET/OU les prix unitaires pour que la somme des (quantité × prix unitaire) des lignes "ouvrage" tombe EXACTEMENT sur le total demandé.
 4. Si l'utilisateur précise UN prix unitaire (ex : "50 € le m²"), tu conserves ce PU tel quel et tu ajustes la quantité pour atteindre le total.
-5. Si l'utilisateur donne une quantité ET un total (ex : "muret 200 m² à 50 €/m²"), tu vérifies que quantité × PU = total ; en cas de conflit, tu privilégies le PU × quantité tel qu'énoncé et tu signales en une phrase le total réel.
+5. Si l'utilisateur donne une quantité ET un total, tu vérifies que quantité × PU = total ; en cas de conflit, tu privilégies le PU × quantité tel qu'énoncé et tu signales en une phrase le total réel.
 6. Vérification mentale obligatoire AVANT d'émettre le JSON : fais la somme des lignes "ouvrage" et confirme qu'elle correspond exactement au montant demandé.
 7. Si aucun montant global n'est imposé, N'AJOUTE PAS le champ "target_total_ht".
 
-TÂCHE : L'utilisateur décrit des travaux à devisser. TOUJOURS répondre avec un JSON entre <DEVIS></DEVIS> même si c'est une seule ligne.
+TÂCHE : L'utilisateur décrit des ${vocab} à devisser. TOUJOURS répondre avec un JSON entre <DEVIS></DEVIS> même si c'est une seule ligne.
 Si l'utilisateur donne un prix unitaire explicite, utilise-le EXACTEMENT.
+
+Unités usuelles pour ce secteur : ${units}.
 
 Format strict : {"objet":"titre court en français","lignes":[
   {"type_ligne":"lot","designation":"NOM DU LOT EN FRANÇAIS"},
-  {"type_ligne":"ouvrage","lot":"nom lot","designation":"description en français","unite":"m2|ml|u|m3|ft|ens","quantite":10,"prix_unitaire":25,"tva_rate":20}
+  {"type_ligne":"ouvrage","lot":"nom lot","designation":"description en français","unite":"${units.split(", ")[0]}","quantite":10,"prix_unitaire":25,"tva_rate":20}
 ]}
 
-${brand.vatRegime === "franchise"
-  ? `TVA — RÈGLE ABSOLUE :
-L'entreprise est en FRANCHISE EN BASE DE TVA (auto-entrepreneur, art. 293 B du CGI).
-- TOUS les ouvrages ont "tva_rate": 0, SANS EXCEPTION.
-- Tu ne proposes jamais 5.5%, 10% ou 20%.
-- Tu ne mentionnes pas la TVA dans le chat (pas de "TVA incluse", "HT", etc.).`
-  : `TVA : applique le taux correct par ouvrage selon la réglementation française :
-- 5.5% : travaux d'amélioration de la qualité énergétique (isolation thermique, pompe à chaleur, fenêtres isolantes dans logement >2 ans).
-- 10% : travaux d'entretien/rénovation/amélioration dans logement d'habitation achevé depuis plus de 2 ans.
-- 20% : neuf, gros œuvre, démolition/évacuation, locaux professionnels, fournitures sans pose.`}
+${tvaContext}
 
-Règles : prix réalistes BTP France 2025, groupe par lots, désignations professionnelles en français.
+${pricing}
+
+Règles : groupe par lots, désignations professionnelles en français.
 Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génère quand même un JSON partiel.${historyBlock}`;
   };
 
