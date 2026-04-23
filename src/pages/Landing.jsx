@@ -81,7 +81,7 @@ export default function Landing({ onLogin, onSignup }) {
               </h1>
 
               <p className="hero-anim-2" style={{ fontSize: 18, color: '#94a3b8', lineHeight: 1.7, marginBottom: 36, maxWidth: 500 }}>
-                Décrivez les travaux en français, arabe, darija ou espagnol —
+                Décrivez vos prestations dans votre langue (français, arabe, darija, espagnol, anglais…) —
                 Zenbat génère instantanément un devis professionnel prêt à signer.
               </p>
 
@@ -142,8 +142,8 @@ export default function Landing({ onLogin, onSignup }) {
                 </div>
                 {/* Bottom nav */}
                 <div style={{ position: 'absolute', bottom: 16, left: 16, right: 16, background: '#0f172a', borderRadius: 12, padding: '8px 0', display: 'flex', justifyContent: 'space-around' }}>
-                  {['🏠', '👥', '📄', '✨'].map(icon => (
-                    <span key={icon} style={{ fontSize: 16 }}>{icon}</span>
+                  {['🏠', '👥', '📄', '🧾', '✨'].map(icon => (
+                    <span key={icon} style={{ fontSize: 14 }}>{icon}</span>
                   ))}
                 </div>
               </div>
@@ -158,7 +158,7 @@ export default function Landing({ onLogin, onSignup }) {
           {[
             ['< 30s', 'Pour générer un devis'],
             ['100%', 'Conforme TVA France'],
-            ['26+', 'Métiers BTP couverts'],
+            ['121+', 'Métiers couverts'],
             ['19€', 'Par mois TTC tout inclus'],
           ].map(([stat, label]) => (
             <div key={stat} style={{ textAlign: 'center' }}>
@@ -185,7 +185,7 @@ export default function Landing({ onLogin, onSignup }) {
               {
                 icon: '🤖',
                 title: 'Agent IA multilingue',
-                desc: 'Décrivez les travaux dans votre langue (français, arabe, darija, espagnol, portugais…). Zenbat rédige le devis en français professionnel, avec les bonnes unités et les bons prix.',
+                desc: 'Décrivez vos prestations par écrit ou à la voix dans 10 langues (français, arabe, darija, espagnol, anglais, portugais, italien…). Zenbat rédige le devis en français professionnel.',
                 color: '#f0fdf4', border: '#bbf7d0',
               },
               {
@@ -217,6 +217,18 @@ export default function Landing({ onLogin, onSignup }) {
                 title: 'Tableau de bord & CA',
                 desc: 'Suivez votre chiffre d\'affaires signé, les devis en cours, votre taux de conversion. Toutes vos stats en un coup d\'œil.',
                 color: '#eff6ff', border: '#bfdbfe',
+              },
+              {
+                icon: '🧾',
+                title: 'Gestion des factures',
+                desc: 'Convertissez un devis accepté en facture en un clic. Générez des PDF conformes, suivez les paiements et préparez-vous à la facturation électronique obligatoire 2026.',
+                color: '#fefce8', border: '#fef08a',
+              },
+              {
+                icon: '🏛️',
+                title: 'Conformité légale & TVA',
+                desc: 'Régime normal ou franchise en base (art. 293B). Mentions légales, assurance décennale, IBAN, RIB — tout est intégré dans vos documents. Conforme Factur-X.',
+                color: '#f0f9ff', border: '#bae6fd',
               },
             ].map(({ icon, title, desc, color, border }) => (
               <div key={title} className="feature-card"
@@ -274,18 +286,19 @@ export default function Landing({ onLogin, onSignup }) {
       {/* ── TRADES ── */}
       <section style={{ padding: '80px 24px', background: '#fff' }}>
         <div style={{ maxWidth: 1000, margin: '0 auto', textAlign: 'center' }}>
-          <div style={{ display: 'inline-block', background: '#f0fdf4', color: '#16a34a', fontSize: 12, fontWeight: 700, padding: '4px 14px', borderRadius: 20, marginBottom: 16, letterSpacing: '0.5px' }}>TOUS CORPS D'ÉTAT</div>
+          <div style={{ display: 'inline-block', background: '#f0fdf4', color: '#16a34a', fontSize: 12, fontWeight: 700, padding: '4px 14px', borderRadius: 20, marginBottom: 16, letterSpacing: '0.5px' }}>TOUS SECTEURS D'ACTIVITÉ</div>
           <h2 className="section-title" style={{ fontSize: 36, fontWeight: 800, color: '#0f172a', letterSpacing: '-1px', marginBottom: 12 }}>Votre métier, votre IA</h2>
-          <p style={{ fontSize: 15, color: '#64748b', marginBottom: 40, maxWidth: 520, margin: '0 auto 40px' }}>
-            Zenbat s'adapte à votre corps d'état. L'IA ne génère que des devis cohérents avec vos métiers déclarés.
+          <p style={{ fontSize: 15, color: '#64748b', marginBottom: 40, maxWidth: 560, margin: '0 auto 40px' }}>
+            BTP, beauté, tech, restauration, santé… Zenbat s'adapte à vos métiers déclarés. L'IA génère des devis cohérents avec votre activité.
           </p>
-          <div className="trades-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, maxWidth: 800, margin: '0 auto' }}>
+          <div className="trades-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, maxWidth: 900, margin: '0 auto' }}>
             {[
-              ['🧱','Maçonnerie'],['🏗️','Gros œuvre'],['🚜','Terrassement'],['🪵','Charpente'],
-              ['🏠','Couverture'],['🏛️','Façade'],['🧊','Isolation'],['📐','Plâtrerie'],
-              ['🚪','Menuiserie'],['🔧','Serrurerie'],['🚰','Plomberie'],['🛁','Sanitaire'],
-              ['🔥','Chauffage'],['❄️','Climatisation'],['⚡','Électricité'],['🎨','Peinture'],
-              ['🟦','Carrelage'],['🟫','Sols & Parquet'],['🍳','Cuisine'],['🌳','Paysagisme'],
+              ['🧱','Maçonnerie'],['🚰','Plomberie'],['⚡','Électricité'],['🎨','Peinture'],
+              ['🪵','Charpente'],['❄️','Climatisation'],['🟦','Carrelage'],['🌳','Paysagisme'],
+              ['✂️','Coiffure'],['💅','Esthétique'],['💻','Développement web'],['📸','Photographie'],
+              ['🍕','Restauration'],['🥐','Boulangerie'],['🚗','Mécanique auto'],['📦','Déménagement'],
+              ['💆','Kinésithérapie'],['🎓','Formation'],['🧹','Nettoyage'],['🐾','Toilettage animal'],
+              ['🔥','Chauffage'],['🛁','Sanitaire'],['🏠','Couverture'],['🍳','Cuisine / Agencement'],
             ].map(([icon, label]) => (
               <div key={label} className="trade-chip"
                 style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '10px 8px', fontSize: 12, fontWeight: 500, color: '#475569', display: 'flex', alignItems: 'center', gap: 6, transition: 'all .2s', cursor: 'default' }}>
@@ -361,7 +374,7 @@ export default function Landing({ onLogin, onSignup }) {
             Prêt à gagner du temps<br />sur vos devis ?
           </h2>
           <p style={{ fontSize: 16, color: '#94a3b8', marginBottom: 36, lineHeight: 1.7 }}>
-            Rejoignez les artisans et PME BTP qui utilisent Zenbat.<br />
+            Rejoignez les artisans et indépendants qui utilisent Zenbat.<br />
             Aucune carte bancaire requise pour l'essai.
           </p>
           <button className="cta-main" onClick={onSignup}
@@ -377,7 +390,7 @@ export default function Landing({ onLogin, onSignup }) {
           <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.5px' }}>
             <span style={{ color: '#22c55e' }}>Zen</span><span style={{ color: '#475569' }}>bat</span>
           </span>
-          <span style={{ color: '#334155', fontSize: 13 }}>© 2025 Zenbat — SaaS de devis BTP</span>
+          <span style={{ color: '#334155', fontSize: 13 }}>© 2026 Zenbat — SaaS de devis & facturation</span>
           <button onClick={onLogin} style={{ background: 'none', border: 'none', color: '#475569', fontSize: 13, cursor: 'pointer' }}
             onMouseOver={e => e.target.style.color = '#94a3b8'} onMouseOut={e => e.target.style.color = '#475569'}>
             Connexion
