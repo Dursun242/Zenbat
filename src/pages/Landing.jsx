@@ -391,10 +391,16 @@ export default function Landing({ onLogin, onSignup }) {
             <span style={{ color: '#22c55e' }}>Zen</span><span style={{ color: '#475569' }}>bat</span>
           </span>
           <span style={{ color: '#334155', fontSize: 13 }}>© 2026 Zenbat — SaaS de devis & facturation</span>
-          <button onClick={onLogin} style={{ background: 'none', border: 'none', color: '#475569', fontSize: 13, cursor: 'pointer' }}
-            onMouseOver={e => e.target.style.color = '#94a3b8'} onMouseOut={e => e.target.style.color = '#475569'}>
-            Connexion
-          </button>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+            <a href="/cgu" style={{ color: '#475569', fontSize: 13, textDecoration: 'none' }}
+              onMouseOver={e => e.target.style.color = '#94a3b8'} onMouseOut={e => e.target.style.color = '#475569'}>
+              CGU
+            </a>
+            <button onClick={onLogin} style={{ background: 'none', border: 'none', color: '#475569', fontSize: 13, cursor: 'pointer' }}
+              onMouseOver={e => e.target.style.color = '#94a3b8'} onMouseOut={e => e.target.style.color = '#475569'}>
+              Connexion
+            </button>
+          </div>
         </div>
       </footer>
     </div>

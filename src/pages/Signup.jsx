@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../lib/auth.jsx'
+import { saveCguAcceptance } from '../lib/api.js'
+import { CGU_VERSION } from './CGU.jsx'
 
 const styles = {
   wrap:   { minHeight:'100vh', display:'grid', placeItems:'center', padding:24, background:'#f8fafc', fontFamily:'system-ui,sans-serif' },
@@ -17,32 +19,42 @@ const styles = {
 
 export default function Signup({ onSwitchToLogin, onBack }) {
   const { signUpWithPassword } = useAuth()
-  const [fullName, setFullName] = useState('')
-  const [company, setCompany]   = useState('')
-  const [email, setEmail]       = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState(null)
-  const [sent, setSent]         = useState(false)
+  const [fullName, setFullName]       = useState('')
+  const [company, setCompany]         = useState('')
+  const [email, setEmail]             = useState('')
+  const [password, setPassword]       = useState('')
+  const [cguAccepted, setCguAccepted] = useState(false)
+  const [loading, setLoading]         = useState(false)
+  const [error, setError]             = useState(null)
+  const [sent, setSent]               = useState(false)
 
   const onSubmit = async (e) => {
     e.preventDefault()
+    if (!cguAccepted) return
     setError(null); setLoading(true)
     const { error } = await signUpWithPassword(email, password, {
-      full_name: fullName,
-      company_name: company,
+      full_name:       fullName,
+      company_name:    company,
+      cgu_version:     CGU_VERSION,
+      cgu_accepted_at: new Date().toISOString(),
     })
     setLoading(false)
-    if (error) setError(error.message)
-    else setSent(true)
+    if (error) { setError(error.message); return }
+    saveCguAcceptance(CGU_VERSION).catch(() => {})
+    setSent(true)
   }
 
   return (
     <div style={styles.wrap}>
       <div style={styles.card}>
-        {onBack && <button type="button" onClick={onBack} style={{background:'none',border:'none',color:'#94a3b8',fontSize:13,cursor:'pointer',padding:0,marginBottom:16,display:'flex',alignItems:'center',gap:4}}>← Retour</button>}
+        {onBack && (
+          <button type="button" onClick={onBack}
+            style={{background:'none',border:'none',color:'#94a3b8',fontSize:13,cursor:'pointer',padding:0,marginBottom:16,display:'flex',alignItems:'center',gap:4}}>
+            ← Retour
+          </button>
+        )}
         <h1 style={styles.title}>Créer un compte</h1>
-        <p style={styles.sub}>14 jours d'essai, aucune carte bancaire.</p>
+        <p style={styles.sub}>30 jours d'essai, aucune carte bancaire.</p>
 
         {sent ? (
           <div style={styles.ok}>
@@ -61,8 +73,30 @@ export default function Signup({ onSwitchToLogin, onBack }) {
             <div style={{height:12}}/>
             <label style={styles.label}>Mot de passe (min. 6 caractères)</label>
             <input type="password" required minLength={6} value={password} onChange={e=>setPassword(e.target.value)} style={styles.input} autoComplete="new-password" />
+
+            {/* CGU */}
+            <label style={{ display:'flex', alignItems:'flex-start', gap:10, marginTop:20, cursor:'pointer', userSelect:'none' }}>
+              <input
+                type="checkbox"
+                checked={cguAccepted}
+                onChange={e => setCguAccepted(e.target.checked)}
+                style={{ width:16, height:16, marginTop:2, accentColor:'#0f172a', flexShrink:0, cursor:'pointer' }}
+              />
+              <span style={{ fontSize:13, color:'#334155', lineHeight:1.5 }}>
+                J'accepte les{' '}
+                <a href="/cgu" target="_blank" rel="noopener noreferrer"
+                  style={{ color:'#2563eb', fontWeight:600, textDecoration:'underline' }}>
+                  Conditions Générales d'Utilisation
+                </a>
+              </span>
+            </label>
+
             {error && <div style={styles.err}>{error}</div>}
-            <button type="submit" disabled={loading} style={{...styles.btn, opacity:loading?0.6:1}}>
+
+            <button
+              type="submit"
+              disabled={loading || !cguAccepted}
+              style={{ ...styles.btn, opacity:(loading || !cguAccepted) ? 0.45 : 1, cursor:(loading || !cguAccepted) ? 'not-allowed' : 'pointer' }}>
               {loading ? 'Création…' : 'Créer mon compte'}
             </button>
           </form>

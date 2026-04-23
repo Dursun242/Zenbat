@@ -368,3 +368,12 @@ export async function getDevisPdfUrl(devisId, expiresIn = 3600) {
   if (error) throw error
   return data.signedUrl
 }
+
+export async function saveCguAcceptance(version = "1.0") {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+  await supabase.from("profiles")
+    .update({ cgu_accepted_at: new Date().toISOString(), cgu_version: version })
+    .eq("id", user.id)
+    .catch(err => console.warn("[cgu] save error (migration 0008 peut-être pas encore appliquée) :", err.message))
+}

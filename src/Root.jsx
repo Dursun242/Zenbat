@@ -6,6 +6,7 @@ import Signup from './pages/Signup.jsx'
 import AuthCallback from './pages/AuthCallback.jsx'
 import ResetPassword from './pages/ResetPassword.jsx'
 import Landing from './pages/Landing.jsx'
+import CGU from './pages/CGU.jsx'
 
 const loader = {
   wrap: { minHeight:'100vh', display:'grid', placeItems:'center', background:'#f8fafc', color:'#64748b', fontFamily:'system-ui,sans-serif' },
@@ -19,6 +20,7 @@ export default function Root() {
 
   if (path === '/auth/callback') return <AuthCallback />
   if (path === '/reset-password' || recovery) return <ResetPassword />
+  if (path === '/cgu') return <CGU />
 
   if (loading) {
     return <div style={loader.wrap}>Chargement…</div>
