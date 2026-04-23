@@ -7,7 +7,7 @@ const Ix = {
   odoo: <svg width="15" height="15" viewBox="0 0 24 24" fill="#714B67"><circle cx="12" cy="12" r="3"/><circle cx="4" cy="12" r="3"/><circle cx="20" cy="12" r="3"/></svg>,
 }
 
-export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageReady, onSendOdoo, sending=false, sent=false, kind="devis", noDownload=false }) {
+export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageReady, onSendOdoo, sending=false, sent=false, kind="devis", noDownload=false, inline=false }) {
   const docLabel = kind === "facture" ? "FACTURE" : "DEVIS";
   const MM_TO_PX = 3.7795275591
   const A4_PX = 210 * MM_TO_PX
