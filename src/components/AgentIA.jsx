@@ -310,6 +310,18 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
     const userMsg = { role: "user", content: input };
     const newMsgs = [...msgs, userMsg];
     setMsgs(newMsgs);
+
+    // Stoppe la dictée vocale en cours et purge le buffer d'accumulation —
+    // sinon le prochain résultat SpeechRecognition ré-injecte l'ancien texte
+    // dans le champ et on risque les doublons d'envoi. On détache aussi
+    // onresult pour ignorer un éventuel tick final en vol après stop().
+    try {
+      const rec = recRef.current;
+      if (rec) { rec.onresult = null; rec.stop(); }
+    } catch {}
+    setListening(false);
+    accumRef.current = "";
+
     setInput(""); setLoading(true);
 
     let assistantAdded = false;
