@@ -9,12 +9,44 @@ const A4_H_MM = 297;
 
 export async function renderElementToPdf(el, { filename = "document.pdf" } = {}) {
   if (!el) throw new Error("Élément cible introuvable pour le rendu PDF.");
-  const canvas = await html2canvas(el, {
-    scale: 2,
-    useCORS: true,
-    backgroundColor: "#ffffff",
-    logging: false,
-  });
+
+  // Le preview de devis utilise souvent `transform: scale(fitScale)` pour
+  // tenir à l'écran (surtout sur mobile). html2canvas gère mal ce transform
+  // et capture soit à la mauvaise taille, soit à une résolution dégradée,
+  // d'où des PDF pixelisés quand on zoome. On neutralise donc le transform
+  // pendant la capture, l'élément est masqué via opacity:0 pour éviter
+  // tout flash visuel.
+  const saved = {
+    transform:  el.style.transform,
+    position:   el.style.position,
+    opacity:    el.style.opacity,
+    pointer:    el.style.pointerEvents,
+  };
+  el.style.transform = "none";
+  el.style.opacity   = "0";
+  el.style.pointerEvents = "none";
+  if (saved.position !== "absolute" && saved.position !== "fixed") {
+    el.style.position = "absolute";
+  }
+  // force reflow
+  // eslint-disable-next-line no-unused-expressions
+  el.offsetHeight;
+
+  let canvas;
+  try {
+    canvas = await html2canvas(el, {
+      scale: 3,               // 300dpi-ish en A4, fini le zoom pixelisé
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+      imageTimeout: 15000,
+    });
+  } finally {
+    el.style.transform = saved.transform;
+    el.style.position  = saved.position;
+    el.style.opacity   = saved.opacity;
+    el.style.pointerEvents = saved.pointer;
+  }
 
   const pageW  = A4_W_MM;
   const ratio  = canvas.height / canvas.width;
@@ -25,7 +57,7 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
     // (jamais de blanc en bas), ou légèrement réduit pour tenir en A4.
     const pageH = Math.min(drawH, A4_H_MM); // hauteur PDF = contenu ou A4 max
     const pdf   = new jsPDF({ unit: "mm", format: [pageW, pageH], orientation: "portrait" });
-    const img   = canvas.toDataURL("image/jpeg", 0.92);
+    const img   = canvas.toDataURL("image/jpeg", 0.95);
 
     if (drawH <= A4_H_MM) {
       // Contenu plus court que A4 : page à la taille exacte du contenu
@@ -54,7 +86,7 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
     slice.width  = canvas.width;
     slice.height = sliceH;
     slice.getContext("2d").drawImage(canvas, 0, y, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-    const img    = slice.toDataURL("image/jpeg", 0.92);
+    const img    = slice.toDataURL("image/jpeg", 0.95);
     const thisH  = (sliceH * pageW) / canvas.width;
     pdf.addImage(img, "JPEG", 0, 0, pageW, thisH, undefined, "FAST");
     y += sliceH;
