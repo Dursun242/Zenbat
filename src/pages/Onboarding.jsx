@@ -278,7 +278,7 @@ export default function Onboarding({ brand, setBrand, onDone }) {
 
             {currentTrades.length === 0 && !tradeInput && (
               <div style={{color:"#475569",fontSize:11,lineHeight:1.5}}>
-                BTP, artisanat, beauté, tech, transport… tous les métiers sont acceptés.
+                Tous les métiers sont acceptés — BTP, artisanat, beauté, tech, transport, santé, créatif, événementiel, immobilier, mode… ou le vôtre. Tapez librement et cliquez sur « Ajouter » si votre métier n'est pas dans la liste.
               </div>
             )}
 

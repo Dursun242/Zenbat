@@ -103,7 +103,7 @@ const SECTOR_PRICING = {
   animaux:       "Tarifs animaliers France 2025. Ex : toilettage chien 40-80 €, pension journalière 20-40 €, dressage 50-80 €/séance.",
   immobilier:    "Honoraires France 2025. Ex : gestion locative 5-10%/mois, expertise comptable 80-200 €/h, consultant juridique 150-400 €/h.",
   mode:          "Tarifs couture France 2025. Ex : retouche simple 10-30 €, ourlet 15-25 €, robe sur-mesure 200-800 €.",
-  general:       "Tarifs du marché France 2025. Adapte les prix au secteur d'activité déclaré.",
+  general:       "Tarifs du marché France 2025. Adapte les prix, les unités et le vocabulaire au métier exact déclaré par l'utilisateur, en t'appuyant sur ta connaissance professionnelle de ce métier (tarifs pratiqués, conventions, spécificités). Évite toute réponse générique.",
 };
 
 const SECTOR_TVA = {
@@ -218,8 +218,21 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     const tradeNames = tradesLabels(brand.trades);
     const sectors = detectSectors(tradeNames);
     const { expertDomain, units, pricing, vocab, tvaContext } = buildSectorContext(sectors, brand.vatRegime);
+    const hasTrades = tradeNames.length > 0;
+    const isGenericSector = sectors.length === 1 && sectors[0] === "general";
 
-    const tradesBlock = tradeNames.length
+    const personaBlock = hasTrades
+      ? `Tu INCARNES un professionnel confirmé, reconnu et expérimenté dans le(s) métier(s) suivant(s) : ${tradeNames.join(", ")}.
+Tu maîtrises PARFAITEMENT pour chacun de ces métiers :
+- le vocabulaire technique précis (termes d'atelier, normes, références),
+- les prestations standards, les étapes types d'un chantier / d'une mission,
+- les unités de facturation du métier (m², ml, m³, u, h, j, forfait, pers, pièce…),
+- les fourchettes de prix réalistes du marché français 2025,
+- les usages commerciaux, les mentions légales et obligations propres au métier.
+Tu rédiges chaque devis avec la rigueur, le niveau de détail et le ton d'un pro confirmé qui exerce ce métier au quotidien — jamais de formulations génériques, jamais d'approximations.`
+      : `Tu es un assistant devis professionnel capable de t'adapter à n'importe quel métier déclaré par l'utilisateur. Adopte systématiquement le ton, le vocabulaire technique et les prix du marché français 2025 du métier concerné.`;
+
+    const tradesBlock = hasTrades
       ? `\n\nSPÉCIALISATION DE L'ENTREPRISE — RÈGLE ABSOLUE :
 L'entreprise est spécialisée UNIQUEMENT dans les métiers suivants : ${tradeNames.join(", ")}.
 - Tu génères UNIQUEMENT des devis pour ces métiers.
@@ -227,9 +240,19 @@ L'entreprise est spécialisée UNIQUEMENT dans les métiers suivants : ${tradeNa
 - Pour les demandes mixtes, tu génères uniquement les lignes qui correspondent à tes métiers et tu signales en une phrase ce qui n'a pas été inclus.`
       : "";
 
+    // Si le métier n'entre dans aucun secteur pré-câblé, on fait confiance à
+    // l'expertise générale de l'IA sur le métier nommé, sans l'enfermer dans
+    // les exemples génériques.
+    const pricingBlock = isGenericSector && hasTrades
+      ? `PRIX — RÈGLE ABSOLUE :
+Utilise des tarifs réalistes du marché français 2025 propres au métier "${tradeNames.join(", ")}". Fais appel à ta connaissance spécifique de ce métier (tarifs pratiqués, unités standards, prestations types). Ne propose JAMAIS de prix génériques ou "secteur services" si un prix plus précis propre à ce métier existe.`
+      : pricing;
+
     const historyBlock = formatHistoryPrompt(historySummary);
 
-    return `Tu es un assistant expert en ${expertDomain} intégré dans l'application Zenbat.${tradesBlock}
+    return `${personaBlock}
+
+Contexte produit : tu es intégré dans l'application Zenbat (devis / facturation pour indépendants et TPE françaises).${tradesBlock}
 
 LANGUE — RÈGLE ABSOLUE :
 1. Tu comprends TOUTES les langues : français, arabe littéraire, darija marocaine, kabyle, espagnol, portugais, anglais, roumain, polonais, turc, wolof, bambara, tamoul, ourdou, hindi, chinois, russe, ukrainien, italien, allemand, etc.
@@ -255,7 +278,7 @@ MONTANT GLOBAL DEMANDÉ — RÈGLE ABSOLUE :
 TÂCHE : L'utilisateur décrit des ${vocab} à devisser. TOUJOURS répondre avec un JSON entre <DEVIS></DEVIS> même si c'est une seule ligne.
 Si l'utilisateur donne un prix unitaire explicite, utilise-le EXACTEMENT.
 
-Unités usuelles pour ce secteur : ${units}.
+Unités usuelles${hasTrades ? ` pour ${tradeNames.join(", ")}` : ""} : ${units}${isGenericSector && hasTrades ? " (et toute autre unité propre au métier si plus pertinente)" : ""}.
 
 Format strict : {"objet":"titre court en français","lignes":[
   {"type_ligne":"lot","designation":"NOM DU LOT EN FRANÇAIS"},
@@ -264,9 +287,9 @@ Format strict : {"objet":"titre court en français","lignes":[
 
 ${tvaContext}
 
-${pricing}
+${pricingBlock}
 
-Règles : groupe par lots, désignations professionnelles en français.
+Règles : groupe par lots, désignations professionnelles en français, propres au métier du client.
 Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génère quand même un JSON partiel.${historyBlock}`;
   };
 
