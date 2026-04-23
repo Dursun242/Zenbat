@@ -33,6 +33,11 @@ export const DEFAULT_BRAND = {
   paymentTerms: "Acompte 30% à la commande, solde à réception.",
   validityDays: 30,
   trades: [],
+  // Mentions BTP obligatoires (décret n°2017-1809 + art. L111-1 code conso)
+  // pour les devis de travaux > 150 € TTC, affichées sur le PDF des devis.
+  devisGratuit: true,          // caractère gratuit du devis (ou payant)
+  devisTarif:   "",            // tarif si devis payant (ex : "50 €")
+  travelFees:   "",            // frais de déplacement (ex : "Gratuits dans un rayon de 30 km")
 };
 
 export const FRANCHISE_MENTION = "TVA non applicable, art. 293 B du CGI";

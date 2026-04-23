@@ -355,6 +355,14 @@ export async function deleteInvoice(id) {
   if (error) throw error
 }
 
+// Crée un avoir (brouillon, modifiable) à partir d'une facture verrouillée.
+// Retourne l'UUID du nouvel avoir — côté client, on navigue ensuite vers lui.
+export async function createAvoirFromInvoice(invoiceId) {
+  const { data, error } = await supabase.rpc('create_avoir_from', { p_invoice_id: invoiceId })
+  if (error) throw error
+  return data // UUID du nouvel avoir
+}
+
 // Appelle le proxy /api/b2brouter avec l'access_token courant.
 async function callB2B(action, payload = {}) {
   const { data: { session } } = await supabase.auth.getSession()

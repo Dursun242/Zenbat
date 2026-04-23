@@ -8,7 +8,8 @@ const Ix = {
 }
 
 export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageReady, onSendOdoo, sending=false, sent=false, kind="devis", noDownload=false, inline=false }) {
-  const docLabel = kind === "facture" ? "FACTURE" : "DEVIS";
+  const isAvoir  = kind === "facture" && !!d?.avoir_of_invoice_id;
+  const docLabel = isAvoir ? "FACTURE D'AVOIR" : kind === "facture" ? "FACTURE" : "DEVIS";
   const MM_TO_PX = 3.7795275591
   const A4_PX = 210 * MM_TO_PX
   const wrapRef = useRef(null)
@@ -228,6 +229,22 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
               {brand.bic&&<div style={{fontSize:9,color:"#4b5563",fontFamily:"monospace"}}>BIC : {brand.bic}</div>}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Mentions BTP obligatoires (décret 2017-1809) — affichées sur le devis uniquement */}
+      {kind !== "facture" && (brand.devisGratuit !== undefined || brand.travelFees) && (
+        <div style={{marginTop:14,paddingTop:10,borderTop:"1px solid #e5e7eb",fontSize:9,color:"#4b5563",lineHeight:1.6}}>
+          <div style={{fontSize:8,fontWeight:700,color:"#9ca3af",letterSpacing:"1px",marginBottom:4}}>INFORMATIONS LÉGALES</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:14}}>
+            {brand.devisGratuit !== false ? (
+              <span>• Devis <strong>gratuit</strong>.</span>
+            ) : (
+              <span>• Devis <strong>payant</strong>{brand.devisTarif ? ` : ${brand.devisTarif}` : ""} (déductible en cas de signature).</span>
+            )}
+            {brand.travelFees && <span>• Frais de déplacement : {brand.travelFees}</span>}
+            {brand.validityDays && <span>• Validité : {brand.validityDays} jour{brand.validityDays>1?"s":""} à compter de l'émission.</span>}
+          </div>
         </div>
       )}
 

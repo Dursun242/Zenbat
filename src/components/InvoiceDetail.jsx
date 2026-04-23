@@ -4,7 +4,7 @@ import Badge from "./ui/Badge.jsx";
 import LignesEditor from "./LignesEditor.jsx";
 import PDFViewer from "./PDFViewer.jsx";
 
-export default function InvoiceDetail({ invoice, client, brand, onBack, onChange, onDelete }) {
+export default function InvoiceDetail({ invoice, client, brand, invoices, onBack, onChange, onCreateAvoir, onDelete }) {
   const [showPDF, setShowPDF] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState(null);
@@ -22,6 +22,10 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
   // Conformité fiscale : une facture émise est immuable (CGI art. 289).
   // Le verrou est posé côté serveur par le trigger autolock_invoice_on_emission().
   const isLocked = !!invoice.locked || invoice.statut !== "brouillon";
+  const isAvoir  = !!invoice.avoir_of_invoice_id;
+  const sourceInvoice = isAvoir && Array.isArray(invoices)
+    ? invoices.find(x => x.id === invoice.avoir_of_invoice_id)
+    : null;
 
   const updateLignes = (newLignes) => {
     if (isLocked) return;
@@ -124,10 +128,24 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
           <div style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace", flex: 1 }}>{invoice.numero}</div>
           <Badge s={invoice.statut} kind="facture"/>
         </div>
-        {isLocked && (
+        {isAvoir && (
+          <div style={{ background: "#eef2ff", border: "1px solid #c7d2fe", color: "#3730a3", padding: "8px 10px", borderRadius: 10, fontSize: 11, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 14 }}>↩</span>
+            <span>
+              <strong>Facture d'avoir</strong> — rectifie la facture {sourceInvoice ? <strong>{sourceInvoice.numero}</strong> : "d'origine"}.
+            </span>
+          </div>
+        )}
+        {isLocked && !isAvoir && (
           <div style={{ background: "#fef3c7", border: "1px solid #fde68a", color: "#92400e", padding: "8px 10px", borderRadius: 10, fontSize: 11, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 14 }}>🔒</span>
             <span><strong>Facture verrouillée</strong> — émise et immuable (CGI art. 289). Pour corriger, créez une facture d'avoir.</span>
+          </div>
+        )}
+        {isLocked && isAvoir && (
+          <div style={{ background: "#fef3c7", border: "1px solid #fde68a", color: "#92400e", padding: "8px 10px", borderRadius: 10, fontSize: 11, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 14 }}>🔒</span>
+            <span><strong>Avoir verrouillé</strong> — émis et immuable.</span>
           </div>
         )}
         <label style={{ display: "block", fontSize: 10, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>OBJET</label>
@@ -220,7 +238,7 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           {!isLocked ? (
             <button onClick={onDelete}
               style={{ background: "white", border: "1px solid #fecaca", color: "#b91c1c", borderRadius: 12, padding: "12px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
@@ -233,6 +251,20 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
               Masquer
             </button>
           )}
+
+          {/* Créer un avoir : uniquement sur facture verrouillée ET qui n'est PAS déjà un avoir */}
+          {isLocked && !isAvoir && onCreateAvoir && (
+            <button
+              onClick={() => {
+                if (!confirm(`Créer une facture d'avoir pour ${invoice.numero} ?\n\nUn nouveau brouillon sera créé avec les mêmes lignes. Vous pourrez ajuster les quantités avant émission.`)) return;
+                onCreateAvoir(invoice.id);
+              }}
+              title="Crée un avoir (facture rectificative) basé sur cette facture"
+              style={{ background: "#eef2ff", border: "1px solid #c7d2fe", color: "#4338ca", borderRadius: 12, padding: "12px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+              ↩ Créer un avoir
+            </button>
+          )}
+
           <button onClick={handleFacturX} disabled={exporting || !lignes.length}
             style={{ flex: 1, background: exporting || !lignes.length ? "#cbd5e1" : "#0f172a", color: "white", border: "none", borderRadius: 12, padding: "12px 16px", fontSize: 13, fontWeight: 700, cursor: exporting || !lignes.length ? "not-allowed" : "pointer" }}>
             {exporting ? "Génération Factur-X…" : (isLocked ? "⬇ Re-télécharger Factur-X" : "⬇ Télécharger Factur-X (PDF + XML)")}

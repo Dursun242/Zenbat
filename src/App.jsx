@@ -3,7 +3,7 @@ import { useAuth } from "./lib/auth.jsx";
 import {
   listClients, createClient as apiCreateClient, updateClient as apiUpdateClient, deleteClient as apiDeleteClient,
   listDevisWithLignes, getDevis, createDevis as apiCreateDevis, updateDevis as apiUpdateDevis, replaceLignes, deleteDevis as apiDeleteDevis,
-  listInvoices, createInvoice as apiCreateInvoice, updateInvoice as apiUpdateInvoice, replaceInvoiceLignes, deleteInvoice as apiDeleteInvoice, nextInvoiceNumber,
+  listInvoices, createInvoice as apiCreateInvoice, updateInvoice as apiUpdateInvoice, replaceInvoiceLignes, deleteInvoice as apiDeleteInvoice, nextInvoiceNumber, createAvoirFromInvoice as apiCreateAvoir,
   updateMyProfile, getMyProfile, saveBrandData,
 } from "./lib/api";
 import { uid } from "./lib/utils.js";
@@ -327,6 +327,20 @@ export default function App() {
     }
   };
 
+  const onCreateAvoir = async (invoiceId) => {
+    if (!user) { showErr("Vous devez être connecté."); return; }
+    try {
+      const newId = await apiCreateAvoir(invoiceId);
+      // Recharge la liste pour récupérer l'avoir fraîchement créé côté DB
+      const fresh = await listInvoices();
+      setInvoices(fresh);
+      goInvoice(newId);
+    } catch (e) {
+      console.error("[create avoir]", e);
+      showErr(e?.message || "Impossible de créer l'avoir");
+    }
+  };
+
   const onDeleteInvoice = async (id) => {
     if (!user) {
       setInvoices(prev => prev.filter(x => x.id !== id));
@@ -520,8 +534,10 @@ export default function App() {
               invoice={inv}
               client={clients.find(c => c.id === inv.client_id)}
               brand={brand}
+              invoices={invoices}
               onBack={() => setTab("factures")}
               onChange={onSaveInvoice}
+              onCreateAvoir={onCreateAvoir}
               onDelete={() => { if (confirm("Supprimer cette facture ?")) onDeleteInvoice(inv.id); }}/>
           );
         })()}

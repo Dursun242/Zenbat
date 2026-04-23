@@ -503,6 +503,53 @@ export default function Onboarding({ brand, setBrand, onDone }) {
               <input type="number" value={local.validityDays} onChange={e=>set("validityDays",parseInt(e.target.value)||30)}
                 style={{width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:12,padding:"10px 14px",fontSize:13,color:"white",outline:"none"}}/>
             </div>
+
+            {/* Mentions BTP obligatoires (décret 2017-1809) */}
+            <div style={{background:"#1e293b",border:"1px solid #334155",borderRadius:12,padding:14}}>
+              <div style={{fontSize:11,fontWeight:700,color:"#22c55e",marginBottom:8,letterSpacing:"0.5px",textTransform:"uppercase"}}>
+                Mentions BTP obligatoires
+              </div>
+              <div style={{fontSize:10,color:"#64748b",lineHeight:1.5,marginBottom:12}}>
+                Pour tout devis de travaux &gt; 150 € TTC (décret n°2017-1809).
+              </div>
+
+              {/* Caractère gratuit / payant */}
+              <div style={{marginBottom:12}}>
+                <label style={{display:"block",fontSize:11,fontWeight:600,color:"#94a3b8",marginBottom:6}}>LE DEVIS EST :</label>
+                <div style={{display:"flex",gap:8}}>
+                  <button
+                    type="button"
+                    onClick={()=>set("devisGratuit",true)}
+                    style={{flex:1,background:local.devisGratuit!==false?"#0f2318":"#0f172a",color:local.devisGratuit!==false?"#22c55e":"#64748b",border:`1.5px solid ${local.devisGratuit!==false?"#22c55e":"#334155"}`,borderRadius:10,padding:"9px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                    Gratuit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={()=>set("devisGratuit",false)}
+                    style={{flex:1,background:local.devisGratuit===false?"#2d1a0a":"#0f172a",color:local.devisGratuit===false?"#f59e0b":"#64748b",border:`1.5px solid ${local.devisGratuit===false?"#f59e0b":"#334155"}`,borderRadius:10,padding:"9px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                    Payant
+                  </button>
+                </div>
+                {local.devisGratuit===false && (
+                  <input
+                    value={local.devisTarif||""}
+                    onChange={e=>set("devisTarif",e.target.value)}
+                    placeholder="Tarif du devis (ex : 50 € TTC)"
+                    style={{marginTop:8,width:"100%",background:"#0f172a",border:"1px solid #334155",borderRadius:10,padding:"9px 12px",fontSize:13,color:"white",outline:"none"}}/>
+                )}
+              </div>
+
+              {/* Frais de déplacement */}
+              <div>
+                <label style={{display:"block",fontSize:11,fontWeight:600,color:"#94a3b8",marginBottom:6}}>FRAIS DE DÉPLACEMENT</label>
+                <input
+                  value={local.travelFees||""}
+                  onChange={e=>set("travelFees",e.target.value)}
+                  placeholder="Ex : Gratuits dans un rayon de 30 km autour du Havre"
+                  style={{width:"100%",background:"#0f172a",border:"1px solid #334155",borderRadius:10,padding:"9px 12px",fontSize:13,color:"white",outline:"none"}}/>
+                <div style={{fontSize:10,color:"#64748b",marginTop:5,lineHeight:1.4}}>Laissez vide s'ils sont déjà intégrés aux lignes du devis.</div>
+              </div>
+            </div>
           </div>
         )}
       </div>
