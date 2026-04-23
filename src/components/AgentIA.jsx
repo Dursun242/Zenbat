@@ -484,6 +484,20 @@ Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génèr
         );
       }
 
+      // Journal complet (user + IA) pour consultation admin compte-par-compte.
+      // Best-effort, silencieux. On ne stocke QUE le texte visible (pas le JSON
+      // <DEVIS>) + le flag had_devis pour l'analyse.
+      supabase.from("ia_conversations").insert({
+        user_message: userMsg.content?.slice(0, 2000) || null,
+        ai_response:  finalText?.slice(0, 2000) || null,
+        had_devis:    !!match,
+        trade_names:  tradesLabels(brand?.trades || []).slice(0, 3).join(", ") || null,
+        model:        CLAUDE_MODEL,
+      }).then(
+        ({ error: dbErr }) => { if (dbErr) console.warn("[conv log/db]", dbErr.message); },
+        (netErr)           => { console.warn("[conv log/net]", netErr?.message || netErr); },
+      );
+
       // Incrémente le compteur d'usage IA (best-effort, silencieux)
       supabase.rpc("increment_ai_used").then(() => {}, () => {});
     } catch (e) {
