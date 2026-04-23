@@ -13,28 +13,29 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
   // Le preview de devis utilise souvent `transform: scale(fitScale)` pour
   // tenir à l'écran (surtout sur mobile). html2canvas gère mal ce transform
   // et capture soit à la mauvaise taille, soit à une résolution dégradée,
-  // d'où des PDF pixelisés quand on zoome. On neutralise donc le transform
-  // pendant la capture, l'élément est masqué via opacity:0 pour éviter
-  // tout flash visuel.
-  const saved = {
-    transform:  el.style.transform,
-    position:   el.style.position,
-    opacity:    el.style.opacity,
-    pointer:    el.style.pointerEvents,
-  };
-  el.style.transform = "none";
-  el.style.opacity   = "0";
-  el.style.pointerEvents = "none";
-  if (saved.position !== "absolute" && saved.position !== "fixed") {
-    el.style.position = "absolute";
-  }
-  // force reflow
-  // eslint-disable-next-line no-unused-expressions
-  el.offsetHeight;
+  // d'où des PDF pixelisés quand on zoome. Stratégie : on clone le nœud
+  // et on l'ajoute hors-champ (sans transform), puis on capture le clone —
+  // l'élément visible par l'utilisateur n'est JAMAIS modifié, donc pas de
+  // flash, pas de risque de capturer un élément masqué.
+  const clone = el.cloneNode(true);
+  // Reset des styles susceptibles de gêner la capture
+  clone.style.transform    = "none";
+  clone.style.position     = "fixed";
+  clone.style.top          = "0";
+  clone.style.left         = "-99999px";
+  clone.style.opacity      = "1";
+  clone.style.visibility   = "visible";
+  clone.style.pointerEvents= "none";
+  clone.style.margin       = "0";
+  clone.style.zIndex       = "-1";
+  document.body.appendChild(clone);
+
+  // Un tick pour laisser le navigateur recalculer le layout du clone
+  await new Promise((r) => requestAnimationFrame(() => r()));
 
   let canvas;
   try {
-    canvas = await html2canvas(el, {
+    canvas = await html2canvas(clone, {
       scale: 3,               // 300dpi-ish en A4, fini le zoom pixelisé
       useCORS: true,
       backgroundColor: "#ffffff",
@@ -42,10 +43,7 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
       imageTimeout: 15000,
     });
   } finally {
-    el.style.transform = saved.transform;
-    el.style.position  = saved.position;
-    el.style.opacity   = saved.opacity;
-    el.style.pointerEvents = saved.pointer;
+    if (clone.parentNode) clone.parentNode.removeChild(clone);
   }
 
   const pageW  = A4_W_MM;
