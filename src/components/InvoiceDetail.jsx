@@ -51,6 +51,12 @@ export default function InvoiceDetail({ invoice, client, brand, invoices, onBack
       const { base64 } = await renderElementToPdf(pageEl, { filename: `${invoice.numero}.pdf` });
 
       // Appelle le serveur pour l'assemblage PDF/A-3 (OutputIntent, XMP, XML embed)
+      // Si la facture est un avoir, on transmet les infos de la facture d'origine
+      // pour que l'XML Factur-X émette TypeCode=381 + InvoiceReferencedDocument.
+      const sourcePayload = isAvoir && sourceInvoice
+        ? { numero: sourceInvoice.numero, date_emission: sourceInvoice.date_emission }
+        : undefined;
+
       const res = await fetch("/api/facturx", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
@@ -59,6 +65,7 @@ export default function InvoiceDetail({ invoice, client, brand, invoices, onBack
           invoice:    { ...invoice, lignes },
           client,
           brand,
+          sourceInvoice: sourcePayload,
         }),
       });
       const data = await res.json();
@@ -80,9 +87,11 @@ export default function InvoiceDetail({ invoice, client, brand, invoices, onBack
 
       setExportMsg(
         (data.icc_applied
-          ? "✓ Factur-X PDF/A-3 téléchargé avec profil sRGB. Conformité maximale."
-          : "✓ Factur-X téléchargé. Pour la conformité PDF/A-3 stricte, ajoutez public/icc/sRGB.icc — voir public/icc/README.md.")
-        + " La facture est maintenant verrouillée (immuable)."
+          ? "✓ Factur-X EN 16931 / PDF-A3 téléchargé avec profil sRGB. Conformité PPF/PDP 2026 maximale."
+          : "✓ Factur-X EN 16931 téléchargé. Pour la conformité PDF/A-3 stricte, ajoutez public/icc/sRGB.icc — voir public/icc/README.md.")
+        + (isAvoir
+            ? " Avoir verrouillé (immuable)."
+            : " La facture est maintenant verrouillée (immuable).")
       );
     } catch (err) {
       console.error("[facturx]", err);

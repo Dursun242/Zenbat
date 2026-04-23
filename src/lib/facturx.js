@@ -9,9 +9,15 @@
 
 import { PDFDocument, AFRelationship, PDFName, PDFRawStream } from "pdf-lib";
 
-const PROFILE = "urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:basic";
+// Profil EN 16931 (norme UE, attendu par PPF/PDP à partir de 09/2026).
+const PROFILE = "urn:cen.eu:en16931:2017";
+const CONFORMANCE_LABEL = "EN 16931";
 const XML_FILENAME = "factur-x.xml";
 const FRANCHISE_NOTICE = "TVA non applicable, art. 293 B du CGI";
+
+// UNTDID 1001
+const TYPE_INVOICE = "380";
+const TYPE_CREDIT  = "381";
 
 // Codes d'unité UN/ECE Rec. 20 acceptés par le schématron Factur-X.
 // On mappe les libellés courants du bâtiment vers les codes officiels.
@@ -55,10 +61,14 @@ function num(n, decimals = 2) {
   return v.toFixed(decimals);
 }
 
-// Construit le XML CII Factur-X profil BASIC.
-export function buildFacturXXML({ invoice, client, brand }) {
+// Construit le XML CII Factur-X profil EN 16931.
+// Supporte les factures d'avoir : passer { sourceInvoice: { numero, date_emission } }
+// ou fournir invoice.avoir_of_invoice_id pour déclencher le TypeCode 381.
+export function buildFacturXXML({ invoice, client, brand, sourceInvoice }) {
   const ouvrages = (invoice.lignes || []).filter(l => l.type_ligne === "ouvrage");
   const franchise = brand.vatRegime === "franchise";
+  const isAvoir  = !!invoice.avoir_of_invoice_id || !!sourceInvoice;
+  const typeCode = isAvoir ? TYPE_CREDIT : TYPE_INVOICE;
 
   // Regroupement TVA par taux
   const taxByRate = {};
@@ -158,14 +168,39 @@ export function buildFacturXXML({ invoice, client, brand }) {
   const iban     = (brand.iban || "").replace(/\s+/g, "");
   const bic      = (brand.bic || "").trim();
 
-  // Enregistrements fiscaux du vendeur :
-  // - schemeID="VA" pour le n° de TVA intracom
-  // - schemeID="FC" pour l'identifiant fiscal (SIRET en France) — requis par
-  //   BR-E-02 quand des lignes sont en exemption (franchise en base).
   const sellerTaxRegs = [
     brand.tva    ? `<ram:SpecifiedTaxRegistration><ram:ID schemeID="VA">${esc(brand.tva)}</ram:ID></ram:SpecifiedTaxRegistration>` : "",
     sellerSiret  ? `<ram:SpecifiedTaxRegistration><ram:ID schemeID="FC">${esc(sellerSiret)}</ram:ID></ram:SpecifiedTaxRegistration>` : "",
   ].filter(Boolean).join("");
+
+  // Contact vendeur (BG-6) EN 16931
+  const sellerContactParts = [
+    brand.firstName || brand.lastName
+      ? `<ram:PersonName>${esc(`${brand.firstName||""} ${brand.lastName||""}`.trim())}</ram:PersonName>`
+      : "",
+    brand.phone
+      ? `<ram:TelephoneUniversalCommunication><ram:CompleteNumber>${esc(brand.phone)}</ram:CompleteNumber></ram:TelephoneUniversalCommunication>`
+      : "",
+    brand.email
+      ? `<ram:EmailURIUniversalCommunication><ram:URIID>${esc(brand.email)}</ram:URIID></ram:EmailURIUniversalCommunication>`
+      : "",
+  ].filter(Boolean).join("");
+  const sellerContact = sellerContactParts
+    ? `<ram:DefinedTradeContact>${sellerContactParts}</ram:DefinedTradeContact>`
+    : "";
+
+  const buyerRef  = esc(invoice.buyer_reference || client?.reference || client?.raison_sociale || client?.nom || "—");
+  const termsDesc = esc(brand.paymentTerms || "Paiement à réception de facture").slice(0, 1000);
+
+  const sourceRefBlock = (isAvoir && sourceInvoice?.numero)
+    ? `<ram:InvoiceReferencedDocument>
+        <ram:IssuerAssignedID>${esc(sourceInvoice.numero)}</ram:IssuerAssignedID>
+        ${sourceInvoice.date_emission ? `<ram:FormattedIssueDateTime><qdt:DateTimeString format="102">${fmtDate(sourceInvoice.date_emission)}</qdt:DateTimeString></ram:FormattedIssueDateTime>` : ""}
+      </ram:InvoiceReferencedDocument>`
+    : "";
+  const docNote = isAvoir && sourceInvoice?.numero
+    ? `<ram:IncludedNote><ram:Content>Avoir rectificatif de la facture ${esc(sourceInvoice.numero)}.</ram:Content></ram:IncludedNote>`
+    : "";
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
@@ -179,16 +214,19 @@ export function buildFacturXXML({ invoice, client, brand }) {
   </rsm:ExchangedDocumentContext>
   <rsm:ExchangedDocument>
     <ram:ID>${esc(invoice.numero || "")}</ram:ID>
-    <ram:TypeCode>380</ram:TypeCode>
+    <ram:TypeCode>${typeCode}</ram:TypeCode>
     <ram:IssueDateTime>
       <udt:DateTimeString format="102">${issue}</udt:DateTimeString>
     </ram:IssueDateTime>
+    ${docNote}
   </rsm:ExchangedDocument>
   <rsm:SupplyChainTradeTransaction>${lineBlocks}
     <ram:ApplicableHeaderTradeAgreement>
+      <ram:BuyerReference>${buyerRef}</ram:BuyerReference>
       <ram:SellerTradeParty>
         <ram:Name>${sellerName}</ram:Name>
         ${sellerSiren ? `<ram:SpecifiedLegalOrganization><ram:ID schemeID="0002">${esc(sellerSiren)}</ram:ID></ram:SpecifiedLegalOrganization>` : ""}
+        ${sellerContact}
         <ram:PostalTradeAddress>
           ${sellerAddr.cp   ? `<ram:PostcodeCode>${sellerAddr.cp}</ram:PostcodeCode>` : ""}
           ${sellerAddr.line ? `<ram:LineOne>${sellerAddr.line}</ram:LineOne>` : ""}
@@ -216,6 +254,7 @@ export function buildFacturXXML({ invoice, client, brand }) {
       </ram:ActualDeliverySupplyChainEvent>
     </ram:ApplicableHeaderTradeDelivery>
     <ram:ApplicableHeaderTradeSettlement>
+      ${sourceRefBlock}
       <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
       ${iban ? `
       <ram:SpecifiedTradeSettlementPaymentMeans>
@@ -229,7 +268,10 @@ export function buildFacturXXML({ invoice, client, brand }) {
         <ram:Reason>Retenue de garantie</ram:Reason>
         <ram:CategoryTradeTax><ram:TypeCode>VAT</ram:TypeCode><ram:CategoryCode>S</ram:CategoryCode><ram:RateApplicablePercent>0.00</ram:RateApplicablePercent></ram:CategoryTradeTax>
       </ram:SpecifiedTradeAllowanceCharge>` : ""}
-      ${due ? `<ram:SpecifiedTradePaymentTerms><ram:DueDateDateTime><udt:DateTimeString format="102">${due}</udt:DateTimeString></ram:DueDateDateTime></ram:SpecifiedTradePaymentTerms>` : ""}
+      <ram:SpecifiedTradePaymentTerms>
+        <ram:Description>${termsDesc}</ram:Description>
+        ${due ? `<ram:DueDateDateTime><udt:DateTimeString format="102">${due}</udt:DateTimeString></ram:DueDateDateTime>` : ""}
+      </ram:SpecifiedTradePaymentTerms>
       <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
         <ram:LineTotalAmount>${num(totalHT)}</ram:LineTotalAmount>
         <ram:TaxBasisTotalAmount>${num(totalHT)}</ram:TaxBasisTotalAmount>
@@ -247,6 +289,8 @@ export function buildFacturXXML({ invoice, client, brand }) {
 function buildFacturXXMP({ invoice }) {
   const now = new Date().toISOString().replace(/\.\d{3}/, "");
   const docId = esc(invoice?.numero || "invoice");
+  const isAvoir = !!invoice?.avoir_of_invoice_id;
+  const docKind = isAvoir ? "Avoir" : "Facture";
   return `<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/">
   <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
@@ -260,7 +304,7 @@ function buildFacturXXMP({ invoice }) {
         xmlns:pdfaProperty="http://www.aiim.org/pdfa/ns/property#"
         xmlns:fx="urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#">
       <dc:title>
-        <rdf:Alt><rdf:li xml:lang="x-default">Facture ${docId}</rdf:li></rdf:Alt>
+        <rdf:Alt><rdf:li xml:lang="x-default">${docKind} ${docId}</rdf:li></rdf:Alt>
       </dc:title>
       <xmp:CreatorTool>Zenbat</xmp:CreatorTool>
       <xmp:CreateDate>${now}</xmp:CreateDate>
@@ -271,7 +315,7 @@ function buildFacturXXMP({ invoice }) {
       <fx:DocumentType>INVOICE</fx:DocumentType>
       <fx:DocumentFileName>${XML_FILENAME}</fx:DocumentFileName>
       <fx:Version>1.0</fx:Version>
-      <fx:ConformanceLevel>BASIC</fx:ConformanceLevel>
+      <fx:ConformanceLevel>${CONFORMANCE_LABEL}</fx:ConformanceLevel>
       <pdfaExtension:schemas>
         <rdf:Bag>
           <rdf:li rdf:parseType="Resource">

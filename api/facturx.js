@@ -17,8 +17,18 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const XML_FILENAME    = "factur-x.xml";
-const PROFILE         = "urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:basic";
+// Profil EN 16931 (norme européenne, obligatoire PPF/PDP à partir de 09/2026).
+// Anciennement BASIC (urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:basic).
+const PROFILE         = "urn:cen.eu:en16931:2017";
+const CONFORMANCE_LABEL = "EN 16931";
 const FRANCHISE_NOTE  = "TVA non applicable, art. 293 B du CGI";
+
+// Codes de type de document (UNTDID 1001) :
+//   380 = Commercial invoice (facture standard)
+//   381 = Credit note (facture d'avoir)
+//   384 = Corrective invoice (rectificative — non utilisé ici, préférer avoir)
+const TYPE_INVOICE = "380";
+const TYPE_CREDIT  = "381";
 
 const UNIT_CODE_MAP = {
   m2: "MTK", "m²": "MTK",
@@ -42,9 +52,11 @@ const fmtDate = d => {
   return `${x.getFullYear()}${String(x.getMonth()+1).padStart(2,"0")}${String(x.getDate()).padStart(2,"0")}`;
 };
 
-function buildXML({ invoice, client, brand }) {
-  const ouvrages  = (invoice.lignes || []).filter(l => l.type_ligne === "ouvrage");
-  const franchise = brand.vatRegime === "franchise";
+function buildXML({ invoice, client, brand, sourceInvoice }) {
+  const ouvrages   = (invoice.lignes || []).filter(l => l.type_ligne === "ouvrage");
+  const franchise  = brand.vatRegime === "franchise";
+  const isAvoir    = !!invoice.avoir_of_invoice_id || !!sourceInvoice;
+  const typeCode   = isAvoir ? TYPE_CREDIT : TYPE_INVOICE;
 
   const taxByRate = {};
   for (const l of ouvrages) {
@@ -127,23 +139,62 @@ function buildXML({ invoice, client, brand }) {
     sellerSiret ? `<ram:SpecifiedTaxRegistration><ram:ID schemeID="FC">${esc(sellerSiret)}</ram:ID></ram:SpecifiedTaxRegistration>` : "",
   ].filter(Boolean).join("");
 
+  // Contact vendeur (BG-6) — requis en EN 16931 si un canal d'échange est connu.
+  const sellerContactParts = [
+    brand.firstName || brand.lastName
+      ? `<ram:PersonName>${esc(`${brand.firstName||""} ${brand.lastName||""}`.trim())}</ram:PersonName>`
+      : "",
+    brand.phone
+      ? `<ram:TelephoneUniversalCommunication><ram:CompleteNumber>${esc(brand.phone)}</ram:CompleteNumber></ram:TelephoneUniversalCommunication>`
+      : "",
+    brand.email
+      ? `<ram:EmailURIUniversalCommunication><ram:URIID>${esc(brand.email)}</ram:URIID></ram:EmailURIUniversalCommunication>`
+      : "",
+  ].filter(Boolean).join("");
+  const sellerContact = sellerContactParts
+    ? `<ram:DefinedTradeContact>${sellerContactParts}</ram:DefinedTradeContact>`
+    : "";
+
+  // BT-10 BuyerReference (obligatoire EN 16931 si pas de PurchaseOrderReference)
+  const buyerRef = esc(invoice.buyer_reference || client?.reference || client?.raison_sociale || client?.nom || "—");
+
+  // BT-20 : description textuelle des conditions de paiement
+  const termsDesc = esc(brand.paymentTerms || "Paiement à réception de facture").slice(0, 1000);
+
+  // Avoir : référence à la facture d'origine (BG-3)
+  const sourceRefBlock = (isAvoir && sourceInvoice?.numero)
+    ? `<ram:InvoiceReferencedDocument>
+        <ram:IssuerAssignedID>${esc(sourceInvoice.numero)}</ram:IssuerAssignedID>
+        ${sourceInvoice.date_emission ? `<ram:FormattedIssueDateTime><qdt:DateTimeString format="102">${fmtDate(sourceInvoice.date_emission)}</qdt:DateTimeString></ram:FormattedIssueDateTime>` : ""}
+      </ram:InvoiceReferencedDocument>`
+    : "";
+
+  // BT-22 : note d'en-tête (description de l'avoir si applicable)
+  const docNote = isAvoir && sourceInvoice?.numero
+    ? `<ram:IncludedNote><ram:Content>Avoir rectificatif de la facture ${esc(sourceInvoice.numero)}.</ram:Content></ram:IncludedNote>`
+    : "";
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
                           xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100"
-                          xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
+                          xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100"
+                          xmlns:qdt="urn:un:unece:uncefact:data:standard:QualifiedDataType:100">
   <rsm:ExchangedDocumentContext>
     <ram:GuidelineSpecifiedDocumentContextParameter><ram:ID>${PROFILE}</ram:ID></ram:GuidelineSpecifiedDocumentContextParameter>
   </rsm:ExchangedDocumentContext>
   <rsm:ExchangedDocument>
     <ram:ID>${esc(invoice.numero||"")}</ram:ID>
-    <ram:TypeCode>380</ram:TypeCode>
+    <ram:TypeCode>${typeCode}</ram:TypeCode>
     <ram:IssueDateTime><udt:DateTimeString format="102">${issue}</udt:DateTimeString></ram:IssueDateTime>
+    ${docNote}
   </rsm:ExchangedDocument>
   <rsm:SupplyChainTradeTransaction>${lineBlocks}
     <ram:ApplicableHeaderTradeAgreement>
+      <ram:BuyerReference>${buyerRef}</ram:BuyerReference>
       <ram:SellerTradeParty>
         <ram:Name>${sellerName}</ram:Name>
         ${sellerSiren ? `<ram:SpecifiedLegalOrganization><ram:ID schemeID="0002">${esc(sellerSiren)}</ram:ID></ram:SpecifiedLegalOrganization>` : ""}
+        ${sellerContact}
         <ram:PostalTradeAddress>
           ${sellerAddr.cp   ? `<ram:PostcodeCode>${sellerAddr.cp}</ram:PostcodeCode>` : ""}
           ${sellerAddr.line ? `<ram:LineOne>${sellerAddr.line}</ram:LineOne>` : ""}
@@ -167,6 +218,7 @@ function buildXML({ invoice, client, brand }) {
       <ram:ActualDeliverySupplyChainEvent><ram:OccurrenceDateTime><udt:DateTimeString format="102">${issue}</udt:DateTimeString></ram:OccurrenceDateTime></ram:ActualDeliverySupplyChainEvent>
     </ram:ApplicableHeaderTradeDelivery>
     <ram:ApplicableHeaderTradeSettlement>
+      ${sourceRefBlock}
       <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
       ${iban ? `
       <ram:SpecifiedTradeSettlementPaymentMeans>
@@ -180,7 +232,10 @@ function buildXML({ invoice, client, brand }) {
         <ram:Reason>Retenue de garantie</ram:Reason>
         <ram:CategoryTradeTax><ram:TypeCode>VAT</ram:TypeCode><ram:CategoryCode>S</ram:CategoryCode><ram:RateApplicablePercent>0.00</ram:RateApplicablePercent></ram:CategoryTradeTax>
       </ram:SpecifiedTradeAllowanceCharge>` : ""}
-      ${due ? `<ram:SpecifiedTradePaymentTerms><ram:DueDateDateTime><udt:DateTimeString format="102">${due}</udt:DateTimeString></ram:DueDateDateTime></ram:SpecifiedTradePaymentTerms>` : ""}
+      <ram:SpecifiedTradePaymentTerms>
+        <ram:Description>${termsDesc}</ram:Description>
+        ${due ? `<ram:DueDateDateTime><udt:DateTimeString format="102">${due}</udt:DateTimeString></ram:DueDateDateTime>` : ""}
+      </ram:SpecifiedTradePaymentTerms>
       <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
         <ram:LineTotalAmount>${num(totalHT)}</ram:LineTotalAmount>
         <ram:TaxBasisTotalAmount>${num(totalHT)}</ram:TaxBasisTotalAmount>
@@ -195,6 +250,8 @@ function buildXML({ invoice, client, brand }) {
 
 function buildXMP({ invoice }) {
   const now = new Date().toISOString().replace(/\.\d{3}/,"");
+  const isAvoir = !!invoice?.avoir_of_invoice_id;
+  const docKind = isAvoir ? "Avoir" : "Facture";
   return `<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/">
   <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
@@ -207,7 +264,7 @@ function buildXMP({ invoice }) {
         xmlns:pdfaSchema="http://www.aiim.org/pdfa/ns/schema#"
         xmlns:pdfaProperty="http://www.aiim.org/pdfa/ns/property#"
         xmlns:fx="urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#">
-      <dc:title><rdf:Alt><rdf:li xml:lang="x-default">Facture ${esc(invoice?.numero||"")}</rdf:li></rdf:Alt></dc:title>
+      <dc:title><rdf:Alt><rdf:li xml:lang="x-default">${docKind} ${esc(invoice?.numero||"")}</rdf:li></rdf:Alt></dc:title>
       <xmp:CreatorTool>Zenbat</xmp:CreatorTool>
       <xmp:CreateDate>${now}</xmp:CreateDate>
       <xmp:ModifyDate>${now}</xmp:ModifyDate>
@@ -217,7 +274,7 @@ function buildXMP({ invoice }) {
       <fx:DocumentType>INVOICE</fx:DocumentType>
       <fx:DocumentFileName>${XML_FILENAME}</fx:DocumentFileName>
       <fx:Version>1.0</fx:Version>
-      <fx:ConformanceLevel>BASIC</fx:ConformanceLevel>
+      <fx:ConformanceLevel>${CONFORMANCE_LABEL}</fx:ConformanceLevel>
       <pdfaExtension:schemas>
         <rdf:Bag>
           <rdf:li rdf:parseType="Resource">
@@ -286,7 +343,7 @@ function addSRGBOutputIntent(pdfDoc, iccBytes) {
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { pdf_base64, invoice, client, brand } = req.body || {};
+  const { pdf_base64, invoice, client, brand, sourceInvoice } = req.body || {};
   if (!pdf_base64 || !invoice) return res.status(400).json({ error: "pdf_base64 et invoice requis" });
 
   try {
@@ -294,7 +351,7 @@ export default async function handler(req, res) {
     const pdfDoc   = await PDFDocument.load(pdfBytes);
 
     // 1. Attache l'XML Factur-X
-    const xml      = buildXML({ invoice, client, brand });
+    const xml      = buildXML({ invoice, client, brand, sourceInvoice });
     const xmlBytes = new TextEncoder().encode(xml);
     await pdfDoc.attach(xmlBytes, XML_FILENAME, {
       mimeType:         "text/xml",
@@ -309,7 +366,8 @@ export default async function handler(req, res) {
     addSRGBOutputIntent(pdfDoc, icc);
 
     // 3. Métadonnées classiques
-    pdfDoc.setTitle(`Facture ${invoice.numero || ""}`.trim());
+    const docKind = invoice.avoir_of_invoice_id ? "Avoir" : "Facture";
+    pdfDoc.setTitle(`${docKind} ${invoice.numero || ""}`.trim());
     pdfDoc.setProducer("Zenbat Factur-X");
     pdfDoc.setCreator("Zenbat");
     pdfDoc.setCreationDate(new Date());
