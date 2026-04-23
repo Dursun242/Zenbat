@@ -85,7 +85,7 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
   return (
     <div style={{ background: "#f8fafc", minHeight: "100%" }}>
       {showPDF && (
-        <PDFViewer d={asDevisShape} cl={client} brand={brand} onClose={() => setShowPDF(false)} kind="facture"/>
+        <PDFViewer d={asDevisShape} cl={client} brand={brand} onClose={() => setShowPDF(false)} kind="facture" noDownload={invoice.statut === "brouillon"}/>
       )}
       {renderFacturX && (
         <PDFViewer d={asDevisShape} cl={client} brand={brand} hidden onPageReady={onPdfPageReady} kind="facture"/>
@@ -103,7 +103,7 @@ export default function InvoiceDetail({ invoice, client, brand, onBack, onChange
       <div style={{ padding: 16 }}>
         <button onClick={() => setShowPDF(true)}
           style={{ width: "100%", background: `linear-gradient(135deg,${ac}ee,${ac})`, color: "white", border: "none", borderRadius: 16, padding: 16, fontSize: 14, fontWeight: 700, cursor: "pointer", boxShadow: `0 6px 20px ${ac}44`, marginBottom: 12 }}>
-          Voir le PDF de la facture
+          {invoice.statut === "brouillon" ? "👁 Aperçu brouillon" : "Voir le PDF de la facture"}
         </button>
 
         <LignesEditor lignes={lignes} onChange={updateLignes} ac={ac} vatRegime={brand.vatRegime}/>
