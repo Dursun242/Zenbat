@@ -109,7 +109,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12,paddingBottom:10,borderBottom:`2px solid ${navy}`}}>
         <div>
           {brand.logo && <img src={brand.logo} alt="" style={{height:44,maxWidth:180,objectFit:"contain",display:"block",marginBottom:6}}/>}
-          <div style={{fontWeight:800,fontSize:16,color:navy}}>{brand.companyName||"Votre Entreprise"}</div>
+          {!brand.logo && <div style={{fontWeight:800,fontSize:16,color:navy}}>{brand.companyName||"Votre Entreprise"}</div>}
         </div>
         <div style={{textAlign:"right"}}>
           <div style={{color:"#94a3b8",fontSize:10,fontWeight:600,letterSpacing:"2px"}}>{docLabel}</div>
