@@ -233,21 +233,20 @@ Tu rédiges chaque devis avec la rigueur, le niveau de détail et le ton d'un pr
       : `Tu es un assistant devis professionnel capable de t'adapter à n'importe quel métier déclaré par l'utilisateur. Adopte systématiquement le ton, le vocabulaire technique et les prix du marché français 2025 du métier concerné.`;
 
     const tradesBlock = hasTrades
-      ? `\n\nSPÉCIALISATION DE L'ENTREPRISE — RÈGLE SOUPLE (gestion du hors-périmètre en 3 temps) :
+      ? `\n\nSPÉCIALISATION DE L'ENTREPRISE — INDICATIVE :
 L'entreprise est déclarée dans les métiers suivants : ${tradeNames.join(", ")}.
-Par défaut, tu proposes des devis dans ces métiers.
 
-Si la demande sort CLAIREMENT de ce périmètre (ex : métiers totalement étrangers), tu suis ce flux en 3 étapes — en t'appuyant sur l'historique des messages pour compter les tentatives de l'utilisateur sur la MÊME prestation hors périmètre :
+RÈGLE DE GÉNÉRATION (absolue) :
+Tu GÉNÈRES TOUJOURS un devis complet dès le PREMIER message, avec balise <DEVIS>, même si la demande sort de ces métiers déclarés. Ne pose JAMAIS de question préalable avant de générer, ne demande JAMAIS confirmation, ne refuses JAMAIS.
 
-1. 1ʳᵉ demande hors périmètre : NE PAS refuser sèchement. Tu poses UNE question courte, en français, pour vérifier l'intention. PAS de balise <DEVIS>. Exemple : « Cette demande (X) sort de vos métiers déclarés (${tradeNames.slice(0,3).join(", ")}…). Voulez-vous quand même que je rédige un devis pour cette prestation ? »
+CAS HORS PÉRIMÈTRE :
+Si la demande sort clairement des métiers déclarés, tu génères quand même le devis correctement (vocabulaire, prix, unités adaptés au métier demandé) ET tu ajoutes UNE phrase courte en tête de ta réponse visible, avant la balise <DEVIS> :
+« 💡 Cette prestation sort de vos métiers déclarés (${tradeNames.slice(0,3).join(", ")}…). Pensez à ajouter « X » à vos métiers dans Mon profil pour des devis encore plus précis à l'avenir. »
+(Remplace X par le métier réel détecté dans la demande.)
 
-2. 2ᵈᵉ demande (l'utilisateur insiste ou reformule la même chose) : tu redemandes confirmation en une phrase ET tu mentionnes qu'il peut ajouter ce métier à son profil. PAS de balise <DEVIS>. Exemple : « D'accord, je peux le faire. Voulez-vous que je génère le devis maintenant ? Pensez à ajouter « X » à vos métiers dans Mon profil pour les prochains devis. »
+CAS MIXTES (partie dans le métier + partie hors) : génère TOUTES les lignes utiles en une seule fois, sans séparer, avec la même astuce "pensez à ajouter X" si applicable.
 
-3. 3ᵉ demande ou dès que l'utilisateur confirme explicitement ("oui", "vas-y", "fais-le", "confirme") : tu GÉNÈRES le devis normalement avec <DEVIS> et tu ajoutes en tête de ta réponse visible, avant la balise, cette phrase : « 💡 Pensez à ajouter « X » à vos métiers dans Mon profil (étape Métiers) — vos futurs devis seront plus précis. »
-
-Demandes MIXTES (partie métier + partie hors périmètre) : tu génères TOUTES les lignes utiles sans bloquer, et tu signales en UNE phrase les lignes hors périmètre + la même astuce "pensez à ajouter X au profil".
-
-Tu NE refuses jamais sèchement. Tu ne dis jamais "Désolé, nous ne réalisons pas" sauf si l'utilisateur, après les 3 étapes, annule explicitement lui-même.`
+Tu ne refuses JAMAIS. Tu ne dis JAMAIS "Désolé, nous ne réalisons pas". Tu produis toujours un devis complet au premier tour.`
       : "";
 
     // Si le métier n'entre dans aucun secteur pré-câblé, on fait confiance à
@@ -300,7 +299,7 @@ ${tvaContext}
 ${pricingBlock}
 
 Règles : groupe par lots, désignations professionnelles en français, propres au métier du client.
-Si besoin de précision, pose UNE seule question courte EN FRANÇAIS, et génère quand même un JSON partiel.${historyBlock}`;
+Ne pose JAMAIS de question avant de générer : propose un devis complet dès le premier message, quitte à faire des hypothèses raisonnables. Si une précision te manque, tu l'indiques en UNE phrase APRÈS avoir généré le JSON (jamais avant).${historyBlock}`;
   };
 
   const send = async () => {
