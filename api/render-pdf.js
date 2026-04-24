@@ -20,6 +20,18 @@ const CHROMIUM_PACK_URL =
   process.env.CHROMIUM_PACK_URL ||
   'https://github.com/Sparticuz/chromium/releases/download/v147.0.2/chromium-v147.0.2-pack.x64.tar'
 
+// Cache module-level du chemin d'exécution. Sans ça, chaque invocation
+// (même dans un container "warm") relance la résolution → race condition
+// "spawn ETXTBSY" si puppeteer.launch démarre avant que l'extraction
+// du binaire soit complètement écrite/fermée sur disque.
+let chromiumExecPathPromise = null
+function getChromiumExecutablePath() {
+  if (!chromiumExecPathPromise) {
+    chromiumExecPathPromise = chromium.executablePath(CHROMIUM_PACK_URL)
+  }
+  return chromiumExecPathPromise
+}
+
 function cors(req, res) {
   const origin = req.headers.origin || ''
   const allow = process.env.VERCEL_ENV !== 'production' || ALLOWED_ORIGINS.includes(origin)
@@ -345,12 +357,27 @@ export default async function handler(req, res) {
   try {
     const html = buildHtml({ d, cl: cl || {}, brand, kind })
 
-    browser = await puppeteer.launch({
+    const executablePath = await getChromiumExecutablePath()
+
+    // Sur cold start, l'extraction du binaire vient juste de finir et le
+    // FS peut encore avoir un handle ouvert → ETXTBSY au spawn. On retry
+    // une fois après 200ms si on tombe sur ce cas précis.
+    const launchOpts = {
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(CHROMIUM_PACK_URL),
+      executablePath,
       headless: chromium.headless,
-    })
+    }
+    try {
+      browser = await puppeteer.launch(launchOpts)
+    } catch (err) {
+      if (err?.code === 'ETXTBSY' || /ETXTBSY/.test(err?.message || '')) {
+        await new Promise(r => setTimeout(r, 200))
+        browser = await puppeteer.launch(launchOpts)
+      } else {
+        throw err
+      }
+    }
     const page = await browser.newPage()
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 25_000 })
     // L'@import des Google Fonts arrive parfois après networkidle :
