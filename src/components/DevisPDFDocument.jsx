@@ -25,7 +25,10 @@ const makeStyles = (fontFamily) => StyleSheet.create({
     fontSize: px(11),
     color: "#1a1a1a",
     padding: "10mm",
-    lineHeight: 1.5,
+    // react-pdf calcule la hauteur de ligne à partir des métriques
+    // ascent/descent du TTF × lineHeight. DM Sans a un linegap généreux,
+    // donc 1.3 dans le PDF rend visuellement comme 1.5 dans le HTML.
+    lineHeight: 1.3,
   },
 
   // Header
@@ -33,8 +36,8 @@ const makeStyles = (fontFamily) => StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: px(12),
-    paddingBottom: px(10),
+    marginBottom: px(8),
+    paddingBottom: px(8),
     borderBottomWidth: 2,
     borderBottomColor: NAVY,
     borderBottomStyle: "solid",
@@ -43,108 +46,109 @@ const makeStyles = (fontFamily) => StyleSheet.create({
   companyFallback: { fontWeight: 800, fontSize: px(16), color: NAVY },
   docLabel: { color: "#94a3b8", fontSize: px(10), fontWeight: 600, letterSpacing: 2, textAlign: "right" },
   docNumero: { color: NAVY, fontWeight: 800, fontSize: px(20), marginTop: px(2), textAlign: "right" },
-  docDate: { color: "#64748b", fontSize: px(10), marginTop: px(6), textAlign: "right" },
+  docDate: { color: "#64748b", fontSize: px(10), marginTop: px(4), textAlign: "right" },
   docDateLine: { color: "#64748b", fontSize: px(10), textAlign: "right" },
   bold1a: { color: "#1a1a1a", fontWeight: 700 },
 
   // Cards entreprise / client
-  twoCols: { flexDirection: "row", gap: px(8), marginBottom: px(12) },
+  twoCols: { flexDirection: "row", gap: px(8), marginBottom: px(8) },
   card: {
     flex: 1,
     borderWidth: 1, borderColor: "#d4d4d8", borderStyle: "solid",
     borderRadius: px(4),
-    padding: "8px 10px",
+    padding: "6px 10px",
   },
-  cardLabel: { fontSize: px(8.5), color: "#6b7280", fontWeight: 700, letterSpacing: 1, marginBottom: px(4), textTransform: "uppercase" },
-  cardName: { fontSize: px(12), fontWeight: 700, color: "#111", marginBottom: px(3) },
-  cardLine: { fontSize: px(9.5), color: "#4b5563", lineHeight: 1.55 },
+  cardLabel: { fontSize: px(8.5), color: "#6b7280", fontWeight: 700, letterSpacing: 1, marginBottom: px(3), textTransform: "uppercase" },
+  cardName: { fontSize: px(12), fontWeight: 700, color: "#111", marginBottom: px(2) },
+  cardLine: { fontSize: px(9.5), color: "#4b5563", lineHeight: 1.35 },
 
   // Banner objet/chantier
   banner: {
     backgroundColor: "#f8f9fb",
     borderWidth: 1, borderColor: "#e5e7eb", borderStyle: "solid",
     borderRadius: px(4),
-    padding: "6px 10px",
-    marginBottom: px(10),
+    padding: "5px 10px",
+    marginBottom: px(6),
     fontSize: px(9.5),
     color: "#374151",
+    lineHeight: 1.3,
   },
 
-  sectionTitle: { fontSize: px(10), fontWeight: 700, color: NAVY, marginBottom: px(6), letterSpacing: 1, textTransform: "uppercase" },
+  sectionTitle: { fontSize: px(10), fontWeight: 700, color: NAVY, marginBottom: px(4), letterSpacing: 1, textTransform: "uppercase" },
 
   // Table prestations
-  tableBottomSpacer: { marginBottom: px(12) },
+  tableBottomSpacer: { marginBottom: px(6) },
   trHead: { flexDirection: "row", backgroundColor: NAVY },
-  thBase: { color: "white", fontSize: px(10), fontWeight: 600, padding: "6px 5px" },
+  thBase: { color: "white", fontSize: px(10), fontWeight: 600, padding: "5px 5px" },
   trLot: { flexDirection: "row", backgroundColor: "#eef2f7", borderBottomWidth: 1, borderBottomColor: `${NAVY}33`, borderBottomStyle: "solid" },
-  tdLot: { fontSize: px(9.5), fontWeight: 700, color: NAVY, padding: "6px 8px", textTransform: "uppercase", letterSpacing: 0.5, flex: 1 },
+  tdLot: { fontSize: px(9.5), fontWeight: 700, color: NAVY, padding: "4px 8px", textTransform: "uppercase", letterSpacing: 0.5, flex: 1 },
   trData: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#e5e7eb", borderBottomStyle: "solid" },
   trDataAlt: { backgroundColor: "#f8f9fb" },
-  tdBase: { fontSize: px(10), padding: "5px 5px" },
+  tdBase: { fontSize: px(10), padding: "4px 5px", lineHeight: 1.3 },
 
   // Totaux
-  totalsWrap: { flexDirection: "row", justifyContent: "flex-end", marginBottom: px(12) },
+  totalsWrap: { flexDirection: "row", justifyContent: "flex-end", marginBottom: px(6) },
   totalsTable: { minWidth: px(240) },
-  totalRow: { flexDirection: "row", justifyContent: "space-between", padding: "3px 8px" },
+  totalRow: { flexDirection: "row", justifyContent: "space-between", padding: "2px 8px" },
   totalLabel: { fontSize: px(10), color: "#4b5563" },
   totalValue: { fontSize: px(10), fontWeight: 600, textAlign: "right" },
   ttcRow: {
     flexDirection: "row", justifyContent: "space-between",
     backgroundColor: "#eef2f7", borderTopWidth: 2, borderTopColor: NAVY, borderTopStyle: "solid",
-    padding: "6px 8px",
+    padding: "5px 8px",
   },
   ttcLabel: { fontSize: px(10.5), fontWeight: 800, color: NAVY },
   ttcValue: { fontSize: px(11.5), fontWeight: 800, color: NAVY, textAlign: "right" },
-  retRow: { flexDirection: "row", justifyContent: "space-between", padding: "4px 10px" },
+  retRow: { flexDirection: "row", justifyContent: "space-between", padding: "3px 10px" },
   retLabel: { fontSize: px(10), color: "#b45309" },
   retValue: { fontSize: px(10), color: "#b45309", textAlign: "right" },
   netRow: {
     flexDirection: "row", justifyContent: "space-between",
     backgroundColor: "#fef9c3", borderTopWidth: 1, borderTopColor: "#fde68a", borderTopStyle: "solid",
-    padding: "8px 10px",
+    padding: "6px 10px",
   },
   netLabel: { fontSize: px(11), fontWeight: 800, color: "#92400e" },
   netValue: { fontSize: px(12), fontWeight: 800, color: "#92400e", textAlign: "right" },
 
   // Observations
-  obsBlock: { marginBottom: px(10) },
-  obsTitle: { fontSize: px(9), fontWeight: 700, color: NAVY, marginBottom: px(3), letterSpacing: 1, textTransform: "uppercase" },
-  obsText: { fontSize: px(9.5), color: "#374151", lineHeight: 1.55 },
+  obsBlock: { marginBottom: px(6) },
+  obsTitle: { fontSize: px(9), fontWeight: 700, color: NAVY, marginBottom: px(2), letterSpacing: 1, textTransform: "uppercase" },
+  obsText: { fontSize: px(9.5), color: "#374151", lineHeight: 1.35 },
 
   // Conditions / Banque
-  twoColsCond: { flexDirection: "row", gap: px(10), marginBottom: px(10) },
+  twoColsCond: { flexDirection: "row", gap: px(10), marginBottom: px(6) },
   condCard: {
     flex: 1,
     backgroundColor: "#f8f9fb",
     borderWidth: 1, borderColor: "#e5e7eb", borderStyle: "solid",
     borderRadius: px(4),
-    padding: "8px 10px",
+    padding: "6px 10px",
   },
-  condTitle: { fontSize: px(9), fontWeight: 700, color: NAVY, marginBottom: px(4), letterSpacing: 1, textTransform: "uppercase" },
-  condText: { fontSize: px(9.5), color: "#374151", lineHeight: 1.55 },
-  ibanText: { fontSize: px(9), color: "#4b5563", fontFamily: "Courier", lineHeight: 1.5 },
+  condTitle: { fontSize: px(9), fontWeight: 700, color: NAVY, marginBottom: px(3), letterSpacing: 1, textTransform: "uppercase" },
+  condText: { fontSize: px(9.5), color: "#374151", lineHeight: 1.35 },
+  ibanText: { fontSize: px(9), color: "#4b5563", fontFamily: "Courier", lineHeight: 1.3 },
 
   // Mentions BTP
-  legalBlock: { marginTop: px(14), paddingTop: px(10), borderTopWidth: 1, borderTopColor: "#e5e7eb", borderTopStyle: "solid" },
-  legalLabel: { fontSize: px(8), fontWeight: 700, color: "#9ca3af", letterSpacing: 1, marginBottom: px(4) },
-  legalRow: { flexDirection: "row", flexWrap: "wrap", fontSize: px(9), color: "#4b5563", lineHeight: 1.6 },
+  legalBlock: { marginTop: px(8), paddingTop: px(6), borderTopWidth: 1, borderTopColor: "#e5e7eb", borderTopStyle: "solid" },
+  legalLabel: { fontSize: px(8), fontWeight: 700, color: "#9ca3af", letterSpacing: 1, marginBottom: px(3) },
+  legalRow: { flexDirection: "row", flexWrap: "wrap", fontSize: px(9), color: "#4b5563", lineHeight: 1.4 },
   legalItem: { fontSize: px(9), color: "#4b5563", marginRight: px(14) },
 
   // Signature
-  signWrap: { flexDirection: "row", gap: px(14), marginTop: px(14), paddingTop: px(12), borderTopWidth: 2, borderTopStyle: "solid" },
+  signWrap: { flexDirection: "row", gap: px(14), marginTop: px(8), paddingTop: px(8), borderTopWidth: 2, borderTopStyle: "solid" },
   signCol1: { flex: 2 },
   signCol2: { flex: 1 },
-  signLabel: { fontSize: px(9), fontWeight: 700, letterSpacing: 1, marginBottom: px(6) },
-  signLine: { height: px(40), borderBottomWidth: 1, borderBottomStyle: "solid" },
+  signLabel: { fontSize: px(9), fontWeight: 700, letterSpacing: 1, marginBottom: px(4) },
+  signLine: { height: px(28), borderBottomWidth: 1, borderBottomStyle: "solid" },
 
   // Footer
   footer: {
-    marginTop: px(14), paddingTop: px(8),
+    marginTop: px(8), paddingTop: px(6),
     borderTopWidth: 1, borderTopColor: "#e5e7eb", borderTopStyle: "solid",
     flexDirection: "row", justifyContent: "space-between", gap: px(10),
   },
-  footerText: { fontSize: px(8), color: "#9ca3af", lineHeight: 1.5 },
-  footerStrong: { fontSize: px(8), color: "#6b7280", fontWeight: 600, marginBottom: px(2) },
+  footerText: { fontSize: px(8), color: "#9ca3af", lineHeight: 1.3 },
+  footerStrong: { fontSize: px(8), color: "#6b7280", fontWeight: 600, marginBottom: px(1) },
   footerRight: { fontSize: px(8), color: "#9ca3af", textAlign: "right", flexShrink: 0 },
 });
 
@@ -271,7 +275,7 @@ export default function DevisPDFDocument({ d, cl, brand, kind = "devis" }) {
             paginer naturellement ligne par ligne, sinon le tableau entier
             saute en page suivante et laisse du blanc page 1. */}
         <Text style={styles.sectionTitle}>Détail des prestations</Text>
-        <View style={styles.trHead} fixed>
+        <View style={styles.trHead}>
           <Text style={[styles.thBase, COL.desc,  { textAlign: "left",   padding: "6px 8px" }]}>Description</Text>
           <Text style={[styles.thBase, COL.unite, { textAlign: "center" }]}>Unité</Text>
           <Text style={[styles.thBase, COL.qte,   { textAlign: "center" }]}>Qté</Text>
@@ -303,8 +307,10 @@ export default function DevisPDFDocument({ d, cl, brand, kind = "devis" }) {
         <View style={styles.tableBottomSpacer} />
 
 
-        {/* TOTAUX */}
-        <View style={styles.totalsWrap}>
+        {/* TOTAUX — wrap={false} pour que TTC/retenue/net restent collés
+            aux sous-totaux HT/TVA et ne se retrouvent pas orphelins en
+            page suivante. */}
+        <View style={styles.totalsWrap} wrap={false}>
           <View style={styles.totalsTable}>
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Total HT</Text>
