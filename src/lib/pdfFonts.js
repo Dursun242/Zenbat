@@ -1,20 +1,17 @@
-// Enregistrement des polices Google pour @react-pdf/renderer.
-// Vite bundle les .woff2 de @fontsource via `?url` → asset local servi par
-// l'app, donc pas de dépendance CDN à l'exécution. fontkit (utilisé par
-// react-pdf) sait décoder le woff2 nativement.
+// Configuration des fontes pour le PDF natif.
+//
+// On utilise les fontes PDF built-in (Helvetica / Times) plutôt que les
+// fontes brand (DM Sans / Playfair / Space Grotesk) parce que les .woff2
+// de @fontsource déclenchent "Out of bounds access" dans le décodeur de
+// fontkit/react-pdf en bundle Vite. Helvetica/Times sont garanties dans
+// tous les lecteurs PDF, sans round-trip réseau.
+//
+// Astuce : Font.register avec un src parmi STANDARD_FONTS (Helvetica,
+// Helvetica-Bold, Times-Roman, Times-Bold...) court-circuite fontkit et
+// utilise les fontes natives PDFKit. Ça nous permet de mapper les poids
+// (400/700) vers les bonnes variantes built-in, donc le `fontWeight`
+// dans les styles continue de fonctionner naturellement.
 import { Font } from "@react-pdf/renderer";
-
-import dmSans400  from "@fontsource/dm-sans/files/dm-sans-latin-400-normal.woff2?url";
-import dmSans500  from "@fontsource/dm-sans/files/dm-sans-latin-500-normal.woff2?url";
-import dmSans600  from "@fontsource/dm-sans/files/dm-sans-latin-600-normal.woff2?url";
-import dmSans700  from "@fontsource/dm-sans/files/dm-sans-latin-700-normal.woff2?url";
-import dmSans800  from "@fontsource/dm-sans/files/dm-sans-latin-800-normal.woff2?url";
-
-import playfair700 from "@fontsource/playfair-display/files/playfair-display-latin-700-normal.woff2?url";
-
-import grotesk400 from "@fontsource/space-grotesk/files/space-grotesk-latin-400-normal.woff2?url";
-import grotesk600 from "@fontsource/space-grotesk/files/space-grotesk-latin-600-normal.woff2?url";
-import grotesk700 from "@fontsource/space-grotesk/files/space-grotesk-latin-700-normal.woff2?url";
 
 let registered = false;
 
@@ -23,27 +20,21 @@ export function ensurePdfFontsRegistered() {
   registered = true;
 
   Font.register({
-    family: "DM Sans",
+    family: "Helvetica",
     fonts: [
-      { src: dmSans400, fontWeight: 400 },
-      { src: dmSans500, fontWeight: 500 },
-      { src: dmSans600, fontWeight: 600 },
-      { src: dmSans700, fontWeight: 700 },
-      { src: dmSans800, fontWeight: 800 },
+      { src: "Helvetica",      fontWeight: 400 },
+      { src: "Helvetica",      fontWeight: 500 },
+      { src: "Helvetica-Bold", fontWeight: 600 },
+      { src: "Helvetica-Bold", fontWeight: 700 },
+      { src: "Helvetica-Bold", fontWeight: 800 },
     ],
   });
 
   Font.register({
-    family: "Playfair Display",
-    fonts: [{ src: playfair700, fontWeight: 700 }],
-  });
-
-  Font.register({
-    family: "Space Grotesk",
+    family: "Times-Roman",
     fonts: [
-      { src: grotesk400, fontWeight: 400 },
-      { src: grotesk600, fontWeight: 600 },
-      { src: grotesk700, fontWeight: 700 },
+      { src: "Times-Roman", fontWeight: 400 },
+      { src: "Times-Bold",  fontWeight: 700 },
     ],
   });
 
@@ -52,7 +43,8 @@ export function ensurePdfFontsRegistered() {
 }
 
 export function pdfFontFamily(brand) {
-  if (brand?.fontStyle === "elegant") return "Playfair Display";
-  if (brand?.fontStyle === "tech")    return "Space Grotesk";
-  return "DM Sans";
+  if (brand?.fontStyle === "elegant") return "Times-Roman";
+  // "modern" et "tech" : Helvetica donne un rendu sans-serif net,
+  // proche visuellement de DM Sans / Space Grotesk.
+  return "Helvetica";
 }
