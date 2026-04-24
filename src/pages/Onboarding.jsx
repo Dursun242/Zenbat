@@ -2,47 +2,8 @@ import { useState, useRef, useEffect } from "react"
 import { searchTrades, tradesLabels, TRADE_EXAMPLES } from "../lib/trades.js"
 import { brandCompleteness } from "../lib/brandCompleteness.js"
 import { supabase } from "../lib/supabase.js"
-
-const Icheck = <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>
-const Iimg   = <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
-
-function Logo({ size=22, white=false }) {
-  return (
-    <span style={{fontWeight:800,fontSize:size,letterSpacing:"-0.5px"}}>
-      <span style={{color:"#22c55e"}}>Zen</span>
-      <span style={{color:white?"white":"#0f172a"}}>bat</span>
-    </span>
-  )
-}
-
-function Field({ dark, label, val, onChange, placeholder, type="text", hint, required, invalid }) {
-  const borderColor = invalid ? "#ef4444" : dark ? "#334155" : "#e2e8f0"
-  return (
-    <div>
-      <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,fontWeight:600,color:dark?"#94a3b8":"#64748b",marginBottom:6}}>
-        <span>{label}{required && <span style={{color:"#ef4444",marginLeft:2}}>*</span>}</span>
-      </label>
-      <input type={type} value={val||""} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
-        style={{width:"100%",background:dark?"#1e293b":"white",border:`1px solid ${borderColor}`,borderRadius:12,padding:"10px 14px",fontSize:13,color:dark?"white":"#0f172a",outline:"none"}}/>
-      {hint && <div style={{fontSize:10,color:invalid?"#fca5a5":"#64748b",marginTop:5,lineHeight:1.4}}>{invalid ? "⚠ " : "💡 "}{hint}</div>}
-    </div>
-  )
-}
-
-const FONTS = [
-  { id:"modern",  label:"Moderne", sample:"DM Sans" },
-  { id:"elegant", label:"Élégant", sample:"Playfair Display" },
-  { id:"tech",    label:"Tech",    sample:"Space Grotesk" },
-]
-const COLORS = ["#22c55e","#3b82f6","#f97316","#8b5cf6","#ef4444","#0891b2","#0f172a","#d97706"]
-const STEPS  = [
-  { title:"Votre identité",       short:"Identité",  subtitle:"Informations qui apparaîtront en en-tête de tous vos devis." },
-  { title:"Vos métiers",          short:"Métiers",   subtitle:"BTP, artisanat, beauté, tech, santé… L'Agent IA adapte les devis à vos spécialités." },
-  { title:"Coordonnées",          short:"Contacts",  subtitle:"Comment vos clients peuvent vous joindre depuis un devis." },
-  { title:"Apparence PDF",        short:"Design",    subtitle:"Couleur, police et rendu visuel de vos devis." },
-  { title:"Informations légales", short:"Légal",     subtitle:"Mentions obligatoires et conditions de paiement." },
-  { title:"Vos données (RGPD)",   short:"Données",   subtitle:"Téléchargez votre archive ou supprimez votre compte. Conforme RGPD art. 15, 17 et 20." },
-]
+import { Icheck, Iimg, Logo, Field, FONTS, COLORS, STEPS } from "../components/onboarding/shared.jsx"
+import DeleteAccountModal from "../components/onboarding/DeleteAccountModal.jsx"
 
 export default function Onboarding({ brand, setBrand, onDone }) {
   const [step,  setStep]  = useState(0)
@@ -606,55 +567,16 @@ export default function Onboarding({ brand, setBrand, onDone }) {
         </div>
       </div>
 
-      {/* Modale confirmation suppression compte */}
       {deleteOpen && (
-        <div onClick={() => !deleteBusy && setDeleteOpen(false)}
-          style={{position:"fixed",inset:0,background:"rgba(0,0,0,.7)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",padding:18,zIndex:200,animation:"popIn .15s ease both"}}>
-          <div onClick={e => e.stopPropagation()}
-            style={{background:"#0f172a",border:"1px solid #334155",borderRadius:18,maxWidth:440,width:"100%",padding:22}}>
-            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
-              <div style={{width:42,height:42,borderRadius:12,background:"#3f0e0e",border:"1px solid #7f1d1d",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:"#ef4444"}}>
-                <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-              </div>
-              <div style={{flex:1}}>
-                <div style={{fontSize:15,fontWeight:700,color:"white"}}>Supprimer mon compte ?</div>
-                <div style={{fontSize:11,color:"#fca5a5",marginTop:2}}>Action <strong>irréversible</strong>.</div>
-              </div>
-            </div>
-
-            <div style={{fontSize:12,color:"#94a3b8",lineHeight:1.6,marginBottom:14}}>
-              Seront supprimés : profil, clients, devis (brouillons + refusés), conversations IA, journaux, PDF.
-              <br/><br/>
-              <strong style={{color:"#cbd5e1"}}>Conservé en archive 10 ans</strong> (LPF L102 B) : factures émises, anonymisées et inaccessibles en lecture sauf injonction administrative.
-            </div>
-
-            <label style={{display:"block",fontSize:11,fontWeight:600,color:"#94a3b8",marginBottom:6}}>
-              Saisissez votre email <strong style={{color:"white"}}>{myEmail || "—"}</strong> pour confirmer :
-            </label>
-            <input value={deleteConfirm} onChange={e => setDeleteConfirm(e.target.value)}
-              placeholder={myEmail}
-              disabled={deleteBusy} autoFocus
-              style={{width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:10,padding:"10px 12px",fontSize:13,color:"white",outline:"none",marginBottom:12,fontFamily:"inherit"}}/>
-
-            {deleteError && (
-              <div style={{background:"#3f0e0e",border:"1px solid #7f1d1d",borderRadius:10,padding:"8px 12px",fontSize:11,color:"#fca5a5",marginBottom:12}}>
-                ❌ {deleteError}
-              </div>
-            )}
-
-            <div style={{display:"flex",gap:8}}>
-              <button onClick={() => setDeleteOpen(false)} disabled={deleteBusy}
-                style={{flex:1,background:"#1e293b",color:"#94a3b8",border:"none",borderRadius:10,padding:"11px",fontSize:12,fontWeight:700,cursor:deleteBusy?"not-allowed":"pointer"}}>
-                Annuler
-              </button>
-              <button onClick={deleteMyAccount}
-                disabled={deleteBusy || deleteConfirm.trim().toLowerCase() !== (myEmail || "").toLowerCase()}
-                style={{flex:2,background:(deleteBusy || deleteConfirm.trim().toLowerCase() !== (myEmail || "").toLowerCase())?"#7f1d1d":"#dc2626",color:"white",border:"none",borderRadius:10,padding:"11px",fontSize:12,fontWeight:700,cursor:"pointer"}}>
-                {deleteBusy ? "Suppression…" : "Supprimer définitivement"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <DeleteAccountModal
+          myEmail={myEmail}
+          confirm={deleteConfirm}
+          setConfirm={setDeleteConfirm}
+          busy={deleteBusy}
+          error={deleteError}
+          onClose={() => setDeleteOpen(false)}
+          onConfirm={deleteMyAccount}
+        />
       )}
     </div>
   )

@@ -8,9 +8,12 @@ import {
 } from "./lib/api";
 import { uid } from "./lib/utils.js";
 import { DEFAULT_DEMO_BRAND, DEFAULT_BRAND, DEMO_CLIENTS, DEMO_DEVIS } from "./lib/constants.js";
+import { TRIAL_DAYS, hydrateFromMetadata } from "./lib/appShell.js";
 
 import Logo        from "./components/ui/Logo.jsx";
 import { I }       from "./components/ui/icons.jsx";
+import Toast       from "./components/app/Toast.jsx";
+import BottomNav   from "./components/app/BottomNav.jsx";
 import Dashboard   from "./components/Dashboard.jsx";
 import ClientsList from "./components/ClientsList.jsx";
 import ClientDetail from "./components/ClientDetail.jsx";
@@ -26,8 +29,6 @@ import AuthScreen       from "./pages/AuthScreen.jsx";
 import PaywallScreen    from "./pages/PaywallScreen.jsx";
 import PWAInstallScreen from "./pages/PWAInstallScreen.jsx";
 
-const TRIAL_DAYS = 30;
-
 const NAV = [
   { id: "dashboard", label: "Accueil",  icon: I.trend },
   { id: "clients",   label: "Clients",  icon: I.users },
@@ -35,39 +36,6 @@ const NAV = [
   { id: "factures",  label: "Factures", icon: I.file  },
   { id: "agent",     label: "Agent IA", icon: I.spark },
 ];
-
-// Recopie les champs de l'inscription (prénom, nom, société, email de
-// connexion) dans le brand si celui-ci est encore vierge. L'email de
-// connexion sert d'email pro par défaut — affiché dans l'en-tête des
-// devis et transmis au client pour la signature.
-function hydrateFromMetadata(user, setBrand) {
-  const md = user?.user_metadata || {};
-  const explicitFirst = (md.first_name || "").trim();
-  const explicitLast  = (md.last_name  || "").trim();
-  const full          = (md.full_name  || "").trim();
-  const company       = (md.company_name || "").trim();
-  const loginEmail    = (user?.email || "").trim();
-  if (!explicitFirst && !explicitLast && !full && !company && !loginEmail) return;
-
-  setBrand(prev => {
-    const next = { ...prev };
-    // Chaque champ est renseigné UNIQUEMENT s'il est vide
-    // (on n'écrase jamais une saisie déjà faite par l'utilisateur).
-    if (!next.companyName?.trim() && company)   next.companyName = company;
-    if (!next.email?.trim()       && loginEmail) next.email       = loginEmail;
-    if (!next.firstName?.trim() && !next.lastName?.trim()) {
-      if (explicitFirst || explicitLast) {
-        next.firstName = explicitFirst;
-        next.lastName  = explicitLast;
-      } else if (full) {
-        const parts = full.split(/\s+/);
-        next.firstName = parts[0] || "";
-        next.lastName  = parts.slice(1).join(" ");
-      }
-    }
-    return next;
-  });
-}
 
 export default function App() {
   const [screen, setScreen]   = useState("app");
@@ -604,43 +572,9 @@ export default function App() {
         </div>{/* end app-content */}
       </div>{/* end body */}
 
-      {/* Toast */}
-      {toast && (
-        <div className="app-toast" style={{ position: "fixed", bottom: "calc(72px + env(safe-area-inset-bottom))", left: 12, right: 12, background: toast.isError ? "#7f1d1d" : "#0f172a", color: "white", borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, boxShadow: "0 10px 30px rgba(0,0,0,.25)", zIndex: 100, animation: "fadeUp .18s ease both" }}>
-          <span style={{ fontSize: 12, fontWeight: 500 }}>{toast.label}</span>
-          <div style={{ display: "flex", gap: 6 }}>
-            {!toast.isError && (
-              <button onClick={() => { toast.onUndo?.(); dismissToast(); }}
-                style={{ background: "#22c55e", color: "white", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-                Annuler
-              </button>
-            )}
-            <button onClick={dismissToast} style={{ background: "transparent", color: "#94a3b8", border: "none", fontSize: 14, cursor: "pointer", padding: "2px 6px" }}>×</button>
-          </div>
-        </div>
-      )}
+      <Toast toast={toast} onDismiss={dismissToast}/>
 
-      {/* Navigation bas (mobile) */}
-      <nav className="app-bottom-nav" style={{ position: "fixed", bottom: 0, left: 0, right: 0, paddingBottom: "env(safe-area-inset-bottom)", background: "#0f172a", borderTop: "1px solid rgba(255,255,255,.06)", display: "flex", zIndex: 50 }}>
-        {NAV.map(({ id, label, icon }) => {
-          const active = activeNav === id;
-          return (
-            <button key={id} onClick={() => setTab(id)}
-              style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, padding: "10px 0", background: "none", border: "none", color: active ? "#22c55e" : "#64748b", position: "relative", cursor: "pointer" }}>
-              {active && <span style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: 28, height: 2.5, background: "#22c55e", borderRadius: 2 }}/>}
-              <div style={{ position: "relative" }}>
-                {icon}
-                {id === "agent" && plan === "free" && daysLeft <= 7 && (
-                  <span style={{ position: "absolute", top: -4, right: -10, background: daysLeft === 0 ? "#ef4444" : "#f97316", color: "white", fontSize: 8, fontWeight: 700, padding: "0 4px", height: 14, minWidth: 14, borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {daysLeft === 0 ? "!" : `${daysLeft}j`}
-                  </span>
-                )}
-              </div>
-              <span style={{ fontSize: 10, fontWeight: active ? 700 : 400 }}>{label}</span>
-            </button>
-          );
-        })}
-      </nav>
+      <BottomNav items={NAV} activeNav={activeNav} onSelect={setTab} plan={plan} daysLeft={daysLeft}/>
     </div>
   );
 }

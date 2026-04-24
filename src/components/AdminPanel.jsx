@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react"
 import { useAuth } from "../lib/auth.jsx"
 import { supabase } from "../lib/supabase.js"
+import { fmtEur, fmtD, fmtDT, pct, relTime, SC, SL, SORT_OPTS } from "../lib/admin/format.js"
+import DeleteUserModal from "./admin/DeleteUserModal.jsx"
+import UserDetailDrawer from "./admin/UserDetailDrawer.jsx"
 
 // Toujours récupérer un token frais — le state React peut être périmé
 // si le token a été renouvelé silencieusement en arrière-plan.
@@ -135,31 +138,6 @@ export default function AdminPanel({ onBack }) {
       setDeleting(false)
     }
   }
-
-  const fmtEur  = n => new Intl.NumberFormat("fr-FR", { style:"currency", currency:"EUR", maximumFractionDigits:0 }).format(n||0)
-  const fmtD    = d => d ? new Date(d).toLocaleDateString("fr-FR") : "—"
-  const fmtDT   = d => d ? new Date(d).toLocaleDateString("fr-FR", { day:"2-digit", month:"2-digit", year:"2-digit" }) : "—"
-  const pct     = (a, b) => b ? Math.round((a / b) * 100) : 0
-  const relTime = d => {
-    if (!d) return "—"
-    const days = Math.floor((Date.now() - new Date(d)) / 86400000)
-    if (days === 0) return "Auj."
-    if (days === 1) return "Hier"
-    if (days < 30)  return `${days}j`
-    if (days < 365) return `${Math.floor(days/30)}m`
-    return `${Math.floor(days/365)}a`
-  }
-
-  const SC = { brouillon:"#94a3b8", envoye:"#3b82f6", en_signature:"#f59e0b", accepte:"#22c55e", refuse:"#ef4444" }
-  const SL = { brouillon:"Brou.", envoye:"Env.", en_signature:"Sig.", accepte:"Acc.", refuse:"Ref." }
-
-  const SORT_OPTS = [
-    { v:"joined",      l:"Inscription" },
-    { v:"lastSignIn",  l:"Connexion" },
-    { v:"caTotal",     l:"CA" },
-    { v:"devisTotal",  l:"Devis" },
-    { v:"ai_used",     l:"IA" },
-  ]
 
   const filteredUsers = (stats?.usersDetail || [])
     .filter(u => {
@@ -554,361 +532,29 @@ export default function AdminPanel({ onBack }) {
       )}
 
       {detailUser && (
-        <div onClick={closeDetail}
-          style={{position:"fixed", inset:0, background:"rgba(15,23,42,.65)", backdropFilter:"blur(4px)", display:"flex", alignItems:"flex-end", justifyContent:"center", zIndex:90, animation:"fadeUp .15s ease both"}}>
-          <div onClick={e => e.stopPropagation()}
-            style={{background:"#f8fafc", borderRadius:"20px 20px 0 0", width:"100%", maxWidth:720, minHeight:"40vh", maxHeight:"92vh", display:"flex", flexDirection:"column", overflow:"hidden", boxShadow:"0 -20px 60px rgba(0,0,0,.35)"}}>
-
-            {/* Header du drawer */}
-            <div style={{background:"#0f172a", padding:"14px 18px", display:"flex", alignItems:"center", gap:12, flexShrink:0}}>
-              <button onClick={closeDetail} style={{background:"none", border:"none", color:"#94a3b8", cursor:"pointer", padding:4, display:"flex", alignItems:"center"}}>
-                <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-              <div style={{flex:1, minWidth:0}}>
-                <div style={{color:"white", fontWeight:700, fontSize:15, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
-                  {detailUser.fullName || detailUser.name}
-                </div>
-                <div style={{color:"#64748b", fontSize:10, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{detailUser.email}</div>
-              </div>
-              <span style={{fontSize:9, fontWeight:700, padding:"3px 8px", borderRadius:20, background:detailUser.plan==="pro"?"rgba(34,197,94,.18)":"rgba(148,163,184,.18)", color:detailUser.plan==="pro"?"#4ade80":"#94a3b8", flexShrink:0}}>
-                {detailUser.plan==="pro"?"PRO":"FREE"}
-              </span>
-            </div>
-
-            {/* Tabs */}
-            {detailData && (
-              <div style={{background:"white", borderBottom:"1px solid #e2e8f0", display:"flex", overflowX:"auto", flexShrink:0}}>
-                {[
-                  { k:"overview",  l:"Vue",            n: null },
-                  { k:"profil",    l:"Profil",         n: null },
-                  { k:"devis",     l:"Devis",          n: detailData.stats.devisTotal },
-                  { k:"invoices",  l:"Factures",       n: detailData.stats.invoicesTotal },
-                  { k:"clients",   l:"Clients",        n: detailData.stats.clientsTotal },
-                  { k:"conv",      l:"Conversations",  n: detailData.stats.conversations },
-                  { k:"activite",  l:"Activité",       n: (detailData.activity||[]).length || null },
-                  { k:"issues",    l:"Incidents",      n: detailData.stats.errors + detailData.stats.negatives },
-                ].map(t => (
-                  <button key={t.k} onClick={() => setDetailTab(t.k)}
-                    style={{background:"none", border:"none", borderBottom:`2px solid ${detailTab===t.k ? "#22c55e" : "transparent"}`, padding:"10px 14px", fontSize:12, fontWeight:600, color:detailTab===t.k ? "#0f172a" : "#64748b", cursor:"pointer", whiteSpace:"nowrap", flexShrink:0, display:"flex", alignItems:"center", gap:5}}>
-                    {t.l}
-                    {t.n !== null && <span style={{fontSize:9, color:"#94a3b8", fontWeight:500}}>({t.n})</span>}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Body scrollable */}
-            <div style={{flex:1, overflowY:"auto", padding:16}}>
-              {detailLoading && <div style={{padding:40, textAlign:"center", color:"#94a3b8", fontSize:12}}>Chargement…</div>}
-              {detailError && (
-                <div style={{background:"#fef2f2", border:"1px solid #fecaca", borderRadius:10, padding:12, color:"#991b1b", fontSize:12}}>❌ {detailError}</div>
-              )}
-
-              {detailData && detailTab === "overview" && (
-                <div style={{display:"flex", flexDirection:"column", gap:12}}>
-                  <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8}}>
-                    {[
-                      { l:"CA signé",      v:fmtEur(detailData.stats.caAccepte), c:"#0ea5e9" },
-                      { l:"CA en cours",   v:fmtEur(detailData.stats.caEnCours), c:"#f59e0b" },
-                      { l:"Devis",         v:detailData.stats.devisTotal,         c:"#7c3aed" },
-                      { l:"Factures",      v:detailData.stats.invoicesTotal,      c:"#22c55e" },
-                      { l:"Clients",       v:detailData.stats.clientsTotal,       c:"#374151" },
-                      { l:"IA utilisée",   v:`${detailData.stats.aiUsed}×`,       c:"#ec4899" },
-                    ].map(m => (
-                      <div key={m.l} style={{background:"white", borderRadius:10, padding:"10px 12px", boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
-                        <div style={{fontSize:10, color:"#94a3b8"}}>{m.l}</div>
-                        <div style={{fontSize:16, fontWeight:800, color:m.c, marginTop:2}}>{m.v}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{background:"white", borderRadius:10, padding:12, fontSize:11, color:"#475569", lineHeight:1.7}}>
-                    <div><strong style={{color:"#0f172a"}}>Inscrit :</strong> {fmtDT(detailData.user.created_at)}</div>
-                    <div><strong style={{color:"#0f172a"}}>Email confirmé :</strong> {detailData.user.confirmed_at ? fmtDT(detailData.user.confirmed_at) : "Non"}</div>
-                    <div><strong style={{color:"#0f172a"}}>Dernière connexion :</strong> {detailData.user.last_sign_in_at ? relTime(detailData.user.last_sign_in_at) : "—"}</div>
-                    {detailData.profile?.company_name && <div><strong style={{color:"#0f172a"}}>Société :</strong> {detailData.profile.company_name}</div>}
-                    {detailData.profile?.brand_data?.trades?.length > 0 && (
-                      <div><strong style={{color:"#0f172a"}}>Métiers :</strong> {detailData.profile.brand_data.trades.join(", ")}</div>
-                    )}
-                    {detailData.profile?.brand_data?.siret && <div><strong style={{color:"#0f172a"}}>SIRET :</strong> {detailData.profile.brand_data.siret}</div>}
-                    {detailData.profile?.brand_data?.city && <div><strong style={{color:"#0f172a"}}>Ville :</strong> {detailData.profile.brand_data.city}</div>}
-                    {detailData.profile?.brand_data?.phone && <div><strong style={{color:"#0f172a"}}>Téléphone :</strong> {detailData.profile.brand_data.phone}</div>}
-                  </div>
-                  {detailData.user.id !== currentUser?.id && (
-                    <button onClick={() => { closeDetail(); openDelete(detailUser); }}
-                      style={{background:"#fef2f2", border:"1px solid #fecaca", color:"#b91c1c", borderRadius:10, padding:"10px", fontSize:12, fontWeight:700, cursor:"pointer"}}>
-                      🗑 Supprimer ce compte définitivement
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {detailData && detailTab === "devis" && (
-                <div style={{display:"flex", flexDirection:"column", gap:8}}>
-                  {detailData.devis.length === 0
-                    ? <div style={{padding:20, textAlign:"center", color:"#94a3b8", fontSize:12}}>Aucun devis.</div>
-                    : detailData.devis.map(d => (
-                      <div key={d.id} style={{background:"white", borderRadius:10, padding:12, boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
-                        <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:8}}>
-                          <div style={{fontFamily:"monospace", fontSize:11, color:"#64748b"}}>{d.numero}</div>
-                          <span style={{fontSize:9, padding:"1px 7px", borderRadius:20, background:`${SC[d.statut]||"#94a3b8"}22`, color:SC[d.statut]||"#94a3b8", fontWeight:700}}>{SL[d.statut]||d.statut}</span>
-                        </div>
-                        <div style={{fontSize:13, fontWeight:600, color:"#0f172a", marginTop:4}}>{d.objet || "Sans objet"}</div>
-                        {d.ville_chantier && <div style={{fontSize:10, color:"#94a3b8"}}>{d.ville_chantier}</div>}
-                        <div style={{display:"flex", justifyContent:"space-between", marginTop:6, fontSize:11, color:"#64748b"}}>
-                          <span>{fmtDT(d.date_emission)}</span>
-                          <span style={{fontWeight:700, color:"#0f172a"}}>{fmtEur(d.montant_ht)} HT</span>
-                        </div>
-                        {d.lignes?.length > 0 && (
-                          <details style={{marginTop:8}}>
-                            <summary style={{fontSize:11, color:"#64748b", cursor:"pointer"}}>{d.lignes.filter(l => l.type_ligne==="ouvrage").length} ligne(s)</summary>
-                            <div style={{marginTop:6, fontSize:11, color:"#475569"}}>
-                              {d.lignes.map(l => (
-                                <div key={l.id} style={{padding:"3px 0", borderBottom:"1px solid #f1f5f9", display:"flex", justifyContent:"space-between", gap:8}}>
-                                  <span style={{flex:1, color:l.type_ligne==="lot"?"#0f172a":"#475569", fontWeight:l.type_ligne==="lot"?700:400}}>
-                                    {l.type_ligne==="lot" ? `▸ ${l.designation}` : l.designation}
-                                  </span>
-                                  {l.type_ligne==="ouvrage" && (
-                                    <span style={{flexShrink:0}}>{l.quantite} {l.unite} × {fmtEur(l.prix_unitaire)}</span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </details>
-                        )}
-                      </div>
-                    ))}
-                </div>
-              )}
-
-              {detailData && detailTab === "invoices" && (
-                <div style={{display:"flex", flexDirection:"column", gap:8}}>
-                  {detailData.invoices.length === 0
-                    ? <div style={{padding:20, textAlign:"center", color:"#94a3b8", fontSize:12}}>Aucune facture.</div>
-                    : detailData.invoices.map(inv => (
-                      <div key={inv.id} style={{background:"white", borderRadius:10, padding:12, boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
-                        <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:8}}>
-                          <div style={{fontFamily:"monospace", fontSize:11, color:"#64748b"}}>{inv.numero}{inv.avoir_of_invoice_id ? " · avoir" : ""}</div>
-                          <div style={{display:"flex", gap:4}}>
-                            {inv.locked && <span style={{fontSize:9, padding:"1px 6px", borderRadius:20, background:"#fef3c7", color:"#92400e", fontWeight:700}}>🔒</span>}
-                            <span style={{fontSize:9, padding:"1px 7px", borderRadius:20, background:"#f1f5f9", color:"#475569", fontWeight:700}}>{inv.statut}</span>
-                          </div>
-                        </div>
-                        <div style={{fontSize:13, fontWeight:600, color:"#0f172a", marginTop:4}}>{inv.objet || "Sans objet"}</div>
-                        <div style={{display:"flex", justifyContent:"space-between", marginTop:6, fontSize:11, color:"#64748b"}}>
-                          <span>{fmtDT(inv.date_emission)}</span>
-                          <span style={{fontWeight:700, color:"#0f172a"}}>{fmtEur(inv.montant_ht)} HT · {fmtEur(inv.montant_ttc)} TTC</span>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-
-              {detailData && detailTab === "clients" && (
-                <div style={{display:"flex", flexDirection:"column", gap:8}}>
-                  {detailData.clients.length === 0
-                    ? <div style={{padding:20, textAlign:"center", color:"#94a3b8", fontSize:12}}>Aucun client.</div>
-                    : detailData.clients.map(c => (
-                      <div key={c.id} style={{background:"white", borderRadius:10, padding:12, boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
-                        <div style={{fontSize:13, fontWeight:700, color:"#0f172a"}}>
-                          {c.raison_sociale || `${c.prenom||""} ${c.nom||""}`.trim() || "—"}
-                        </div>
-                        <div style={{fontSize:11, color:"#64748b", marginTop:2}}>
-                          {c.email || "—"}{c.telephone ? ` · ${c.telephone}` : ""}
-                        </div>
-                        <div style={{fontSize:10, color:"#94a3b8", marginTop:2}}>
-                          {[c.ville, c.type==="entreprise"?"Entreprise":"Particulier"].filter(Boolean).join(" · ")}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-
-              {detailData && detailTab === "conv" && (
-                <div style={{display:"flex", flexDirection:"column", gap:8}}>
-                  {detailData.conversations.length === 0
-                    ? <div style={{padding:20, textAlign:"center", color:"#94a3b8", fontSize:12}}>Aucune conversation.</div>
-                    : detailData.conversations.map(turn => (
-                      <div key={turn.id} style={{display:"flex", flexDirection:"column", gap:4}}>
-                        {turn.user_message && (
-                          <div style={{alignSelf:"flex-end", maxWidth:"88%", background:"#0f172a", color:"white", borderRadius:"12px 12px 3px 12px", padding:"7px 11px", fontSize:12, lineHeight:1.5, wordBreak:"break-word"}}>{turn.user_message}</div>
-                        )}
-                        {turn.ai_response && (
-                          <div style={{alignSelf:"flex-start", maxWidth:"88%", background:"white", color:"#1e293b", border:"1px solid #f1f5f9", borderRadius:"12px 12px 12px 3px", padding:"7px 11px", fontSize:12, lineHeight:1.5, wordBreak:"break-word"}}>
-                            {turn.ai_response}
-                            {turn.had_devis && <span style={{display:"inline-block", marginLeft:6, fontSize:9, padding:"1px 6px", borderRadius:10, background:"rgba(34,197,94,.12)", color:"#15803d", fontWeight:700}}>devis ✓</span>}
-                          </div>
-                        )}
-                        <div style={{fontSize:9, color:"#cbd5e1", alignSelf:"center"}}>
-                          {fmtDT(turn.created_at)} · {new Date(turn.created_at).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-
-              {detailData && detailTab === "profil" && (() => {
-                const bd = detailData.profile?.brand_data || {}
-                const row = (label, val) => val ? (
-                  <div key={label} style={{display:"flex", gap:8, padding:"6px 0", borderBottom:"1px solid #f1f5f9", fontSize:12}}>
-                    <span style={{width:130, flexShrink:0, color:"#94a3b8", fontWeight:600}}>{label}</span>
-                    <span style={{color:"#1e293b", wordBreak:"break-word"}}>{val}</span>
-                  </div>
-                ) : null
-                return (
-                  <div style={{display:"flex", flexDirection:"column", gap:14}}>
-                    {/* Identité */}
-                    <div style={{background:"white", borderRadius:10, padding:"12px 14px", boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
-                      <div style={{fontSize:10, fontWeight:700, color:"#94a3b8", letterSpacing:"1px", textTransform:"uppercase", marginBottom:8}}>Identité</div>
-                      {row("Société", bd.companyName)}
-                      {row("SIRET", bd.siret)}
-                      {row("N° TVA", bd.vatNumber)}
-                      {row("Régime TVA", bd.vatRegime === "franchise" ? "Franchise en base" : bd.vatRegime === "normal" ? "Régime normal" : bd.vatRegime)}
-                      {row("Métiers", Array.isArray(bd.trades) ? bd.trades.join(", ") : null)}
-                    </div>
-                    {/* Coordonnées */}
-                    <div style={{background:"white", borderRadius:10, padding:"12px 14px", boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
-                      <div style={{fontSize:10, fontWeight:700, color:"#94a3b8", letterSpacing:"1px", textTransform:"uppercase", marginBottom:8}}>Coordonnées</div>
-                      {row("Adresse", bd.address)}
-                      {row("CP / Ville", [bd.postalCode, bd.city].filter(Boolean).join(" "))}
-                      {row("Téléphone", bd.phone)}
-                      {row("Email", bd.email)}
-                      {row("Site web", bd.website)}
-                    </div>
-                    {/* PDF */}
-                    <div style={{background:"white", borderRadius:10, padding:"12px 14px", boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
-                      <div style={{fontSize:10, fontWeight:700, color:"#94a3b8", letterSpacing:"1px", textTransform:"uppercase", marginBottom:8}}>Apparence PDF</div>
-                      {bd.color && (
-                        <div style={{display:"flex", gap:8, padding:"6px 0", borderBottom:"1px solid #f1f5f9", fontSize:12, alignItems:"center"}}>
-                          <span style={{width:130, flexShrink:0, color:"#94a3b8", fontWeight:600}}>Couleur</span>
-                          <span style={{width:18, height:18, borderRadius:4, background:bd.color, border:"1px solid #e2e8f0", flexShrink:0}}/>
-                          <span style={{color:"#1e293b"}}>{bd.color}</span>
-                        </div>
-                      )}
-                      {row("Police", bd.fontStyle)}
-                      {bd.logo && <div style={{padding:"6px 0", borderBottom:"1px solid #f1f5f9"}}><img src={bd.logo} alt="logo" style={{maxHeight:48, maxWidth:160, objectFit:"contain", borderRadius:4, border:"1px solid #e2e8f0"}}/></div>}
-                    </div>
-                    {/* Paiement & mentions */}
-                    <div style={{background:"white", borderRadius:10, padding:"12px 14px", boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
-                      <div style={{fontSize:10, fontWeight:700, color:"#94a3b8", letterSpacing:"1px", textTransform:"uppercase", marginBottom:8}}>Paiement & mentions</div>
-                      {row("Conditions règlement", bd.paymentTerms)}
-                      {row("Coordonnées bancaires", bd.bankDetails)}
-                      {row("Mentions légales", bd.legalMentions)}
-                      {row("Mention BTP", bd.btpMention)}
-                      {row("Mention RGPD", bd.rgpdMention)}
-                    </div>
-                  </div>
-                )
-              })()}
-
-              {detailData && detailTab === "activite" && (
-                <div style={{display:"flex", flexDirection:"column", gap:6}}>
-                  {(detailData.activity||[]).length === 0
-                    ? <div style={{padding:20, textAlign:"center", color:"#94a3b8", fontSize:12}}>Aucune activité enregistrée.</div>
-                    : (detailData.activity||[]).map((a, i) => (
-                      <div key={a.id||i} style={{background:"white", borderRadius:10, padding:"8px 12px", boxShadow:"0 1px 3px rgba(0,0,0,.04)", display:"flex", gap:10, alignItems:"flex-start"}}>
-                        <div style={{flexShrink:0, width:6, height:6, borderRadius:"50%", background: a.action==="DELETE"?"#ef4444":a.action==="INSERT"?"#22c55e":"#3b82f6", marginTop:5}}/>
-                        <div style={{flex:1, minWidth:0}}>
-                          <div style={{display:"flex", gap:6, alignItems:"baseline", flexWrap:"wrap"}}>
-                            <span style={{fontSize:10, fontWeight:700, padding:"1px 6px", borderRadius:10, background: a.action==="DELETE"?"#fef2f2":a.action==="INSERT"?"#f0fdf4":"#eff6ff", color: a.action==="DELETE"?"#b91c1c":a.action==="INSERT"?"#15803d":"#1d4ed8"}}>{a.action}</span>
-                            <span style={{fontSize:11, fontWeight:600, color:"#0f172a"}}>{a.table_name}</span>
-                            {a.record_id && <span style={{fontSize:9, color:"#94a3b8", fontFamily:"monospace"}}>{String(a.record_id).slice(0,8)}…</span>}
-                          </div>
-                          <div style={{fontSize:9, color:"#94a3b8", marginTop:3}}>{fmtDT(a.created_at)} · {new Date(a.created_at).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-
-              {detailData && detailTab === "issues" && (
-                <div style={{display:"flex", flexDirection:"column", gap:12}}>
-                  <div>
-                    <div style={{fontSize:11, fontWeight:700, color:"#94a3b8", letterSpacing:"0.5px", textTransform:"uppercase", marginBottom:6}}>Erreurs IA ({detailData.errors.length})</div>
-                    {detailData.errors.length === 0 ? <div style={{fontSize:11, color:"#94a3b8"}}>Aucune erreur 🎉</div> : detailData.errors.map(e => (
-                      <div key={e.id} style={{background:"white", borderRadius:10, padding:"8px 12px", marginBottom:6, boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
-                        <div style={{fontSize:11, color:"#b91c1c", fontFamily:"ui-monospace,monospace", wordBreak:"break-word"}}>{e.error}</div>
-                        {e.user_message && <div style={{fontSize:10, color:"#64748b", marginTop:3, fontStyle:"italic"}}>« {e.user_message.slice(0,200)}{e.user_message.length>200?"…":""} »</div>}
-                        <div style={{fontSize:9, color:"#94a3b8", marginTop:3}}>{fmtDT(e.created_at)}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <div>
-                    <div style={{fontSize:11, fontWeight:700, color:"#94a3b8", letterSpacing:"0.5px", textTransform:"uppercase", marginBottom:6}}>Réponses négatives ({detailData.negatives.length})</div>
-                    {detailData.negatives.length === 0 ? <div style={{fontSize:11, color:"#94a3b8"}}>Aucun signal négatif.</div> : detailData.negatives.map(n => (
-                      <div key={n.id} style={{background:"white", borderRadius:10, padding:"8px 12px", marginBottom:6, boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
-                        <span style={{fontSize:9, fontWeight:700, padding:"2px 7px", borderRadius:20, background:n.kind==="ai_refusal"?"#f1f5f9":"#fef2f2", color:n.kind==="ai_refusal"?"#475569":"#b91c1c"}}>
-                          {n.kind==="ai_refusal"?"Refus IA":"Usager mécontent"}
-                        </span>
-                        {n.user_message && <div style={{fontSize:11, color:"#0f172a", marginTop:4}}>« {n.user_message.slice(0,200)}{n.user_message.length>200?"…":""} »</div>}
-                        {n.ai_response && <div style={{fontSize:11, color:"#64748b", marginTop:2, fontStyle:"italic"}}>{n.ai_response.slice(0,200)}{n.ai_response.length>200?"…":""}</div>}
-                        <div style={{fontSize:9, color:"#94a3b8", marginTop:3}}>{fmtDT(n.created_at)}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <UserDetailDrawer
+          user={detailUser}
+          data={detailData}
+          loading={detailLoading}
+          error={detailError}
+          tab={detailTab}
+          onTabChange={setDetailTab}
+          onClose={closeDetail}
+          onRequestDelete={() => { closeDetail(); openDelete(detailUser); }}
+          currentUserId={currentUser?.id}
+        />
       )}
 
       {deleteTarget && (
-        <div onClick={closeDelete}
-          style={{position:"fixed", inset:0, background:"rgba(15,23,42,.6)", backdropFilter:"blur(4px)", display:"flex", alignItems:"center", justifyContent:"center", padding:18, zIndex:100, animation:"fadeUp .15s ease both"}}>
-          <div onClick={e => e.stopPropagation()}
-            style={{background:"white", borderRadius:16, maxWidth:420, width:"100%", padding:22, boxShadow:"0 24px 48px rgba(0,0,0,.3)"}}>
-            <div style={{display:"flex", alignItems:"center", gap:12, marginBottom:14}}>
-              <div style={{width:42, height:42, borderRadius:12, background:"#fef2f2", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0}}>
-                <svg width="22" height="22" fill="none" stroke="#dc2626" strokeWidth="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-              </div>
-              <div style={{flex:1, minWidth:0}}>
-                <div style={{fontSize:15, fontWeight:700, color:"#0f172a"}}>Supprimer ce compte ?</div>
-                <div style={{fontSize:11, color:"#64748b", marginTop:2}}>Cette action est <strong style={{color:"#dc2626"}}>irréversible</strong>.</div>
-              </div>
-            </div>
-
-            <div style={{background:"#f8fafc", borderRadius:12, padding:12, marginBottom:14}}>
-              <div style={{fontSize:12, fontWeight:700, color:"#0f172a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{deleteTarget.name}</div>
-              <div style={{fontSize:11, color:"#64748b", marginTop:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{deleteTarget.email}</div>
-              <div style={{display:"flex", gap:12, marginTop:8, fontSize:10, color:"#64748b", flexWrap:"wrap"}}>
-                <span><strong style={{color:"#0f172a"}}>{deleteTarget.devisTotal}</strong> devis</span>
-                <span><strong style={{color:"#0f172a"}}>{fmtEur(deleteTarget.caTotal)}</strong> de CA</span>
-                <span>Plan <strong style={{color:deleteTarget.plan==="pro"?"#15803d":"#64748b"}}>{deleteTarget.plan==="pro"?"PRO":"FREE"}</strong></span>
-              </div>
-            </div>
-
-            <div style={{fontSize:11, color:"#64748b", lineHeight:1.5, marginBottom:12}}>
-              Seront supprimés : compte utilisateur, profil, clients, devis, lignes et PDF associés.
-            </div>
-
-            <label style={{display:"block", fontSize:11, fontWeight:600, color:"#374151", marginBottom:6}}>
-              Saisissez l'email <strong style={{color:"#0f172a"}}>{deleteTarget.email}</strong> pour confirmer :
-            </label>
-            <input value={confirmInput} onChange={e => setConfirmInput(e.target.value)}
-              placeholder={deleteTarget.email}
-              disabled={deleting}
-              autoFocus
-              style={{width:"100%", border:"1px solid #e2e8f0", borderRadius:10, padding:"10px 12px", fontSize:13, outline:"none", marginBottom:12}}/>
-
-            {deleteError && (
-              <div style={{background:"#fef2f2", border:"1px solid #fecaca", borderRadius:10, padding:"8px 12px", fontSize:11, color:"#991b1b", marginBottom:12}}>
-                ❌ {deleteError}
-              </div>
-            )}
-
-            <div style={{display:"flex", gap:8}}>
-              <button onClick={closeDelete} disabled={deleting}
-                style={{flex:1, background:"#f1f5f9", color:"#374151", border:"none", borderRadius:10, padding:"10px", fontSize:12, fontWeight:700, cursor:deleting?"not-allowed":"pointer"}}>
-                Annuler
-              </button>
-              <button onClick={confirmDelete}
-                disabled={deleting || confirmInput.trim().toLowerCase() !== (deleteTarget.email || "").toLowerCase()}
-                style={{flex:2, background: (deleting || confirmInput.trim().toLowerCase() !== (deleteTarget.email || "").toLowerCase()) ? "#fca5a5" : "#dc2626", color:"white", border:"none", borderRadius:10, padding:"10px", fontSize:12, fontWeight:700, cursor:"pointer"}}>
-                {deleting ? "Suppression…" : "Supprimer définitivement"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <DeleteUserModal
+          target={deleteTarget}
+          confirmInput={confirmInput}
+          setConfirmInput={setConfirmInput}
+          deleting={deleting}
+          error={deleteError}
+          onClose={closeDelete}
+          onConfirm={confirmDelete}
+        />
       )}
     </div>
   )

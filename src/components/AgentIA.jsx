@@ -2,159 +2,14 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { CLAUDE_MODEL, TX } from "../lib/constants.js";
 import { fmt, uid } from "../lib/utils.js";
 import { tradesLabels, firstDevisExampleFor } from "../lib/trades.js";
-import { buildDevisHistorySummary, formatHistoryPrompt } from "../lib/devisHistory.js";
+import { buildDevisHistorySummary } from "../lib/devisHistory.js";
 import { supabase } from "../lib/supabase.js";
+import { SR_LANGS, MIC_LANG_KEY, pickInitialLang } from "../lib/agentIA/speech.js";
+import { buildAgentGreeting } from "../lib/agentIA/sectors.js";
+import { buildSystemPrompt } from "../lib/agentIA/prompt.js";
 import { I } from "./ui/icons.jsx";
 import ClientPickerModal from "./ClientPickerModal.jsx";
-
-const SR_LANGS = [
-  { code: "fr-FR", label: "Français", flag: "🇫🇷" },
-  { code: "ar-SA", label: "العربية",   flag: "🇸🇦" },
-  { code: "ar-MA", label: "الدارجة",   flag: "🇲🇦" },
-  { code: "en-US", label: "English",  flag: "🇬🇧" },
-  { code: "es-ES", label: "Español",  flag: "🇪🇸" },
-  { code: "pt-PT", label: "Português",flag: "🇵🇹" },
-  { code: "it-IT", label: "Italiano", flag: "🇮🇹" },
-  { code: "de-DE", label: "Deutsch",  flag: "🇩🇪" },
-  { code: "tr-TR", label: "Türkçe",   flag: "🇹🇷" },
-  { code: "ro-RO", label: "Română",   flag: "🇷🇴" },
-  { code: "pl-PL", label: "Polski",   flag: "🇵🇱" },
-  { code: "ru-RU", label: "Русский",  flag: "🇷🇺" },
-];
-
-const MIC_LANG_KEY = "zenbat_mic_lang";
-
-const pickInitialLang = () => {
-  if (typeof window !== "undefined") {
-    try {
-      const saved = localStorage.getItem(MIC_LANG_KEY);
-      if (saved && SR_LANGS.some(l => l.code === saved)) return saved;
-    } catch {}
-  }
-  if (typeof navigator === "undefined") return "fr-FR";
-  const nav = (navigator.language || "fr-FR").toLowerCase();
-  const match = SR_LANGS.find(l => l.code.toLowerCase() === nav || l.code.toLowerCase().split("-")[0] === nav.split("-")[0]);
-  return match?.code || "fr-FR";
-};
-
-// ── Détection de la famille de métiers ───────────────────────────────────────
-const SECTOR_KEYWORDS = {
-  btp:          ["maçonnerie","plomberie","électricité","charpente","couverture","isolation","carrelage","peinture","menuiserie","façade","étanchéité","terrassement","gros œuvre","chauffage","climatisation","serrurerie","sols souples","vitrerie","piscine","paysagiste","démolition","domotique","sanitaire","architecture","maîtrise d'œuvre","bureau d'études","cuisine / agencement","zinguerie","vrd","béton"],
-  beaute:       ["coiffure","barbier","esthétique","onglerie","maquillage","massage","tatouage","piercing","bien-être"],
-  sante:        ["kinésithérapie","ostéopathie","naturopathie","diététique","coach sportif","psychologie","opticien","audioprothésiste","nutrition","personal trainer"],
-  tech:         ["développement web","développement mobile","informatique","cybersécurité","graphisme","ux","ui design","seo","sea","community management","création de contenu","développement logiciel","réseaux"],
-  alimentaire:  ["boulangerie","pâtisserie","boucherie","charcuterie","traiteur","restauration","chocolatier","confiseur","glacier","sommellerie","cave"],
-  transport:    ["mécanique automobile","carrosserie","vitrage auto","moto","vélo","déménagement","transport","livraison","vtc","taxi"],
-  communication:["photographie","vidéographie","montage","drone","rédaction","copywriting","traduction","illustration","impression","signalétique","publicité","marketing"],
-  evenementiel: ["événements","dj","animation musicale","traiteur événementiel","décoration événementielle","son / lumière","scène"],
-  education:    ["cours particuliers","formation professionnelle","auto-école"],
-  nettoyage:    ["nettoyage","pressing","blanchisserie","ramonage","entretien cheminée","désinfection","dératisation"],
-  animaux:      ["toilettage animal","vétérinaire","dog-sitting","pet-sitting","dressage","éducation canine"],
-  immobilier:   ["agent immobilier","gestionnaire de patrimoine","comptabilité","expertise comptable","juridique","conseil"],
-  mode:         ["couture","retouche","maroquinerie","cordonnerie","teinturerie"],
-};
-
-const detectSectors = (tradeNames, fallback = "") => {
-  const t = (tradeNames.join(" ") + " " + fallback).toLowerCase();
-  const found = Object.entries(SECTOR_KEYWORDS)
-    .filter(([, kws]) => kws.some(kw => t.includes(kw)))
-    .map(([sector]) => sector);
-  return found.length ? found : ["general"];
-};
-
-// ── Contexte adapté au secteur ────────────────────────────────────────────────
-const SECTOR_LABELS = {
-  btp: "BTP et travaux du bâtiment", beaute: "beauté et bien-être", sante: "santé et paramédical",
-  tech: "tech et numérique", alimentaire: "artisanat alimentaire et restauration",
-  transport: "transport et automobile", communication: "communication et créatif",
-  evenementiel: "événementiel et animation", education: "enseignement et formation",
-  nettoyage: "nettoyage et entretien", animaux: "services animaliers",
-  immobilier: "immobilier et conseil", mode: "mode et textile", general: "prestations de services",
-};
-
-const SECTOR_UNITS = {
-  btp:           "m², ml, m³, u, ens, h",
-  beaute:        "u (prestation), forfait, h, min",
-  sante:         "u (séance), forfait, h",
-  tech:          "j (jour/homme), h, forfait, u",
-  alimentaire:   "u, kg, pers, pièce, lot, kg",
-  transport:     "km, h, j, forfait, u",
-  communication: "j, h, forfait, u",
-  evenementiel:  "h, j, forfait, pers, u",
-  education:     "h, j, session, forfait",
-  nettoyage:     "h, m², forfait, j",
-  animaux:       "u, h, j, forfait",
-  immobilier:    "h, j, forfait, u",
-  mode:          "u, h, pièce, forfait",
-  general:       "u, h, j, forfait, ens",
-};
-
-const SECTOR_PRICING = {
-  btp:           "Prix réalistes BTP France 2025. Ex : main-d'œuvre élec 45-65 €/h, pose carrelage 30-50 €/m², isolation combles 20-40 €/m².",
-  beaute:        "Tarifs beauté France 2025. Ex : coupe femme 35-80 €, soin visage 60-120 €, pose ongles 40-80 €, épilation 20-60 €.",
-  sante:         "Tarifs paramédicaux France 2025. Ex : séance kiné 40-70 €, ostéo 60-90 €, coaching sportif 50-100 €/h, consultation diét. 60-80 €.",
-  tech:          "TJM tech France 2025. Ex : dev web junior 350-500 €/j, senior 600-900 €/j, graphiste 300-600 €/j, chef de projet 500-800 €/j.",
-  alimentaire:   "Tarifs artisanat alimentaire France 2025. Ex : plateau repas traiteur 15-35 €/pers, buffet cocktail 25-55 €/pers, gâteau sur-mesure 4-8 €/part.",
-  transport:     "Tarifs transport France 2025. Ex : déménagement studio 400-800 €, VTC aéroport 40-80 €, dépannage moto 80-150 €, livraison express 15-40 €.",
-  communication: "Tarifs comm/créatif France 2025. Ex : reportage photo demi-journée 400-800 €, vidéo institutionnelle 1 500-5 000 €, logo 500-2 000 €.",
-  evenementiel:  "Tarifs événementiel France 2025. Ex : DJ soirée 400-1 200 €, photographe événement 600-1 500 €, animation musicale 300-800 €.",
-  education:     "Tarifs formation France 2025. Ex : cours particulier 25-60 €/h, formation pro 500-1 500 €/jour, auto-école forfait 1 200-2 000 €.",
-  nettoyage:     "Tarifs nettoyage France 2025. Ex : ménage domicile 15-25 €/h, nettoyage bureaux 18-30 €/h, vitres 3-8 €/m².",
-  animaux:       "Tarifs animaliers France 2025. Ex : toilettage chien 40-80 €, pension journalière 20-40 €, dressage 50-80 €/séance.",
-  immobilier:    "Honoraires France 2025. Ex : gestion locative 5-10%/mois, expertise comptable 80-200 €/h, consultant juridique 150-400 €/h.",
-  mode:          "Tarifs couture France 2025. Ex : retouche simple 10-30 €, ourlet 15-25 €, robe sur-mesure 200-800 €.",
-  general:       "Tarifs du marché France 2025. Adapte les prix, les unités et le vocabulaire au métier exact déclaré par l'utilisateur, en t'appuyant sur ta connaissance professionnelle de ce métier (tarifs pratiqués, conventions, spécificités). Évite toute réponse générique.",
-};
-
-const SECTOR_TVA = {
-  btp: `TVA : applique le taux correct par ouvrage selon la réglementation française :
-- 5.5% : travaux d'amélioration énergétique (isolation, PAC, fenêtres dans logement >2 ans).
-- 10% : entretien/rénovation/amélioration dans logement d'habitation >2 ans.
-- 20% : neuf, gros œuvre, locaux professionnels, fournitures sans pose.`,
-  alimentaire: `TVA :
-- 5.5% : produits alimentaires de base (pain, épicerie, pâtisserie non luxe).
-- 10% : restauration, plats cuisinés, traiteur.
-- 20% : boissons alcoolisées, confiseries, chocolat.`,
-  sante: `TVA : 20% pour les soins non remboursés (coaching, naturopathie, nutrition). Actes paramédicaux conventionnés : tva_rate 0. En cas de doute, applique 20%.`,
-  nettoyage: `TVA : 10% pour les services à la personne à domicile (résidence principale). 20% pour locaux professionnels.`,
-  default: `TVA : 20% par défaut pour les prestations de services en France.`,
-};
-
-const buildSectorContext = (sectors, vatRegime) => {
-  const expertDomain = sectors.map(s => SECTOR_LABELS[s] || s).join(" et ");
-  const units = [...new Set(sectors.flatMap(s => (SECTOR_UNITS[s] || SECTOR_UNITS.general).split(", ")))].join(", ");
-  const pricing = sectors.map(s => SECTOR_PRICING[s] || SECTOR_PRICING.general).join("\n");
-  const vocab = sectors.includes("btp") ? "travaux / ouvrages" : "prestations / services";
-  const tvaContext = vatRegime === "franchise"
-    ? `TVA — RÈGLE ABSOLUE : franchise en base (art. 293 B). TOUS les ouvrages ont "tva_rate": 0. Ne propose jamais d'autre taux. Ne mentionne pas la TVA dans le chat.`
-    : (SECTOR_TVA[sectors.find(s => SECTOR_TVA[s])] || SECTOR_TVA.default);
-  return { expertDomain, units, pricing, vocab, tvaContext };
-};
-
-const SECTOR_GREETING_EXAMPLE = {
-  btp:           "Ex : *Pose carrelage 40m² à 25€/m², fourniture incluse*",
-  beaute:        "Ex : *Coupe + couleur femme 80€, soin visage 60€*",
-  sante:         "Ex : *Séance kiné 45€ × 4, bilan posture 90€*",
-  tech:          "Ex : *Site vitrine 5j × 500€/j, maintenance 2h/mois × 80€*",
-  alimentaire:   "Ex : *Buffet cocktail 35€/pers × 50 pers, livraison 80€*",
-  transport:     "Ex : *Déménagement T2 Paris–Lyon forfait 650€, emballage 80€*",
-  communication: "Ex : *Reportage photo 8h × 120€, retouches forfait 200€*",
-  evenementiel:  "Ex : *DJ soirée 6h 800€, sono & lumières forfait 400€*",
-  education:     "Ex : *Cours de maths 2h/sem × 35€/h, bilan pédagogique 90€*",
-  nettoyage:     "Ex : *Nettoyage bureaux 80m² × 18€/m², vitrerie 20m² × 5€/m²*",
-  animaux:       "Ex : *Toilettage golden 65€, bain + séchage 30€*",
-  immobilier:    "Ex : *Gestion locative 6 mois × 120€/mois, état des lieux 180€*",
-  mode:          "Ex : *Ourlet pantalon 20€ × 3, retouche robe de soirée 60€*",
-  general:       "Ex : *Prestation 2h × 60€/h, fourniture matériel forfait 120€*",
-};
-
-const buildAgentGreeting = (brand) => {
-  const tradeNames = tradesLabels(brand?.trades || []);
-  const sectors = detectSectors(tradeNames, brand?.companyName || "");
-  const { expertDomain } = buildSectorContext(sectors, brand?.vatRegime);
-  const example = SECTOR_GREETING_EXAMPLE[sectors[0]] || SECTOR_GREETING_EXAMPLE.general;
-  return `Bonjour 👋 Je suis votre assistant spécialisé en **${expertDomain}**.\n\nDécrivez votre besoin ligne par ligne, dans la langue de votre choix (français, arabe, darija, espagnol, anglais, portugais…). Je rédige le devis en français professionnel.\n\n${example}`;
-};
+import CelebrateModal from "./agent/CelebrateModal.jsx";
 
 export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, plan, trialExpired, onPaywall, setTab, onOpenDevisPDF, brand }) {
   const [msgs,         setMsgs]         = useState(() => [{ role: "assistant", content: buildAgentGreeting(brand) }]);
@@ -222,138 +77,6 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   const tvaTotal = tvaRows.reduce((s, r) => s + r.montant, 0);
   const ttc = ht + tvaTotal;
 
-  const buildSystemPrompt = () => {
-    const tradeNames = tradesLabels(brand.trades);
-    const sectors = detectSectors(tradeNames, brand.companyName || "");
-    const { expertDomain, units, pricing, vocab, tvaContext } = buildSectorContext(sectors, brand.vatRegime);
-    const hasTrades = tradeNames.length > 0;
-    const isGenericSector = sectors.length === 1 && sectors[0] === "general";
-
-    const personaBlock = hasTrades
-      ? `Tu INCARNES un professionnel confirmé, reconnu et expérimenté dans le(s) métier(s) suivant(s) : ${tradeNames.join(", ")}.
-Tu maîtrises PARFAITEMENT pour chacun de ces métiers :
-- le vocabulaire technique précis (termes d'atelier, normes, références),
-- les prestations standards, les étapes types d'un chantier / d'une mission,
-- les unités de facturation du métier (m², ml, m³, u, h, j, forfait, pers, pièce…),
-- les fourchettes de prix réalistes du marché français 2025,
-- les usages commerciaux, les mentions légales et obligations propres au métier.
-Tu rédiges chaque devis avec la rigueur, le niveau de détail et le ton d'un pro confirmé qui exerce ce métier au quotidien — jamais de formulations génériques, jamais d'approximations.`
-      : `Tu es un assistant devis professionnel capable de t'adapter à n'importe quel métier déclaré par l'utilisateur. Adopte systématiquement le ton, le vocabulaire technique et les prix du marché français 2025 du métier concerné.`;
-
-    const tradesBlock = hasTrades
-      ? `\n\nSPÉCIALISATION — INDICATIVE, JAMAIS BLOQUANTE :
-L'entreprise est déclarée dans les métiers : ${tradeNames.join(", ")}.
-
-Tu GÉNÈRES TOUJOURS le devis quel que soit le métier demandé — pas de question, pas de refus, pas de reproche.
-
-Si la demande sort des métiers déclarés, tu adaptes vocabulaire / prix / unités au métier réel, et tu ajoutes DISCRÈTEMENT une seule astuce bienveillante APRÈS le <DEVIS>, jamais avant :
-« 💡 Astuce : ajoutez « X » à vos métiers dans Mon profil pour retrouver ce type de devis encore plus vite la prochaine fois. »
-(Remplace X par le métier détecté. Ton amical, jamais culpabilisant. JAMAIS tu n'écris "sort de vos métiers" / "hors périmètre" / "n'est pas votre spécialité".)
-
-Demandes mixtes : tu génères TOUTES les lignes d'un coup, sans séparer.`
-      : "";
-
-    // Si le métier n'entre dans aucun secteur pré-câblé, on fait confiance à
-    // l'expertise générale de l'IA sur le métier nommé, sans l'enfermer dans
-    // les exemples génériques.
-    const pricingBlock = isGenericSector && hasTrades
-      ? `PRIX — RÈGLE ABSOLUE :
-Utilise des tarifs réalistes du marché français 2025 propres au métier "${tradeNames.join(", ")}". Fais appel à ta connaissance spécifique de ce métier (tarifs pratiqués, unités standards, prestations types). Ne propose JAMAIS de prix génériques ou "secteur services" si un prix plus précis propre à ce métier existe.`
-      : pricing;
-
-    const historyBlock = formatHistoryPrompt(historySummary);
-
-    return `====================================================
-RÈGLE N°1 — ABSOLUE, NON NÉGOCIABLE, PRIORITAIRE :
-Dès le PREMIER message de l'utilisateur, tu GÉNÈRES IMMÉDIATEMENT un devis complet encapsulé entre <DEVIS></DEVIS>.
-
-TU NE POSES AUCUNE QUESTION AVANT LE <DEVIS>.
-TU NE DEMANDES AUCUNE PRÉCISION AVANT LE <DEVIS>.
-TU NE DIS JAMAIS "pour vous faire un devis, j'aurais besoin de…".
-TU NE DIS JAMAIS "avant de générer, pouvez-vous préciser…".
-TU NE DIS JAMAIS "voulez-vous que je génère…".
-TU NE DIS JAMAIS "Désolé, nous ne réalisons pas ce type de travaux".
-
-Si l'utilisateur n'a pas donné de prix, tu ESTIMES sur la base des tarifs du marché 2025.
-Si l'utilisateur n'a pas donné de quantité, tu PROPOSES une quantité par défaut (ex : 1 forfait, 1 unité, 10 m², etc.) en le signalant dans la désignation.
-Si l'utilisateur a donné une phrase vague ("fais-moi un devis de salle de bain"), tu INVENTES un devis type complet (plusieurs lignes crédibles) et tu l'émets immédiatement.
-
-RÈGLE N°2 — MAXIMUM 2 TOURS POUR FINALISER :
-L'utilisateur doit obtenir son devis final en 2 messages maximum. Concrètement :
-• Tour 1 (son 1er message) : tu émets un devis COMPLET immédiatement.
-• Tour 2 (sa réponse éventuelle) : tu émets le devis AJUSTÉ et FINAL, sans aucune question supplémentaire.
-À partir du tour 2, tu n'as plus le droit de poser la moindre question — tu fais les dernières hypothèses toi-même et tu finalises.
-
-RÈGLE N°3 — TON BIENVEILLANT :
-Tu t'adresses à l'utilisateur comme un collègue pro qui veut l'aider vite. Jamais culpabilisant, jamais procédurier, jamais stressant.
-• ✅ « Voici un premier devis, ajustez-le librement. »
-• ✅ « Je suis parti sur 40 m², modifiez si besoin. »
-• ❌ « Vous n'avez pas précisé la surface. »        (reproche)
-• ❌ « Cette demande sort de votre périmètre. »     (jugement)
-• ❌ « Il me manque plusieurs informations. »       (charge mentale)
-
-PHRASE OPTIONNELLE APRÈS </DEVIS> :
-Si tu veux proposer un ajustement possible, UNE SEULE phrase courte et douce, style « Dites-moi si vous voulez ajuster X » ou « N'hésitez pas à modifier les quantités ». JAMAIS une liste de questions. JAMAIS au tour 2.
-
-EXEMPLE DE COMPORTEMENT CORRECT :
-Utilisateur : « un devis pour une rénovation de salle de bain »
-Toi : « Voici un devis type pour une rénovation complète de salle de bain (base 6 m²). Ajustez librement les quantités et prix.
-<DEVIS>{"objet":"Rénovation salle de bain","lignes":[...]}</DEVIS>
-Dites-moi si vous voulez passer en gamme supérieure. »
-
-EXEMPLE DE COMPORTEMENT INTERDIT :
-Utilisateur : « un devis pour une rénovation de salle de bain »
-Toi : « Pouvez-vous me préciser la surface, le niveau de gamme… ? »  ← ❌ INTERDIT
-
-RÈGLE N°4 — COHÉRENCE INTERNE DU DEVIS (VÉRIFICATION OBLIGATOIRE) :
-Avant d'émettre le JSON, tu effectues ces 3 vérifications mentales :
-
-1. ZÉRO DOUBLON : chaque désignation est UNIQUE dans le devis. Si une même prestation apparaît plusieurs fois (même nom, même surface, même unité), tu la fusionne en une seule ligne. Exemple interdit : avoir à la fois "Enduit monocouche 440 m²" ET "Enduit monocouche 480 m²" dans le même devis → choisir l'une.
-
-2. COHÉRENCE DES DIMENSIONS : si l'utilisateur donne des dimensions (ex : "10 m × 12 m × 2 étages"), tu calcules la surface UNE SEULE FOIS et tu utilises EXACTEMENT la même valeur sur toutes les lignes du même lot. Jamais deux surfaces différentes pour le même type de travaux.
-
-3. CORRECTION = DEVIS COMPLET : quand l'utilisateur demande une modification, tu émets le devis ENTIER dans sa version finale — toutes les lignes conservées + les corrections. Aucune ligne n'est dupliquée. Aucune ligne demandée à supprimer ne réapparaît.
-====================================================
-
-${personaBlock}
-
-Contexte produit : tu es intégré dans l'application Zenbat (devis / facturation pour indépendants et TPE françaises).${tradesBlock}
-
-LANGUE — RÈGLE ABSOLUE :
-1. Tu comprends TOUTES les langues : français, arabe littéraire, darija marocaine, kabyle, espagnol, portugais, anglais, roumain, polonais, turc, wolof, bambara, tamoul, ourdou, hindi, chinois, russe, ukrainien, italien, allemand, etc.
-2. Tu réponds TOUJOURS en français professionnel, 100% du temps, SANS EXCEPTION.
-3. Tu TRADUIS systématiquement en français toutes les prestations décrites, quel que soit la langue d'entrée.
-4. Le JSON (objet, lots, désignations, unités) est TOUJOURS rédigé en français normé.
-
-MONNAIE — RÈGLE ABSOLUE :
-1. Toutes les valeurs monétaires sont TOUJOURS en euros (€), sans exception.
-2. Si l'utilisateur exprime un montant dans une autre devise par habitude (dirhams, dollars, livres, yen, dinars, francs CFA, roubles, pesos, réais, zlotys, lei, lires, etc.), tu l'interprètes DIRECTEMENT en euros comme s'il avait dit "euros" — AUCUNE conversion, AUCUN taux de change.
-3. Exemples : "10 000 dirhams" = 10 000 €, "5000 dollars" = 5000 €, "100 DH le m²" = 100 € le m².
-4. Tu ne mentionnes jamais la devise d'origine dans le devis ni dans ta réponse.
-
-MONTANT GLOBAL DEMANDÉ — RÈGLE ABSOLUE :
-1. Si l'utilisateur impose un montant total (ex : "fais-moi un devis de 10 000 € pour...", "budget 15 000", "total 8000 €"), le devis DOIT respecter ce total EXACTEMENT au centime près, quel que soit le nombre de lignes.
-2. Dans ce cas, tu DOIS ajouter le champ "target_total_ht": <nombre> dans le JSON racine avec le montant exact demandé par l'utilisateur (en euros, sans symbole, sans séparateur de milliers).
-3. Méthode : décompose en lots/${vocab} réalistes, puis ajuste les quantités ET/OU les prix unitaires pour que la somme des (quantité × prix unitaire) des lignes "ouvrage" tombe EXACTEMENT sur le total demandé.
-4. Si l'utilisateur précise UN prix unitaire (ex : "50 € le m²"), tu conserves ce PU tel quel et tu ajustes la quantité pour atteindre le total.
-5. Si l'utilisateur donne une quantité ET un total, tu vérifies que quantité × PU = total ; en cas de conflit, tu privilégies le PU × quantité tel qu'énoncé et tu signales en une phrase le total réel.
-6. Vérification mentale obligatoire AVANT d'émettre le JSON : fais la somme des lignes "ouvrage" et confirme qu'elle correspond exactement au montant demandé.
-7. Si aucun montant global n'est imposé, N'AJOUTE PAS le champ "target_total_ht".
-
-Unités usuelles${hasTrades ? ` pour ${tradeNames.join(", ")}` : ""} : ${units}${isGenericSector && hasTrades ? " (et toute autre unité propre au métier si plus pertinente)" : ""}.
-
-Format strict du JSON : {"objet":"titre court en français","lignes":[
-  {"type_ligne":"lot","designation":"NOM DU LOT EN FRANÇAIS"},
-  {"type_ligne":"ouvrage","lot":"nom lot","designation":"description en français","unite":"${units.split(", ")[0]}","quantite":10,"prix_unitaire":25,"tva_rate":20}
-]}
-
-${tvaContext}
-
-${pricingBlock}
-
-Groupe les ouvrages par lots cohérents, désignations professionnelles en français.
-RAPPEL FINAL : le JSON sort TOUJOURS au premier tour — sans doublon, avec des dimensions cohérentes sur toutes les lignes.${historyBlock}`;
-  };
 
   const send = async (overrideText) => {
     // overrideText est optionnel : il peut être une string fournie par la
@@ -405,7 +128,7 @@ RAPPEL FINAL : le JSON sort TOUJOURS au premier tour — sans doublon, avec des 
       // Température basse = adhésion forte aux règles "pas de question avant <DEVIS>"
       // et prix plus stables pour une même demande (audit recommandation).
       temperature: 0.2,
-      system: buildSystemPrompt(),
+      system: buildSystemPrompt({ brand, historySummary }),
       messages: newMsgs.map(m => ({ role: m.role, content: m.content })),
     };
 
@@ -1083,37 +806,13 @@ RAPPEL FINAL : le JSON sort TOUJOURS au premier tour — sans doublon, avec des 
       )}
 
       {celebrate && (
-        <div onClick={() => setCelebrate(false)}
-          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.65)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 200, animation: "fadeUp .2s ease both" }}>
-          <div onClick={e => e.stopPropagation()}
-            style={{ background: "white", borderRadius: 20, maxWidth: 380, width: "100%", padding: 24, textAlign: "center", boxShadow: "0 30px 60px rgba(0,0,0,.35)", animation: "popIn .3s cubic-bezier(.34,1.56,.64,1) both" }}>
-            <div style={{ fontSize: 56, lineHeight: 1, marginBottom: 8 }}>🎉</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", fontFamily, marginBottom: 6 }}>
-              Votre premier devis est prêt&nbsp;!
-            </div>
-            {celebrateSecondsRef.current > 0 && (
-              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 14 }}>
-                Généré en {celebrateSecondsRef.current} seconde{celebrateSecondsRef.current > 1 ? "s" : ""}. Pas mal pour un début 💪
-              </div>
-            )}
-            <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.6, marginBottom: 16 }}>
-              Ajustez librement les lignes ci-dessus, puis enregistrez-le. Vous pourrez l'envoyer à votre client en signature ou le télécharger en PDF.
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => setCelebrate(false)}
-                style={{ flex: 1, background: "#f1f5f9", color: "#374151", border: "none", borderRadius: 12, padding: 11, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                Continuer
-              </button>
-              <button onClick={() => { setCelebrate(false); setPickingClient(true); }}
-                style={{ flex: 2, background: ac, color: "white", border: "none", borderRadius: 12, padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: `0 6px 16px ${ac}55` }}>
-                ✓ Enregistrer ce devis
-              </button>
-            </div>
-            <div style={{ fontSize: 10, color: "#cbd5e1", marginTop: 12 }}>
-              Conseil : complétez SIRET + adresse dans « Mon profil » pour un PDF 100% pro.
-            </div>
-          </div>
-        </div>
+        <CelebrateModal
+          seconds={celebrateSecondsRef.current}
+          fontFamily={fontFamily}
+          ac={ac}
+          onClose={() => setCelebrate(false)}
+          onSave={() => { setCelebrate(false); setPickingClient(true); }}
+        />
       )}
     </div>
   );
