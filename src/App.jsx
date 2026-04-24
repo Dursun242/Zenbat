@@ -174,9 +174,13 @@ export default function App() {
           setBrandState(merged);
           try { localStorage.setItem("zenbat_brand", JSON.stringify(merged)); } catch {}
         } else {
-          // Nouveau compte : pré-remplit depuis les métadonnées d'inscription
-          // (prénom + nom + société). Ne touche pas un champ déjà saisi.
+          // Nouveau compte (brand_data vide en DB) : on pré-remplit depuis
+          // les métadonnées d'inscription (prénom + nom + société) et on
+          // redirige vers la sélection des métiers AVANT d'atterrir sur
+          // le Dashboard. Fonctionne quel que soit le flow (Signup par
+          // email, AuthScreen legacy, OAuth futur…).
           hydrateFromMetadata(user, setBrand);
+          setScreen("trades_picker");
         }
       })
       .catch(err => {
@@ -437,7 +441,12 @@ export default function App() {
     brand={brand}
     setBrand={setBrand}
     onDone={() => setScreen(showPwa ? "pwa_install" : "app")}
-    onSkip={() => setScreen(showPwa ? "pwa_install" : "app")}
+    onSkip={() => {
+      // Marque l'étape comme "vue" côté DB pour éviter de la re-déclencher
+      // au prochain login si l'utilisateur a juste voulu passer.
+      setBrand(b => ({ ...b, initialSetupDoneAt: new Date().toISOString() }));
+      setScreen(showPwa ? "pwa_install" : "app");
+    }}
   />;
   if (screen === "onboarding") return <Onboarding brand={brand} setBrand={setBrand} onDone={() => setScreen(showPwa ? "pwa_install" : "app")}/>;
   if (screen === "pwa_install") return <PWAInstallScreen deferredPrompt={deferredPrompt.current} onDone={() => { setShowPwa(false); setScreen("app"); }}/>;
