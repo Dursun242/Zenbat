@@ -7,6 +7,11 @@ import { fmt, fmtD } from "../lib/utils.js";
 
 ensurePdfFontsRegistered();
 
+// Intl.NumberFormat("fr-FR") insère un U+202F (NARROW NO-BREAK SPACE) entre
+// les milliers et un U+00A0 avant €. Helvetica built-in PDF ne contient pas
+// le glyphe U+202F → il s'affiche comme un "/". On normalise en U+00A0 pour
+// que le séparateur de milliers reste un espace insécable mais visible.
+const fmtPdf = (n) => fmt(n).replace(/ /g, " ");
 const NAVY = "#1e3a5f";
 
 // Conversion 1px = 0.75pt à 96dpi : on travaille en pixels pour rester
@@ -68,7 +73,7 @@ const makeStyles = (fontFamily) => StyleSheet.create({
   sectionTitle: { fontSize: px(10), fontWeight: 700, color: NAVY, marginBottom: px(6), letterSpacing: 1, textTransform: "uppercase" },
 
   // Table prestations
-  table: { width: "100%", marginBottom: px(12) },
+  tableBottomSpacer: { marginBottom: px(12) },
   trHead: { flexDirection: "row", backgroundColor: NAVY },
   thBase: { color: "white", fontSize: px(10), fontWeight: 600, padding: "6px 5px" },
   trLot: { flexDirection: "row", backgroundColor: "#eef2f7", borderBottomWidth: 1, borderBottomColor: `${NAVY}33`, borderBottomStyle: "solid" },
@@ -138,9 +143,9 @@ const makeStyles = (fontFamily) => StyleSheet.create({
     borderTopWidth: 1, borderTopColor: "#e5e7eb", borderTopStyle: "solid",
     flexDirection: "row", justifyContent: "space-between", gap: px(10),
   },
-  footerText: { fontSize: px(8), color: "#9ca3af", lineHeight: 1.5, flex: 1 },
+  footerText: { fontSize: px(8), color: "#9ca3af", lineHeight: 1.5 },
   footerStrong: { fontSize: px(8), color: "#6b7280", fontWeight: 600, marginBottom: px(2) },
-  footerRight: { fontSize: px(8), color: "#9ca3af", textAlign: "right" },
+  footerRight: { fontSize: px(8), color: "#9ca3af", textAlign: "right", flexShrink: 0 },
 });
 
 // Largeurs des colonnes du tableau (en %, somme = 100). On garde le ratio de
@@ -261,71 +266,71 @@ export default function DevisPDFDocument({ d, cl, brand, kind = "devis" }) {
           </View>
         )}
 
-        {/* TABLE PRESTATIONS */}
+        {/* TABLE PRESTATIONS — pas de View wrapper pour laisser react-pdf
+            paginer naturellement ligne par ligne, sinon le tableau entier
+            saute en page suivante et laisse du blanc page 1. */}
         <Text style={styles.sectionTitle}>Détail des prestations</Text>
-        <View style={styles.table}>
-          {/* Header */}
-          <View style={styles.trHead} fixed>
-            <Text style={[styles.thBase, { width: COL.desc, textAlign: "left", padding: "6px 8px" }]}>Description</Text>
-            <Text style={[styles.thBase, { width: COL.unite, textAlign: "center" }]}>Unité</Text>
-            <Text style={[styles.thBase, { width: COL.qte,   textAlign: "center" }]}>Qté</Text>
-            <Text style={[styles.thBase, { width: COL.pu,    textAlign: "right",  padding: "6px 6px" }]}>PU HT</Text>
-            <Text style={[styles.thBase, { width: COL.tva,   textAlign: "center" }]}>TVA</Text>
-            <Text style={[styles.thBase, { width: COL.total, textAlign: "right",  padding: "6px 8px" }]}>Total HT</Text>
-          </View>
+        <View style={styles.trHead} fixed>
+          <Text style={[styles.thBase, { width: COL.desc, textAlign: "left", padding: "6px 8px" }]}>Description</Text>
+          <Text style={[styles.thBase, { width: COL.unite, textAlign: "center" }]}>Unité</Text>
+          <Text style={[styles.thBase, { width: COL.qte,   textAlign: "center" }]}>Qté</Text>
+          <Text style={[styles.thBase, { width: COL.pu,    textAlign: "right",  padding: "6px 6px" }]}>PU HT</Text>
+          <Text style={[styles.thBase, { width: COL.tva,   textAlign: "center" }]}>TVA</Text>
+          <Text style={[styles.thBase, { width: COL.total, textAlign: "right",  padding: "6px 8px" }]}>Total HT</Text>
+        </View>
 
-          {/* Rows */}
-          {filteredLignes.map((l, i) => {
-            if (l.type_ligne === "lot") {
-              return (
-                <View key={l.id} style={styles.trLot} wrap={false}>
-                  <Text style={styles.tdLot}>{l.designation}</Text>
-                </View>
-              );
-            }
-            const total = (l.quantite || 0) * (l.prix_unitaire || 0);
+        {filteredLignes.map((l, i) => {
+          if (l.type_ligne === "lot") {
             return (
-              <View key={l.id} style={[styles.trData, i % 2 ? styles.trDataAlt : null]} wrap={false}>
-                <Text style={[styles.tdBase, { width: COL.desc,  textAlign: "left",   padding: "5px 8px" }]}>{l.designation}</Text>
-                <Text style={[styles.tdBase, { width: COL.unite, textAlign: "center", color: "#6b7280" }]}>{l.unite || "—"}</Text>
-                <Text style={[styles.tdBase, { width: COL.qte,   textAlign: "center" }]}>{String(l.quantite ?? "")}</Text>
-                <Text style={[styles.tdBase, { width: COL.pu,    textAlign: "right",  padding: "5px 6px" }]}>{fmt(l.prix_unitaire)}</Text>
-                <Text style={[styles.tdBase, { width: COL.tva,   textAlign: "center", color: "#6b7280" }]}>{rateOf(l).toString().replace(".", ",")}%</Text>
-                <Text style={[styles.tdBase, { width: COL.total, textAlign: "right",  padding: "5px 8px", fontWeight: 600 }]}>{fmt(total)}</Text>
+              <View key={l.id} style={styles.trLot} wrap={false}>
+                <Text style={styles.tdLot}>{l.designation}</Text>
               </View>
             );
-          })}
-        </View>
+          }
+          const total = (l.quantite || 0) * (l.prix_unitaire || 0);
+          return (
+            <View key={l.id} style={[styles.trData, i % 2 ? styles.trDataAlt : null]} wrap={false}>
+              <Text style={[styles.tdBase, { width: COL.desc,  textAlign: "left",   padding: "5px 8px" }]}>{l.designation}</Text>
+              <Text style={[styles.tdBase, { width: COL.unite, textAlign: "center", color: "#6b7280" }]}>{l.unite || "—"}</Text>
+              <Text style={[styles.tdBase, { width: COL.qte,   textAlign: "center" }]}>{String(l.quantite ?? "")}</Text>
+              <Text style={[styles.tdBase, { width: COL.pu,    textAlign: "right",  padding: "5px 6px" }]}>{fmtPdf(l.prix_unitaire)}</Text>
+              <Text style={[styles.tdBase, { width: COL.tva,   textAlign: "center", color: "#6b7280" }]}>{rateOf(l).toString().replace(".", ",")}%</Text>
+              <Text style={[styles.tdBase, { width: COL.total, textAlign: "right",  padding: "5px 8px", fontWeight: 600 }]}>{fmtPdf(total)}</Text>
+            </View>
+          );
+        })}
+        <View style={styles.tableBottomSpacer} />
+
 
         {/* TOTAUX */}
         <View style={styles.totalsWrap}>
           <View style={styles.totalsTable}>
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Total HT</Text>
-              <Text style={styles.totalValue}>{fmt(ht)}</Text>
+              <Text style={styles.totalValue}>{fmtPdf(ht)}</Text>
             </View>
             {tvaRows.map((row) => (
               <View key={row.rate} style={styles.totalRow}>
                 <Text style={styles.totalLabel}>
                   TVA {row.rate.toString().replace(".", ",")}%
-                  <Text style={{ color: "#9ca3af", fontSize: px(8.5) }}>  (sur {fmt(row.base)})</Text>
+                  <Text style={{ color: "#9ca3af", fontSize: px(8.5) }}>  (sur {fmtPdf(row.base)})</Text>
                 </Text>
-                <Text style={[styles.totalValue, { fontWeight: 400 }]}>{fmt(row.montant)}</Text>
+                <Text style={[styles.totalValue, { fontWeight: 400 }]}>{fmtPdf(row.montant)}</Text>
               </View>
             ))}
             <View style={styles.ttcRow}>
               <Text style={styles.ttcLabel}>TOTAL TTC</Text>
-              <Text style={styles.ttcValue}>{fmt(ttc)}</Text>
+              <Text style={styles.ttcValue}>{fmtPdf(ttc)}</Text>
             </View>
             {kind === "facture" && Number(d.retenue_garantie_eur) > 0 && (
               <>
                 <View style={styles.retRow}>
                   <Text style={styles.retLabel}>Retenue de garantie {d.retenue_garantie_pct}%</Text>
-                  <Text style={styles.retValue}>−{fmt(d.retenue_garantie_eur)}</Text>
+                  <Text style={styles.retValue}>−{fmtPdf(d.retenue_garantie_eur)}</Text>
                 </View>
                 <View style={styles.netRow}>
                   <Text style={styles.netLabel}>NET À PAYER</Text>
-                  <Text style={styles.netValue}>{fmt(ttc - Number(d.retenue_garantie_eur))}</Text>
+                  <Text style={styles.netValue}>{fmtPdf(ttc - Number(d.retenue_garantie_eur))}</Text>
                 </View>
               </>
             )}
@@ -409,7 +414,13 @@ export default function DevisPDFDocument({ d, cl, brand, kind = "devis" }) {
         <View style={styles.footer}>
           <View style={{ flex: 1 }}>
             {showFootnoteVAT && <Text style={styles.footerStrong}>TVA non applicable, art. 293 B du CGI</Text>}
-            {brand.mentionsLegales && <Text style={styles.footerText}>{brand.mentionsLegales}</Text>}
+            {/* brand.mentionsLegales peut contenir des \n → on split et on
+                rend chaque ligne comme un Text distinct, pour que le flex
+                column calcule la hauteur correctement (sans cette séparation
+                les lignes suivantes se superposent visuellement). */}
+            {(brand.mentionsLegales || "").split("\n").filter(Boolean).map((line, i) => (
+              <Text key={`ml-${i}`} style={styles.footerText}>{line}</Text>
+            ))}
             {(identityParts || brand.siret) && <Text style={styles.footerText}>{identityParts || `SIRET ${brand.siret}`}</Text>}
             {kind === "facture" && brand.paymentPenalties && <Text style={[styles.footerText, { marginTop: px(3) }]}>{brand.paymentPenalties}</Text>}
             {kind === "facture" && brand.escompte && <Text style={styles.footerText}>{brand.escompte}</Text>}
