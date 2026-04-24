@@ -15,6 +15,8 @@ function cors(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
 }
 
+// Remplace admin-ia-conversations.js, admin-ia-logs.js, admin-ia-negatives.js
+// Paramètre requis : ?type=conversations | logs | negatives
 export default async function handler(req, res) {
   cors(req, res)
   if (req.method === 'OPTIONS') return res.status(204).end()
@@ -40,37 +42,37 @@ export default async function handler(req, res) {
   if (!adminEmail || norm(user.email) !== norm(adminEmail))
     return res.status(403).json({ error: "Accès réservé à l'administrateur" })
 
-  // Limite généreuse côté back : on récupère les 500 derniers échanges
-  // tous comptes confondus, puis on les groupe côté front par utilisateur.
+  const type = (req.query.type || '').toString().trim()
+  const tableMap = {
+    conversations: { table: 'ia_conversations', limit: 500, key: 'conversations' },
+    logs:          { table: 'ia_error_logs',    limit: 200, key: 'logs' },
+    negatives:     { table: 'ia_negative_logs', limit: 200, key: 'logs' },
+  }
+  const cfg = tableMap[type]
+  if (!cfg) return res.status(400).json({ error: "Paramètre 'type' invalide (conversations | logs | negatives)" })
+
   const [
-    { data: convs, error: ce },
+    { data: rows,     error: re },
     { data: profiles, error: pe },
     { data: authUsers, error: ae },
   ] = await Promise.all([
-    admin.from('ia_conversations')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(500),
+    admin.from(cfg.table).select('*').order('created_at', { ascending: false }).limit(cfg.limit),
     admin.from('profiles').select('id, company_name, full_name'),
     admin.auth.admin.listUsers({ perPage: 1000 }).then(r => ({ data: r.data?.users || [], error: r.error })),
   ])
 
-  if (ce) return res.status(500).json({ error: ce.message })
+  if (re) return res.status(500).json({ error: re.message })
   if (pe) return res.status(500).json({ error: pe.message })
   if (ae) return res.status(500).json({ error: ae.message })
 
   const profById = new Map((profiles || []).map(p => [p.id, p]))
   const authById = new Map((authUsers || []).map(u => [u.id, u]))
 
-  const enriched = (convs || []).map(c => {
-    const p = profById.get(c.owner_id)
-    const a = authById.get(c.owner_id)
-    return {
-      ...c,
-      email: a?.email || null,
-      name:  p?.company_name || p?.full_name || a?.email || '—',
-    }
+  const enriched = (rows || []).map(r => {
+    const p = profById.get(r.owner_id)
+    const a = authById.get(r.owner_id)
+    return { ...r, email: a?.email || null, name: p?.company_name || p?.full_name || a?.email || '—' }
   })
 
-  return res.status(200).json({ conversations: enriched, generatedAt: new Date().toISOString() })
+  return res.status(200).json({ [cfg.key]: enriched, generatedAt: new Date().toISOString() })
 }
