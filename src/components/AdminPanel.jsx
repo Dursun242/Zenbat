@@ -580,10 +580,12 @@ export default function AdminPanel({ onBack }) {
               <div style={{background:"white", borderBottom:"1px solid #e2e8f0", display:"flex", overflowX:"auto", flexShrink:0}}>
                 {[
                   { k:"overview",  l:"Vue",            n: null },
+                  { k:"profil",    l:"Profil",         n: null },
                   { k:"devis",     l:"Devis",          n: detailData.stats.devisTotal },
                   { k:"invoices",  l:"Factures",       n: detailData.stats.invoicesTotal },
                   { k:"clients",   l:"Clients",        n: detailData.stats.clientsTotal },
                   { k:"conv",      l:"Conversations",  n: detailData.stats.conversations },
+                  { k:"activite",  l:"Activité",       n: (detailData.activity||[]).length || null },
                   { k:"issues",    l:"Incidents",      n: detailData.stats.errors + detailData.stats.negatives },
                 ].map(t => (
                   <button key={t.k} onClick={() => setDetailTab(t.k)}
@@ -738,6 +740,80 @@ export default function AdminPanel({ onBack }) {
                         )}
                         <div style={{fontSize:9, color:"#cbd5e1", alignSelf:"center"}}>
                           {fmtDT(turn.created_at)} · {new Date(turn.created_at).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              {detailData && detailTab === "profil" && (() => {
+                const bd = detailData.profile?.brand_data || {}
+                const row = (label, val) => val ? (
+                  <div key={label} style={{display:"flex", gap:8, padding:"6px 0", borderBottom:"1px solid #f1f5f9", fontSize:12}}>
+                    <span style={{width:130, flexShrink:0, color:"#94a3b8", fontWeight:600}}>{label}</span>
+                    <span style={{color:"#1e293b", wordBreak:"break-word"}}>{val}</span>
+                  </div>
+                ) : null
+                return (
+                  <div style={{display:"flex", flexDirection:"column", gap:14}}>
+                    {/* Identité */}
+                    <div style={{background:"white", borderRadius:10, padding:"12px 14px", boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+                      <div style={{fontSize:10, fontWeight:700, color:"#94a3b8", letterSpacing:"1px", textTransform:"uppercase", marginBottom:8}}>Identité</div>
+                      {row("Société", bd.companyName)}
+                      {row("SIRET", bd.siret)}
+                      {row("N° TVA", bd.vatNumber)}
+                      {row("Régime TVA", bd.vatRegime === "franchise" ? "Franchise en base" : bd.vatRegime === "normal" ? "Régime normal" : bd.vatRegime)}
+                      {row("Métiers", Array.isArray(bd.trades) ? bd.trades.join(", ") : null)}
+                    </div>
+                    {/* Coordonnées */}
+                    <div style={{background:"white", borderRadius:10, padding:"12px 14px", boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+                      <div style={{fontSize:10, fontWeight:700, color:"#94a3b8", letterSpacing:"1px", textTransform:"uppercase", marginBottom:8}}>Coordonnées</div>
+                      {row("Adresse", bd.address)}
+                      {row("CP / Ville", [bd.postalCode, bd.city].filter(Boolean).join(" "))}
+                      {row("Téléphone", bd.phone)}
+                      {row("Email", bd.email)}
+                      {row("Site web", bd.website)}
+                    </div>
+                    {/* PDF */}
+                    <div style={{background:"white", borderRadius:10, padding:"12px 14px", boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+                      <div style={{fontSize:10, fontWeight:700, color:"#94a3b8", letterSpacing:"1px", textTransform:"uppercase", marginBottom:8}}>Apparence PDF</div>
+                      {bd.color && (
+                        <div style={{display:"flex", gap:8, padding:"6px 0", borderBottom:"1px solid #f1f5f9", fontSize:12, alignItems:"center"}}>
+                          <span style={{width:130, flexShrink:0, color:"#94a3b8", fontWeight:600}}>Couleur</span>
+                          <span style={{width:18, height:18, borderRadius:4, background:bd.color, border:"1px solid #e2e8f0", flexShrink:0}}/>
+                          <span style={{color:"#1e293b"}}>{bd.color}</span>
+                        </div>
+                      )}
+                      {row("Police", bd.fontStyle)}
+                      {bd.logo && <div style={{padding:"6px 0", borderBottom:"1px solid #f1f5f9"}}><img src={bd.logo} alt="logo" style={{maxHeight:48, maxWidth:160, objectFit:"contain", borderRadius:4, border:"1px solid #e2e8f0"}}/></div>}
+                    </div>
+                    {/* Paiement & mentions */}
+                    <div style={{background:"white", borderRadius:10, padding:"12px 14px", boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+                      <div style={{fontSize:10, fontWeight:700, color:"#94a3b8", letterSpacing:"1px", textTransform:"uppercase", marginBottom:8}}>Paiement & mentions</div>
+                      {row("Conditions règlement", bd.paymentTerms)}
+                      {row("Coordonnées bancaires", bd.bankDetails)}
+                      {row("Mentions légales", bd.legalMentions)}
+                      {row("Mention BTP", bd.btpMention)}
+                      {row("Mention RGPD", bd.rgpdMention)}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {detailData && detailTab === "activite" && (
+                <div style={{display:"flex", flexDirection:"column", gap:6}}>
+                  {(detailData.activity||[]).length === 0
+                    ? <div style={{padding:20, textAlign:"center", color:"#94a3b8", fontSize:12}}>Aucune activité enregistrée.</div>
+                    : (detailData.activity||[]).map((a, i) => (
+                      <div key={a.id||i} style={{background:"white", borderRadius:10, padding:"8px 12px", boxShadow:"0 1px 3px rgba(0,0,0,.04)", display:"flex", gap:10, alignItems:"flex-start"}}>
+                        <div style={{flexShrink:0, width:6, height:6, borderRadius:"50%", background: a.action==="DELETE"?"#ef4444":a.action==="INSERT"?"#22c55e":"#3b82f6", marginTop:5}}/>
+                        <div style={{flex:1, minWidth:0}}>
+                          <div style={{display:"flex", gap:6, alignItems:"baseline", flexWrap:"wrap"}}>
+                            <span style={{fontSize:10, fontWeight:700, padding:"1px 6px", borderRadius:10, background: a.action==="DELETE"?"#fef2f2":a.action==="INSERT"?"#f0fdf4":"#eff6ff", color: a.action==="DELETE"?"#b91c1c":a.action==="INSERT"?"#15803d":"#1d4ed8"}}>{a.action}</span>
+                            <span style={{fontSize:11, fontWeight:600, color:"#0f172a"}}>{a.table_name}</span>
+                            {a.record_id && <span style={{fontSize:9, color:"#94a3b8", fontFamily:"monospace"}}>{String(a.record_id).slice(0,8)}…</span>}
+                          </div>
+                          <div style={{fontSize:9, color:"#94a3b8", marginTop:3}}>{fmtDT(a.created_at)} · {new Date(a.created_at).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</div>
                         </div>
                       </div>
                     ))}
