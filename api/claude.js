@@ -44,15 +44,24 @@ export default async function handler(req, res) {
   if (typeof top_p === "number")       payload.top_p = top_p;
 
   try {
-    const upstream = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify(payload),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 28000);
+
+    let upstream;
+    try {
+      upstream = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.ANTHROPIC_KEY,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
 
     if (stream === true && upstream.ok && upstream.body) {
       res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -78,6 +87,9 @@ export default async function handler(req, res) {
     const data = await upstream.json();
     return res.status(upstream.status).json(data);
   } catch (err) {
+    if (err?.name === "AbortError") {
+      return res.status(504).json({ error: "Délai dépassé — Claude API n'a pas répondu en 28 secondes" });
+    }
     return res.status(502).json({ error: "Upstream Anthropic unreachable" });
   }
 }

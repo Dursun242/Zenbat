@@ -35,53 +35,83 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Non authentifié' })
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '')
+    if (!token) return res.status(401).json({ error: 'Non authentifié' })
 
-  const supabaseUrl = process.env.VITE_SUPABASE_URL
-  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!supabaseUrl || !serviceKey)
-    return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY non configurée' })
+    const supabaseUrl = process.env.VITE_SUPABASE_URL
+    const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!supabaseUrl || !serviceKey)
+      return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY non configurée' })
 
-  const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
-
-  // Identifie l'appelant via son token
-  const { data: { user }, error: authErr } = await admin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Token invalide' })
-
-  // Confirmation par email pour éviter les suppressions accidentelles
-  const { confirmEmail } = req.body || {}
-  if (!confirmEmail || typeof confirmEmail !== 'string')
-    return res.status(400).json({ error: "Confirmation par email obligatoire" })
-  if (confirmEmail.trim().toLowerCase() !== (user.email || '').toLowerCase())
-    return res.status(400).json({ error: "L'email de confirmation ne correspond pas à votre compte" })
-
-  // Sentinel : empêche un admin de se supprimer en libre-service par mégarde
-  const adminEmail = process.env.ADMIN_EMAIL
-  if (adminEmail && (user.email || '').toLowerCase() === adminEmail.toLowerCase())
-    return res.status(400).json({
-      error: "Le compte administrateur ne peut pas être supprimé en libre-service. Contactez l'équipe Zenbat.",
+    const admin = createClient(supabaseUrl, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
     })
 
-  // Nettoyage du bucket PDF (best-effort)
-  try {
-    const { data: files } = await admin.storage.from('devis-pdfs').list(user.id, { limit: 1000 })
-    if (files?.length) {
-      const paths = files.map(f => `${user.id}/${f.name}`)
-      await admin.storage.from('devis-pdfs').remove(paths)
+    // Identifie l'appelant via son token
+    const { data: { user }, error: authErr } = await admin.auth.getUser(token)
+    if (authErr || !user) return res.status(401).json({ error: 'Token invalide' })
+
+    // Confirmation par email pour éviter les suppressions accidentelles
+    const { confirmEmail } = req.body || {}
+    if (!confirmEmail || typeof confirmEmail !== 'string')
+      return res.status(400).json({ error: "Confirmation par email obligatoire" })
+    if (confirmEmail.trim().toLowerCase() !== (user.email || '').toLowerCase())
+      return res.status(400).json({ error: "L'email de confirmation ne correspond pas à votre compte" })
+
+    // Sentinel : empêche un admin de se supprimer en libre-service par mégarde
+    const adminEmail = process.env.ADMIN_EMAIL
+    if (adminEmail && (user.email || '').toLowerCase() === adminEmail.toLowerCase())
+      return res.status(400).json({
+        error: "Le compte administrateur ne peut pas être supprimé en libre-service. Contactez l'équipe Zenbat.",
+      })
+
+    // Purge préalable des tables avec ON DELETE SET NULL pour respecter le RGPD
+    // et éviter les conflits FK lors du trigger d'audit pendant la cascade.
+    const purgeTables = [
+      'ia_conversations',
+      'ia_error_logs',
+      'ia_negative_logs',
+      'activity_log',
+    ]
+    for (const t of purgeTables) {
+      try {
+        await admin.from(t).delete().eq('owner_id', user.id)
+      } catch (e) {
+        console.warn(`[delete-my-account] purge ${t}:`, e?.message)
+      }
     }
-  } catch (e) {
-    console.warn('[delete-my-account] storage cleanup:', e?.message)
+
+    // Nettoyage du bucket PDF (best-effort)
+    try {
+      const { data: files } = await admin.storage.from('devis-pdfs').list(user.id, { limit: 1000 })
+      if (files?.length) {
+        const paths = files.map(f => `${user.id}/${f.name}`)
+        await admin.storage.from('devis-pdfs').remove(paths)
+      }
+    } catch (e) {
+      console.warn('[delete-my-account] storage cleanup:', e?.message)
+    }
+
+    // Suppression du compte — cascade SQL nettoie le reste
+    const { error: delErr } = await admin.auth.admin.deleteUser(user.id)
+    if (delErr) {
+      console.error('[delete-my-account] deleteUser failed:', delErr)
+      return res.status(500).json({
+        error: delErr.message || 'Échec suppression compte',
+        code:  delErr.code || delErr.status || null,
+      })
+    }
+
+    return res.status(200).json({
+      ok: true,
+      deleted_at: new Date().toISOString(),
+    })
+  } catch (err) {
+    console.error('[delete-my-account] unhandled:', err)
+    return res.status(500).json({
+      error: err?.message || String(err) || 'Erreur interne inconnue',
+      stack: process.env.VERCEL_ENV === 'production' ? undefined : (err?.stack || null),
+    })
   }
-
-  // Suppression du compte — cascade SQL nettoie le reste
-  const { error: delErr } = await admin.auth.admin.deleteUser(user.id)
-  if (delErr) return res.status(500).json({ error: delErr.message })
-
-  return res.status(200).json({
-    ok: true,
-    deleted_at: new Date().toISOString(),
-  })
 }
