@@ -10,6 +10,9 @@
     "generate-pwa-assets": "pwa-assets-generator --preset minimal2023 public/icon.svg"
   },
   "dependencies": {
+    "@expo-google-fonts/dm-sans": "^0.4.2",
+    "@expo-google-fonts/playfair-display": "^0.4.2",
+    "@expo-google-fonts/space-grotesk": "^0.4.1",
     "@react-pdf/renderer": "^4.5.1",
     "@supabase/supabase-js": "^2.103.3",
     "pdf-lib": "^1.17.1",
