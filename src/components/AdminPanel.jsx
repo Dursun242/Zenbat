@@ -181,7 +181,7 @@ export default function AdminPanel({ onBack }) {
   )
 
   return (
-    <div style={{minHeight:"100%", background:"#f8fafc", paddingBottom:40}} className="fu">
+    <div style={{minHeight:"100%", background:"#f8fafc", paddingBottom:40}}>
       <div style={{background:"#0f172a", padding:"14px 18px", display:"flex", alignItems:"center", gap:12, position:"sticky", top:0, zIndex:10}}>
         <button onClick={onBack} style={{background:"none", border:"none", color:"#94a3b8", cursor:"pointer", padding:4}}>
           <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12,5 5,12 12,19"/></svg>
