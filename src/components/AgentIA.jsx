@@ -54,8 +54,8 @@ const SECTOR_KEYWORDS = {
   mode:         ["couture","retouche","maroquinerie","cordonnerie","teinturerie"],
 };
 
-const detectSectors = (tradeNames) => {
-  const t = tradeNames.join(" ").toLowerCase();
+const detectSectors = (tradeNames, fallback = "") => {
+  const t = (tradeNames.join(" ") + " " + fallback).toLowerCase();
   const found = Object.entries(SECTOR_KEYWORDS)
     .filter(([, kws]) => kws.some(kw => t.includes(kw)))
     .map(([sector]) => sector);
@@ -150,7 +150,7 @@ const SECTOR_GREETING_EXAMPLE = {
 
 const buildAgentGreeting = (brand) => {
   const tradeNames = tradesLabels(brand?.trades || []);
-  const sectors = detectSectors(tradeNames);
+  const sectors = detectSectors(tradeNames, brand?.companyName || "");
   const { expertDomain } = buildSectorContext(sectors, brand?.vatRegime);
   const example = SECTOR_GREETING_EXAMPLE[sectors[0]] || SECTOR_GREETING_EXAMPLE.general;
   return `Bonjour 👋 Je suis votre assistant spécialisé en **${expertDomain}**.\n\nDécrivez votre besoin ligne par ligne, dans la langue de votre choix (français, arabe, darija, espagnol, anglais, portugais…). Je rédige le devis en français professionnel.\n\n${example}`;
@@ -224,7 +224,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
 
   const buildSystemPrompt = () => {
     const tradeNames = tradesLabels(brand.trades);
-    const sectors = detectSectors(tradeNames);
+    const sectors = detectSectors(tradeNames, brand.companyName || "");
     const { expertDomain, units, pricing, vocab, tvaContext } = buildSectorContext(sectors, brand.vatRegime);
     const hasTrades = tradeNames.length > 0;
     const isGenericSector = sectors.length === 1 && sectors[0] === "general";
@@ -521,11 +521,8 @@ Groupe les ouvrages par lots cohérents, désignations professionnelles en fran�
             }
           }
 
-          if (parsed.objet && !objet) setObjet(parsed.objet);
-          setLignes(prev => {
-            const existingDesigs = new Set(prev.map(l => l.designation));
-            return [...prev, ...finalLignes.filter(l => !existingDesigs.has(l.designation))];
-          });
+          if (parsed.objet) setObjet(parsed.objet);
+          setLignes(finalLignes);
 
           // Tout premier devis jamais généré sur ce compte (stocké localement) :
           // on déclenche une modale festive pour marquer le moment.
