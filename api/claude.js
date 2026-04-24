@@ -25,17 +25,23 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "ANTHROPIC_KEY non configurée côté serveur" });
   }
 
-  const { model, max_tokens, messages, system, stream } = req.body || {};
+  const { model, max_tokens, messages, system, stream, temperature, top_p } = req.body || {};
   if (!model || typeof model !== "string")
     return res.status(400).json({ error: "Paramètre 'model' manquant ou invalide" });
   if (!max_tokens || typeof max_tokens !== "number" || max_tokens < 1 || max_tokens > 8000)
     return res.status(400).json({ error: "Paramètre 'max_tokens' invalide (1–8000)" });
   if (!Array.isArray(messages) || messages.length === 0)
     return res.status(400).json({ error: "Paramètre 'messages' manquant ou vide" });
+  if (temperature !== undefined && (typeof temperature !== "number" || temperature < 0 || temperature > 1))
+    return res.status(400).json({ error: "Paramètre 'temperature' invalide (0–1)" });
+  if (top_p !== undefined && (typeof top_p !== "number" || top_p < 0 || top_p > 1))
+    return res.status(400).json({ error: "Paramètre 'top_p' invalide (0–1)" });
 
   const payload = { model, max_tokens, messages };
   if (system && typeof system === "string") payload.system = system;
   if (stream === true) payload.stream = true;
+  if (typeof temperature === "number") payload.temperature = temperature;
+  if (typeof top_p === "number")       payload.top_p = top_p;
 
   try {
     const upstream = await fetch("https://api.anthropic.com/v1/messages", {

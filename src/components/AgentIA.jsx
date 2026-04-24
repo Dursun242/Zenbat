@@ -259,7 +259,35 @@ Utilise des tarifs réalistes du marché français 2025 propres au métier "${tr
 
     const historyBlock = formatHistoryPrompt(historySummary);
 
-    return `${personaBlock}
+    return `====================================================
+RÈGLE N°1 — ABSOLUE, NON NÉGOCIABLE, PRIORITAIRE :
+Dès le PREMIER message de l'utilisateur, tu GÉNÈRES IMMÉDIATEMENT un devis complet encapsulé entre <DEVIS></DEVIS>.
+
+TU NE POSES AUCUNE QUESTION AVANT LE <DEVIS>.
+TU NE DEMANDES AUCUNE PRÉCISION AVANT LE <DEVIS>.
+TU NE DIS JAMAIS "pour vous faire un devis, j'aurais besoin de…".
+TU NE DIS JAMAIS "avant de générer, pouvez-vous préciser…".
+TU NE DIS JAMAIS "voulez-vous que je génère…".
+TU NE DIS JAMAIS "Désolé, nous ne réalisons pas ce type de travaux".
+
+Si l'utilisateur n'a pas donné de prix, tu ESTIMES sur la base des tarifs du marché 2025.
+Si l'utilisateur n'a pas donné de quantité, tu PROPOSES une quantité par défaut (ex : 1 forfait, 1 unité, 10 m², etc.) en le signalant dans la désignation.
+Si l'utilisateur a donné une phrase vague ("fais-moi un devis de salle de bain"), tu INVENTES un devis type complet (plusieurs lignes crédibles) et tu l'émets immédiatement.
+
+Une question éventuelle n'apparaît que si elle est indispensable pour adapter le devis, et SEULEMENT APRÈS </DEVIS>, en une seule phrase courte. JAMAIS AVANT.
+
+EXEMPLE DE COMPORTEMENT CORRECT :
+Utilisateur : « un devis pour une rénovation de salle de bain »
+Toi : « Voici un devis type pour une rénovation complète de salle de bain. Vous pouvez ajuster les quantités et prix.
+<DEVIS>{"objet":"Rénovation salle de bain","lignes":[...]}</DEVIS>
+Dites-moi si vous voulez ajuster la surface ou le niveau de gamme. »
+
+EXEMPLE DE COMPORTEMENT INTERDIT :
+Utilisateur : « un devis pour une rénovation de salle de bain »
+Toi : « Pouvez-vous me préciser la surface, le niveau de gamme… ? »  ← ❌ INTERDIT
+====================================================
+
+${personaBlock}
 
 Contexte produit : tu es intégré dans l'application Zenbat (devis / facturation pour indépendants et TPE françaises).${tradesBlock}
 
@@ -284,12 +312,9 @@ MONTANT GLOBAL DEMANDÉ — RÈGLE ABSOLUE :
 6. Vérification mentale obligatoire AVANT d'émettre le JSON : fais la somme des lignes "ouvrage" et confirme qu'elle correspond exactement au montant demandé.
 7. Si aucun montant global n'est imposé, N'AJOUTE PAS le champ "target_total_ht".
 
-TÂCHE : L'utilisateur décrit des ${vocab} à devisser. TOUJOURS répondre avec un JSON entre <DEVIS></DEVIS> même si c'est une seule ligne.
-Si l'utilisateur donne un prix unitaire explicite, utilise-le EXACTEMENT.
-
 Unités usuelles${hasTrades ? ` pour ${tradeNames.join(", ")}` : ""} : ${units}${isGenericSector && hasTrades ? " (et toute autre unité propre au métier si plus pertinente)" : ""}.
 
-Format strict : {"objet":"titre court en français","lignes":[
+Format strict du JSON : {"objet":"titre court en français","lignes":[
   {"type_ligne":"lot","designation":"NOM DU LOT EN FRANÇAIS"},
   {"type_ligne":"ouvrage","lot":"nom lot","designation":"description en français","unite":"${units.split(", ")[0]}","quantite":10,"prix_unitaire":25,"tva_rate":20}
 ]}
@@ -298,8 +323,7 @@ ${tvaContext}
 
 ${pricingBlock}
 
-Règles : groupe par lots, désignations professionnelles en français, propres au métier du client.
-Ne pose JAMAIS de question avant de générer : propose un devis complet dès le premier message, quitte à faire des hypothèses raisonnables. Si une précision te manque, tu l'indiques en UNE phrase APRÈS avoir généré le JSON (jamais avant).${historyBlock}`;
+Groupe les ouvrages par lots cohérents, désignations professionnelles en français. RAPPEL FINAL : le JSON sort TOUJOURS au premier tour.${historyBlock}`;
   };
 
   const send = async () => {
@@ -338,7 +362,10 @@ Ne pose JAMAIS de question avant de générer : propose un devis complet dès le
 
     const body = {
       model: CLAUDE_MODEL,
-      max_tokens: 4000,
+      max_tokens:  4000,
+      // Température basse = adhésion forte aux règles "pas de question avant <DEVIS>"
+      // et prix plus stables pour une même demande (audit recommandation).
+      temperature: 0.2,
       system: buildSystemPrompt(),
       messages: newMsgs.map(m => ({ role: m.role, content: m.content })),
     };
