@@ -7,15 +7,16 @@ Stack : React + Vite (frontend) · Vercel Serverless Functions (API) · Supabase
 
 ## Règles critiques — lire avant tout changement
 
-### Vercel : limite 12 fonctions serverless
+### Vercel : limite 12 fonctions serverless — QUOTA ATTEINT
 Le plan Hobby de Vercel autorise **maximum 12 fichiers** dans `/api/`.
-Fichiers actuels (11) :
+Fichiers actuels (12/12) :
 ```
 admin-delete-user.js   admin-ia-data.js   admin-stats.js   admin-user-detail.js
 b2brouter.js   b2brouter-webhook.js   claude.js   delete-my-account.js
-facturx.js   my-data-export.js   odoo-sign.js
+facturx.js   my-data-export.js   odoo-sign.js   render-pdf.js
 ```
-→ Ne jamais créer un nouveau fichier `/api/` sans en supprimer un autre ou fusionner des endpoints.
+→ **Quota atteint.** Ne pas créer de nouveau fichier `/api/` sans en supprimer
+un autre ou fusionner des endpoints.
 
 ### Migrations Supabase : application manuelle
 Les fichiers dans `/supabase/migrations/` ne s'appliquent **pas automatiquement**.
@@ -88,6 +89,7 @@ Les endpoints admin vérifient en plus que `caller.email === ADMIN_EMAIL`.
 | `b2brouter.js` | Proxy B2Brouter eDocExchange (facture électronique) |
 | `b2brouter-webhook.js` | Webhook B2Brouter → mise à jour statuts factures |
 | `odoo-sign.js` | Proxy Odoo Sign (signature électronique) |
+| `render-pdf.js` | Rend le devis/facture en HTML puis imprime en PDF via Chromium headless (Puppeteer + @sparticuz/chromium-min) — fidélité pixel-perfect avec l'aperçu |
 
 ### Base de données (Supabase)
 Tables principales : `profiles`, `clients`, `devis`, `lignes_devis`, `invoices`, `lignes_invoices`
@@ -112,6 +114,7 @@ RLS activé sur toutes les tables — les endpoints admin contournent via `SUPAB
 | `B2B_API_URL` | URL B2Brouter (défaut: staging) |
 | `B2B_WEBHOOK_SECRET` | Secret HMAC webhook B2Brouter |
 | `ODOO_URL` / `ODOO_DB` / `ODOO_USERNAME` / `ODOO_API_KEY` | Odoo Sign |
+| `CHROMIUM_PACK_URL` | (optionnel) URL d'un binaire Chromium pour `render-pdf.js`. Par défaut, la release v147.0.2 de @sparticuz/chromium est utilisée. À aligner sur la version du package. |
 
 ---
 

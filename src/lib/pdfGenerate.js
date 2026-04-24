@@ -1,51 +1,18 @@
-// Générateur PDF natif (vectoriel) — drop-in pour l'ancien renderElementToPdf.
-// Retourne { blob, base64, filename } : même shape que l'ancienne API pour
-// que les call-sites existants (Odoo Sign, Factur-X, téléchargement direct)
-// continuent de fonctionner sans modification de leur logique métier.
-import React from "react";
-import { pdf } from "@react-pdf/renderer";
-import DevisPDFDocument from "../components/DevisPDFDocument.jsx";
+// Générateur PDF côté serveur via /api/render-pdf (Puppeteer + Chromium).
+// Le rendu est strictement aligné sur l'aperçu HTML de PDFViewer.jsx
+// puisqu'on imprime via le même moteur Chromium qui rend l'app.
+//
+// Retourne { blob, base64, filename } : même shape que l'ancienne API
+// pour que les call-sites (Odoo Sign, Factur-X, téléchargement direct)
+// fonctionnent sans modification.
+import { supabase } from "./supabase.js"
 
-function blobToBase64(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const dataUrl = String(reader.result || "");
-      const comma = dataUrl.indexOf(",");
-      resolve(comma === -1 ? "" : dataUrl.slice(comma + 1));
-    };
-    reader.onerror = () => reject(reader.error || new Error("FileReader failed"));
-    reader.readAsDataURL(blob);
-  });
-}
-
-// Le décodeur d'images de @react-pdf/image plante ("out of bounds access")
-// sur certains JPEG progressifs, WebP ou PNG avec chunks atypiques. On
-// re-encode systématiquement le logo en PNG via canvas : on récupère
-// toujours un PNG plat, prévisible, que react-pdf sait lire sans broncher.
-async function normalizeLogoForPdf(src) {
-  if (!src || typeof src !== "string") return null;
-  try {
-    const img = await new Promise((resolve, reject) => {
-      const i = new Image();
-      i.crossOrigin = "anonymous";
-      i.onload = () => resolve(i);
-      i.onerror = () => reject(new Error("logo load failed"));
-      i.src = src;
-    });
-    // Borne raisonnable : un logo > 600px de large est sur-échantillonné.
-    const maxW = 600;
-    const w = Math.min(img.naturalWidth || img.width || 200, maxW);
-    const h = Math.round(((img.naturalHeight || img.height || 100) * w) / (img.naturalWidth || img.width || 200));
-    const canvas = document.createElement("canvas");
-    canvas.width = w; canvas.height = h;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(img, 0, 0, w, h);
-    return canvas.toDataURL("image/png");
-  } catch (err) {
-    console.warn("[pdfGenerate] logo non décodable, ignoré :", err);
-    return null;
-  }
+function base64ToBlob(base64, mime = "application/pdf") {
+  const binary = atob(base64)
+  const len = binary.length
+  const bytes = new Uint8Array(len)
+  for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i)
+  return new Blob([bytes], { type: mime })
 }
 
 /**
@@ -56,11 +23,29 @@ async function normalizeLogoForPdf(src) {
  * @returns {Promise<{ blob: Blob, base64: string, filename: string }>}
  */
 export async function generatePdf(d, cl, brand, { kind = "devis", filename } = {}) {
-  const fname = filename || `${d.numero || "document"}.pdf`;
-  const safeLogo = await normalizeLogoForPdf(brand?.logo);
-  const safeBrand = { ...brand, logo: safeLogo };
-  const doc = React.createElement(DevisPDFDocument, { d, cl, brand: safeBrand, kind });
-  const blob = await pdf(doc).toBlob();
-  const base64 = await blobToBase64(blob);
-  return { blob, base64, filename: fname };
+  const fname = filename || `${d?.numero || "document"}.pdf`
+
+  const { data: { session } } = await supabase.auth.getSession()
+  const token = session?.access_token
+  if (!token) throw new Error("Session expirée — reconnectez-vous")
+
+  const res = await fetch("/api/render-pdf", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ d, cl, brand, kind }),
+  })
+
+  const data = await res.json().catch(() => null)
+  if (!res.ok) {
+    throw new Error(data?.detail || data?.error || `HTTP ${res.status}`)
+  }
+
+  const base64 = data.pdf_base64
+  if (!base64) throw new Error("Réponse invalide : pdf_base64 manquant")
+
+  const blob = base64ToBlob(base64)
+  return { blob, base64, filename: fname }
 }
