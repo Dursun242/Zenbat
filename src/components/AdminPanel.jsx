@@ -557,10 +557,10 @@ export default function AdminPanel({ onBack }) {
         <div onClick={closeDetail}
           style={{position:"fixed", inset:0, background:"rgba(15,23,42,.65)", backdropFilter:"blur(4px)", display:"flex", alignItems:"flex-end", justifyContent:"center", zIndex:90, animation:"fadeUp .15s ease both"}}>
           <div onClick={e => e.stopPropagation()}
-            style={{background:"#f8fafc", borderRadius:"20px 20px 0 0", width:"100%", maxWidth:720, maxHeight:"92vh", display:"flex", flexDirection:"column", overflow:"hidden", boxShadow:"0 -20px 60px rgba(0,0,0,.35)"}}>
+            style={{background:"#f8fafc", borderRadius:"20px 20px 0 0", width:"100%", maxWidth:720, minHeight:"40vh", maxHeight:"92vh", display:"flex", flexDirection:"column", overflow:"hidden", boxShadow:"0 -20px 60px rgba(0,0,0,.35)"}}>
 
             {/* Header du drawer */}
-            <div style={{background:"#0f172a", padding:"14px 18px calc(14px + env(safe-area-inset-top)) 18px", display:"flex", alignItems:"center", gap:12, flexShrink:0}}>
+            <div style={{background:"#0f172a", padding:"14px 18px", display:"flex", alignItems:"center", gap:12, flexShrink:0}}>
               <button onClick={closeDetail} style={{background:"none", border:"none", color:"#94a3b8", cursor:"pointer", padding:4, display:"flex", alignItems:"center"}}>
                 <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
