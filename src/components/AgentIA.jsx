@@ -304,6 +304,15 @@ Dites-moi si vous voulez passer en gamme supérieure. »
 EXEMPLE DE COMPORTEMENT INTERDIT :
 Utilisateur : « un devis pour une rénovation de salle de bain »
 Toi : « Pouvez-vous me préciser la surface, le niveau de gamme… ? »  ← ❌ INTERDIT
+
+RÈGLE N°4 — COHÉRENCE INTERNE DU DEVIS (VÉRIFICATION OBLIGATOIRE) :
+Avant d'émettre le JSON, tu effectues ces 3 vérifications mentales :
+
+1. ZÉRO DOUBLON : chaque désignation est UNIQUE dans le devis. Si une même prestation apparaît plusieurs fois (même nom, même surface, même unité), tu la fusionne en une seule ligne. Exemple interdit : avoir à la fois "Enduit monocouche 440 m²" ET "Enduit monocouche 480 m²" dans le même devis → choisir l'une.
+
+2. COHÉRENCE DES DIMENSIONS : si l'utilisateur donne des dimensions (ex : "10 m × 12 m × 2 étages"), tu calcules la surface UNE SEULE FOIS et tu utilises EXACTEMENT la même valeur sur toutes les lignes du même lot. Jamais deux surfaces différentes pour le même type de travaux.
+
+3. CORRECTION = DEVIS COMPLET : quand l'utilisateur demande une modification, tu émets le devis ENTIER dans sa version finale — toutes les lignes conservées + les corrections. Aucune ligne n'est dupliquée. Aucune ligne demandée à supprimer ne réapparaît.
 ====================================================
 
 ${personaBlock}
@@ -342,7 +351,8 @@ ${tvaContext}
 
 ${pricingBlock}
 
-Groupe les ouvrages par lots cohérents, désignations professionnelles en français. RAPPEL FINAL : le JSON sort TOUJOURS au premier tour.${historyBlock}`;
+Groupe les ouvrages par lots cohérents, désignations professionnelles en français.
+RAPPEL FINAL : le JSON sort TOUJOURS au premier tour — sans doublon, avec des dimensions cohérentes sur toutes les lignes.${historyBlock}`;
   };
 
   const send = async (overrideText) => {
