@@ -19,7 +19,8 @@ const styles = {
 
 export default function Signup({ onSwitchToLogin, onBack }) {
   const { signUpWithPassword } = useAuth()
-  const [fullName, setFullName]       = useState('')
+  const [firstName, setFirstName]     = useState('')
+  const [lastName,  setLastName]      = useState('')
   const [company, setCompany]         = useState('')
   const [email, setEmail]             = useState('')
   const [password, setPassword]       = useState('')
@@ -32,7 +33,10 @@ export default function Signup({ onSwitchToLogin, onBack }) {
     e.preventDefault()
     if (!cguAccepted) return
     setError(null); setLoading(true)
+    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim()
     const { error } = await signUpWithPassword(email, password, {
+      first_name:      firstName.trim(),
+      last_name:       lastName.trim(),
       full_name:       fullName,
       company_name:    company,
       cgu_version:     CGU_VERSION,
@@ -62,11 +66,19 @@ export default function Signup({ onSwitchToLogin, onBack }) {
           </div>
         ) : (
           <form onSubmit={onSubmit}>
-            <label style={styles.label}>Nom complet</label>
-            <input required value={fullName} onChange={e=>setFullName(e.target.value)} style={styles.input} autoComplete="name" />
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              <div>
+                <label style={styles.label}>Prénom</label>
+                <input required value={firstName} onChange={e=>setFirstName(e.target.value)} style={styles.input} autoComplete="given-name" />
+              </div>
+              <div>
+                <label style={styles.label}>Nom</label>
+                <input required value={lastName} onChange={e=>setLastName(e.target.value)} style={styles.input} autoComplete="family-name" />
+              </div>
+            </div>
             <div style={{height:12}}/>
-            <label style={styles.label}>Entreprise</label>
-            <input value={company} onChange={e=>setCompany(e.target.value)} style={styles.input} autoComplete="organization" />
+            <label style={styles.label}>Nom de l'entreprise</label>
+            <input required value={company} onChange={e=>setCompany(e.target.value)} style={styles.input} autoComplete="organization" placeholder="Ex : Aila Façade, SARL Dupont…" />
             <div style={{height:12}}/>
             <label style={styles.label}>Email</label>
             <input type="email" required value={email} onChange={e=>setEmail(e.target.value)} style={styles.input} autoComplete="email" />

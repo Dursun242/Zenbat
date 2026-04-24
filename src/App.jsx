@@ -36,6 +36,35 @@ const NAV = [
   { id: "agent",     label: "Agent IA", icon: I.spark },
 ];
 
+// Recopie les champs remplis à l'inscription (prénom, nom, société) dans le
+// brand si celui-ci est encore vierge. Supporte l'ancien format (full_name seul
+// à splitter) et le nouveau (first_name / last_name explicites).
+function hydrateFromMetadata(user, setBrand) {
+  const md = user?.user_metadata || {};
+  const explicitFirst = (md.first_name || "").trim();
+  const explicitLast  = (md.last_name  || "").trim();
+  const full          = (md.full_name  || "").trim();
+  const company       = (md.company_name || "").trim();
+  if (!explicitFirst && !explicitLast && !full && !company) return;
+
+  setBrand(prev => {
+    const next = { ...prev };
+    // Société : on ne remplit que si le champ est vide (évite l'écrasement)
+    if (!next.companyName?.trim() && company) next.companyName = company;
+    if (!next.firstName?.trim() && !next.lastName?.trim()) {
+      if (explicitFirst || explicitLast) {
+        next.firstName = explicitFirst;
+        next.lastName  = explicitLast;
+      } else if (full) {
+        const parts = full.split(/\s+/);
+        next.firstName = parts[0] || "";
+        next.lastName  = parts.slice(1).join(" ");
+      }
+    }
+    return next;
+  });
+}
+
 export default function App() {
   const [screen, setScreen]   = useState("app");
   const [tab,    setTab]      = useState("dashboard");
@@ -145,29 +174,16 @@ export default function App() {
           setBrandState(merged);
           try { localStorage.setItem("zenbat_brand", JSON.stringify(merged)); } catch {}
         } else {
-          // Nouveau compte : pré-remplissage prénom/nom depuis les métadonnées d'inscription
-          const full = (user.user_metadata?.full_name || "").trim();
-          if (full) {
-            setBrand(prev => {
-              if (prev.firstName?.trim() || prev.lastName?.trim()) return prev;
-              const parts = full.split(/\s+/);
-              return { ...prev, firstName: parts[0] || "", lastName: parts.slice(1).join(" ") };
-            });
-          }
+          // Nouveau compte : pré-remplit depuis les métadonnées d'inscription
+          // (prénom + nom + société). Ne touche pas un champ déjà saisi.
+          hydrateFromMetadata(user, setBrand);
         }
       })
       .catch(err => {
         if (cancelled) return;
         console.warn("[brand load]", err);
-        // Fallback : pré-remplissage depuis les métadonnées si Supabase échoue
-        const full = (user.user_metadata?.full_name || "").trim();
-        if (full) {
-          setBrand(prev => {
-            if (prev.firstName?.trim() || prev.lastName?.trim()) return prev;
-            const parts = full.split(/\s+/);
-            return { ...prev, firstName: parts[0] || "", lastName: parts.slice(1).join(" ") };
-          });
-        }
+        // Fallback si Supabase échoue : on tente quand même le pré-remplissage
+        hydrateFromMetadata(user, setBrand);
       });
     return () => { cancelled = true; };
   }, [user?.id, setBrand]);
