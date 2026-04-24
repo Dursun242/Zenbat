@@ -32,6 +32,44 @@ function getChromiumExecutablePath() {
   return chromiumExecPathPromise
 }
 
+// Browser singleton réutilisé entre invocations chaudes — économise
+// ~1-2s par PDF sur container warm (boot Chromium = poste le plus
+// coûteux). On vérifie qu'il est encore vivant avant chaque réutilisation,
+// et on le recrée si Vercel a gelé le container entre-temps.
+let cachedBrowser = null
+async function getBrowser() {
+  if (cachedBrowser) {
+    try {
+      // Ping rapide : si le process Chromium est mort, version() throw.
+      await cachedBrowser.version()
+      return cachedBrowser
+    } catch {
+      cachedBrowser = null
+    }
+  }
+  const executablePath = await getChromiumExecutablePath()
+  const launchOpts = {
+    args: chromium.args,
+    defaultViewport: chromium.defaultViewport,
+    executablePath,
+    headless: chromium.headless,
+  }
+  try {
+    cachedBrowser = await puppeteer.launch(launchOpts)
+  } catch (err) {
+    // Au cold start, l'extraction du binaire vient de finir et le FS
+    // peut encore avoir un handle ouvert → ETXTBSY au spawn. Retry 1×.
+    if (err?.code === 'ETXTBSY' || /ETXTBSY/.test(err?.message || '')) {
+      await new Promise(r => setTimeout(r, 200))
+      cachedBrowser = await puppeteer.launch(launchOpts)
+    } else {
+      throw err
+    }
+  }
+  cachedBrowser.on('disconnected', () => { cachedBrowser = null })
+  return cachedBrowser
+}
+
 function cors(req, res) {
   const origin = req.headers.origin || ''
   const allow = process.env.VERCEL_ENV !== 'production' || ALLOWED_ORIGINS.includes(origin)
@@ -118,20 +156,21 @@ function buildHtml({ d, cl, brand, kind = 'devis' }) {
     brand.tva && brand.vatRegime !== 'franchise' ? `TVA ${brand.tva}` : '',
   ].filter(Boolean).join(' · ')
 
-  // Lignes du tableau
+  // Lignes du tableau — lineHeight:1.3 sur chaque cellule pour resserrer
+  // verticalement sans toucher à fontSize.
   const tableRows = filteredLignes.map((l, i) => {
     if (l.type_ligne === 'lot') {
-      return `<tr><td colspan="6" style="padding:6px 8px;font-weight:700;font-size:9.5px;color:${NAVY};text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid ${NAVY}33;background:#eef2f7">${escape(l.designation)}</td></tr>`
+      return `<tr><td colspan="6" style="padding:4px 8px;font-weight:700;font-size:9.5px;color:${NAVY};text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid ${NAVY}33;background:#eef2f7;line-height:1.3">${escape(l.designation)}</td></tr>`
     }
     const total = (l.quantite || 0) * (l.prix_unitaire || 0)
     const bg = i % 2 ? '#f8f9fb' : 'white'
     return `<tr style="background:${bg};border-bottom:1px solid #e5e7eb">
-      <td style="padding:5px 8px">${escape(l.designation)}</td>
-      <td style="padding:5px 5px;text-align:center;color:#6b7280">${escape(l.unite || '—')}</td>
-      <td style="padding:5px 5px;text-align:center">${escape(l.quantite)}</td>
-      <td style="padding:5px 6px;text-align:right">${fmt(l.prix_unitaire)}</td>
-      <td style="padding:5px 5px;text-align:center;color:#6b7280">${escape(rateOf(l).toString().replace('.', ','))}%</td>
-      <td style="padding:5px 8px;text-align:right;font-weight:600">${fmt(total)}</td>
+      <td style="padding:3px 8px;line-height:1.3">${escape(l.designation)}</td>
+      <td style="padding:3px 5px;text-align:center;color:#6b7280;line-height:1.3">${escape(l.unite || '—')}</td>
+      <td style="padding:3px 5px;text-align:center;line-height:1.3">${escape(l.quantite)}</td>
+      <td style="padding:3px 6px;text-align:right;line-height:1.3">${fmt(l.prix_unitaire)}</td>
+      <td style="padding:3px 5px;text-align:center;color:#6b7280;line-height:1.3">${escape(rateOf(l).toString().replace('.', ','))}%</td>
+      <td style="padding:3px 8px;text-align:right;font-weight:600;line-height:1.3">${fmt(total)}</td>
     </tr>`
   }).join('')
 
@@ -353,35 +392,14 @@ export default async function handler(req, res) {
   const { d, cl, brand, kind = 'devis' } = req.body || {}
   if (!d || !brand) return res.status(400).json({ error: 'd et brand requis' })
 
-  let browser = null
+  let page = null
   try {
     const html = buildHtml({ d, cl: cl || {}, brand, kind })
-
-    const executablePath = await getChromiumExecutablePath()
-
-    // Sur cold start, l'extraction du binaire vient juste de finir et le
-    // FS peut encore avoir un handle ouvert → ETXTBSY au spawn. On retry
-    // une fois après 200ms si on tombe sur ce cas précis.
-    const launchOpts = {
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath,
-      headless: chromium.headless,
-    }
-    try {
-      browser = await puppeteer.launch(launchOpts)
-    } catch (err) {
-      if (err?.code === 'ETXTBSY' || /ETXTBSY/.test(err?.message || '')) {
-        await new Promise(r => setTimeout(r, 200))
-        browser = await puppeteer.launch(launchOpts)
-      } else {
-        throw err
-      }
-    }
-    const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 25_000 })
-    // L'@import des Google Fonts arrive parfois après networkidle :
-    // attendre explicitement que les polices déclarées soient prêtes.
+    const browser = await getBrowser()
+    page = await browser.newPage()
+    // domcontentloaded + fonts.ready est ~10× plus rapide que networkidle0
+    // (qui attend bêtement 500ms de silence réseau après chaque ressource).
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 20_000 })
     await page.evaluate(() => document.fonts && document.fonts.ready)
     const pdfBytes = await page.pdf({
       format: 'A4',
@@ -403,6 +421,8 @@ export default async function handler(req, res) {
       detail: err?.message || String(err),
     })
   } finally {
-    if (browser) await browser.close().catch(() => {})
+    // On ferme la page mais on garde le browser ouvert pour la prochaine
+    // invocation (cf. cachedBrowser).
+    if (page) await page.close().catch(() => {})
   }
 }
