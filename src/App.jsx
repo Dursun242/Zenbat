@@ -36,21 +36,25 @@ const NAV = [
   { id: "agent",     label: "Agent IA", icon: I.spark },
 ];
 
-// Recopie les champs remplis à l'inscription (prénom, nom, société) dans le
-// brand si celui-ci est encore vierge. Supporte l'ancien format (full_name seul
-// à splitter) et le nouveau (first_name / last_name explicites).
+// Recopie les champs de l'inscription (prénom, nom, société, email de
+// connexion) dans le brand si celui-ci est encore vierge. L'email de
+// connexion sert d'email pro par défaut — affiché dans l'en-tête des
+// devis et transmis au client pour la signature.
 function hydrateFromMetadata(user, setBrand) {
   const md = user?.user_metadata || {};
   const explicitFirst = (md.first_name || "").trim();
   const explicitLast  = (md.last_name  || "").trim();
   const full          = (md.full_name  || "").trim();
   const company       = (md.company_name || "").trim();
-  if (!explicitFirst && !explicitLast && !full && !company) return;
+  const loginEmail    = (user?.email || "").trim();
+  if (!explicitFirst && !explicitLast && !full && !company && !loginEmail) return;
 
   setBrand(prev => {
     const next = { ...prev };
-    // Société : on ne remplit que si le champ est vide (évite l'écrasement)
-    if (!next.companyName?.trim() && company) next.companyName = company;
+    // Chaque champ est renseigné UNIQUEMENT s'il est vide
+    // (on n'écrase jamais une saisie déjà faite par l'utilisateur).
+    if (!next.companyName?.trim() && company)   next.companyName = company;
+    if (!next.email?.trim()       && loginEmail) next.email       = loginEmail;
     if (!next.firstName?.trim() && !next.lastName?.trim()) {
       if (explicitFirst || explicitLast) {
         next.firstName = explicitFirst;
