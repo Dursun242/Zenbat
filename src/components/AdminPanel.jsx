@@ -46,7 +46,7 @@ export default function AdminPanel({ onBack }) {
   const loadLogs = async () => {
     setLogsLoading(true)
     try {
-      const res = await fetch("/api/admin-ia-logs", {
+      const res = await fetch("/api/admin-ia-data?type=logs", {
         headers: { Authorization: `Bearer ${session?.access_token}` },
       })
       const data = await res.json()
@@ -57,7 +57,7 @@ export default function AdminPanel({ onBack }) {
   const loadNegs = async () => {
     setNegsLoading(true)
     try {
-      const res = await fetch("/api/admin-ia-negatives", {
+      const res = await fetch("/api/admin-ia-data?type=negatives", {
         headers: { Authorization: `Bearer ${session?.access_token}` },
       })
       const data = await res.json()
@@ -68,7 +68,7 @@ export default function AdminPanel({ onBack }) {
   const loadConvs = async () => {
     setConvsLoading(true)
     try {
-      const res = await fetch("/api/admin-ia-conversations", {
+      const res = await fetch("/api/admin-ia-data?type=conversations", {
         headers: { Authorization: `Bearer ${session?.access_token}` },
       })
       const data = await res.json()
