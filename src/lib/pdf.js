@@ -39,15 +39,35 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
   // effective. Si l'utilisateur arrive sur le PDF sans avoir scrollé l'aperçu,
   // html2canvas rasterise avec la police système fallback (Arial / Helvetica)
   // → rendu "bizarre" par rapport à l'aperçu HTML.
+  if (document.fonts?.ready) {
+    try {
+      // Attend que TOUTES les polices déclarées du document soient prêtes
+      await document.fonts.ready;
+    } catch (err) {
+      console.warn("[pdf.renderElementToPdf] document.fonts.ready failed:", err);
+    }
+  }
+
+  // Fallback : tente de charger explicitement chaque variante si document.fonts.load existe
   if (document.fonts?.load) {
     const families = ["DM Sans", "Playfair Display", "Space Grotesk"];
-    const weights  = [400, 600, 700, 800];
+    const weights  = [400, 500, 600, 700, 800];
     try {
-      await Promise.all(
-        families.flatMap(f => weights.map(w => document.fonts.load(`${w} 16px "${f}"`))),
+      const fontLoads = families.flatMap(f =>
+        weights.map(w => {
+          try {
+            return document.fonts.load(`${w} 14px "${f}"`);
+          } catch {
+            return null; // Ignore les variantes qui n'existent pas
+          }
+        }).filter(Boolean)
       );
-      if (document.fonts.ready) await document.fonts.ready;
-    } catch {}
+      if (fontLoads.length > 0) {
+        await Promise.all(fontLoads);
+      }
+    } catch (err) {
+      console.warn("[pdf.renderElementToPdf] font loading failed:", err);
+    }
   }
 
   // Deuxième tick : laisse le moteur de rendu appliquer les polices
@@ -60,12 +80,34 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
   // `document.fonts.load()` ci-dessus + préchargement <link> dans index.html.
   let canvas;
   try {
+    // Copie tous les <style> du head vers le clone pour s'assurer que
+    // les styles CSS globaux sont appliqués correctement à la capture
+    const styleElements = Array.from(document.head.querySelectorAll("style"));
+    const stylesCopy = styleElements.map((style) => {
+      const copy = document.createElement("style");
+      copy.textContent = style.textContent;
+      return copy;
+    });
+    stylesCopy.forEach((style) => clone.appendChild(style));
+
     canvas = await html2canvas(clone, {
-      scale: 3,               // 300dpi-ish en A4, fini le zoom pixelisé
+      scale: 4,               // 380dpi-ish en A4 pour une meilleure netteté texte
       useCORS: true,
+      allowTaint: true,       // Tolère les images sans CORS (fallback si image externe bloquée)
       backgroundColor: "#ffffff",
       logging: false,
-      imageTimeout: 15000,
+      imageTimeout: 20000,    // Augmente le timeout pour laisser le temps à tous les assets
+      windowWidth: 793,       // Force 210mm @ 96dpi = 793px (élimine les variations de zoom)
+      windowHeight: 1122,     // Force 297mm @ 96dpi = 1122px (une page A4)
+      // onclone: (doc) => {
+      //   // Préservation du layout exact du clone avant la capture
+      //   doc.documentElement.style.transform = "none";
+      // }
+    });
+
+    // Nettoie les styles copiés
+    stylesCopy.forEach((style) => {
+      if (style.parentNode) style.parentNode.removeChild(style);
     });
   } finally {
     if (clone.parentNode) clone.parentNode.removeChild(clone);
