@@ -33,6 +33,13 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
   // Un tick pour laisser le navigateur recalculer le layout du clone
   await new Promise((r) => requestAnimationFrame(() => r()));
 
+  // Attend que les Google Fonts (DM Sans, Playfair, Space Grotesk) soient
+  // réellement chargées avant la capture — sinon html2canvas rasterise avec
+  // les polices système fallback, ce qui donne un rendu "bizarre" dans le PDF.
+  if (document.fonts?.ready) {
+    try { await document.fonts.ready; } catch {}
+  }
+
   let canvas;
   try {
     canvas = await html2canvas(clone, {
@@ -55,17 +62,19 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
     // (jamais de blanc en bas), ou légèrement réduit pour tenir en A4.
     const pageH = Math.min(drawH, A4_H_MM); // hauteur PDF = contenu ou A4 max
     const pdf   = new jsPDF({ unit: "mm", format: [pageW, pageH], orientation: "portrait" });
-    const img   = canvas.toDataURL("image/jpeg", 0.95);
+    // PNG (sans perte) pour le texte — JPEG bave sur les bords des caractères
+    // et donne un rendu "flou" typique des PDF rasterisés.
+    const img   = canvas.toDataURL("image/png");
 
     if (drawH <= A4_H_MM) {
       // Contenu plus court que A4 : page à la taille exacte du contenu
-      pdf.addImage(img, "JPEG", 0, 0, pageW, drawH, undefined, "FAST");
+      pdf.addImage(img, "PNG", 0, 0, pageW, drawH, undefined, "FAST");
     } else {
       // Contenu entre A4 et 1,5× A4 : réduit proportionnellement pour tenir en A4
       const scale   = A4_H_MM / drawH;
       const scaledW = pageW * scale;
       const marginX = (pageW - scaledW) / 2;
-      pdf.addImage(img, "JPEG", marginX, 0, scaledW, A4_H_MM, undefined, "FAST");
+      pdf.addImage(img, "PNG", marginX, 0, scaledW, A4_H_MM, undefined, "FAST");
     }
 
     const blob    = pdf.output("blob");
@@ -84,9 +93,9 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
     slice.width  = canvas.width;
     slice.height = sliceH;
     slice.getContext("2d").drawImage(canvas, 0, y, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-    const img    = slice.toDataURL("image/jpeg", 0.95);
+    const img    = slice.toDataURL("image/png");
     const thisH  = (sliceH * pageW) / canvas.width;
-    pdf.addImage(img, "JPEG", 0, 0, pageW, thisH, undefined, "FAST");
+    pdf.addImage(img, "PNG", 0, 0, pageW, thisH, undefined, "FAST");
     y += sliceH;
     if (canvas.height - y > MIN_REM) pdf.addPage();
     else break;
