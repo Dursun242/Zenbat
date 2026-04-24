@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { CLAUDE_MODEL, TX } from "../lib/constants.js";
 import { fmt, uid } from "../lib/utils.js";
-import { tradesLabels } from "../lib/trades.js";
+import { tradesLabels, firstDevisExampleFor } from "../lib/trades.js";
 import { buildDevisHistorySummary, formatHistoryPrompt } from "../lib/devisHistory.js";
 import { supabase } from "../lib/supabase.js";
 import { I } from "./ui/icons.jsx";
@@ -167,6 +167,12 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   const [listening,    setListening]    = useState(false);
   const [micLang,      setMicLang]      = useState(() => pickInitialLang());
   const [langMenu,     setLangMenu]     = useState(false);
+  // Suggestion cliquable adaptée au 1er métier — anti-syndrome page blanche
+  const [exampleText]  = useState(() => firstDevisExampleFor(brand?.trades));
+  // Flag one-shot : modale festive au tout premier devis du compte
+  const [celebrate,    setCelebrate]    = useState(false);
+  const celebrateStartRef = useRef(null);
+  const celebrateSecondsRef = useRef(0);
   const [micError,     setMicError]     = useState(null);
   const chatRef  = useRef(null);
   const inputRef = useRef(null);
@@ -337,11 +343,15 @@ ${pricingBlock}
 Groupe les ouvrages par lots cohérents, désignations professionnelles en français. RAPPEL FINAL : le JSON sort TOUJOURS au premier tour.${historyBlock}`;
   };
 
-  const send = async () => {
-    if (!input.trim() || loading) return;
+  const send = async (overrideText) => {
+    const payload = (overrideText ?? input).trim();
+    if (!payload || loading) return;
     if (trialExpired) { onPaywall(); return; }
 
-    const userMsg = { role: "user", content: input };
+    // Chrono pour la modale festive "X secondes"
+    celebrateStartRef.current = Date.now();
+
+    const userMsg = { role: "user", content: payload };
     const newMsgs = [...msgs, userMsg];
     setMsgs(newMsgs);
 
@@ -508,6 +518,20 @@ Groupe les ouvrages par lots cohérents, désignations professionnelles en fran�
             const existingDesigs = new Set(prev.map(l => l.designation));
             return [...prev, ...finalLignes.filter(l => !existingDesigs.has(l.designation))];
           });
+
+          // Tout premier devis jamais généré sur ce compte (stocké localement) :
+          // on déclenche une modale festive pour marquer le moment.
+          try {
+            const celebratedAt = localStorage.getItem("zenbat_first_devis_celebrated_at");
+            if (!celebratedAt && finalLignes.some(l => l.type_ligne === "ouvrage")) {
+              const elapsed = celebrateStartRef.current
+                ? Math.max(1, Math.round((Date.now() - celebrateStartRef.current) / 1000))
+                : 0;
+              celebrateSecondsRef.current = elapsed;
+              localStorage.setItem("zenbat_first_devis_celebrated_at", new Date().toISOString());
+              setCelebrate(true);
+            }
+          } catch {}
         } catch { /* JSON mal formé — on ignore */ }
       }
 
@@ -851,6 +875,42 @@ Groupe les ouvrages par lots cohérents, désignations professionnelles en fran�
             </div>
           ))}
 
+          {/* Suggestion cliquable — visible uniquement sur le chat vierge,
+              avant qu'un devis existe. Amorce le premier tour sans friction. */}
+          {msgs.length === 1 && lignes.length === 0 && !loading && exampleText && (
+            <div style={{ alignSelf: "flex-start", marginLeft: 30, marginTop: 4, maxWidth: "88%", animation: "fadeUp .25s ease both" }}>
+              <button
+                onClick={() => send(exampleText)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  background: `linear-gradient(135deg, ${ac}22, ${ac}10)`,
+                  border: `1px solid ${ac}55`,
+                  color: "#0f172a",
+                  borderRadius: 14,
+                  padding: "10px 14px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  textAlign: "left",
+                  lineHeight: 1.4,
+                  boxShadow: `0 2px 8px ${ac}22`,
+                  width: "100%",
+                }}>
+                <span style={{ fontSize: 16 }}>✨</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: ac, fontWeight: 700, letterSpacing: ".5px", textTransform: "uppercase", marginBottom: 2 }}>
+                    Essayer un exemple
+                  </div>
+                  <div style={{ color: "#1e293b", fontWeight: 500 }}>{exampleText}</div>
+                </div>
+                <span style={{ color: ac, fontSize: 14, flexShrink: 0 }}>→</span>
+              </button>
+              <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 6, marginLeft: 4 }}>
+                Ou décrivez directement votre besoin ci-dessous.
+              </div>
+            </div>
+          )}
+
           {loading && msgs[msgs.length - 1]?.role !== "assistant" && (
             <div style={{ display: "flex", alignItems: "flex-end", gap: 6 }}>
               <div style={{ width: 24, height: 24, borderRadius: "50%", background: ac + "22", border: `1px solid ${ac}44`, display: "flex", alignItems: "center", justifyContent: "center", color: ac, fontSize: 12 }}>✦</div>
@@ -954,6 +1014,40 @@ Groupe les ouvrages par lots cohérents, désignations professionnelles en fran�
           onPick={finalizeSave}
           onClose={() => setPickingClient(false)}
         />
+      )}
+
+      {celebrate && (
+        <div onClick={() => setCelebrate(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.65)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 200, animation: "fadeUp .2s ease both" }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: "white", borderRadius: 20, maxWidth: 380, width: "100%", padding: 24, textAlign: "center", boxShadow: "0 30px 60px rgba(0,0,0,.35)", animation: "popIn .3s cubic-bezier(.34,1.56,.64,1) both" }}>
+            <div style={{ fontSize: 56, lineHeight: 1, marginBottom: 8 }}>🎉</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", fontFamily, marginBottom: 6 }}>
+              Votre premier devis est prêt&nbsp;!
+            </div>
+            {celebrateSecondsRef.current > 0 && (
+              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 14 }}>
+                Généré en {celebrateSecondsRef.current} seconde{celebrateSecondsRef.current > 1 ? "s" : ""}. Pas mal pour un début 💪
+              </div>
+            )}
+            <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.6, marginBottom: 16 }}>
+              Ajustez librement les lignes ci-dessus, puis enregistrez-le. Vous pourrez l'envoyer à votre client en signature ou le télécharger en PDF.
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setCelebrate(false)}
+                style={{ flex: 1, background: "#f1f5f9", color: "#374151", border: "none", borderRadius: 12, padding: 11, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                Continuer
+              </button>
+              <button onClick={() => { setCelebrate(false); setPickingClient(true); }}
+                style={{ flex: 2, background: ac, color: "white", border: "none", borderRadius: 12, padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: `0 6px 16px ${ac}55` }}>
+                ✓ Enregistrer ce devis
+              </button>
+            </div>
+            <div style={{ fontSize: 10, color: "#cbd5e1", marginTop: 12 }}>
+              Conseil : complétez SIRET + adresse dans « Mon profil » pour un PDF 100% pro.
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

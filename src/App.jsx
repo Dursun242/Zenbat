@@ -444,11 +444,15 @@ export default function App() {
   if (screen === "trades_picker") return <TradesQuickPicker
     brand={brand}
     setBrand={setBrand}
-    onDone={() => setScreen(showPwa ? "pwa_install" : "app")}
+    onDone={() => {
+      // Fresh signup terminé : on ouvre directement l'Agent IA avec un
+      // exemple pré-rempli (géré dans AgentIA via brand.freshSignupExample).
+      setTab("agent");
+      setScreen(showPwa ? "pwa_install" : "app");
+    }}
     onSkip={() => {
-      // Marque l'étape comme "vue" côté DB pour éviter de la re-déclencher
-      // au prochain login si l'utilisateur a juste voulu passer.
       setBrand(b => ({ ...b, initialSetupDoneAt: new Date().toISOString() }));
+      setTab("agent");
       setScreen(showPwa ? "pwa_install" : "app");
     }}
   />;
