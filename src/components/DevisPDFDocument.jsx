@@ -148,15 +148,16 @@ const makeStyles = (fontFamily) => StyleSheet.create({
   footerRight: { fontSize: px(8), color: "#9ca3af", textAlign: "right", flexShrink: 0 },
 });
 
-// Largeurs des colonnes du tableau (en %, somme = 100). On garde le ratio de
-// l'aperçu HTML : description large + colonnes étroites pour les chiffres.
+// Largeurs des colonnes du tableau alignées sur l'aperçu HTML : colonnes
+// chiffrées à largeur fixe (en px comme PDFViewer.jsx) et description qui
+// remplit l'espace restant via flexGrow.
 const COL = {
-  desc:  "40%",
-  unite: "9%",
-  qte:   "8%",
-  pu:    "14%",
-  tva:   "10%",
-  total: "19%",
+  desc:  { flexGrow: 1, flexShrink: 1, flexBasis: 0 },
+  unite: { width: "44px" },
+  qte:   { width: "38px" },
+  pu:    { width: "66px" },
+  tva:   { width: "44px" },
+  total: { width: "72px" },
 };
 
 export default function DevisPDFDocument({ d, cl, brand, kind = "devis" }) {
@@ -271,12 +272,12 @@ export default function DevisPDFDocument({ d, cl, brand, kind = "devis" }) {
             saute en page suivante et laisse du blanc page 1. */}
         <Text style={styles.sectionTitle}>Détail des prestations</Text>
         <View style={styles.trHead} fixed>
-          <Text style={[styles.thBase, { width: COL.desc, textAlign: "left", padding: "6px 8px" }]}>Description</Text>
-          <Text style={[styles.thBase, { width: COL.unite, textAlign: "center" }]}>Unité</Text>
-          <Text style={[styles.thBase, { width: COL.qte,   textAlign: "center" }]}>Qté</Text>
-          <Text style={[styles.thBase, { width: COL.pu,    textAlign: "right",  padding: "6px 6px" }]}>PU HT</Text>
-          <Text style={[styles.thBase, { width: COL.tva,   textAlign: "center" }]}>TVA</Text>
-          <Text style={[styles.thBase, { width: COL.total, textAlign: "right",  padding: "6px 8px" }]}>Total HT</Text>
+          <Text style={[styles.thBase, COL.desc,  { textAlign: "left",   padding: "6px 8px" }]}>Description</Text>
+          <Text style={[styles.thBase, COL.unite, { textAlign: "center" }]}>Unité</Text>
+          <Text style={[styles.thBase, COL.qte,   { textAlign: "center" }]}>Qté</Text>
+          <Text style={[styles.thBase, COL.pu,    { textAlign: "right",  padding: "6px 6px" }]}>PU HT</Text>
+          <Text style={[styles.thBase, COL.tva,   { textAlign: "center" }]}>TVA</Text>
+          <Text style={[styles.thBase, COL.total, { textAlign: "right",  padding: "6px 8px" }]}>Total HT</Text>
         </View>
 
         {filteredLignes.map((l, i) => {
@@ -290,12 +291,12 @@ export default function DevisPDFDocument({ d, cl, brand, kind = "devis" }) {
           const total = (l.quantite || 0) * (l.prix_unitaire || 0);
           return (
             <View key={l.id} style={[styles.trData, i % 2 ? styles.trDataAlt : null]} wrap={false}>
-              <Text style={[styles.tdBase, { width: COL.desc,  textAlign: "left",   padding: "5px 8px" }]}>{l.designation}</Text>
-              <Text style={[styles.tdBase, { width: COL.unite, textAlign: "center", color: "#6b7280" }]}>{l.unite || "—"}</Text>
-              <Text style={[styles.tdBase, { width: COL.qte,   textAlign: "center" }]}>{String(l.quantite ?? "")}</Text>
-              <Text style={[styles.tdBase, { width: COL.pu,    textAlign: "right",  padding: "5px 6px" }]}>{fmtPdf(l.prix_unitaire)}</Text>
-              <Text style={[styles.tdBase, { width: COL.tva,   textAlign: "center", color: "#6b7280" }]}>{rateOf(l).toString().replace(".", ",")}%</Text>
-              <Text style={[styles.tdBase, { width: COL.total, textAlign: "right",  padding: "5px 8px", fontWeight: 600 }]}>{fmtPdf(total)}</Text>
+              <Text style={[styles.tdBase, COL.desc,  { textAlign: "left",   padding: "5px 8px" }]}>{l.designation}</Text>
+              <Text style={[styles.tdBase, COL.unite, { textAlign: "center", color: "#6b7280" }]}>{l.unite || "—"}</Text>
+              <Text style={[styles.tdBase, COL.qte,   { textAlign: "center" }]}>{String(l.quantite ?? "")}</Text>
+              <Text style={[styles.tdBase, COL.pu,    { textAlign: "right",  padding: "5px 6px" }]}>{fmtPdf(l.prix_unitaire)}</Text>
+              <Text style={[styles.tdBase, COL.tva,   { textAlign: "center", color: "#6b7280" }]}>{rateOf(l).toString().replace(".", ",")}%</Text>
+              <Text style={[styles.tdBase, COL.total, { textAlign: "right",  padding: "5px 8px", fontWeight: 600 }]}>{fmtPdf(total)}</Text>
             </View>
           );
         })}
