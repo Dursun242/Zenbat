@@ -356,15 +356,19 @@ export default async function handler(req, res) {
     // L'@import des Google Fonts arrive parfois après networkidle :
     // attendre explicitement que les polices déclarées soient prêtes.
     await page.evaluate(() => document.fonts && document.fonts.ready)
-    const pdfBuffer = await page.pdf({
+    const pdfBytes = await page.pdf({
       format: 'A4',
       printBackground: true,
       preferCSSPageSize: true,
       margin: { top: 0, right: 0, bottom: 0, left: 0 },
     })
+    // puppeteer-core v22+ retourne un Uint8Array. Sans Buffer.from(),
+    // toString('base64') produit "21,55,80,..." (CSV des codepoints) qui
+    // fait planter atob() côté client avec "invalid characters".
+    const base64 = Buffer.from(pdfBytes).toString('base64')
 
     res.setHeader('Content-Type', 'application/json')
-    return res.status(200).json({ pdf_base64: pdfBuffer.toString('base64') })
+    return res.status(200).json({ pdf_base64: base64 })
   } catch (err) {
     console.error('[render-pdf]', err)
     return res.status(500).json({
