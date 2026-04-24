@@ -54,7 +54,7 @@ export default function Onboarding({ brand, setBrand, onDone }) {
   const tradeRef   = useRef(null)
   const set = (k, v) => setLocal(b => ({ ...b, [k]: v }))
 
-  const MAX_TRADES = 7
+  const MAX_TRADES = 10
   const currentTrades = tradesLabels(local.trades || [])
 
   // ── État RGPD (étape "Vos données") ─────────────────────────────

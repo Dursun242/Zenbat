@@ -7,7 +7,7 @@
 import { useState, useRef } from "react"
 import { searchTrades, tradesLabels, TRADE_EXAMPLES } from "../lib/trades.js"
 
-const MAX_TRADES = 3
+const MAX_TRADES = 10
 
 const normalize = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
 
@@ -69,12 +69,17 @@ export default function TradesQuickPicker({ brand, setBrand, onDone, onSkip }) {
       <div style={{flex:1,padding:"0 20px",overflowY:"auto",paddingBottom:120}}>
         <div style={{animation:"popIn .3s ease both",marginTop:20,marginBottom:24}}>
           <div style={{fontSize:12,fontWeight:700,color:"#22c55e",letterSpacing:"1px",textTransform:"uppercase",marginBottom:8}}>1 dernière étape</div>
-          <h1 style={{fontSize:28,fontWeight:800,color:"white",letterSpacing:"-0.5px",lineHeight:1.15,marginBottom:8}}>
+          <h1 style={{fontSize:28,fontWeight:800,color:"white",letterSpacing:"-0.5px",lineHeight:1.15,marginBottom:10}}>
             Quels sont vos métiers&nbsp;?
           </h1>
-          <p style={{fontSize:14,color:"#94a3b8",lineHeight:1.6}}>
-            L'Agent IA adaptera instantanément vocabulaire, tarifs et unités à votre activité. Ajoutez-en 1 à {MAX_TRADES}.
+          <p style={{fontSize:14,color:"#cbd5e1",lineHeight:1.6,marginBottom:12}}>
+            Plus vous en ajoutez, plus l'Agent IA produit des devis <strong style={{color:"white"}}>précis et professionnels</strong> dès le premier essai.
           </p>
+          <div style={{display:"flex",flexDirection:"column",gap:6,fontSize:12,color:"#94a3b8",lineHeight:1.5}}>
+            <div>✓ Vocabulaire technique exact à votre métier</div>
+            <div>✓ Tarifs du marché 2025 pré-calibrés</div>
+            <div>✓ Unités et lots adaptés (m², ml, forfait, h…)</div>
+          </div>
         </div>
 
         {/* Tags sélectionnés */}
@@ -148,8 +153,9 @@ export default function TradesQuickPicker({ brand, setBrand, onDone, onSkip }) {
           </>
         )}
 
-        <div style={{marginTop:20,fontSize:11,color:local.length>=MAX_TRADES?"#f59e0b":"#475569",textAlign:"right"}}>
-          {local.length} / {MAX_TRADES} métier{local.length>1?"s":""}{local.length>=MAX_TRADES && " — maximum atteint"}
+        <div style={{marginTop:16,fontSize:11,color:"#64748b",textAlign:"right"}}>
+          {local.length === 0 ? "Aucun métier ajouté" : `${local.length} métier${local.length>1?"s":""} sélectionné${local.length>1?"s":""}`}
+          {local.length >= MAX_TRADES && <span style={{color:"#f59e0b",marginLeft:6}}>· max atteint</span>}
         </div>
 
         <div style={{marginTop:24,background:"#1e293b",border:"1px solid #334155",borderRadius:12,padding:14,fontSize:11,color:"#94a3b8",lineHeight:1.6}}>
