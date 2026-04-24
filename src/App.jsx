@@ -14,6 +14,7 @@ import Logo        from "./components/ui/Logo.jsx";
 import { I }       from "./components/ui/icons.jsx";
 import Toast       from "./components/app/Toast.jsx";
 import BottomNav   from "./components/app/BottomNav.jsx";
+import SaveIndicator from "./components/app/SaveIndicator.jsx";
 import Dashboard   from "./components/Dashboard.jsx";
 import ClientsList from "./components/ClientsList.jsx";
 import ClientDetail from "./components/ClientDetail.jsx";
@@ -44,6 +45,17 @@ export default function App() {
   const [selC,   setSelC]     = useState(null);
   const [plan,   setPlan]     = useState("free");
   const [toast,  setToast]    = useState(null);
+  const [saveState, setSaveState] = useState("idle"); // idle | saving | saved
+  const saveResetTimer = useRef(null);
+  const markSaving = useCallback(() => {
+    clearTimeout(saveResetTimer.current);
+    setSaveState("saving");
+  }, []);
+  const markSaved = useCallback(() => {
+    clearTimeout(saveResetTimer.current);
+    setSaveState("saved");
+    saveResetTimer.current = setTimeout(() => setSaveState("idle"), 1800);
+  }, []);
   const [loadingDevis, setLoadingDevis] = useState(new Set());
   const [autoOpenPDF,  setAutoOpenPDF]  = useState(null); // devis id à ouvrir en PDF
   const [showPwa, setShowPwa] = useState(false);
@@ -169,13 +181,15 @@ export default function App() {
   const scheduleDevisSave = (d, immediate = false, saveLignes = false) => {
     if (!user) return;
     const run = async () => {
+      markSaving();
       try {
         const { lignes: dl, client, created_at, updated_at, id: _id, ...fields } = d;
         await apiUpdateDevis(d.id, fields);
         if (saveLignes) {
           await replaceLignes(d.id, (dl || []).map(({ id, created_at, ...l }) => l));
         }
-      } catch (err) { console.error("[save devis]", err); showErr("Impossible de sauvegarder le devis"); }
+        markSaved();
+      } catch (err) { console.error("[save devis]", err); showErr("Impossible de sauvegarder le devis"); setSaveState("idle"); }
     };
     if (immediate) { run(); return; }
     clearTimeout(saveTimers.current[d.id]);
@@ -187,11 +201,13 @@ export default function App() {
     const isNew = !clients.some(x => x.id === c.id);
     setClients(prev => isNew ? [c, ...prev] : prev.map(x => x.id === c.id ? c : x));
     if (!user) return;
+    markSaving();
     try {
       const { created_at, updated_at, ...fields } = c;
       if (isNew) await apiCreateClient(fields);
       else       await apiUpdateClient(c.id, fields);
-    } catch (err) { console.error("[save client]", err); showErr("Impossible de sauvegarder le contact"); }
+      markSaved();
+    } catch (err) { console.error("[save client]", err); showErr("Impossible de sauvegarder le contact"); setSaveState("idle"); }
   };
 
   const onDeleteClient = async (id) => {
@@ -255,11 +271,15 @@ export default function App() {
     setInvoices(prev => prev.map(x => x.id === inv.id ? inv : x));
     if (!user) return;
     const { lignes: il, created_at, updated_at, ...fields } = inv;
-    apiUpdateInvoice(inv.id, fields).catch(e => { console.error("[save invoice]", e); showErr("Impossible de sauvegarder la facture"); });
-    if (saveLignes) {
-      replaceInvoiceLignes(inv.id, (il || []).map(({ id, created_at, ...l }) => l))
-        .catch(e => { console.error("[save invoice lignes]", e); showErr("Erreur sauvegarde lignes facture"); });
-    }
+    markSaving();
+    const p1 = apiUpdateInvoice(inv.id, fields);
+    const p2 = saveLignes
+      ? replaceInvoiceLignes(inv.id, (il || []).map(({ id, created_at, ...l }) => l))
+      : Promise.resolve();
+    Promise.all([p1, p2]).then(
+      () => markSaved(),
+      (e) => { console.error("[save invoice]", e); showErr("Impossible de sauvegarder la facture"); setSaveState("idle"); },
+    );
   };
 
   const onCreateInvoiceFromDevis = async (devisId) => {
@@ -473,6 +493,7 @@ export default function App() {
               {I.logout}
             </button>
           )}
+          <SaveIndicator state={saveState}/>
           {plan === "pro"
             ? <span style={{ background: "rgba(34,197,94,.15)", color: "#4ade80", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, border: "1px solid rgba(34,197,94,.25)" }}>PRO</span>
             : <span style={{ background: daysLeft <= 7 ? "rgba(249,115,22,.15)" : "#1e293b", color: daysLeft <= 7 ? "#fb923c" : "#94a3b8", fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 20, border: daysLeft <= 7 ? "1px solid rgba(249,115,22,.25)" : "none" }}>Essai · {daysLeft}j</span>

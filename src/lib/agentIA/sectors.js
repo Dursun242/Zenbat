@@ -111,6 +111,32 @@ export const SECTOR_GREETING_EXAMPLE = {
   general:       "Ex : *Prestation 2h × 60€/h, fourniture matériel forfait 120€*",
 };
 
+// 4 suggestions cliquables par secteur, affichées au 1er tour du chat.
+// Anti-page-blanche pour les utilisateurs non-tech : 1 clic = devis rempli.
+export const SECTOR_QUICKSTARTS = {
+  btp:           ["Rénovation salle de bain 6 m² complète", "Pose carrelage 40 m² fourniture incluse", "Peinture 3 pièces murs + plafonds", "Isolation combles 80 m²"],
+  beaute:        ["Coupe + couleur + brushing femme", "Soin visage complet 1h", "Pose ongles semi-permanente + nail art", "Forfait mariée maquillage + coiffure"],
+  sante:         ["3 séances kiné + bilan initial", "Consultation ostéo adulte 1h", "Bilan nutritionnel + suivi 3 mois", "10 séances coaching sportif individuel"],
+  tech:          ["Site vitrine 5 pages responsive", "Refonte logo + charte graphique", "Audit SEO complet + plan d'action", "Maintenance mensuelle site web"],
+  alimentaire:   ["Buffet cocktail 50 personnes", "Plateau repas entreprise 20 pers", "Pièce montée mariage 80 parts", "Traiteur anniversaire 30 pers"],
+  transport:     ["Déménagement T3 région parisienne", "Révision complète auto + vidange", "Livraison express Paris-Lyon", "Forfait VTC aéroport aller-retour"],
+  communication: ["Reportage photo mariage journée", "Vidéo institutionnelle 2 min", "Shooting produit 30 visuels", "Logo + charte + carte de visite"],
+  evenementiel:  ["DJ soirée 6h sono incluse", "Décoration mariage salle + cérémonie", "Animation enfants anniversaire 3h", "Prestation photo + vidéo événement"],
+  education:     ["20h cours particuliers maths lycée", "Formation bureautique 2 jours", "Forfait permis B 20h + code", "Stage d'été intensif anglais"],
+  nettoyage:     ["Nettoyage bureaux 200 m² hebdo", "Grand nettoyage fin de chantier", "Vitrerie immeuble 3 étages", "Désinfection locaux 300 m²"],
+  animaux:       ["Toilettage complet chien moyen", "Pension chat 10 jours", "3 séances éducation canine", "Visite vétérinaire + vaccins"],
+  immobilier:    ["Bilan comptable TPE annuel", "Conseil juridique création SARL", "Gestion locative 6 mois", "État des lieux entrée + sortie"],
+  mode:          ["Retouche robe de mariée", "5 ourlets pantalons", "Réfection fauteuil Voltaire", "Réparation maroquinerie sac cuir"],
+  general:       ["Prestation forfait journée", "10 h de consultation expert", "Intervention urgente sur site", "Pack 3 prestations + suivi"],
+};
+
+export const quickStartsFor = (brand) => {
+  const tradeNames = tradesLabels(brand?.trades || []);
+  const sectors = detectSectors(tradeNames, brand?.companyName || "");
+  const primary = sectors[0] || "general";
+  return SECTOR_QUICKSTARTS[primary] || SECTOR_QUICKSTARTS.general;
+};
+
 export const buildAgentGreeting = (brand) => {
   const tradeNames = tradesLabels(brand?.trades || []);
   const sectors = detectSectors(tradeNames, brand?.companyName || "");

@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { CLAUDE_MODEL, TX } from "../lib/constants.js";
 import { fmt, uid } from "../lib/utils.js";
-import { tradesLabels, firstDevisExampleFor } from "../lib/trades.js";
+import { tradesLabels } from "../lib/trades.js";
 import { buildDevisHistorySummary } from "../lib/devisHistory.js";
 import { supabase } from "../lib/supabase.js";
 import { SR_LANGS, MIC_LANG_KEY, pickInitialLang } from "../lib/agentIA/speech.js";
-import { buildAgentGreeting } from "../lib/agentIA/sectors.js";
+import { buildAgentGreeting, quickStartsFor } from "../lib/agentIA/sectors.js";
 import { buildSystemPrompt } from "../lib/agentIA/prompt.js";
 import { I } from "./ui/icons.jsx";
 import ClientPickerModal from "./ClientPickerModal.jsx";
@@ -22,8 +22,9 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   const [listening,    setListening]    = useState(false);
   const [micLang,      setMicLang]      = useState(() => pickInitialLang());
   const [langMenu,     setLangMenu]     = useState(false);
-  // Suggestion cliquable adaptée au 1er métier — anti-syndrome page blanche
-  const [exampleText]  = useState(() => firstDevisExampleFor(brand?.trades));
+  // Suggestions cliquables adaptées au 1er secteur — anti-syndrome page blanche.
+  // 4 exemples de devis typiques du métier pour démarrer en 1 clic.
+  const [quickStarts] = useState(() => quickStartsFor(brand));
   // Flag one-shot : modale festive au tout premier devis du compte
   const [celebrate,    setCelebrate]    = useState(false);
   const celebrateStartRef = useRef(null);
@@ -664,38 +665,42 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
             </div>
           ))}
 
-          {/* Suggestion cliquable — visible uniquement sur le chat vierge,
-              avant qu'un devis existe. Amorce le premier tour sans friction. */}
-          {msgs.length === 1 && lignes.length === 0 && !loading && exampleText && (
+          {/* Puces de démarrage rapide — visibles uniquement sur le chat vierge.
+              4 exemples typiques du métier, 1 clic = devis généré. Anti-page blanche
+              pour les utilisateurs non-tech. */}
+          {msgs.length === 1 && lignes.length === 0 && !loading && quickStarts.length > 0 && (
             <div style={{ alignSelf: "flex-start", marginLeft: 30, marginTop: 4, maxWidth: "88%", animation: "fadeUp .25s ease both" }}>
-              <button
-                onClick={() => send(exampleText)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 8,
-                  background: `linear-gradient(135deg, ${ac}22, ${ac}10)`,
-                  border: `1px solid ${ac}55`,
-                  color: "#0f172a",
-                  borderRadius: 14,
-                  padding: "10px 14px",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  textAlign: "left",
-                  lineHeight: 1.4,
-                  boxShadow: `0 2px 8px ${ac}22`,
-                  width: "100%",
-                }}>
-                <span style={{ fontSize: 16 }}>✨</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 10, color: ac, fontWeight: 700, letterSpacing: ".5px", textTransform: "uppercase", marginBottom: 2 }}>
-                    Essayer un exemple
-                  </div>
-                  <div style={{ color: "#1e293b", fontWeight: 500 }}>{exampleText}</div>
-                </div>
-                <span style={{ color: ac, fontSize: 14, flexShrink: 0 }}>→</span>
-              </button>
-              <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 6, marginLeft: 4 }}>
-                Ou décrivez directement votre besoin ci-dessous.
+              <div style={{ fontSize: 11, color: ac, fontWeight: 700, letterSpacing: ".5px", textTransform: "uppercase", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}>
+                <span style={{ fontSize: 13 }}>✨</span>
+                <span>Démarrage rapide — cliquez pour essayer</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {quickStarts.map((q) => (
+                  <button key={q} onClick={() => send(q)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 8,
+                      background: `linear-gradient(135deg, ${ac}18, ${ac}08)`,
+                      border: `1px solid ${ac}44`,
+                      color: "#0f172a",
+                      borderRadius: 12,
+                      padding: "11px 14px",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      cursor: "pointer",
+                      textAlign: "left",
+                      lineHeight: 1.35,
+                      width: "100%",
+                      transition: "background .15s, transform .1s",
+                    }}
+                    onMouseOver={e => e.currentTarget.style.background = `linear-gradient(135deg, ${ac}28, ${ac}12)`}
+                    onMouseOut={e => e.currentTarget.style.background = `linear-gradient(135deg, ${ac}18, ${ac}08)`}>
+                    <div style={{ flex: 1, color: "#1e293b" }}>{q}</div>
+                    <span style={{ color: ac, fontSize: 16, flexShrink: 0, fontWeight: 700 }}>→</span>
+                  </button>
+                ))}
+              </div>
+              <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8, marginLeft: 4 }}>
+                Ou décrivez votre besoin ci-dessous (écrit ou vocal).
               </div>
             </div>
           )}
