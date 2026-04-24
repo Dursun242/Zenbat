@@ -22,64 +22,71 @@ function cors(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
 }
 
+// Exécute une requête Supabase en tolérant l'absence de table (ex: migration
+// 0012 non appliquée sur l'env courant). Renvoie { data: [], error } au lieu
+// de faire crasher tout l'endpoint.
+async function safe(q) {
+  try {
+    const r = await q
+    if (r.error) return { data: null, error: r.error.message || String(r.error) }
+    return { data: r.data, error: null }
+  } catch (e) {
+    return { data: null, error: e?.message || String(e) }
+  }
+}
+
 export default async function handler(req, res) {
   cors(req, res)
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Non authentifié' })
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '')
+    if (!token) return res.status(401).json({ error: 'Non authentifié' })
 
-  const supabaseUrl = process.env.VITE_SUPABASE_URL
-  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const adminEmail  = process.env.ADMIN_EMAIL
-  if (!supabaseUrl || !serviceKey)
-    return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY non configurée' })
+    const supabaseUrl = process.env.VITE_SUPABASE_URL
+    const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const adminEmail  = process.env.ADMIN_EMAIL
+    if (!supabaseUrl || !serviceKey)
+      return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY non configurée' })
 
-  const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
+    const admin = createClient(supabaseUrl, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
 
-  // Vérifie l'identité de l'appelant + droit admin
-  const { data: { user: caller }, error: authErr } = await admin.auth.getUser(token)
-  if (authErr || !caller) return res.status(401).json({ error: 'Token invalide' })
-  const norm = (s) => String(s || '').trim().toLowerCase()
-  if (!adminEmail || norm(caller.email) !== norm(adminEmail))
-    return res.status(403).json({ error: "Accès réservé à l'administrateur" })
+    // Vérifie l'identité de l'appelant + droit admin
+    const { data: { user: caller }, error: authErr } = await admin.auth.getUser(token)
+    if (authErr || !caller) return res.status(401).json({ error: 'Token invalide' })
+    const norm = (s) => String(s || '').trim().toLowerCase()
+    if (!adminEmail || norm(caller.email) !== norm(adminEmail))
+      return res.status(403).json({ error: "Accès réservé à l'administrateur" })
 
-  const userId = (req.query.userId || req.query.id || '').toString().trim()
-  if (!userId) return res.status(400).json({ error: 'userId manquant' })
+    const userId = (req.query.userId || req.query.id || '').toString().trim()
+    if (!userId) return res.status(400).json({ error: 'userId manquant' })
 
-  // Auth user cible
-  const { data: targetRes, error: targetErr } = await admin.auth.admin.getUserById(userId)
-  if (targetErr || !targetRes?.user)
-    return res.status(404).json({ error: 'Utilisateur introuvable' })
-  const target = targetRes.user
+    // Auth user cible
+    const { data: targetRes, error: targetErr } = await admin.auth.admin.getUserById(userId)
+    if (targetErr || !targetRes?.user)
+      return res.status(404).json({ error: 'Utilisateur introuvable' })
+    const target = targetRes.user
 
-  // Chargement parallèle de toutes les données liées au user
-  const [
-    profileR,
-    clientsR,
-    devisR,
-    lignesDevisR,
-    invoicesR,
-    lignesInvoicesR,
-    convR,
-    errR,
-    negR,
-    activityR,
-  ] = await Promise.all([
-    admin.from('profiles').select('*').eq('id', userId).maybeSingle(),
-    admin.from('clients').select('*').eq('owner_id', userId).order('created_at', { ascending: false }),
-    admin.from('devis').select('*').eq('owner_id', userId).is('deleted_at', null).order('created_at', { ascending: false }),
-    admin.from('lignes_devis').select('*').eq('owner_id', userId).order('position'),
-    admin.from('invoices').select('*').eq('owner_id', userId).is('deleted_at', null).order('created_at', { ascending: false }),
-    admin.from('lignes_invoices').select('*').eq('owner_id', userId).order('position'),
-    admin.from('ia_conversations').select('*').eq('owner_id', userId).order('created_at', { ascending: true }).limit(500),
-    admin.from('ia_error_logs').select('*').eq('owner_id', userId).order('created_at', { ascending: false }).limit(100),
-    admin.from('ia_negative_logs').select('*').eq('owner_id', userId).order('created_at', { ascending: false }).limit(100),
-    admin.from('activity_log').select('*').eq('owner_id', userId).order('created_at', { ascending: false }).limit(200),
-  ])
+    // Chargement parallèle — chaque requête est isolée pour qu'un table
+    // manquante / erreur unitaire ne plombe pas l'ensemble.
+    const [
+      profileR, clientsR, devisR, lignesDevisR,
+      invoicesR, lignesInvoicesR, convR, errR, negR, activityR,
+    ] = await Promise.all([
+      safe(admin.from('profiles').select('*').eq('id', userId).maybeSingle()),
+      safe(admin.from('clients').select('*').eq('owner_id', userId).order('created_at', { ascending: false })),
+      safe(admin.from('devis').select('*').eq('owner_id', userId).is('deleted_at', null).order('created_at', { ascending: false })),
+      safe(admin.from('lignes_devis').select('*').eq('owner_id', userId).order('position')),
+      safe(admin.from('invoices').select('*').eq('owner_id', userId).is('deleted_at', null).order('created_at', { ascending: false })),
+      safe(admin.from('lignes_invoices').select('*').eq('owner_id', userId).order('position')),
+      safe(admin.from('ia_conversations').select('*').eq('owner_id', userId).order('created_at', { ascending: true }).limit(500)),
+      safe(admin.from('ia_error_logs').select('*').eq('owner_id', userId).order('created_at', { ascending: false }).limit(100)),
+      safe(admin.from('ia_negative_logs').select('*').eq('owner_id', userId).order('created_at', { ascending: false }).limit(100)),
+      safe(admin.from('activity_log').select('*').eq('owner_id', userId).order('created_at', { ascending: false }).limit(200)),
+    ])
 
   const devis    = devisR.data    || []
   const invoices = invoicesR.data || []
@@ -130,8 +137,16 @@ export default async function handler(req, res) {
     invoices:      invoicesWithLines,
     conversations: convR.data  || [],
     errors:        errR.data   || [],
-    negatives:     negR.data   || [],
-    activity:      activityR.data || [],
-    generatedAt:   new Date().toISOString(),
-  })
+      negatives:     negR.data   || [],
+      activity:      activityR.data || [],
+      warnings:      [profileR, clientsR, devisR, lignesDevisR, invoicesR, lignesInvoicesR, convR, errR, negR, activityR]
+                       .filter(r => r.error).map(r => r.error),
+      generatedAt:   new Date().toISOString(),
+    })
+  } catch (err) {
+    console.error('[admin-user-detail] unhandled:', err)
+    return res.status(500).json({
+      error: err?.message || String(err) || 'Erreur interne inconnue',
+    })
+  }
 }
