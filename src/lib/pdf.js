@@ -75,20 +75,21 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
   await new Promise((r) => requestAnimationFrame(() => r()));
 
   // Mode canvas classique : html2canvas parse le DOM et dessine lui-même.
-  // Fiable partout (Safari iOS y compris). Les polices personnalisées
-  // (DM Sans / Playfair / Space Grotesk) sont correctement rendues grâce à
-  // `document.fonts.load()` ci-dessus + préchargement <link> dans index.html.
+  // Les polices personnalisées (DM Sans / Playfair / Space Grotesk) ne rendent
+  // pas correctement via html2canvas même avec préchargement. On force les
+  // polices système qui sont stables et nettes en rasterisation.
   let canvas;
   try {
-    // Copie tous les <style> du head vers le clone pour s'assurer que
-    // les styles CSS globaux sont appliqués correctement à la capture
-    const styleElements = Array.from(document.head.querySelectorAll("style"));
-    const stylesCopy = styleElements.map((style) => {
-      const copy = document.createElement("style");
-      copy.textContent = style.textContent;
-      return copy;
+    // Force l'utilisation de polices système pour le rendu PDF
+    clone.style.fontFamily = "'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
+    // Remplace aussi les polices spécifiques du DOM pour la cohérence
+    const allText = clone.querySelectorAll("*");
+    allText.forEach((el) => {
+      const fontFamily = window.getComputedStyle(el).fontFamily;
+      if (fontFamily.includes("Playfair") || fontFamily.includes("DM Sans") || fontFamily.includes("Space Grotesk")) {
+        el.style.fontFamily = "'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
+      }
     });
-    stylesCopy.forEach((style) => clone.appendChild(style));
 
     canvas = await html2canvas(clone, {
       scale: 4,               // 380dpi-ish en A4 pour une meilleure netteté texte
@@ -99,15 +100,6 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
       imageTimeout: 20000,    // Augmente le timeout pour laisser le temps à tous les assets
       windowWidth: 793,       // Force 210mm @ 96dpi = 793px (élimine les variations de zoom)
       windowHeight: 1122,     // Force 297mm @ 96dpi = 1122px (une page A4)
-      // onclone: (doc) => {
-      //   // Préservation du layout exact du clone avant la capture
-      //   doc.documentElement.style.transform = "none";
-      // }
-    });
-
-    // Nettoie les styles copiés
-    stylesCopy.forEach((style) => {
-      if (style.parentNode) style.parentNode.removeChild(style);
     });
   } finally {
     if (clone.parentNode) clone.parentNode.removeChild(clone);
