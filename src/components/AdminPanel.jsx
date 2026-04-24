@@ -1,5 +1,13 @@
 import { useState, useEffect } from "react"
 import { useAuth } from "../lib/auth.jsx"
+import { supabase } from "../lib/supabase.js"
+
+// Toujours récupérer un token frais — le state React peut être périmé
+// si le token a été renouvelé silencieusement en arrière-plan.
+async function getToken() {
+  const { data: { session } } = await supabase.auth.getSession()
+  return session?.access_token ?? null
+}
 
 export default function AdminPanel({ onBack }) {
   const { session, user: currentUser } = useAuth()
@@ -33,8 +41,9 @@ export default function AdminPanel({ onBack }) {
   const load = async () => {
     setLoading(true); setError(null)
     try {
+      const token = await getToken()
       const res = await fetch("/api/admin-stats", {
-        headers: { Authorization: `Bearer ${session?.access_token}` },
+        headers: { Authorization: `Bearer ${token}` },
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || "Erreur serveur")
@@ -46,8 +55,9 @@ export default function AdminPanel({ onBack }) {
   const loadLogs = async () => {
     setLogsLoading(true)
     try {
+      const token = await getToken()
       const res = await fetch("/api/admin-ia-data?type=logs", {
-        headers: { Authorization: `Bearer ${session?.access_token}` },
+        headers: { Authorization: `Bearer ${token}` },
       })
       const data = await res.json()
       if (res.ok) setIaLogs(data.logs || [])
@@ -57,8 +67,9 @@ export default function AdminPanel({ onBack }) {
   const loadNegs = async () => {
     setNegsLoading(true)
     try {
+      const token = await getToken()
       const res = await fetch("/api/admin-ia-data?type=negatives", {
-        headers: { Authorization: `Bearer ${session?.access_token}` },
+        headers: { Authorization: `Bearer ${token}` },
       })
       const data = await res.json()
       if (res.ok) setIaNegs(data.logs || [])
@@ -68,8 +79,9 @@ export default function AdminPanel({ onBack }) {
   const loadConvs = async () => {
     setConvsLoading(true)
     try {
+      const token = await getToken()
       const res = await fetch("/api/admin-ia-data?type=conversations", {
-        headers: { Authorization: `Bearer ${session?.access_token}` },
+        headers: { Authorization: `Bearer ${token}` },
       })
       const data = await res.json()
       if (res.ok) setIaConvs(data.conversations || [])
@@ -82,8 +94,9 @@ export default function AdminPanel({ onBack }) {
     setDetailUser(u); setDetailData(null); setDetailError(null)
     setDetailTab("overview"); setDetailLoading(true)
     try {
+      const token = await getToken()
       const res = await fetch(`/api/admin-user-detail?userId=${encodeURIComponent(u.id)}`, {
-        headers: { Authorization: `Bearer ${session?.access_token}` },
+        headers: { Authorization: `Bearer ${token}` },
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || "Erreur serveur")
@@ -101,11 +114,12 @@ export default function AdminPanel({ onBack }) {
     if (!deleteTarget) return
     setDeleting(true); setDeleteError(null)
     try {
+      const token = await getToken()
       const res = await fetch("/api/admin-delete-user", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ userId: deleteTarget.id, confirmEmail: confirmInput }),
       })
