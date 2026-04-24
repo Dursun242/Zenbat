@@ -54,32 +54,19 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
   // fraîchement chargées avant la capture.
   await new Promise((r) => requestAnimationFrame(() => r()));
 
-  // Deux stratégies de rasterisation :
-  // 1. foreignObjectRendering (SVG) : le navigateur rend le DOM NATIVEMENT
-  //    en SVG, donc polices vectorielles conservées → texte parfaitement fidèle
-  //    à l'aperçu HTML. Seul inconvénient : ne marche pas partout (Safari < 15
-  //    a des bugs). Si ça échoue, on retombe sur le mode classique.
-  // 2. Mode classique : html2canvas re-rasterise lui-même le DOM. Marche partout
-  //    mais utilise parfois des polices fallback si elles ne sont pas parfaitement
-  //    chargées au moment du rendu.
+  // Mode canvas classique : html2canvas parse le DOM et dessine lui-même.
+  // Fiable partout (Safari iOS y compris). Les polices personnalisées
+  // (DM Sans / Playfair / Space Grotesk) sont correctement rendues grâce à
+  // `document.fonts.load()` ci-dessus + préchargement <link> dans index.html.
   let canvas;
-  const opts = {
-    scale: 3,               // 300dpi-ish en A4, fini le zoom pixelisé
-    useCORS: true,
-    backgroundColor: "#ffffff",
-    logging: false,
-    imageTimeout: 15000,
-  };
   try {
-    try {
-      canvas = await html2canvas(clone, { ...opts, foreignObjectRendering: true });
-      // Safari foreignObject retourne parfois un canvas blanc → détection
-      // best-effort : on vérifie que le canvas a un contenu non vide.
-      if (!canvas || canvas.width < 10 || canvas.height < 10) throw new Error("empty canvas");
-    } catch (svgErr) {
-      console.warn("[pdf] foreignObjectRendering failed, fallback:", svgErr?.message || svgErr);
-      canvas = await html2canvas(clone, opts);
-    }
+    canvas = await html2canvas(clone, {
+      scale: 3,               // 300dpi-ish en A4, fini le zoom pixelisé
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+      imageTimeout: 15000,
+    });
   } finally {
     if (clone.parentNode) clone.parentNode.removeChild(clone);
   }
