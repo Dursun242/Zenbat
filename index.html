@@ -12,6 +12,16 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Zenbat" />
     <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- Préchargement des Google Fonts utilisées dans les devis / factures.
+         Sans ce préchargement, html2canvas peut capturer AVANT que les polices
+         soient téléchargées → le PDF utilise la police système fallback au lieu
+         de DM Sans / Playfair / Space Grotesk → rendu "bizarre" inconsistant
+         avec l'aperçu HTML. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700&family=Space+Grotesk:wght@400;600;700&display=swap">
+
     <title>Zenbat — Devis BTP</title>
   </head>
   <body>

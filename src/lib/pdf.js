@@ -33,12 +33,26 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
   // Un tick pour laisser le navigateur recalculer le layout du clone
   await new Promise((r) => requestAnimationFrame(() => r()));
 
-  // Attend que les Google Fonts (DM Sans, Playfair, Space Grotesk) soient
-  // réellement chargées avant la capture — sinon html2canvas rasterise avec
-  // les polices système fallback, ce qui donne un rendu "bizarre" dans le PDF.
-  if (document.fonts?.ready) {
-    try { await document.fonts.ready; } catch {}
+  // Force le téléchargement effectif des 3 Google Fonts utilisées dans les
+  // devis / factures AVANT la capture. `document.fonts.ready` seul ne suffit
+  // pas : le navigateur ne télécharge une police qu'à la première utilisation
+  // effective. Si l'utilisateur arrive sur le PDF sans avoir scrollé l'aperçu,
+  // html2canvas rasterise avec la police système fallback (Arial / Helvetica)
+  // → rendu "bizarre" par rapport à l'aperçu HTML.
+  if (document.fonts?.load) {
+    const families = ["DM Sans", "Playfair Display", "Space Grotesk"];
+    const weights  = [400, 600, 700, 800];
+    try {
+      await Promise.all(
+        families.flatMap(f => weights.map(w => document.fonts.load(`${w} 16px "${f}"`))),
+      );
+      if (document.fonts.ready) await document.fonts.ready;
+    } catch {}
   }
+
+  // Deuxième tick : laisse le moteur de rendu appliquer les polices
+  // fraîchement chargées avant la capture.
+  await new Promise((r) => requestAnimationFrame(() => r()));
 
   let canvas;
   try {
