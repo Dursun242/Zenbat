@@ -97,7 +97,7 @@ export default function PDFViewer({ d, cl, brand, onClose, onSendOdoo, sending=f
     <>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12,paddingBottom:10,borderBottom:`2px solid ${navy}`}}>
         <div>
-          {brand.logo && <img src={brand.logo} alt="" style={{height:44,maxWidth:180,objectFit:"contain",display:"block",marginBottom:6}}/>}
+          {brand.logo && <img src={brand.logo} alt="" style={{height:60,maxWidth:220,objectFit:"contain",display:"block",marginBottom:6}}/>}
           {!brand.logo && <div style={{fontWeight:800,fontSize:16,color:navy}}>{brand.companyName||"Votre Entreprise"}</div>}
         </div>
         <div style={{textAlign:"right"}}>

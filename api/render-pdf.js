@@ -253,7 +253,7 @@ function buildHtml({ d, cl, brand, kind = 'devis' }) {
     .map(line => `<div>${escape(line)}</div>`).join('')
 
   const headerLogo = brand.logo
-    ? `<img src="${escape(brand.logo)}" alt="" style="height:44px;max-width:180px;object-fit:contain;display:block;margin-bottom:6px"/>`
+    ? `<img src="${escape(brand.logo)}" alt="" style="height:60px;max-width:220px;object-fit:contain;display:block;margin-bottom:6px"/>`
     : `<div style="font-weight:800;font-size:16px;color:${NAVY}">${escape(brand.companyName || 'Votre Entreprise')}</div>`
 
   const dateLine = kind === 'facture'
