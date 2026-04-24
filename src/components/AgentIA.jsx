@@ -344,7 +344,13 @@ Groupe les ouvrages par lots cohérents, désignations professionnelles en fran�
   };
 
   const send = async (overrideText) => {
-    const payload = (overrideText ?? input).trim();
+    // overrideText est optionnel : il peut être une string fournie par la
+    // puce « Essayer un exemple », ou ne pas être passé. Quand cette
+    // fonction est branchée directement sur onClick={send}, React passe
+    // un SyntheticEvent comme 1er argument → on ignore tout ce qui n'est
+    // pas une string et on retombe sur la valeur du champ texte.
+    const source = typeof overrideText === "string" ? overrideText : input;
+    const payload = source.trim();
     if (!payload || loading) return;
     if (trialExpired) { onPaywall(); return; }
 
