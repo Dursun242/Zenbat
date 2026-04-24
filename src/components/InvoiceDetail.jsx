@@ -8,7 +8,6 @@ export default function InvoiceDetail({ invoice, client, brand, invoices, onBack
   const [showPDF, setShowPDF] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState(null);
-  const [renderFacturX, setRenderFacturX] = useState(false);
   const ac = brand.color || "#22c55e";
 
   const lignes = invoice.lignes || [];
@@ -36,19 +35,16 @@ export default function InvoiceDetail({ invoice, client, brand, invoices, onBack
     }, true);
   };
 
-  const handleFacturX = () => {
+  const handleFacturX = async () => {
     if (!lignes.length) { setExportMsg("Ajoutez au moins une ligne avant d'exporter."); return; }
     setExporting(true); setExportMsg(null);
-    setRenderFacturX(true); // monte le PDFViewer caché, onPdfPageReady fera la suite
-  };
 
-  const onPdfPageReady = async (pageEl) => {
     try {
-      const [{ renderElementToPdf }, { downloadBlob }] = await Promise.all([
-        import("../lib/pdf.js"),
+      const [{ generatePdf }, { downloadBlob }] = await Promise.all([
+        import("../lib/pdfGenerate.js"),
         import("../lib/facturx.js"),
       ]);
-      const { base64 } = await renderElementToPdf(pageEl, { filename: `${invoice.numero}.pdf` });
+      const { base64 } = await generatePdf(asDevisShape, client, brand, { kind: "facture", filename: `${invoice.numero}.pdf` });
 
       // Appelle le serveur pour l'assemblage PDF/A-3 (OutputIntent, XMP, XML embed)
       // Si la facture est un avoir, on transmet les infos de la facture d'origine
@@ -98,7 +94,6 @@ export default function InvoiceDetail({ invoice, client, brand, invoices, onBack
       setExportMsg("❌ Erreur génération Factur-X : " + (err.message || err));
     } finally {
       setExporting(false);
-      setRenderFacturX(false);
     }
   };
 
@@ -123,9 +118,6 @@ export default function InvoiceDetail({ invoice, client, brand, invoices, onBack
       `}</style>
       {showPDF && (
         <PDFViewer d={asDevisShape} cl={client} brand={brand} onClose={() => setShowPDF(false)} kind="facture" noDownload={invoice.statut === "brouillon"}/>
-      )}
-      {renderFacturX && (
-        <PDFViewer d={asDevisShape} cl={client} brand={brand} hidden onPageReady={onPdfPageReady} kind="facture"/>
       )}
       <div className="detail-shell" style={{ background: "#f8fafc", minHeight: "100%", display: "flex", flexDirection: "column" }}>
         <div className="detail-row" style={{ flex: 1, display: "flex" }}>

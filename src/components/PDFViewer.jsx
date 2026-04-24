@@ -7,7 +7,7 @@ const Ix = {
   odoo: <svg width="15" height="15" viewBox="0 0 24 24" fill="#714B67"><circle cx="12" cy="12" r="3"/><circle cx="4" cy="12" r="3"/><circle cx="20" cy="12" r="3"/></svg>,
 }
 
-export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageReady, onSendOdoo, sending=false, sent=false, kind="devis", noDownload=false, inline=false }) {
+export default function PDFViewer({ d, cl, brand, onClose, onSendOdoo, sending=false, sent=false, kind="devis", noDownload=false, inline=false }) {
   const isAvoir  = kind === "facture" && !!d?.avoir_of_invoice_id;
   const docLabel = isAvoir ? "FACTURE D'AVOIR" : kind === "facture" ? "FACTURE" : "DEVIS";
   const MM_TO_PX = 3.7795275591
@@ -15,16 +15,16 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
   const wrapRef = useRef(null)
   const pageRef = useRef(null)
   const [fitScale, setFitScale] = useState(() => {
-    if (hidden || typeof window === "undefined") return 1
+    if (typeof window === "undefined") return 1
     const avail = Math.max(240, window.innerWidth - 32)
     return Math.min(1, avail / A4_PX)
   })
   const [userZoom, setUserZoom] = useState(1)
-  const scale = hidden ? 1 : fitScale * userZoom
+  const scale = fitScale * userZoom
   const [pageH, setPageH] = useState(null)
 
   useEffect(() => {
-    if (hidden || !wrapRef.current) return
+    if (!wrapRef.current) return
     const compute = () => {
       const w = wrapRef.current?.clientWidth || (window.innerWidth - 32)
       setFitScale(Math.min(1, w / A4_PX))
@@ -33,10 +33,10 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
     const ro = new ResizeObserver(compute)
     ro.observe(wrapRef.current)
     return () => ro.disconnect()
-  }, [hidden])
+  }, [])
 
   useEffect(() => {
-    if (hidden || !pageRef.current) return
+    if (!pageRef.current) return
     const measure = () => {
       const h = pageRef.current?.offsetHeight || 0
       setPageH(h * scale)
@@ -44,19 +44,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
     measure()
     const id = setTimeout(measure, 50)
     return () => clearTimeout(id)
-  }, [scale, d.numero, hidden])
-
-  const firedReadyRef = useRef(false)
-  useEffect(() => {
-    if (!onPageReady || !pageRef.current || firedReadyRef.current) return
-    const id = setTimeout(() => {
-      if (pageRef.current && !firedReadyRef.current) {
-        firedReadyRef.current = true
-        onPageReady(pageRef.current)
-      }
-    }, 400)
-    return () => clearTimeout(id)
-  }, [onPageReady])
+  }, [scale, d.numero])
 
   const lignes = d.lignes || []
 
@@ -313,8 +301,8 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
   if (inline) {
     const download = async () => {
       try {
-        const { renderElementToPdf } = await import("../lib/pdf.js")
-        const { blob } = await renderElementToPdf(pageRef.current, { filename: `${d.numero}.pdf` })
+        const { generatePdf } = await import("../lib/pdfGenerate.js")
+        const { blob } = await generatePdf(d, cl, brand, { kind, filename: `${d.numero}.pdf` })
         const url = URL.createObjectURL(blob)
         const a = document.createElement("a")
         a.href = url; a.download = `${d.numero}.pdf`
@@ -341,16 +329,6 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
               {pageBody}
             </div>
           </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (hidden) {
-    return (
-      <div aria-hidden="true" style={{position:"fixed",left:-99999,top:0,pointerEvents:"none",opacity:0}}>
-        <div ref={pageRef} className="pdf-page" style={{background:"white",width:"210mm",padding:"10mm",fontFamily,color:"#1a1a1a",fontSize:11,lineHeight:1.5,boxSizing:"border-box"}}>
-          {pageBody}
         </div>
       </div>
     )
@@ -385,8 +363,8 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
             <button
               onClick={async () => {
                 try {
-                  const { renderElementToPdf } = await import("../lib/pdf.js")
-                  const { blob } = await renderElementToPdf(pageRef.current, { filename: `${d.numero}.pdf` })
+                  const { generatePdf } = await import("../lib/pdfGenerate.js")
+                  const { blob } = await generatePdf(d, cl, brand, { kind, filename: `${d.numero}.pdf` })
                   const url = URL.createObjectURL(blob)
                   const a = document.createElement("a")
                   a.href = url

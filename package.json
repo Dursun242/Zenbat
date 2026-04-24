@@ -10,9 +10,11 @@
     "generate-pwa-assets": "pwa-assets-generator --preset minimal2023 public/icon.svg"
   },
   "dependencies": {
+    "@fontsource/dm-sans": "^5.2.8",
+    "@fontsource/playfair-display": "^5.2.8",
+    "@fontsource/space-grotesk": "^5.2.10",
+    "@react-pdf/renderer": "^4.5.1",
     "@supabase/supabase-js": "^2.103.3",
-    "html2canvas": "^1.4.1",
-    "jspdf": "^2.5.2",
     "pdf-lib": "^1.17.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
