@@ -21,6 +21,12 @@ export default function AdminPanel({ onBack }) {
   const [confirmInput, setConfirmInput] = useState("")
   const [deleting,     setDeleting]     = useState(false)
   const [deleteError,  setDeleteError]  = useState(null)
+  // Drill-down utilisateur
+  const [detailUser,   setDetailUser]   = useState(null)   // entrée du tableau usersDetail
+  const [detailData,   setDetailData]   = useState(null)   // payload renvoyé par /api/admin-user-detail
+  const [detailLoading,setDetailLoading]= useState(false)
+  const [detailError,  setDetailError]  = useState(null)
+  const [detailTab,    setDetailTab]    = useState("overview")
 
   useEffect(() => { if (session) { load(); loadLogs(); loadNegs(); loadConvs() } }, [session?.access_token])
 
@@ -71,6 +77,24 @@ export default function AdminPanel({ onBack }) {
   }
 
   const openDelete = (u) => { setDeleteTarget(u); setConfirmInput(""); setDeleteError(null) }
+
+  const openDetail = async (u) => {
+    setDetailUser(u); setDetailData(null); setDetailError(null)
+    setDetailTab("overview"); setDetailLoading(true)
+    try {
+      const res = await fetch(`/api/admin-user-detail?userId=${encodeURIComponent(u.id)}`, {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || "Erreur serveur")
+      setDetailData(data)
+    } catch (e) {
+      setDetailError(e.message || "Impossible de charger le détail")
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+  const closeDetail = () => { setDetailUser(null); setDetailData(null); setDetailError(null) }
   const closeDelete = () => { if (deleting) return; setDeleteTarget(null); setConfirmInput(""); setDeleteError(null) }
 
   const confirmDelete = async () => {
@@ -257,7 +281,8 @@ export default function AdminPanel({ onBack }) {
             )}
 
             {filteredUsers.map((u, i) => (
-              <div key={u.id} style={{padding:"12px 16px", borderBottom:"1px solid #f8fafc", background:i%2===0?"white":"#fafbfc"}}>
+              <div key={u.id} style={{padding:"12px 16px", borderBottom:"1px solid #f8fafc", background:i%2===0?"white":"#fafbfc", cursor:"pointer"}}
+                onClick={(e) => { if (!e.target.closest("button")) openDetail(u); }}>
                 <div style={{display:"flex", alignItems:"center", gap:8, marginBottom:6}}>
                   <div style={{flex:1, minWidth:0}}>
                     <div style={{fontSize:13, fontWeight:700, color:"#0f172a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
@@ -510,6 +535,229 @@ export default function AdminPanel({ onBack }) {
 
           <div style={{textAlign:"center", fontSize:10, color:"#cbd5e1"}}>
             Données du {fmtD(stats.generatedAt)} à {new Date(stats.generatedAt).toLocaleTimeString("fr-FR")}
+          </div>
+        </div>
+      )}
+
+      {detailUser && (
+        <div onClick={closeDetail}
+          style={{position:"fixed", inset:0, background:"rgba(15,23,42,.65)", backdropFilter:"blur(4px)", display:"flex", alignItems:"flex-end", justifyContent:"center", zIndex:90, animation:"fadeUp .15s ease both"}}>
+          <div onClick={e => e.stopPropagation()}
+            style={{background:"#f8fafc", borderRadius:"20px 20px 0 0", width:"100%", maxWidth:720, maxHeight:"92vh", display:"flex", flexDirection:"column", overflow:"hidden", boxShadow:"0 -20px 60px rgba(0,0,0,.35)"}}>
+
+            {/* Header du drawer */}
+            <div style={{background:"#0f172a", padding:"14px 18px calc(14px + env(safe-area-inset-top)) 18px", display:"flex", alignItems:"center", gap:12, flexShrink:0}}>
+              <button onClick={closeDetail} style={{background:"none", border:"none", color:"#94a3b8", cursor:"pointer", padding:4, display:"flex", alignItems:"center"}}>
+                <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+              <div style={{flex:1, minWidth:0}}>
+                <div style={{color:"white", fontWeight:700, fontSize:15, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
+                  {detailUser.fullName || detailUser.name}
+                </div>
+                <div style={{color:"#64748b", fontSize:10, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{detailUser.email}</div>
+              </div>
+              <span style={{fontSize:9, fontWeight:700, padding:"3px 8px", borderRadius:20, background:detailUser.plan==="pro"?"rgba(34,197,94,.18)":"rgba(148,163,184,.18)", color:detailUser.plan==="pro"?"#4ade80":"#94a3b8", flexShrink:0}}>
+                {detailUser.plan==="pro"?"PRO":"FREE"}
+              </span>
+            </div>
+
+            {/* Tabs */}
+            {detailData && (
+              <div style={{background:"white", borderBottom:"1px solid #e2e8f0", display:"flex", overflowX:"auto", flexShrink:0}}>
+                {[
+                  { k:"overview",  l:"Vue",            n: null },
+                  { k:"devis",     l:"Devis",          n: detailData.stats.devisTotal },
+                  { k:"invoices",  l:"Factures",       n: detailData.stats.invoicesTotal },
+                  { k:"clients",   l:"Clients",        n: detailData.stats.clientsTotal },
+                  { k:"conv",      l:"Conversations",  n: detailData.stats.conversations },
+                  { k:"issues",    l:"Incidents",      n: detailData.stats.errors + detailData.stats.negatives },
+                ].map(t => (
+                  <button key={t.k} onClick={() => setDetailTab(t.k)}
+                    style={{background:"none", border:"none", borderBottom:`2px solid ${detailTab===t.k ? "#22c55e" : "transparent"}`, padding:"10px 14px", fontSize:12, fontWeight:600, color:detailTab===t.k ? "#0f172a" : "#64748b", cursor:"pointer", whiteSpace:"nowrap", flexShrink:0, display:"flex", alignItems:"center", gap:5}}>
+                    {t.l}
+                    {t.n !== null && <span style={{fontSize:9, color:"#94a3b8", fontWeight:500}}>({t.n})</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Body scrollable */}
+            <div style={{flex:1, overflowY:"auto", padding:16}}>
+              {detailLoading && <div style={{padding:40, textAlign:"center", color:"#94a3b8", fontSize:12}}>Chargement…</div>}
+              {detailError && (
+                <div style={{background:"#fef2f2", border:"1px solid #fecaca", borderRadius:10, padding:12, color:"#991b1b", fontSize:12}}>❌ {detailError}</div>
+              )}
+
+              {detailData && detailTab === "overview" && (
+                <div style={{display:"flex", flexDirection:"column", gap:12}}>
+                  <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8}}>
+                    {[
+                      { l:"CA signé",      v:fmtEur(detailData.stats.caAccepte), c:"#0ea5e9" },
+                      { l:"CA en cours",   v:fmtEur(detailData.stats.caEnCours), c:"#f59e0b" },
+                      { l:"Devis",         v:detailData.stats.devisTotal,         c:"#7c3aed" },
+                      { l:"Factures",      v:detailData.stats.invoicesTotal,      c:"#22c55e" },
+                      { l:"Clients",       v:detailData.stats.clientsTotal,       c:"#374151" },
+                      { l:"IA utilisée",   v:`${detailData.stats.aiUsed}×`,       c:"#ec4899" },
+                    ].map(m => (
+                      <div key={m.l} style={{background:"white", borderRadius:10, padding:"10px 12px", boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+                        <div style={{fontSize:10, color:"#94a3b8"}}>{m.l}</div>
+                        <div style={{fontSize:16, fontWeight:800, color:m.c, marginTop:2}}>{m.v}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{background:"white", borderRadius:10, padding:12, fontSize:11, color:"#475569", lineHeight:1.7}}>
+                    <div><strong style={{color:"#0f172a"}}>Inscrit :</strong> {fmtDT(detailData.user.created_at)}</div>
+                    <div><strong style={{color:"#0f172a"}}>Email confirmé :</strong> {detailData.user.confirmed_at ? fmtDT(detailData.user.confirmed_at) : "Non"}</div>
+                    <div><strong style={{color:"#0f172a"}}>Dernière connexion :</strong> {detailData.user.last_sign_in_at ? relTime(detailData.user.last_sign_in_at) : "—"}</div>
+                    {detailData.profile?.company_name && <div><strong style={{color:"#0f172a"}}>Société :</strong> {detailData.profile.company_name}</div>}
+                    {detailData.profile?.brand_data?.trades?.length > 0 && (
+                      <div><strong style={{color:"#0f172a"}}>Métiers :</strong> {detailData.profile.brand_data.trades.join(", ")}</div>
+                    )}
+                    {detailData.profile?.brand_data?.siret && <div><strong style={{color:"#0f172a"}}>SIRET :</strong> {detailData.profile.brand_data.siret}</div>}
+                    {detailData.profile?.brand_data?.city && <div><strong style={{color:"#0f172a"}}>Ville :</strong> {detailData.profile.brand_data.city}</div>}
+                    {detailData.profile?.brand_data?.phone && <div><strong style={{color:"#0f172a"}}>Téléphone :</strong> {detailData.profile.brand_data.phone}</div>}
+                  </div>
+                  {detailData.user.id !== currentUser?.id && (
+                    <button onClick={() => { closeDetail(); openDelete(detailUser); }}
+                      style={{background:"#fef2f2", border:"1px solid #fecaca", color:"#b91c1c", borderRadius:10, padding:"10px", fontSize:12, fontWeight:700, cursor:"pointer"}}>
+                      🗑 Supprimer ce compte définitivement
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {detailData && detailTab === "devis" && (
+                <div style={{display:"flex", flexDirection:"column", gap:8}}>
+                  {detailData.devis.length === 0
+                    ? <div style={{padding:20, textAlign:"center", color:"#94a3b8", fontSize:12}}>Aucun devis.</div>
+                    : detailData.devis.map(d => (
+                      <div key={d.id} style={{background:"white", borderRadius:10, padding:12, boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+                        <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:8}}>
+                          <div style={{fontFamily:"monospace", fontSize:11, color:"#64748b"}}>{d.numero}</div>
+                          <span style={{fontSize:9, padding:"1px 7px", borderRadius:20, background:`${SC[d.statut]||"#94a3b8"}22`, color:SC[d.statut]||"#94a3b8", fontWeight:700}}>{SL[d.statut]||d.statut}</span>
+                        </div>
+                        <div style={{fontSize:13, fontWeight:600, color:"#0f172a", marginTop:4}}>{d.objet || "Sans objet"}</div>
+                        {d.ville_chantier && <div style={{fontSize:10, color:"#94a3b8"}}>{d.ville_chantier}</div>}
+                        <div style={{display:"flex", justifyContent:"space-between", marginTop:6, fontSize:11, color:"#64748b"}}>
+                          <span>{fmtDT(d.date_emission)}</span>
+                          <span style={{fontWeight:700, color:"#0f172a"}}>{fmtEur(d.montant_ht)} HT</span>
+                        </div>
+                        {d.lignes?.length > 0 && (
+                          <details style={{marginTop:8}}>
+                            <summary style={{fontSize:11, color:"#64748b", cursor:"pointer"}}>{d.lignes.filter(l => l.type_ligne==="ouvrage").length} ligne(s)</summary>
+                            <div style={{marginTop:6, fontSize:11, color:"#475569"}}>
+                              {d.lignes.map(l => (
+                                <div key={l.id} style={{padding:"3px 0", borderBottom:"1px solid #f1f5f9", display:"flex", justifyContent:"space-between", gap:8}}>
+                                  <span style={{flex:1, color:l.type_ligne==="lot"?"#0f172a":"#475569", fontWeight:l.type_ligne==="lot"?700:400}}>
+                                    {l.type_ligne==="lot" ? `▸ ${l.designation}` : l.designation}
+                                  </span>
+                                  {l.type_ligne==="ouvrage" && (
+                                    <span style={{flexShrink:0}}>{l.quantite} {l.unite} × {fmtEur(l.prix_unitaire)}</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              {detailData && detailTab === "invoices" && (
+                <div style={{display:"flex", flexDirection:"column", gap:8}}>
+                  {detailData.invoices.length === 0
+                    ? <div style={{padding:20, textAlign:"center", color:"#94a3b8", fontSize:12}}>Aucune facture.</div>
+                    : detailData.invoices.map(inv => (
+                      <div key={inv.id} style={{background:"white", borderRadius:10, padding:12, boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+                        <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:8}}>
+                          <div style={{fontFamily:"monospace", fontSize:11, color:"#64748b"}}>{inv.numero}{inv.avoir_of_invoice_id ? " · avoir" : ""}</div>
+                          <div style={{display:"flex", gap:4}}>
+                            {inv.locked && <span style={{fontSize:9, padding:"1px 6px", borderRadius:20, background:"#fef3c7", color:"#92400e", fontWeight:700}}>🔒</span>}
+                            <span style={{fontSize:9, padding:"1px 7px", borderRadius:20, background:"#f1f5f9", color:"#475569", fontWeight:700}}>{inv.statut}</span>
+                          </div>
+                        </div>
+                        <div style={{fontSize:13, fontWeight:600, color:"#0f172a", marginTop:4}}>{inv.objet || "Sans objet"}</div>
+                        <div style={{display:"flex", justifyContent:"space-between", marginTop:6, fontSize:11, color:"#64748b"}}>
+                          <span>{fmtDT(inv.date_emission)}</span>
+                          <span style={{fontWeight:700, color:"#0f172a"}}>{fmtEur(inv.montant_ht)} HT · {fmtEur(inv.montant_ttc)} TTC</span>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              {detailData && detailTab === "clients" && (
+                <div style={{display:"flex", flexDirection:"column", gap:8}}>
+                  {detailData.clients.length === 0
+                    ? <div style={{padding:20, textAlign:"center", color:"#94a3b8", fontSize:12}}>Aucun client.</div>
+                    : detailData.clients.map(c => (
+                      <div key={c.id} style={{background:"white", borderRadius:10, padding:12, boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+                        <div style={{fontSize:13, fontWeight:700, color:"#0f172a"}}>
+                          {c.raison_sociale || `${c.prenom||""} ${c.nom||""}`.trim() || "—"}
+                        </div>
+                        <div style={{fontSize:11, color:"#64748b", marginTop:2}}>
+                          {c.email || "—"}{c.telephone ? ` · ${c.telephone}` : ""}
+                        </div>
+                        <div style={{fontSize:10, color:"#94a3b8", marginTop:2}}>
+                          {[c.ville, c.type==="entreprise"?"Entreprise":"Particulier"].filter(Boolean).join(" · ")}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              {detailData && detailTab === "conv" && (
+                <div style={{display:"flex", flexDirection:"column", gap:8}}>
+                  {detailData.conversations.length === 0
+                    ? <div style={{padding:20, textAlign:"center", color:"#94a3b8", fontSize:12}}>Aucune conversation.</div>
+                    : detailData.conversations.map(turn => (
+                      <div key={turn.id} style={{display:"flex", flexDirection:"column", gap:4}}>
+                        {turn.user_message && (
+                          <div style={{alignSelf:"flex-end", maxWidth:"88%", background:"#0f172a", color:"white", borderRadius:"12px 12px 3px 12px", padding:"7px 11px", fontSize:12, lineHeight:1.5, wordBreak:"break-word"}}>{turn.user_message}</div>
+                        )}
+                        {turn.ai_response && (
+                          <div style={{alignSelf:"flex-start", maxWidth:"88%", background:"white", color:"#1e293b", border:"1px solid #f1f5f9", borderRadius:"12px 12px 12px 3px", padding:"7px 11px", fontSize:12, lineHeight:1.5, wordBreak:"break-word"}}>
+                            {turn.ai_response}
+                            {turn.had_devis && <span style={{display:"inline-block", marginLeft:6, fontSize:9, padding:"1px 6px", borderRadius:10, background:"rgba(34,197,94,.12)", color:"#15803d", fontWeight:700}}>devis ✓</span>}
+                          </div>
+                        )}
+                        <div style={{fontSize:9, color:"#cbd5e1", alignSelf:"center"}}>
+                          {fmtDT(turn.created_at)} · {new Date(turn.created_at).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              {detailData && detailTab === "issues" && (
+                <div style={{display:"flex", flexDirection:"column", gap:12}}>
+                  <div>
+                    <div style={{fontSize:11, fontWeight:700, color:"#94a3b8", letterSpacing:"0.5px", textTransform:"uppercase", marginBottom:6}}>Erreurs IA ({detailData.errors.length})</div>
+                    {detailData.errors.length === 0 ? <div style={{fontSize:11, color:"#94a3b8"}}>Aucune erreur 🎉</div> : detailData.errors.map(e => (
+                      <div key={e.id} style={{background:"white", borderRadius:10, padding:"8px 12px", marginBottom:6, boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+                        <div style={{fontSize:11, color:"#b91c1c", fontFamily:"ui-monospace,monospace", wordBreak:"break-word"}}>{e.error}</div>
+                        {e.user_message && <div style={{fontSize:10, color:"#64748b", marginTop:3, fontStyle:"italic"}}>« {e.user_message.slice(0,200)}{e.user_message.length>200?"…":""} »</div>}
+                        <div style={{fontSize:9, color:"#94a3b8", marginTop:3}}>{fmtDT(e.created_at)}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <div style={{fontSize:11, fontWeight:700, color:"#94a3b8", letterSpacing:"0.5px", textTransform:"uppercase", marginBottom:6}}>Réponses négatives ({detailData.negatives.length})</div>
+                    {detailData.negatives.length === 0 ? <div style={{fontSize:11, color:"#94a3b8"}}>Aucun signal négatif.</div> : detailData.negatives.map(n => (
+                      <div key={n.id} style={{background:"white", borderRadius:10, padding:"8px 12px", marginBottom:6, boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+                        <span style={{fontSize:9, fontWeight:700, padding:"2px 7px", borderRadius:20, background:n.kind==="ai_refusal"?"#f1f5f9":"#fef2f2", color:n.kind==="ai_refusal"?"#475569":"#b91c1c"}}>
+                          {n.kind==="ai_refusal"?"Refus IA":"Usager mécontent"}
+                        </span>
+                        {n.user_message && <div style={{fontSize:11, color:"#0f172a", marginTop:4}}>« {n.user_message.slice(0,200)}{n.user_message.length>200?"…":""} »</div>}
+                        {n.ai_response && <div style={{fontSize:11, color:"#64748b", marginTop:2, fontStyle:"italic"}}>{n.ai_response.slice(0,200)}{n.ai_response.length>200?"…":""}</div>}
+                        <div style={{fontSize:9, color:"#94a3b8", marginTop:3}}>{fmtDT(n.created_at)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
