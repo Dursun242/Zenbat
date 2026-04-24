@@ -174,6 +174,8 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   const celebrateStartRef = useRef(null);
   const celebrateSecondsRef = useRef(0);
   const [micError,     setMicError]     = useState(null);
+  const [editing,      setEditing]      = useState(null);   // { id, field }
+  const [editingObjet, setEditingObjet] = useState(false);
   const chatRef  = useRef(null);
   const inputRef = useRef(null);
   const recRef   = useRef(null);
@@ -666,6 +668,15 @@ Groupe les ouvrages par lots cohérents, désignations professionnelles en fran�
 
   const deleteLigne = id => setLignes(l => l.filter(x => x.id !== id));
 
+  const updateLigne = (id, field, val) =>
+    setLignes(prev => prev.map(l => l.id === id ? { ...l, [field]: val } : l));
+
+  const addLigne = () => {
+    const l = { id: uid(), type_ligne: "ouvrage", designation: "Nouvelle prestation", unite: "u", quantite: 1, prix_unitaire: 0, tva_rate: brand.vatRegime === "franchise" ? 0 : 20 };
+    setLignes(prev => [...prev, l]);
+    setEditing({ id: l.id, field: "designation" });
+  };
+
   const finalizeSave = (clientId) => {
     const ht2     = lignes.filter(l => l.type_ligne === "ouvrage").reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0), 0);
     const picked  = clientId ? clients.find(c => c.id === clientId) : null;
@@ -724,8 +735,15 @@ Groupe les ouvrages par lots cohérents, désignations professionnelles en fran�
         {/* Objet du devis */}
         {objet && (
           <div style={{ background: "#0f172a", padding: "6px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontFamily, color: "rgba(255,255,255,.9)", fontSize: 12, fontWeight: 600 }}>{objet}</span>
-            <span style={{ color: "#64748b", fontSize: 10 }}>{lignes.filter(l => l.type_ligne === "ouvrage").length} ligne{lignes.filter(l => l.type_ligne === "ouvrage").length > 1 ? "s" : ""}</span>
+            {editingObjet
+              ? <input autoFocus defaultValue={objet}
+                  onBlur={e => { setObjet(e.target.value.trim() || objet); setEditingObjet(false); }}
+                  onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEditingObjet(false); }}
+                  style={{ flex: 1, fontFamily, fontSize: 12, fontWeight: 600, color: "#0f172a", background: "white", border: "none", outline: "none", borderRadius: 4, padding: "2px 6px" }} />
+              : <span onClick={() => setEditingObjet(true)} title="Cliquer pour modifier"
+                  style={{ fontFamily, color: "rgba(255,255,255,.9)", fontSize: 12, fontWeight: 600, cursor: "text", flex: 1 }}>{objet}</span>
+            }
+            <span style={{ color: "#64748b", fontSize: 10, marginLeft: 8, flexShrink: 0 }}>{lignes.filter(l => l.type_ligne === "ouvrage").length} ligne{lignes.filter(l => l.type_ligne === "ouvrage").length > 1 ? "s" : ""}</span>
           </div>
         )}
 
@@ -761,7 +779,14 @@ Groupe les ouvrages par lots cohérents, désignations professionnelles en fran�
                   return (
                     <tr key={l.id} style={{ borderBottom: "1px solid #f8fafc", animation: "rowPop .3s cubic-bezier(.34,1.3,.64,1) both", animationDelay: `${idx * 0.06}s` }}>
                       <td style={{ padding: "8px 14px" }}>
-                        <div style={{ fontSize: 12, fontWeight: 500, color: "#1e293b", fontFamily }}>{l.designation}</div>
+                        {editing?.id === l.id && editing?.field === "designation"
+                          ? <input autoFocus defaultValue={l.designation}
+                              onBlur={e => { updateLigne(l.id, "designation", e.target.value.trim() || l.designation); setEditing(null); }}
+                              onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEditing(null); }}
+                              style={{ fontSize: 12, fontWeight: 500, color: "#1e293b", width: "100%", border: "none", outline: `2px solid ${ac}`, borderRadius: 4, padding: "2px 4px", background: "#f0fdf4", fontFamily }} />
+                          : <div onClick={() => setEditing({ id: l.id, field: "designation" })} title="Cliquer pour modifier"
+                              style={{ fontSize: 12, fontWeight: 500, color: "#1e293b", fontFamily, cursor: "text" }}>{l.designation}</div>
+                        }
                         <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 1, display: "flex", alignItems: "center", gap: 6 }}>
                           <span>{l.unite}</span>
                           <button
@@ -779,8 +804,24 @@ Groupe les ouvrages par lots cohérents, désignations professionnelles en fran�
                           </button>
                         </div>
                       </td>
-                      <td style={{ padding: "8px", textAlign: "right", fontSize: 12, color: "#374151", fontWeight: 600 }}>{l.quantite}</td>
-                      <td style={{ padding: "8px", textAlign: "right", fontSize: 11, color: "#64748b" }}>{fmt(l.prix_unitaire)}</td>
+                      <td style={{ padding: "8px", textAlign: "right", fontSize: 12, color: "#374151", fontWeight: 600 }}>
+                        {editing?.id === l.id && editing?.field === "quantite"
+                          ? <input autoFocus type="number" defaultValue={l.quantite} min="0"
+                              onBlur={e => { updateLigne(l.id, "quantite", parseFloat(e.target.value) || 0); setEditing(null); }}
+                              onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEditing(null); }}
+                              style={{ width: 50, textAlign: "right", border: "none", outline: `2px solid ${ac}`, borderRadius: 4, fontSize: 12, fontWeight: 600, color: "#374151", background: "#f0fdf4", padding: "2px 4px" }} />
+                          : <span onClick={() => setEditing({ id: l.id, field: "quantite" })} title="Cliquer pour modifier" style={{ cursor: "text" }}>{l.quantite}</span>
+                        }
+                      </td>
+                      <td style={{ padding: "8px", textAlign: "right", fontSize: 11, color: "#64748b" }}>
+                        {editing?.id === l.id && editing?.field === "prix"
+                          ? <input autoFocus type="number" defaultValue={l.prix_unitaire} min="0" step="0.01"
+                              onBlur={e => { updateLigne(l.id, "prix_unitaire", parseFloat(e.target.value) || 0); setEditing(null); }}
+                              onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEditing(null); }}
+                              style={{ width: 65, textAlign: "right", border: "none", outline: `2px solid ${ac}`, borderRadius: 4, fontSize: 11, color: "#64748b", background: "#f0fdf4", padding: "2px 4px" }} />
+                          : <span onClick={() => setEditing({ id: l.id, field: "prix" })} title="Cliquer pour modifier" style={{ cursor: "text" }}>{fmt(l.prix_unitaire)}</span>
+                        }
+                      </td>
                       <td style={{ padding: "8px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: "#0f172a" }}>{fmt(total)}</td>
                       <td style={{ padding: "4px" }}>
                         <button onClick={() => deleteLigne(l.id)}
@@ -791,6 +832,18 @@ Groupe les ouvrages par lots cohérents, désignations professionnelles en fran�
                     </tr>
                   );
                 })}
+
+                {/* Bouton ajouter une ligne manuelle */}
+                {visibleCount >= lignes.length && lignes.length > 0 && (
+                  <tr>
+                    <td colSpan={5} style={{ padding: "4px 14px 8px" }}>
+                      <button onClick={addLigne}
+                        style={{ background: "none", border: `1px dashed ${ac}44`, borderRadius: 8, padding: "5px 14px", fontSize: 11, color: ac, cursor: "pointer", width: "100%", fontWeight: 600 }}>
+                        + Ajouter une ligne
+                      </button>
+                    </td>
+                  </tr>
+                )}
 
                 {/* Indicateur d'ajout en cours */}
                 {visibleCount < lignes.length && (
