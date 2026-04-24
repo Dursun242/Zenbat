@@ -21,6 +21,7 @@ import InvoiceDetail from "./components/InvoiceDetail.jsx";
 import AgentIA     from "./components/AgentIA.jsx";
 import AdminPanel  from "./components/AdminPanel.jsx";
 import Onboarding       from "./pages/Onboarding.jsx";
+import TradesQuickPicker from "./pages/TradesQuickPicker.jsx";
 import AuthScreen       from "./pages/AuthScreen.jsx";
 import PaywallScreen    from "./pages/PaywallScreen.jsx";
 import PWAInstallScreen from "./pages/PWAInstallScreen.jsx";
@@ -409,7 +410,19 @@ export default function App() {
   const activeNav = NAV.find(n => tab.startsWith(n.id))?.id || "dashboard";
 
   // ── Écrans hors dashboard ─────────────────────────────────
-  if (screen === "auth")       return <AuthScreen onEnter={(co, isSignup) => { setBrand(b => ({ ...b, companyName: co || "" })); setShowPwa(!!isSignup); setScreen("onboarding"); }}/>;
+  if (screen === "auth") return <AuthScreen onEnter={(co, isSignup) => {
+    setBrand(b => ({ ...b, companyName: co || "" }));
+    setShowPwa(!!isSignup);
+    // Nouveau parcours : signup → mini-étape "métiers" → (pwa) → app.
+    // Login existant (isSignup=false) → directement app.
+    setScreen(isSignup ? "trades_picker" : "app");
+  }}/>;
+  if (screen === "trades_picker") return <TradesQuickPicker
+    brand={brand}
+    setBrand={setBrand}
+    onDone={() => setScreen(showPwa ? "pwa_install" : "app")}
+    onSkip={() => setScreen(showPwa ? "pwa_install" : "app")}
+  />;
   if (screen === "onboarding") return <Onboarding brand={brand} setBrand={setBrand} onDone={() => setScreen(showPwa ? "pwa_install" : "app")}/>;
   if (screen === "pwa_install") return <PWAInstallScreen deferredPrompt={deferredPrompt.current} onDone={() => { setShowPwa(false); setScreen("app"); }}/>;
   if (screen === "paywall")    return <PaywallScreen daysLeft={daysLeft} onBack={() => setScreen("app")} onSubscribe={() => { setPlan("pro"); setScreen("app"); }}/>;
