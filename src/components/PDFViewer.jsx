@@ -83,7 +83,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
   }))
   const tva = tvaRows.reduce((s, row) => s + row.montant, 0)
   const ttc = ht + tva
-  const fontFamily = brand.fontStyle==="elegant"?"Playfair Display":brand.fontStyle==="tech"?"Space Grotesk":"DM Sans"
+  const fontFamily = brand.fontStyle==="elegant"?"'Playfair Display', Georgia, serif":brand.fontStyle==="tech"?"'Space Grotesk', system-ui, sans-serif":"'DM Sans', system-ui, sans-serif"
   const navy = "#1e3a5f"
   const baseDate = d.date_emission ? new Date(d.date_emission) : new Date()
   const validUntil = isNaN(baseDate.getTime()) ? new Date() : baseDate

@@ -74,23 +74,14 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
   // fraîchement chargées avant la capture.
   await new Promise((r) => requestAnimationFrame(() => r()));
 
-  // Mode canvas classique : html2canvas parse le DOM et dessine lui-même.
-  // Les polices personnalisées (DM Sans / Playfair / Space Grotesk) ne rendent
-  // pas correctement via html2canvas même avec préchargement. On force les
-  // polices système qui sont stables et nettes en rasterisation.
+  // Les polices Google (DM Sans / Playfair / Space Grotesk) sont préchargées
+  // dans index.html et la boucle ci-dessus a forcé leur téléchargement effectif.
+  // On laisse html2canvas rasteriser avec les vraies polices : sinon les métriques
+  // système (Arial/Helvetica) sont plus larges que DM Sans, le texte ne s'enroule
+  // pas pareil et l'utilisateur voit un PDF avec des polices "trop grandes" par
+  // rapport à l'aperçu.
   let canvas;
   try {
-    // Force l'utilisation de polices système pour le rendu PDF
-    clone.style.fontFamily = "'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
-    // Remplace aussi les polices spécifiques du DOM pour la cohérence
-    const allText = clone.querySelectorAll("*");
-    allText.forEach((el) => {
-      const fontFamily = window.getComputedStyle(el).fontFamily;
-      if (fontFamily.includes("Playfair") || fontFamily.includes("DM Sans") || fontFamily.includes("Space Grotesk")) {
-        el.style.fontFamily = "'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
-      }
-    });
-
     canvas = await html2canvas(clone, {
       scale: 4,               // 380dpi-ish en A4 pour une meilleure netteté texte
       useCORS: true,
