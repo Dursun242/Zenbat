@@ -14,6 +14,7 @@ import Logo        from "./components/ui/Logo.jsx";
 import { I }       from "./components/ui/icons.jsx";
 import Toast       from "./components/app/Toast.jsx";
 import BottomNav   from "./components/app/BottomNav.jsx";
+import SearchBar   from "./components/app/SearchBar.jsx";
 import SaveIndicator from "./components/app/SaveIndicator.jsx";
 import Dashboard   from "./components/Dashboard.jsx";
 import ClientsList from "./components/ClientsList.jsx";
@@ -539,6 +540,7 @@ export default function App() {
 
         {/* Contenu principal */}
         <div className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "64px" }}>
+        <SearchBar devis={devis} clients={clients} invoices={invoices} goDevis={goDevis} goClient={goClient} goInvoice={goInvoice}/>
         {tab === "dashboard"     && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}
                                        onOpenProfile={() => setScreen("onboarding")}
                                        onOpenPWAInstall={() => setScreen("pwa_install")}/>}
