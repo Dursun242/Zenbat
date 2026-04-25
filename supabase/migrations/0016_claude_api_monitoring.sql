@@ -7,12 +7,10 @@ create table if not exists public.claude_api_logs (
   use_case text, -- "devis" ou "contact"
   input_tokens integer,
   output_tokens integer,
-  total_tokens integer as (input_tokens + output_tokens) stored,
   latency_ms integer,
   status_code integer,
   error_message text,
-  stream_enabled boolean default false,
-  success boolean as (status_code = 200 or status_code is null) stored
+  stream_enabled boolean default false
 );
 
 -- Index pour requêtes rapides
@@ -26,8 +24,8 @@ create index if not exists claude_api_logs_use_case_idx
   on public.claude_api_logs(use_case, created_at desc);
 
 create index if not exists claude_api_logs_error_idx
-  on public.claude_api_logs(success, created_at desc)
-  where success = false;
+  on public.claude_api_logs(status_code, created_at desc)
+  where status_code != 200;
 
 -- RLS : lecture admin uniquement
 alter table public.claude_api_logs enable row level security;
