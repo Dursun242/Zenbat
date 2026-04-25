@@ -63,7 +63,7 @@ function need(pdf, y, h) {
 }
 
 // Charge n'importe quelle image (JPEG, PNG, WebP, SVG…) et la retourne
-// en data URL PNG via un canvas — seul format fiable pour jsPDF addImage.
+// en PNG via canvas + dimensions naturelles pour respecter les proportions.
 async function loadImgAsPng(url) {
   try {
     const blob = await fetch(url, { mode: "cors" }).then(r => r.ok ? r.blob() : null);
@@ -74,11 +74,12 @@ async function loadImgAsPng(url) {
       img.crossOrigin = "anonymous";
       img.onload = () => {
         try {
+          const w = img.naturalWidth  || img.width  || 180;
+          const h = img.naturalHeight || img.height || 60;
           const canvas = document.createElement("canvas");
-          canvas.width  = img.naturalWidth  || img.width  || 180;
-          canvas.height = img.naturalHeight || img.height || 60;
+          canvas.width = w; canvas.height = h;
           canvas.getContext("2d").drawImage(img, 0, 0);
-          resolve(canvas.toDataURL("image/png"));
+          resolve({ dataUrl: canvas.toDataURL("image/png"), w, h });
         } catch { resolve(null); }
         URL.revokeObjectURL(objectUrl);
       };
@@ -142,10 +143,14 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
   // ── Header ────────────────────────────────────────────────────────────────
   // Logo
   if (brand.logo) {
-    const imgPng = await loadImgAsPng(brand.logo);
-    if (imgPng) {
-      // max ≈47mm wide × ≈12mm tall (proportions préservées via canvas)
-      pdf.addImage(imgPng, "PNG", X, y, 44, 11.6, undefined, "FAST");
+    const img = await loadImgAsPng(brand.logo);
+    if (img) {
+      // Proportions d'origine préservées, bornes max : 50mm wide × 14mm tall
+      const MAX_W = 50, MAX_H = 14;
+      const aspect = img.w / img.h;
+      let dw = MAX_W, dh = dw / aspect;
+      if (dh > MAX_H) { dh = MAX_H; dw = dh * aspect; }
+      pdf.addImage(img.dataUrl, "PNG", X, y, dw, dh, undefined, "FAST");
     } else {
       txt(pdf, brand.companyName || "Votre Entreprise", X, y + 5, { size: 13, bold: true, color: NAVY });
     }
