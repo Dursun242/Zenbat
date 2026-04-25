@@ -81,17 +81,22 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
 
   let canvas;
   try {
+    // foreignObjectRendering: true = texte vectoriel SVG (pixel-parfait, identique à l'aperçu)
     canvas = await html2canvas(clone, {
-      scale: 3,               // 3× pour netteté + performance (les fonts seront vectorielles)
+      scale: 2,                       // 2× pour bonne qualité (SVG vectoriel, pas de perte)
       useCORS: true,
       allowTaint: true,
       backgroundColor: "#ffffff",
       logging: false,
       imageTimeout: 20000,
-      windowWidth: cloneWidth,   // Utilise la taille réelle du contenu
+      windowWidth: cloneWidth,        // Taille réelle du contenu
       windowHeight: cloneHeight,
-      useForeignObjectRendering: true, // Rend le texte en SVG (vectoriel, fonts parfaites)
+      useForeignObjectRendering: true, // ✅ Rend en SVG vectoriel = fonts parfaites
       removeContainer: true,
+      ignoreElements: (el) => {
+        // Ignore les éléments qui ne doivent pas apparaître en PDF
+        return el.className?.includes?.("no-pdf");
+      },
     });
   } finally {
     if (clone.parentNode) clone.parentNode.removeChild(clone);
@@ -150,62 +155,3 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
   return { blob, base64: dataUri.split(",")[1] || "", filename };
 }
 
-// Génère un PDF côté serveur via Puppeteer (meilleure qualité que html2canvas).
-// Fallback automatique à renderElementToPdf si le serveur échoue.
-export async function generatePdfOnServer(el, { filename = "document.pdf" } = {}) {
-  if (!el) throw new Error("Élément cible introuvable pour le rendu PDF.");
-
-  try {
-    // Clone et optimise le HTML pour Puppeteer (retire les éléments inutiles)
-    const clone = el.cloneNode(true);
-
-    // Retire les animations/transitions pour accélération
-    const style = document.createElement("style");
-    style.textContent = `
-      * {
-        animation: none !important;
-        transition: none !important;
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-      }
-      @media print { * { box-shadow: none !important; } }
-    `;
-    clone.insertBefore(style, clone.firstChild);
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <style>
-            body { margin: 0; padding: 0; background: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif; }
-            @page { size: A4; margin: 0; }
-          </style>
-        </head>
-        <body>
-          ${clone.outerHTML}
-        </body>
-      </html>
-    `;
-
-    // Envoie à l'API Puppeteer
-    const response = await fetch("/api/generate-pdf", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ html, filename }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Server error: ${response.status}`);
-    }
-
-    // Récupère le PDF
-    const blob = await response.blob();
-    return { blob, filename };
-  } catch (err) {
-    // Fallback : utilise html2canvas côté client
-    console.warn("[generatePdfOnServer] Fallback to client-side rendering:", err.message);
-    return renderElementToPdf(el, { filename });
-  }
-}

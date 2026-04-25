@@ -315,8 +315,8 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
     const download = async () => {
       setGeneratingPdf(true)
       try {
-        const { generatePdfOnServer } = await import("../lib/pdf.js")
-        const { blob } = await generatePdfOnServer(pageRef.current, { filename: `${d.numero}.pdf` })
+        const { renderElementToPdf } = await import("../lib/pdf.js")
+        const { blob } = await renderElementToPdf(pageRef.current, { filename: `${d.numero}.pdf` })
         const url = URL.createObjectURL(blob)
         const a = document.createElement("a")
         a.href = url; a.download = `${d.numero}.pdf`
@@ -389,8 +389,8 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
               onClick={async () => {
                 setGeneratingPdf(true)
                 try {
-                  const { generatePdfOnServer } = await import("../lib/pdf.js")
-                  const { blob } = await generatePdfOnServer(pageRef.current, { filename: `${d.numero}.pdf` })
+                  const { renderElementToPdf } = await import("../lib/pdf.js")
+                  const { blob } = await renderElementToPdf(pageRef.current, { filename: `${d.numero}.pdf` })
                   const url = URL.createObjectURL(blob)
                   const a = document.createElement("a")
                   a.href = url
