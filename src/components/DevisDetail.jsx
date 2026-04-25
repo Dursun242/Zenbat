@@ -6,12 +6,11 @@ import LignesEditor from "./LignesEditor.jsx";
 import PDFViewer from "./PDFViewer.jsx";
 
 export default function DevisDetail({ d, cl, onBack, brand, onChange, onConvertToInvoice, loading, autoOpenPDF, onAutoOpenPDFConsumed }) {
-  const [showPDF,       setShowPDF]       = useState(false);
-  const [sending,       setSending]       = useState(false);
-  const [signUrl,       setSignUrl]       = useState(d?.odoo_sign_url || null);
-  const [log,           setLog]           = useState([]);
-  const [showLog,       setShowLog]       = useState(false);
-  const [odooRendering, setOdooRendering] = useState(false);
+  const [showPDF,  setShowPDF]  = useState(false);
+  const [sending,  setSending]  = useState(false);
+  const [signUrl,  setSignUrl]  = useState(d?.odoo_sign_url || null);
+  const [log,      setLog]      = useState([]);
+  const [showLog,  setShowLog]  = useState(false);
 
   // Ouvre automatiquement le PDF quand on arrive depuis l'Agent IA après save
   useEffect(() => {
@@ -47,13 +46,9 @@ export default function DevisDetail({ d, cl, onBack, brand, onChange, onConvertT
     }
     setSending(true); setLog([]); setShowLog(true);
     addLog("Préparation du PDF…");
-    setOdooRendering(true);
-  };
-
-  const onPdfPageReady = async (pageEl) => {
     try {
-      const { renderElementToPdf } = await import("../lib/pdf.js");
-      const { base64 } = await renderElementToPdf(pageEl, { filename: `${d.numero}.pdf` });
+      const { renderDataToPdf } = await import("../lib/pdf.js");
+      const { base64 } = await renderDataToPdf(d, cl, brand, "devis", { filename: `${d.numero}.pdf` });
       addLog("✓ PDF généré");
       addLog("Envoi vers Odoo Sign…");
       const res = await fetch("/api/odoo-sign", {
@@ -82,7 +77,6 @@ export default function DevisDetail({ d, cl, onBack, brand, onChange, onConvertT
     } catch (err) {
       addLog(`❌ ${err.message || err}`);
     } finally {
-      setOdooRendering(false);
       setSending(false);
     }
   };
@@ -109,10 +103,6 @@ export default function DevisDetail({ d, cl, onBack, brand, onChange, onConvertT
           sending={sending}
           sent={!!signUrl || d.statut === "en_signature"}/>
       )}
-      {odooRendering && (
-        <PDFViewer d={d} cl={cl} brand={brand} hidden onPageReady={onPdfPageReady}/>
-      )}
-
       <div className="detail-shell" style={{ minHeight: "100%", background: "#f8fafc", display: "flex", flexDirection: "column" }}>
         <div className="detail-row" style={{ flex: 1, display: "flex" }}>
           <div className="detail-editor fu" style={{ flex: 1, minWidth: 0 }}>
