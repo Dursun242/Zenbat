@@ -22,6 +22,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
   const [userZoom, setUserZoom] = useState(1)
   const scale = hidden ? 1 : fitScale * userZoom
   const [pageH, setPageH] = useState(null)
+  const [generatingPdf, setGeneratingPdf] = useState(false)
 
   useEffect(() => {
     if (hidden || !wrapRef.current) return
@@ -312,6 +313,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
 
   if (inline) {
     const download = async () => {
+      setGeneratingPdf(true)
       try {
         const { generatePdfOnServer } = await import("../lib/pdf.js")
         const { blob } = await generatePdfOnServer(pageRef.current, { filename: `${d.numero}.pdf` })
@@ -321,6 +323,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
         document.body.appendChild(a); a.click(); document.body.removeChild(a)
         setTimeout(() => URL.revokeObjectURL(url), 3000)
       } catch (e) { alert("Impossible de générer le PDF : " + (e.message || e)) }
+      finally { setGeneratingPdf(false) }
     }
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -384,6 +387,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
           {!noDownload && (
             <button
               onClick={async () => {
+                setGeneratingPdf(true)
                 try {
                   const { generatePdfOnServer } = await import("../lib/pdf.js")
                   const { blob } = await generatePdfOnServer(pageRef.current, { filename: `${d.numero}.pdf` })
@@ -399,9 +403,13 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
                   console.error("[pdf download]", e)
                   alert("Impossible de générer le PDF : " + (e.message || e))
                 }
+                finally { setGeneratingPdf(false) }
               }}
+              disabled={generatingPdf}
               title="Télécharger le PDF"
-              style={{background:"#22c55e",color:"white",border:"none",borderRadius:10,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>⬇</button>
+              style={{background:generatingPdf?"#9ca3af":"#22c55e",color:"white",border:"none",borderRadius:10,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:generatingPdf?"default":"pointer"}}>
+              {generatingPdf ? "⏳" : "⬇"}
+            </button>
           )}
           <button onClick={onClose} style={{background:"#1e293b",color:"#94a3b8",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer"}}>{Ix.x}</button>
         </div>
@@ -427,6 +435,17 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
                 : <>{Ix.odoo} Envoyer en signature Odoo Sign</>
             }
           </button>
+        </div>
+      )}
+
+      {/* Loader overlay pendant la génération du PDF */}
+      {generatingPdf && (
+        <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300}}>
+          <div style={{background:"white",borderRadius:12,padding:"24px 32px",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,.3)"}}>
+            <div style={{display:"inline-block",width:32,height:32,border:"3px solid #e5e7eb",borderTopColor:"#22c55e",borderRadius:"50%",animation:"spin 1s linear infinite",marginBottom:16}}/>
+            <p style={{fontSize:14,fontWeight:600,color:"#0f172a",margin:"12px 0 4px"}}>Génération du PDF en cours…</p>
+            <p style={{fontSize:12,color:"#64748b"}}>Cela peut prendre quelques secondes</p>
+          </div>
         </div>
       )}
     </div>

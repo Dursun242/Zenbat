@@ -34,14 +34,35 @@ export default async function handler(req, res) {
     const page = await browser.newPage();
     await page.setViewport({ width: 793, height: 1122 });
 
-    // Injecter le HTML et attendre que tout charge
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    // Désactive les animations/transitions pour plus rapidité
+    await page.addStyleTag({
+      content: `
+        * {
+          animation: none !important;
+          transition: none !important;
+        }
+      `,
+    });
 
-    // Générer le PDF
+    // Injecter le HTML avec timeout générique
+    await page.setContent(html, {
+      waitUntil: ["domcontentloaded", "networkidle2"],
+      timeout: 30000,
+    });
+
+    // Attendre que les fonts se chargent
+    try {
+      await page.evaluateHandle("document.fonts.ready");
+    } catch (e) {
+      // Ignore si fonts.ready n'est pas disponible
+    }
+
+    // Générer le PDF avec marges zéro pour maximum fidélité
     const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
       margin: { top: 0, right: 0, bottom: 0, left: 0 },
+      preferCSSPageSize: true, // Respecte le CSS page size si défini
     });
 
     await browser.close();
@@ -49,6 +70,7 @@ export default async function handler(req, res) {
     // Retourner le PDF
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Cache-Control", "public, max-age=3600"); // Cache 1h
     res.send(pdfBuffer);
   } catch (error) {
     console.error("[generate-pdf] Error:", error);
