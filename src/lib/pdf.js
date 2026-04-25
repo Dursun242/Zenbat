@@ -74,25 +74,10 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
   // fraîchement chargées avant la capture.
   await new Promise((r) => requestAnimationFrame(() => r()));
 
-  // Mode canvas classique : html2canvas parse le DOM et dessine lui-même.
-  // Les polices personnalisées (DM Sans / Playfair / Space Grotesk) ne rendent
-  // pas correctement via html2canvas même avec préchargement. On force les
-  // polices système qui sont stables et nettes en rasterisation.
   let canvas;
   try {
-    // Force l'utilisation de polices système pour le rendu PDF
-    clone.style.fontFamily = "'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
-    // Remplace aussi les polices spécifiques du DOM pour la cohérence
-    const allText = clone.querySelectorAll("*");
-    allText.forEach((el) => {
-      const fontFamily = window.getComputedStyle(el).fontFamily;
-      if (fontFamily.includes("Playfair") || fontFamily.includes("DM Sans") || fontFamily.includes("Space Grotesk")) {
-        el.style.fontFamily = "'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
-      }
-    });
-
     canvas = await html2canvas(clone, {
-      scale: 4,               // 380dpi-ish en A4 pour une meilleure netteté texte
+      scale: 5,               // 5× pour une netteté maximale (470dpi-ish)
       useCORS: true,
       allowTaint: true,       // Tolère les images sans CORS (fallback si image externe bloquée)
       backgroundColor: "#ffffff",
@@ -100,6 +85,7 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
       imageTimeout: 20000,    // Augmente le timeout pour laisser le temps à tous les assets
       windowWidth: 793,       // Force 210mm @ 96dpi = 793px (élimine les variations de zoom)
       windowHeight: 1122,     // Force 297mm @ 96dpi = 1122px (une page A4)
+      useForeignObjectRendering: false, // Force le mode canvas classique
     });
   } finally {
     if (clone.parentNode) clone.parentNode.removeChild(clone);
