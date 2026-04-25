@@ -104,16 +104,19 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
   const drawH  = pageW * ratio; // hauteur réelle du contenu en mm
 
   if (drawH <= A4_H_MM * 1.5) {
-    // Contenu court ou moyen : 1 page à la hauteur exacte du contenu
-    // (jamais de blanc en bas), ou légèrement réduit pour tenir en A4.
-    const pageH = Math.min(drawH, A4_H_MM); // hauteur PDF = contenu ou A4 max
-    const pdf   = new jsPDF({ unit: "mm", format: [pageW, pageH], orientation: "portrait" });
+    // Format A4 strict : on conserve toujours la page complète (210×297 mm),
+    // exactement comme l'aperçu HTML (qui a min-height: 297mm). Le contenu
+    // plus court qu'A4 laisse simplement du blanc en bas — c'est le standard
+    // attendu pour un devis / une facture, et ça garantit que l'aperçu et le
+    // PDF téléchargé ont la même taille de page.
+    const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
     // PNG (sans perte) pour le texte — JPEG bave sur les bords des caractères
     // et donne un rendu "flou" typique des PDF rasterisés.
-    const img   = canvas.toDataURL("image/png");
+    const img = canvas.toDataURL("image/png");
 
     if (drawH <= A4_H_MM) {
-      // Contenu plus court que A4 : page à la taille exacte du contenu
+      // Contenu plus court que A4 : on dessine à la taille naturelle, le bas
+      // de la page A4 reste blanc (identique au min-height: 297mm de l'aperçu).
       pdf.addImage(img, "PNG", 0, 0, pageW, drawH, undefined, "FAST");
     } else {
       // Contenu entre A4 et 1,5× A4 : réduit proportionnellement pour tenir en A4
