@@ -135,6 +135,8 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
 
     let raw = "";
     let apiError = null;
+    const fetchStartTime = Date.now();
+    let firstChunkTime = null;
 
     const streamResponse = async () => {
       const res = await fetch("/api/claude", {
@@ -166,6 +168,11 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
             try {
               const msg = JSON.parse(payload);
               if (msg.type === "content_block_delta" && msg.delta?.type === "text_delta") {
+                if (!firstChunkTime) {
+                  firstChunkTime = Date.now() - fetchStartTime;
+                  // Log timing perçu (TTFB — Time To First Byte)
+                  console.log(`[AgentIA] TTFB=${firstChunkTime}ms, model=${CLAUDE_MODEL}`);
+                }
                 raw += msg.delta.text || "";
                 const cut     = raw.indexOf("<DEVIS>");
                 const visible = (cut >= 0 ? raw.slice(0, cut) : raw).trim();

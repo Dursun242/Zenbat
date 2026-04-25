@@ -11,6 +11,31 @@ function resolveOrigin(req) {
   return ALLOWED_ORIGINS[0] || "";
 }
 
+// Simple in-memory queue pour logs asynchrones (ne bloque pas la réponse)
+const logQueue = [];
+let logFlushInterval;
+
+function queueLog(logData) {
+  logQueue.push(logData);
+  // Flush après 5 secondes ou 10 logs
+  if (!logFlushInterval) {
+    logFlushInterval = setInterval(flushLogs, 5000);
+  }
+  if (logQueue.length >= 10) flushLogs();
+}
+
+async function flushLogs() {
+  if (logQueue.length === 0) return;
+  const toFlush = logQueue.splice(0);
+  try {
+    await fetch("https://api.anthropic.com/v1/messages", { // Placeholder — remplacer par endpoint réel
+      // Les logs seront stocker localement ou via un service externe
+    }).catch(() => {
+      // Silent fail — ne pas bloquer si logging échoue
+    });
+  } catch {}
+}
+
 export default async function handler(req, res) {
   const origin = resolveOrigin(req);
   if (origin) res.setHeader("Access-Control-Allow-Origin", origin);
@@ -43,6 +68,9 @@ export default async function handler(req, res) {
   if (typeof temperature === "number") payload.temperature = temperature;
   if (typeof top_p === "number")       payload.top_p = top_p;
 
+  const startTime = Date.now();
+  const isDevise = system?.includes("DEVIS") ? "devis" : system?.includes("contact") ? "contact" : null;
+
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 28000);
@@ -62,6 +90,23 @@ export default async function handler(req, res) {
     } finally {
       clearTimeout(timeout);
     }
+
+    const latencyMs = Date.now() - startTime;
+    const upstreamData = await upstream.json();
+    const inputTokens = upstreamData?.usage?.input_tokens;
+    const outputTokens = upstreamData?.usage?.output_tokens;
+
+    // Log asynchrone (ne bloque pas)
+    queueLog({
+      model,
+      use_case: isDevise,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      latency_ms: latencyMs,
+      status_code: upstream.status,
+      error_message: upstream.ok ? null : upstreamData?.error?.message,
+      stream_enabled: stream === true,
+    });
 
     if (stream === true && upstream.ok && upstream.body) {
       res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -84,9 +129,22 @@ export default async function handler(req, res) {
       return res.end();
     }
 
-    const data = await upstream.json();
-    return res.status(upstream.status).json(data);
+    return res.status(upstream.status).json(upstreamData);
   } catch (err) {
+    const latencyMs = Date.now() - startTime;
+
+    // Log l'erreur
+    queueLog({
+      model,
+      use_case: isDevise,
+      input_tokens: null,
+      output_tokens: null,
+      latency_ms: latencyMs,
+      status_code: err?.name === "AbortError" ? 504 : 502,
+      error_message: err?.message || "Unknown error",
+      stream_enabled: stream === true,
+    });
+
     if (err?.name === "AbortError") {
       return res.status(504).json({ error: "Délai dépassé — Claude API n'a pas répondu en 28 secondes" });
     }
