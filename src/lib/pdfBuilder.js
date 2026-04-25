@@ -219,13 +219,13 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
     box(pdf, X, atY, CW, 8, NAVY);
     pdf.setFontSize(8); pdf.setFont("helvetica", "bold"); setTxt(pdf, WHITE);
     let cx = X;
-    pdf.text("Description",  cx + 3,                        atY + 5.5);
-    pdf.text("Unité",        cx + CD + CU / 2,              atY + 5.5, { align: "center" });
-    pdf.text("Qté",          cx + CD + CU + CQ / 2,         atY + 5.5, { align: "center" });
-    pdf.text("PU HT",        cx + CD + CU + CQ + CP - 2,   atY + 5.5, { align: "right" });
-    pdf.text("TVA",          cx + CD + CU + CQ + CP + CT / 2, atY + 5.5, { align: "center" });
-    pdf.text("Total HT",     cx + CW - 2,                   atY + 5.5, { align: "right" });
-    return atY + 8;
+    pdf.text("Description",  cx + 3,                        atY + 4.5);
+    pdf.text("Unité",        cx + CD + CU / 2,              atY + 4.5, { align: "center" });
+    pdf.text("Qté",          cx + CD + CU + CQ / 2,         atY + 4.5, { align: "center" });
+    pdf.text("PU HT",        cx + CD + CU + CQ + CP - 2,   atY + 4.5, { align: "right" });
+    pdf.text("TVA",          cx + CD + CU + CQ + CP + CT / 2, atY + 4.5, { align: "center" });
+    pdf.text("Total HT",     cx + CW - 2,                   atY + 4.5, { align: "right" });
+    return atY + 7;
   };
   y = need(pdf, y, 12);
   y = drawTableHeader(y);
@@ -233,16 +233,16 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
   // Table rows
   filteredLignes.forEach((l, i) => {
     if (l.type_ligne === "lot") {
-      y = need(pdf, y, 8);
+      y = need(pdf, y, 7);
       if (y === PAD) y = drawTableHeader(y); // repeat header after page break
-      box(pdf, X, y, CW, 7, NAVY_BG);
-      hline(pdf, X, X + CW, y + 7, BORDER);
-      txt(pdf, (l.designation || "").toUpperCase(), X + 3, y + 4.5, { size: 8, bold: true, color: NAVY });
-      y += 7;
+      box(pdf, X, y, CW, 6, NAVY_BG);
+      hline(pdf, X, X + CW, y + 6, BORDER);
+      txt(pdf, (l.designation || "").toUpperCase(), X + 3, y + 4, { size: 8, bold: true, color: NAVY });
+      y += 6;
     } else if (l.type_ligne === "ouvrage") {
       pdf.setFontSize(8.5);
       const descLines = pdf.splitTextToSize(s(l.designation || ""), CD - 5);
-      const rowH      = Math.max(7, descLines.length * 4.2 + 3);
+      const rowH      = Math.max(6, descLines.length * 3.8 + 2.5);
 
       y = need(pdf, y, rowH);
       if (y === PAD) y = drawTableHeader(y);
@@ -250,7 +250,7 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
       if (i % 2 === 1) box(pdf, X, y, CW, rowH, BG_LIGHT);
       hline(pdf, X, X + CW, y + rowH, BORDER);
 
-      const ty = y + 4.5;
+      const ty = y + 4;
       pdf.setFont("helvetica", "normal"); setTxt(pdf, DARK);
       pdf.text(descLines, X + 3, ty);
 
