@@ -155,8 +155,9 @@ Si les erreurs sont réseau, utilisateur, ou hors index.html : retourne "correct
 
   let claudeResponse;
   try {
+    const model = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model,
       max_tokens: 4096,
       messages: [{ role: 'user', content: prompt }],
     });
@@ -164,7 +165,7 @@ Si les erreurs sont réseau, utilisateur, ou hors index.html : retourne "correct
     claudeResponse = extractJson(rawText);
   } catch (e) {
     console.error('❌ Erreur Claude :', e.message);
-    // On continue sans corrections pour quand même marquer resolved et écrire le rapport
+    // Continue sans corrections pour quand même marquer resolved et écrire le rapport
     claudeResponse = { rapport: `Erreur lors de l'appel Claude : ${e.message}`, corrections: [] };
   }
 
