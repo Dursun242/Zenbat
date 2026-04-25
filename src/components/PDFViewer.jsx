@@ -43,8 +43,14 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
       setPageH(h * scale)
     }
     measure()
-    const id = setTimeout(measure, 50)
-    return () => clearTimeout(id)
+    // La page est position:absolute → sa hauteur n'alimente pas le scroll du
+    // parent. On observe sa taille réelle pour garder pageH synchrone quand
+    // le contenu change après le premier rendu (brand chargée d'Supabase,
+    // lignes ajoutées, polices appliquées…). Sans ça, le bas du PDF (mentions
+    // légales) est tronqué dans l'aperçu alors qu'il est bien dans le PDF généré.
+    const ro = new ResizeObserver(measure)
+    ro.observe(pageRef.current)
+    return () => ro.disconnect()
   }, [scale, d.numero, hidden])
 
   const firedReadyRef = useRef(false)
