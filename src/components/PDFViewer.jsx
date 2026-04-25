@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useLayoutEffect } from "react"
 import { fmt, fmtD } from "../lib/utils.js"
 
 const Ix = {
@@ -36,22 +36,27 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
     return () => ro.disconnect()
   }, [hidden])
 
+  // La page est position:absolute → sa hauteur n'alimente pas le scroll du
+  // parent. On la mesure à chaque render (useLayoutEffect, synchrone avec le
+  // paint) + via ResizeObserver pour les changements asynchrones (polices,
+  // images). Sans ça, le bas du PDF (mentions légales TVA / SIRET / "Généré
+  // via Zenbat") est tronqué dans l'aperçu alors qu'il est bien dans le PDF
+  // généré.
+  useLayoutEffect(() => {
+    if (hidden || !pageRef.current) return
+    const h = pageRef.current.offsetHeight || 0
+    setPageH(h * scale)
+  })
+
   useEffect(() => {
     if (hidden || !pageRef.current) return
-    const measure = () => {
+    const ro = new ResizeObserver(() => {
       const h = pageRef.current?.offsetHeight || 0
       setPageH(h * scale)
-    }
-    measure()
-    // La page est position:absolute → sa hauteur n'alimente pas le scroll du
-    // parent. On observe sa taille réelle pour garder pageH synchrone quand
-    // le contenu change après le premier rendu (brand chargée d'Supabase,
-    // lignes ajoutées, polices appliquées…). Sans ça, le bas du PDF (mentions
-    // légales) est tronqué dans l'aperçu alors qu'il est bien dans le PDF généré.
-    const ro = new ResizeObserver(measure)
+    })
     ro.observe(pageRef.current)
     return () => ro.disconnect()
-  }, [scale, d.numero, hidden])
+  }, [scale, hidden])
 
   const firedReadyRef = useRef(false)
   useEffect(() => {
