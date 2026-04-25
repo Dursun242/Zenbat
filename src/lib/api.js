@@ -278,9 +278,10 @@ export async function nextInvoiceNumber() {
   return data
 }
 
-export async function createAcompteFromDevis(devis, montantHT, tvaRate = 20) {
+export async function createAcompteFromDevis(devis, montantHT, tvaRate = 20, vatRegime) {
   const numero = await nextInvoiceNumber()
-  const montant_tva = Math.round(montantHT * tvaRate) / 100
+  const effectiveRate = vatRegime === 'franchise' ? 0 : tvaRate
+  const montant_tva = Math.round(montantHT * effectiveRate) / 100
   const montant_ttc = montantHT + montant_tva
   const lignes = [{
     type_ligne:    'ouvrage',
@@ -288,7 +289,7 @@ export async function createAcompteFromDevis(devis, montantHT, tvaRate = 20) {
     unite:         'forfait',
     quantite:      1,
     prix_unitaire: montantHT,
-    tva_rate:      tvaRate,
+    tva_rate:      effectiveRate,
   }]
   const invoice = {
     devis_id:       devis.id,

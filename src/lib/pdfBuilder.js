@@ -201,8 +201,12 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
   y += gridH + 5;
 
   // ── Objet / Chantier ──────────────────────────────────────────────────────
-  if (d.objet || d.ville_chantier) {
-    const lines2 = [d.objet && `Objet : ${d.objet}`, d.ville_chantier && `Chantier : ${d.ville_chantier}`].filter(Boolean);
+  if (d.objet || d.ville_chantier || isAcompte) {
+    const lines2 = [
+      isAcompte && d.devis_numero && `Acompte sur devis : ${d.devis_numero}`,
+      d.objet && `Objet : ${d.objet}`,
+      d.ville_chantier && `Chantier : ${d.ville_chantier}`,
+    ].filter(Boolean);
     const objH   = 6 + lines2.length * 5;
     y = need(pdf, y, objH + 4);
     box(pdf, X, y, CW, objH, BG_LIGHT, BORDER);

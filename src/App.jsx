@@ -346,7 +346,7 @@ export default function App() {
     try {
       const found = devis.find(d => d.id === devisId);
       if (!found) throw new Error("Devis introuvable");
-      const saved = await apiCreateAcompte(found, montantHT, tvaRate);
+      const saved = await apiCreateAcompte(found, montantHT, tvaRate, brand?.vatRegime);
       const fresh = await listInvoices();
       setInvoices(fresh);
       goInvoice(saved.id);
@@ -589,9 +589,11 @@ export default function App() {
         {tab === "factures_detail"   && selI && (() => {
           const inv = invoices.find(x => x.id === selI);
           if (!inv) return null;
+          const linkedDevis = inv.devis_id ? devis.find(d => d.id === inv.devis_id) : null;
+          const invoiceWithRef = linkedDevis ? { ...inv, devis_numero: linkedDevis.numero } : inv;
           return (
             <InvoiceDetail
-              invoice={inv}
+              invoice={invoiceWithRef}
               client={clients.find(c => c.id === inv.client_id)}
               brand={brand}
               invoices={invoices}

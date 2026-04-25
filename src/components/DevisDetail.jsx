@@ -89,7 +89,8 @@ export default function DevisDetail({ d, cl, onBack, brand, onChange, onConvertT
     return a;
   }, {});
 
-  const tvaRate = lignes.find(l => l.type_ligne === "ouvrage")?.tva_rate ?? 20;
+  const franchise  = brand?.vatRegime === "franchise";
+  const tvaRate    = franchise ? 0 : (lignes.find(l => l.type_ligne === "ouvrage")?.tva_rate ?? 20);
   const acompteHT  = Math.round(ht * acomptePct) / 100;
   const acompteTTC = Math.round(acompteHT * (1 + tvaRate / 100) * 100) / 100;
   const canAcompte = onCreateAcompte && lignes.length > 0 && ["envoye","en_signature","accepte"].includes(d.statut);
@@ -144,14 +145,23 @@ export default function DevisDetail({ d, cl, onBack, brand, onChange, onConvertT
             </div>
 
             <div style={{ background: "#f8fafc", borderRadius: 14, padding: "14px 16px", marginBottom: 20 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontSize: 13, color: "#64748b" }}>Montant HT</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{fmt(acompteHT)}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 13, color: "#64748b" }}>Montant TTC ({tvaRate}%)</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: ac }}>{fmt(acompteTTC)}</span>
-              </div>
+              {franchise ? (
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 13, color: "#64748b" }}>Montant (TVA non applicable)</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: ac }}>{fmt(acompteHT)}</span>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <span style={{ fontSize: 13, color: "#64748b" }}>Montant HT</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{fmt(acompteHT)}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 13, color: "#64748b" }}>Montant TTC ({tvaRate}%)</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: ac }}>{fmt(acompteTTC)}</span>
+                  </div>
+                </>
+              )}
             </div>
 
             <div style={{ display: "flex", gap: 10 }}>
