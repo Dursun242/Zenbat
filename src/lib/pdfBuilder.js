@@ -62,16 +62,28 @@ function need(pdf, y, h) {
   return y + h > PAGE_BOTTOM ? newPage(pdf) : y;
 }
 
-async function loadImgDataUrl(url) {
+// Charge n'importe quelle image (JPEG, PNG, WebP, SVG…) et la retourne
+// en data URL PNG via un canvas — seul format fiable pour jsPDF addImage.
+async function loadImgAsPng(url) {
   try {
-    const res = await fetch(url, { mode: "cors" });
-    if (!res.ok) return null;
-    const blob = await res.blob();
+    const blob = await fetch(url, { mode: "cors" }).then(r => r.ok ? r.blob() : null);
+    if (!blob) return null;
+    const objectUrl = URL.createObjectURL(blob);
     return await new Promise((resolve) => {
-      const r = new FileReader();
-      r.onload = () => resolve(r.result);
-      r.onerror = () => resolve(null);
-      r.readAsDataURL(blob);
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width  = img.naturalWidth  || img.width  || 180;
+          canvas.height = img.naturalHeight || img.height || 60;
+          canvas.getContext("2d").drawImage(img, 0, 0);
+          resolve(canvas.toDataURL("image/png"));
+        } catch { resolve(null); }
+        URL.revokeObjectURL(objectUrl);
+      };
+      img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(null); };
+      img.src = objectUrl;
     });
   } catch { return null; }
 }
@@ -130,10 +142,10 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
   // ── Header ────────────────────────────────────────────────────────────────
   // Logo
   if (brand.logo) {
-    const imgData = await loadImgDataUrl(brand.logo);
-    if (imgData) {
-      // max 44px≈11.6mm tall, max 180px≈47.6mm wide — keep proportions
-      pdf.addImage(imgData, X, y, 44, 11.6, undefined, "FAST");
+    const imgPng = await loadImgAsPng(brand.logo);
+    if (imgPng) {
+      // max ≈47mm wide × ≈12mm tall (proportions préservées via canvas)
+      pdf.addImage(imgPng, "PNG", X, y, 44, 11.6, undefined, "FAST");
     } else {
       txt(pdf, brand.companyName || "Votre Entreprise", X, y + 5, { size: 13, bold: true, color: NAVY });
     }
