@@ -463,6 +463,10 @@ export default function App() {
         .pop{animation:popIn .28s cubic-bezier(.34,1.56,.64,1) both}
         input,textarea,select,button{font-family:inherit}
         input,textarea,select{font-size:max(16px,1em) !important}
+        @media (display-mode: standalone){
+          .app-bottom-nav{padding-bottom:env(safe-area-inset-bottom)}
+          .app-content{padding-bottom:calc(64px + env(safe-area-inset-bottom)) !important}
+        }
         @media (min-width:1024px){
           .app-sidebar{display:flex !important}
           .app-bottom-nav{display:none !important}
@@ -534,7 +538,7 @@ export default function App() {
         </nav>
 
         {/* Contenu principal */}
-        <div className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "calc(64px + env(safe-area-inset-bottom))" }}>
+        <div className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "64px" }}>
         {tab === "dashboard"     && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}
                                        onOpenProfile={() => setScreen("onboarding")}
                                        onOpenPWAInstall={() => setScreen("pwa_install")}/>}
