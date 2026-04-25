@@ -251,6 +251,27 @@ export default function App() {
     } catch (err) { console.error("[create devis]", err); showErr("Erreur lors de l'enregistrement du devis"); }
   };
 
+  const onDuplicateDevis = async (sourceId) => {
+    const src = devis.find(d => d.id === sourceId);
+    if (!src) return;
+    const newId    = uid();
+    const newNumero = `DEV-${new Date().getFullYear()}-${String(devis.length + 1).padStart(4, "0")}`;
+    const copy = {
+      id:            newId,
+      numero:        newNumero,
+      objet:         src.objet ? `Copie – ${src.objet}` : "Copie",
+      client_id:     src.client_id,
+      ville_chantier:src.ville_chantier,
+      statut:        "brouillon",
+      montant_ht:    src.montant_ht,
+      tva_rate:      src.tva_rate,
+      date_emission: new Date().toISOString().split("T")[0],
+      lignes:        (src.lignes || []).map(l => ({ ...l, id: uid() })),
+    };
+    await onCreateDevis(copy);
+    goDevis(newId);
+  };
+
   const onDeleteDevis = async (id) => {
     if (!user) {
       setDevis(prev => prev.filter(x => x.id !== id));
@@ -581,6 +602,7 @@ export default function App() {
             onChange={onSaveDevis}
             onConvertToInvoice={() => onCreateInvoiceFromDevis(selD)}
             onCreateAcompte={onCreateAcompte}
+            onDuplicate={() => onDuplicateDevis(selD)}
             autoOpenPDF={autoOpenPDF === selD}
             onAutoOpenPDFConsumed={() => setAutoOpenPDF(null)}
             loading={loadingDevis.has(selD)}/>

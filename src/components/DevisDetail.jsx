@@ -5,7 +5,7 @@ import Badge from "./ui/Badge.jsx";
 import LignesEditor from "./LignesEditor.jsx";
 import PDFViewer from "./PDFViewer.jsx";
 
-export default function DevisDetail({ d, cl, onBack, brand, onChange, onConvertToInvoice, onCreateAcompte, loading, autoOpenPDF, onAutoOpenPDFConsumed }) {
+export default function DevisDetail({ d, cl, onBack, brand, onChange, onConvertToInvoice, onCreateAcompte, onDuplicate, loading, autoOpenPDF, onAutoOpenPDFConsumed }) {
   const [showPDF,      setShowPDF]      = useState(false);
   const [sending,      setSending]      = useState(false);
   const [signUrl,      setSignUrl]      = useState(d?.odoo_sign_url || null);
@@ -215,6 +215,14 @@ export default function DevisDetail({ d, cl, onBack, brand, onChange, onConvertT
             style={{ width: "100%", background: `linear-gradient(135deg,${ac}ee,${ac})`, color: "white", border: "none", borderRadius: 16, padding: 16, fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, cursor: "pointer", boxShadow: `0 6px 20px ${ac}44`, marginBottom: 12 }}>
             {I.pdf} Voir le PDF du devis
           </button>
+
+          {/* Dupliquer */}
+          {onDuplicate && (
+            <button onClick={onDuplicate}
+              style={{ width: "100%", background: "white", color: "#64748b", border: "1.5px solid #e2e8f0", borderRadius: 14, padding: 13, fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              📋 Dupliquer ce devis
+            </button>
+          )}
 
           {/* Conversion en facture (visible dès qu'il y a au moins une ligne) */}
           {onConvertToInvoice && lignes.length > 0 && (
