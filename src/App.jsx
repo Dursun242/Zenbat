@@ -547,7 +547,7 @@ export default function App() {
             onUpdate={onSaveClient}
             onDelete={async () => { await onDeleteClient(selC); setTab("clients"); }}/>
         )}
-        {tab === "devis"         && <DevisList devis={devis} clients={clients} goDevis={goDevis} setTab={setTab}/>}
+        {tab === "devis"         && <DevisList devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} onDelete={onDeleteDevis}/>}
         {tab === "devis_detail"  && selD && (
           <DevisDetail
             d={devis.find(x => x.id === selD)}
@@ -560,7 +560,7 @@ export default function App() {
             onAutoOpenPDFConsumed={() => setAutoOpenPDF(null)}
             loading={loadingDevis.has(selD)}/>
         )}
-        {tab === "factures"         && <InvoicesList invoices={invoices} clients={clients} goInvoice={goInvoice} onCreateEmpty={onCreateEmptyInvoice}/>}
+        {tab === "factures"         && <InvoicesList invoices={invoices} clients={clients} goInvoice={goInvoice} onCreateEmpty={onCreateEmptyInvoice} onDelete={onDeleteInvoice}/>}
         {tab === "factures_detail"   && selI && (() => {
           const inv = invoices.find(x => x.id === selI);
           if (!inv) return null;
