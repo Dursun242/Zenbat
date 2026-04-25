@@ -4,16 +4,18 @@ import { I } from "./ui/icons.jsx";
 import Badge from "./ui/Badge.jsx";
 import LignesEditor from "./LignesEditor.jsx";
 import PDFViewer from "./PDFViewer.jsx";
+import ClientPickerModal from "./app/ClientPickerModal.jsx";
 
-export default function DevisDetail({ d, cl, onBack, brand, onChange, onConvertToInvoice, onCreateAcompte, onDuplicate, loading, autoOpenPDF, onAutoOpenPDFConsumed }) {
-  const [showPDF,      setShowPDF]      = useState(false);
-  const [sending,      setSending]      = useState(false);
-  const [signUrl,      setSignUrl]      = useState(d?.odoo_sign_url || null);
-  const [log,          setLog]          = useState([]);
-  const [showLog,      setShowLog]      = useState(false);
-  const [acompteModal, setAcompteModal] = useState(false);
-  const [acomptePct,   setAcomptePct]   = useState(30);
+export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChange, onConvertToInvoice, onCreateAcompte, onDuplicate, loading, autoOpenPDF, onAutoOpenPDFConsumed }) {
+  const [showPDF,        setShowPDF]        = useState(false);
+  const [sending,        setSending]        = useState(false);
+  const [signUrl,        setSignUrl]        = useState(d?.odoo_sign_url || null);
+  const [log,            setLog]            = useState([]);
+  const [showLog,        setShowLog]        = useState(false);
+  const [acompteModal,   setAcompteModal]   = useState(false);
+  const [acomptePct,     setAcomptePct]     = useState(30);
   const [acompteLoading, setAcompteLoading] = useState(false);
+  const [clientPicker,   setClientPicker]   = useState(false);
 
   // Ouvre automatiquement le PDF quand on arrive depuis l'Agent IA après save
   useEffect(() => {
@@ -177,6 +179,13 @@ export default function DevisDetail({ d, cl, onBack, brand, onChange, onConvertT
           </div>
         </div>
       )}
+      {clientPicker && (
+        <ClientPickerModal
+          clients={clients}
+          current={cl}
+          onSelect={c => onChange({ ...d, client_id: c?.id ?? null })}
+          onClose={() => setClientPicker(false)}/>
+      )}
       <div className="detail-shell" style={{ minHeight: "100%", background: "#f8fafc", display: "flex", flexDirection: "column" }}>
         <div className="detail-row" style={{ flex: 1, display: "flex" }}>
           <div className="detail-editor fu" style={{ flex: 1, minWidth: 0 }}>
@@ -193,6 +202,19 @@ export default function DevisDetail({ d, cl, onBack, brand, onChange, onConvertT
               <Badge s={d.statut}/>
             </div>
           </div>
+          {/* Client */}
+          <button onClick={() => setClientPicker(true)}
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "7px 10px", marginBottom: 8, cursor: "pointer", textAlign: "left" }}>
+            <span style={{ fontSize: 16 }}>👤</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {cl ? (cl.raison_sociale || `${cl.prenom || ""} ${cl.nom || ""}`.trim()) : <span style={{ color: "#94a3b8", fontStyle: "italic" }}>Sans client</span>}
+              </div>
+              {cl?.email && <div style={{ fontSize: 11, color: "#94a3b8" }}>{cl.email}</div>}
+            </div>
+            <span style={{ fontSize: 11, color: "#94a3b8", flexShrink: 0 }}>Changer ›</span>
+          </button>
+
           <label style={{ display: "block", fontSize: 10, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>OBJET</label>
           <input
             value={d.objet || ""}

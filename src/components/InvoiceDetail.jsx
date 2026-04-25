@@ -3,6 +3,7 @@ import { fmt } from "../lib/utils.js";
 import Badge from "./ui/Badge.jsx";
 import LignesEditor from "./LignesEditor.jsx";
 import PDFViewer from "./PDFViewer.jsx";
+import ClientPickerModal from "./app/ClientPickerModal.jsx";
 import { supabase } from "../lib/supabase.js";
 
 async function getToken() {
@@ -10,10 +11,11 @@ async function getToken() {
   return session?.access_token ?? null;
 }
 
-export default function InvoiceDetail({ invoice, client, brand, invoices, onBack, onChange, onCreateAvoir, onDelete }) {
-  const [showPDF, setShowPDF] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [exportMsg, setExportMsg] = useState(null);
+export default function InvoiceDetail({ invoice, client, clients = [], brand, invoices, onBack, onChange, onCreateAvoir, onDelete }) {
+  const [showPDF,      setShowPDF]      = useState(false);
+  const [exporting,    setExporting]    = useState(false);
+  const [exportMsg,    setExportMsg]    = useState(null);
+  const [clientPicker, setClientPicker] = useState(false);
   const ac = brand.color || "#22c55e";
 
   const lignes = invoice.lignes || [];
@@ -128,6 +130,13 @@ export default function InvoiceDetail({ invoice, client, brand, invoices, onBack
       {showPDF && (
         <PDFViewer d={asDevisShape} cl={client} brand={brand} onClose={() => setShowPDF(false)} kind="facture" noDownload={invoice.statut === "brouillon"}/>
       )}
+      {clientPicker && (
+        <ClientPickerModal
+          clients={clients}
+          current={client}
+          onSelect={c => onChange({ ...invoice, client_id: c?.id ?? null })}
+          onClose={() => setClientPicker(false)}/>
+      )}
       <div className="detail-shell" style={{ background: "#f8fafc", minHeight: "100%", display: "flex", flexDirection: "column" }}>
         <div className="detail-row" style={{ flex: 1, display: "flex" }}>
           <div className="detail-editor" style={{ flex: 1, minWidth: 0 }}>
@@ -167,6 +176,19 @@ export default function InvoiceDetail({ invoice, client, brand, invoices, onBack
             <span><strong>Avoir verrouillé</strong> — émis et immuable.</span>
           </div>
         )}
+        {/* Client */}
+        <button onClick={() => !isLocked && setClientPicker(true)} disabled={isLocked}
+          style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: isLocked ? "#f1f5f9" : "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "7px 10px", marginBottom: 8, cursor: isLocked ? "not-allowed" : "pointer", textAlign: "left" }}>
+          <span style={{ fontSize: 16 }}>👤</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: isLocked ? "#94a3b8" : "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {client ? (client.raison_sociale || `${client.prenom || ""} ${client.nom || ""}`.trim()) : <span style={{ color: "#94a3b8", fontStyle: "italic" }}>Sans client</span>}
+            </div>
+            {client?.email && <div style={{ fontSize: 11, color: "#94a3b8" }}>{client.email}</div>}
+          </div>
+          {!isLocked && <span style={{ fontSize: 11, color: "#94a3b8", flexShrink: 0 }}>Changer ›</span>}
+        </button>
+
         <label style={{ display: "block", fontSize: 10, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>OBJET</label>
         <input
           value={invoice.objet || ""}

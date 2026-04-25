@@ -597,6 +597,7 @@ export default function App() {
           <DevisDetail
             d={devis.find(x => x.id === selD)}
             cl={clients.find(c => c.id === devis.find(x => x.id === selD)?.client_id)}
+            clients={clients}
             onBack={() => setTab("devis")}
             brand={brand}
             onChange={onSaveDevis}
@@ -617,6 +618,7 @@ export default function App() {
             <InvoiceDetail
               invoice={invoiceWithRef}
               client={clients.find(c => c.id === inv.client_id)}
+              clients={clients}
               brand={brand}
               invoices={invoices}
               onBack={() => setTab("factures")}
