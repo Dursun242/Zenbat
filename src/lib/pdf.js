@@ -81,22 +81,19 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
 
   let canvas;
   try {
-    // foreignObjectRendering: true = texte vectoriel SVG (pixel-parfait, identique à l'aperçu)
+    // Mode canvas classique haute résolution (rasterisé)
+    // Scale élevé = haute résolution = fidélité maximale à l'aperçu
     canvas = await html2canvas(clone, {
-      scale: 2,                       // 2× pour bonne qualité (SVG vectoriel, pas de perte)
+      scale: 4,                       // 4× pour très haute résolution (380dpi-ish)
       useCORS: true,
       allowTaint: true,
       backgroundColor: "#ffffff",
       logging: false,
       imageTimeout: 20000,
-      windowWidth: cloneWidth,        // Taille réelle du contenu
+      windowWidth: cloneWidth,
       windowHeight: cloneHeight,
-      useForeignObjectRendering: true, // ✅ Rend en SVG vectoriel = fonts parfaites
+      useForeignObjectRendering: false, // Mode canvas classique (plus fidèle à l'aperçu)
       removeContainer: true,
-      ignoreElements: (el) => {
-        // Ignore les éléments qui ne doivent pas apparaître en PDF
-        return el.className?.includes?.("no-pdf");
-      },
     });
   } finally {
     if (clone.parentNode) clone.parentNode.removeChild(clone);
