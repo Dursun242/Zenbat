@@ -12,9 +12,25 @@
 // mais centralise la logique pour qu'on puisse facilement ajouter des
 // polices embarquées, compression, signature, etc. plus tard.
 
+import { createClient } from "@supabase/supabase-js";
 import { PDFDocument, AFRelationship, PDFName, PDFRawStream } from "pdf-lib";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "")
+  .split(",").map(s => s.trim()).filter(Boolean);
+
+function cors(req, res) {
+  const origin = req.headers.origin || "";
+  const isProd  = process.env.VERCEL_ENV === "production";
+  const allowed = isProd
+    ? (ALLOWED_ORIGINS.includes(origin) ? origin : (ALLOWED_ORIGINS[0] || ""))
+    : origin;
+  if (allowed) res.setHeader("Access-Control-Allow-Origin", allowed);
+  res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+}
 
 const XML_FILENAME    = "factur-x.xml";
 // Profil EN 16931 (norme européenne, obligatoire PPF/PDP à partir de 09/2026).
@@ -341,10 +357,39 @@ function addSRGBOutputIntent(pdfDoc, iccBytes) {
 }
 
 export default async function handler(req, res) {
+  cors(req, res);
+  if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  // Authentification
+  const token = req.headers.authorization?.replace("Bearer ", "");
+  if (!token) return res.status(401).json({ error: "Non authentifié" });
+
+  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey)
+    return res.status(500).json({ error: "Configuration serveur manquante" });
+
+  const admin = createClient(supabaseUrl, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  const { data: { user }, error: authErr } = await admin.auth.getUser(token);
+  if (authErr || !user) return res.status(401).json({ error: "Token invalide" });
 
   const { pdf_base64, invoice, client, brand, sourceInvoice } = req.body || {};
   if (!pdf_base64 || !invoice) return res.status(400).json({ error: "pdf_base64 et invoice requis" });
+
+  // Vérification propriété de la facture (si elle existe en base)
+  if (invoice.id) {
+    const { data: row } = await admin
+      .from("invoices")
+      .select("id")
+      .eq("id", invoice.id)
+      .eq("owner_id", user.id)
+      .maybeSingle();
+    if (!row) return res.status(403).json({ error: "Accès refusé à cette facture" });
+  }
 
   try {
     const pdfBytes = Uint8Array.from(Buffer.from(pdf_base64, "base64"));

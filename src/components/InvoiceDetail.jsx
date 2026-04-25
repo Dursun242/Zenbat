@@ -3,6 +3,12 @@ import { fmt } from "../lib/utils.js";
 import Badge from "./ui/Badge.jsx";
 import LignesEditor from "./LignesEditor.jsx";
 import PDFViewer from "./PDFViewer.jsx";
+import { supabase } from "../lib/supabase.js";
+
+async function getToken() {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token ?? null;
+}
 
 export default function InvoiceDetail({ invoice, client, brand, invoices, onBack, onChange, onCreateAvoir, onDelete }) {
   const [showPDF, setShowPDF] = useState(false);
@@ -52,9 +58,13 @@ export default function InvoiceDetail({ invoice, client, brand, invoices, onBack
         ? { numero: sourceInvoice.numero, date_emission: sourceInvoice.date_emission }
         : undefined;
 
+      const token = await getToken();
       const res = await fetch("/api/facturx", {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
         body:    JSON.stringify({
           pdf_base64: base64,
           invoice:    { ...invoice, lignes },

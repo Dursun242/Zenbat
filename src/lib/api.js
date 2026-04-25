@@ -335,6 +335,11 @@ export async function createInvoice(invoice, lignes = []) {
 }
 
 export async function updateInvoice(id, patch) {
+  if (patch.retenue_garantie_pct !== undefined) {
+    const pct = Number(patch.retenue_garantie_pct);
+    if (isNaN(pct) || pct < 0 || pct > 10)
+      throw new Error("Retenue de garantie invalide (0–10 %)");
+  }
   const { data, error } = await supabase
     .from('invoices').update(patch).eq('id', id).select().single()
   if (error) throw error
@@ -343,7 +348,12 @@ export async function updateInvoice(id, patch) {
 
 export async function replaceInvoiceLignes(invoiceId, lignes) {
   const { data: { user } } = await supabase.auth.getUser()
-  const { error: e1 } = await supabase.from('lignes_invoices').delete().eq('invoice_id', invoiceId)
+  // Soft-delete des lignes existantes (conformité fiscale — pas de hard-delete)
+  const { error: e1 } = await supabase
+    .from('lignes_invoices')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('invoice_id', invoiceId)
+    .is('deleted_at', null)
   if (e1) throw e1
   if (!lignes.length) return []
   const rows = lignes.map((l, i) => ({
@@ -360,7 +370,12 @@ export async function replaceInvoiceLignes(invoiceId, lignes) {
   }))
   const { error } = await supabase.from('lignes_invoices').insert(rows)
   if (error) throw error
-  const { data: inserted } = await supabase.from('lignes_invoices').select('*').eq('invoice_id', invoiceId).order('position')
+  const { data: inserted } = await supabase
+    .from('lignes_invoices')
+    .select('*')
+    .eq('invoice_id', invoiceId)
+    .is('deleted_at', null)
+    .order('position')
   return inserted || []
 }
 
