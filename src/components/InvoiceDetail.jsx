@@ -172,6 +172,45 @@ export default function InvoiceDetail({ invoice, client, brand, invoices, onBack
           {invoice.statut === "brouillon" ? "👁 Aperçu brouillon" : "Voir le PDF de la facture"}
         </button>
 
+        {/* Actions principales — sous l'aperçu */}
+        <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+          {!isLocked ? (
+            <button onClick={onDelete}
+              style={{ background: "white", border: "1px solid #fecaca", color: "#b91c1c", borderRadius: 12, padding: "12px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
+              Supprimer
+            </button>
+          ) : (
+            <button onClick={onDelete}
+              title="Une facture émise ne peut être que masquée (conservée 10 ans en base, art. L102 B LPF)."
+              style={{ background: "white", border: "1px solid #e2e8f0", color: "#64748b", borderRadius: 12, padding: "12px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
+              Masquer
+            </button>
+          )}
+          <button onClick={handleFacturX} disabled={exporting || !lignes.length}
+            style={{ flex: 1, background: exporting || !lignes.length ? "#cbd5e1" : "#0f172a", color: "white", border: "none", borderRadius: 12, padding: "12px 16px", fontSize: 13, fontWeight: 700, cursor: exporting || !lignes.length ? "not-allowed" : "pointer", lineHeight: 1.3 }}>
+            {exporting
+              ? "Génération en cours…"
+              : isLocked
+                ? "⬇ Re-télécharger Factur-X"
+                : "🔒 Émettre la facture définitive"}
+          </button>
+        </div>
+        {!isLocked && (
+          <div style={{ fontSize: 11, color: "#b45309", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 8, padding: "8px 10px", marginBottom: 12, lineHeight: 1.45 }}>
+            ⚠ En cliquant sur « Émettre », le PDF + XML Factur-X seront générés et la facture sera <strong>verrouillée définitivement</strong> — plus aucune modification possible (CGI art. 289).
+          </div>
+        )}
+        {exportMsg && (
+          <div style={{
+            background: exportMsg.startsWith("❌") ? "#fef2f2" : "#ecfdf5",
+            border: `1px solid ${exportMsg.startsWith("❌") ? "#fecaca" : "#bbf7d0"}`,
+            color: exportMsg.startsWith("❌") ? "#991b1b" : "#065f46",
+            padding: "10px 12px", borderRadius: 10, fontSize: 12, marginBottom: 12, lineHeight: 1.4,
+          }}>
+            {exportMsg}
+          </div>
+        )}
+
         <LignesEditor lignes={lignes} onChange={updateLignes} ac={ac} vatRegime={brand.vatRegime}/>
 
         <div style={{ background: "white", borderRadius: 14, border: "1px solid #f1f5f9", padding: 14, marginBottom: 12 }}>
@@ -227,33 +266,9 @@ export default function InvoiceDetail({ invoice, client, brand, invoices, onBack
             </div>
           </div>
 
-        {exportMsg && (
-          <div style={{
-            background: exportMsg.startsWith("❌") ? "#fef2f2" : "#ecfdf5",
-            border: `1px solid ${exportMsg.startsWith("❌") ? "#fecaca" : "#bbf7d0"}`,
-            color: exportMsg.startsWith("❌") ? "#991b1b" : "#065f46",
-            padding: "10px 12px", borderRadius: 10, fontSize: 12, marginBottom: 12, lineHeight: 1.4,
-          }}>
-            {exportMsg}
-          </div>
-        )}
-
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          {!isLocked ? (
-            <button onClick={onDelete}
-              style={{ background: "white", border: "1px solid #fecaca", color: "#b91c1c", borderRadius: 12, padding: "12px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-              Supprimer
-            </button>
-          ) : (
-            <button onClick={onDelete}
-              title="Une facture émise ne peut être que masquée (conservée 10 ans en base, art. L102 B LPF)."
-              style={{ background: "white", border: "1px solid #e2e8f0", color: "#64748b", borderRadius: 12, padding: "12px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-              Masquer
-            </button>
-          )}
-
-          {/* Créer un avoir : uniquement sur facture verrouillée ET qui n'est PAS déjà un avoir */}
-          {isLocked && !isAvoir && onCreateAvoir && (
+        {/* Créer un avoir : uniquement sur facture verrouillée ET qui n'est PAS déjà un avoir */}
+        {isLocked && !isAvoir && onCreateAvoir && (
+          <div style={{ marginTop: 10 }}>
             <button
               onClick={() => {
                 if (!confirm(`Créer une facture d'avoir pour ${invoice.numero} ?\n\nUn nouveau brouillon sera créé avec les mêmes lignes. Vous pourrez ajuster les quantités avant émission.`)) return;
@@ -263,18 +278,8 @@ export default function InvoiceDetail({ invoice, client, brand, invoices, onBack
               style={{ background: "#eef2ff", border: "1px solid #c7d2fe", color: "#4338ca", borderRadius: 12, padding: "12px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
               ↩ Créer un avoir
             </button>
-          )}
-
-          <button onClick={handleFacturX} disabled={exporting || !lignes.length}
-            style={{ flex: 1, background: exporting || !lignes.length ? "#cbd5e1" : "#0f172a", color: "white", border: "none", borderRadius: 12, padding: "12px 16px", fontSize: 13, fontWeight: 700, cursor: exporting || !lignes.length ? "not-allowed" : "pointer" }}>
-            {exporting ? "Génération Factur-X…" : (isLocked ? "⬇ Re-télécharger Factur-X" : "⬇ Télécharger Factur-X (PDF + XML)")}
-          </button>
-        </div>
-
-        <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 10, lineHeight: 1.5, textAlign: "center" }}>
-          Le PDF Factur-X généré est légalement valide pour le B2B (art. 289 VII du CGI).
-          Le client peut l'importer automatiquement dans son logiciel comptable via l'XML embarqué.
-        </div>
+          </div>
+        )}
       </div>
           </div>{/* end detail-editor */}
 
