@@ -10,10 +10,12 @@
     "generate-pwa-assets": "pwa-assets-generator --preset minimal2023 public/icon.svg"
   },
   "dependencies": {
+    "@sparticuz/chromium": "^119.0.0",
     "@supabase/supabase-js": "^2.103.3",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.2",
     "pdf-lib": "^1.17.1",
+    "puppeteer": "^21.6.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

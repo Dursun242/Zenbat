@@ -149,3 +149,33 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
   const dataUri = pdf.output("datauristring");
   return { blob, base64: dataUri.split(",")[1] || "", filename };
 }
+
+// Génère un PDF côté serveur via Puppeteer (meilleure qualité que html2canvas).
+// Fallback automatique à renderElementToPdf si le serveur échoue.
+export async function generatePdfOnServer(el, { filename = "document.pdf" } = {}) {
+  if (!el) throw new Error("Élément cible introuvable pour le rendu PDF.");
+
+  try {
+    // Récupère le HTML de l'élément
+    const html = el.outerHTML;
+
+    // Envoie à l'API Puppeteer
+    const response = await fetch("/api/generate-pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ html, filename }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.status}`);
+    }
+
+    // Récupère le PDF
+    const blob = await response.blob();
+    return { blob, filename };
+  } catch (err) {
+    // Fallback : utilise html2canvas côté client
+    console.warn("[generatePdfOnServer] Fallback to client-side rendering:", err.message);
+    return renderElementToPdf(el, { filename });
+  }
+}
