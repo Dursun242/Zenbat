@@ -126,6 +126,9 @@ export default function InvoiceDetail({ invoice, client, brand, invoices, onBack
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
           <button onClick={onBack} style={{ background: "none", border: "none", color: "#64748b", fontSize: 20, cursor: "pointer", flexShrink: 0 }}>←</button>
           <div style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace", flex: 1 }}>{invoice.numero}</div>
+          {invoice.invoice_type === "acompte" && (
+            <span style={{ fontSize: 9, fontWeight: 700, color: "#c2410c", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 6, padding: "2px 6px" }}>ACOMPTE</span>
+          )}
           <Badge s={invoice.statut} kind="facture"/>
         </div>
         {isAvoir && (
@@ -134,6 +137,12 @@ export default function InvoiceDetail({ invoice, client, brand, invoices, onBack
             <span>
               <strong>Facture d'avoir</strong> — rectifie la facture {sourceInvoice ? <strong>{sourceInvoice.numero}</strong> : "d'origine"}.
             </span>
+          </div>
+        )}
+        {invoice.invoice_type === "acompte" && (
+          <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", color: "#c2410c", padding: "8px 10px", borderRadius: 10, fontSize: 11, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 14 }}>💰</span>
+            <span><strong>Facture d'acompte</strong> — sera déduite de la facture finale.</span>
           </div>
         )}
         {isLocked && !isAvoir && (

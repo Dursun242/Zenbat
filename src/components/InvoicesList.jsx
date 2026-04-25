@@ -63,7 +63,12 @@ export default function InvoicesList({ invoices, clients, goInvoice, onCreateEmp
                 </div>
                 <div style={{ textAlign: "right", marginLeft: 12, flexShrink: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{fmt(i.montant_ttc)}</div>
-                  <div style={{ marginTop: 5 }}><Badge s={i.statut} kind="facture"/></div>
+                  <div style={{ marginTop: 5, display: "flex", gap: 5, justifyContent: "flex-end", alignItems: "center" }}>
+                    {i.invoice_type === "acompte" && (
+                      <span style={{ fontSize: 9, fontWeight: 700, color: "#c2410c", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 6, padding: "1px 5px" }}>ACOMPTE</span>
+                    )}
+                    <Badge s={i.statut} kind="facture"/>
+                  </div>
                 </div>
                 {i.statut === "brouillon" && onDelete && (
                   <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(confirmDelete === i.id ? null : i.id); }}

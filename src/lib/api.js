@@ -278,6 +278,35 @@ export async function nextInvoiceNumber() {
   return data
 }
 
+export async function createAcompteFromDevis(devis, montantHT, tvaRate = 20) {
+  const numero = await nextInvoiceNumber()
+  const montant_tva = Math.round(montantHT * tvaRate) / 100
+  const montant_ttc = montantHT + montant_tva
+  const lignes = [{
+    type_ligne:    'ouvrage',
+    designation:   `Acompte sur devis ${devis.numero}${devis.objet ? ' – ' + devis.objet : ''}`,
+    unite:         'forfait',
+    quantite:      1,
+    prix_unitaire: montantHT,
+    tva_rate:      tvaRate,
+  }]
+  const invoice = {
+    devis_id:       devis.id,
+    client_id:      devis.client_id,
+    numero,
+    objet:          `Acompte – ${devis.objet || devis.numero}`,
+    operation_type: 'service',
+    statut:         'brouillon',
+    invoice_type:   'acompte',
+    montant_ht:     montantHT,
+    montant_tva,
+    montant_ttc,
+    date_emission:  new Date().toISOString().split('T')[0],
+    date_echeance:  new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+  }
+  return createInvoice(invoice, lignes)
+}
+
 export async function createInvoice(invoice, lignes = []) {
   const { data: { user } } = await supabase.auth.getUser()
   const { data: inv, error } = await supabase

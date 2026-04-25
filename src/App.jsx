@@ -3,7 +3,7 @@ import { useAuth } from "./lib/auth.jsx";
 import {
   listClients, createClient as apiCreateClient, updateClient as apiUpdateClient, deleteClient as apiDeleteClient,
   listDevisWithLignes, getDevis, createDevis as apiCreateDevis, updateDevis as apiUpdateDevis, replaceLignes, deleteDevis as apiDeleteDevis,
-  listInvoices, createInvoice as apiCreateInvoice, updateInvoice as apiUpdateInvoice, replaceInvoiceLignes, deleteInvoice as apiDeleteInvoice, nextInvoiceNumber, createAvoirFromInvoice as apiCreateAvoir,
+  listInvoices, createInvoice as apiCreateInvoice, updateInvoice as apiUpdateInvoice, replaceInvoiceLignes, deleteInvoice as apiDeleteInvoice, nextInvoiceNumber, createAvoirFromInvoice as apiCreateAvoir, createAcompteFromDevis as apiCreateAcompte,
   updateMyProfile, getMyProfile, saveBrandData,
 } from "./lib/api";
 import { uid } from "./lib/utils.js";
@@ -341,6 +341,21 @@ export default function App() {
     }
   };
 
+  const onCreateAcompte = async (devisId, montantHT, tvaRate) => {
+    if (!user) { showErr("Vous devez être connecté."); return; }
+    try {
+      const found = devis.find(d => d.id === devisId);
+      if (!found) throw new Error("Devis introuvable");
+      const saved = await apiCreateAcompte(found, montantHT, tvaRate);
+      const fresh = await listInvoices();
+      setInvoices(fresh);
+      goInvoice(saved.id);
+    } catch (e) {
+      console.error("[create acompte]", e);
+      showErr(e?.message || "Impossible de créer l'acompte");
+    }
+  };
+
   const onCreateAvoir = async (invoiceId) => {
     if (!user) { showErr("Vous devez être connecté."); return; }
     try {
@@ -565,6 +580,7 @@ export default function App() {
             brand={brand}
             onChange={onSaveDevis}
             onConvertToInvoice={() => onCreateInvoiceFromDevis(selD)}
+            onCreateAcompte={onCreateAcompte}
             autoOpenPDF={autoOpenPDF === selD}
             onAutoOpenPDFConsumed={() => setAutoOpenPDF(null)}
             loading={loadingDevis.has(selD)}/>

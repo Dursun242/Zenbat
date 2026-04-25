@@ -92,8 +92,9 @@ async function loadImgAsPng(url) {
 // ─── Main builder ─────────────────────────────────────────────────────────────
 
 export async function buildPdf(d, cl, brand, kind = "devis", { filename = "document.pdf" } = {}) {
-  const isAvoir  = kind === "facture" && !!d?.avoir_of_invoice_id;
-  const docLabel = isAvoir ? "FACTURE D'AVOIR" : kind === "facture" ? "FACTURE" : "DEVIS";
+  const isAvoir   = kind === "facture" && !!d?.avoir_of_invoice_id;
+  const isAcompte = kind === "facture" && d?.invoice_type === "acompte";
+  const docLabel  = isAvoir ? "FACTURE D'AVOIR" : isAcompte ? "FACTURE D'ACOMPTE" : kind === "facture" ? "FACTURE" : "DEVIS";
 
   // Compute totals (mirrors PDFViewer.jsx)
   const lignes = d.lignes || [];

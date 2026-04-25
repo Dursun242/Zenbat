@@ -5,12 +5,15 @@ import Badge from "./ui/Badge.jsx";
 import LignesEditor from "./LignesEditor.jsx";
 import PDFViewer from "./PDFViewer.jsx";
 
-export default function DevisDetail({ d, cl, onBack, brand, onChange, onConvertToInvoice, loading, autoOpenPDF, onAutoOpenPDFConsumed }) {
-  const [showPDF,  setShowPDF]  = useState(false);
-  const [sending,  setSending]  = useState(false);
-  const [signUrl,  setSignUrl]  = useState(d?.odoo_sign_url || null);
-  const [log,      setLog]      = useState([]);
-  const [showLog,  setShowLog]  = useState(false);
+export default function DevisDetail({ d, cl, onBack, brand, onChange, onConvertToInvoice, onCreateAcompte, loading, autoOpenPDF, onAutoOpenPDFConsumed }) {
+  const [showPDF,      setShowPDF]      = useState(false);
+  const [sending,      setSending]      = useState(false);
+  const [signUrl,      setSignUrl]      = useState(d?.odoo_sign_url || null);
+  const [log,          setLog]          = useState([]);
+  const [showLog,      setShowLog]      = useState(false);
+  const [acompteModal, setAcompteModal] = useState(false);
+  const [acomptePct,   setAcomptePct]   = useState(30);
+  const [acompteLoading, setAcompteLoading] = useState(false);
 
   // Ouvre automatiquement le PDF quand on arrive depuis l'Agent IA après save
   useEffect(() => {
@@ -86,6 +89,22 @@ export default function DevisDetail({ d, cl, onBack, brand, onChange, onConvertT
     return a;
   }, {});
 
+  const tvaRate = lignes.find(l => l.type_ligne === "ouvrage")?.tva_rate ?? 20;
+  const acompteHT  = Math.round(ht * acomptePct) / 100;
+  const acompteTTC = Math.round(acompteHT * (1 + tvaRate / 100) * 100) / 100;
+  const canAcompte = onCreateAcompte && lignes.length > 0 && ["envoye","en_signature","accepte"].includes(d.statut);
+
+  const handleAcompte = async () => {
+    if (!acompteHT || acompteLoading) return;
+    setAcompteLoading(true);
+    try {
+      await onCreateAcompte(d.id, acompteHT, tvaRate);
+      setAcompteModal(false);
+    } finally {
+      setAcompteLoading(false);
+    }
+  };
+
   return (
     <>
       <style>{`
@@ -102,6 +121,51 @@ export default function DevisDetail({ d, cl, onBack, brand, onChange, onConvertT
           onSendOdoo={!["accepte", "refuse"].includes(d.statut) ? sendOdoo : undefined}
           sending={sending}
           sent={!!signUrl || d.statut === "en_signature"}/>
+      )}
+
+      {acompteModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 200, display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+          onClick={e => { if (e.target === e.currentTarget) setAcompteModal(false); }}>
+          <div style={{ background: "white", borderRadius: "20px 20px 0 0", padding: 24, width: "100%", maxWidth: 480 }}>
+            <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a", marginBottom: 4 }}>Facture d'acompte</div>
+            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 20 }}>Devis {d.numero} · Total HT {fmt(ht)}</div>
+
+            <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b", display: "block", marginBottom: 8 }}>POURCENTAGE DE L'ACOMPTE</label>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+              <input type="range" min={1} max={100} value={acomptePct}
+                onChange={e => setAcomptePct(Number(e.target.value))}
+                style={{ flex: 1, accentColor: ac }}/>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, border: "1px solid #e2e8f0", borderRadius: 10, padding: "6px 10px" }}>
+                <input type="number" min={1} max={100} value={acomptePct}
+                  onChange={e => setAcomptePct(Math.min(100, Math.max(1, Number(e.target.value))))}
+                  style={{ width: 48, border: "none", outline: "none", fontSize: 15, fontWeight: 700, textAlign: "right", fontFamily: "inherit", color: "#0f172a" }}/>
+                <span style={{ color: "#64748b", fontSize: 14 }}>%</span>
+              </div>
+            </div>
+
+            <div style={{ background: "#f8fafc", borderRadius: 14, padding: "14px 16px", marginBottom: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 13, color: "#64748b" }}>Montant HT</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{fmt(acompteHT)}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 13, color: "#64748b" }}>Montant TTC ({tvaRate}%)</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: ac }}>{fmt(acompteTTC)}</span>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setAcompteModal(false)}
+                style={{ flex: 1, background: "#f1f5f9", border: "none", borderRadius: 14, padding: 14, fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#64748b" }}>
+                Annuler
+              </button>
+              <button onClick={handleAcompte} disabled={acompteLoading}
+                style={{ flex: 2, background: acompteLoading ? "#94a3b8" : ac, border: "none", borderRadius: 14, padding: 14, fontSize: 14, fontWeight: 700, cursor: acompteLoading ? "not-allowed" : "pointer", color: "white" }}>
+                {acompteLoading ? "Création…" : `Créer l'acompte (${fmt(acompteTTC)} TTC)`}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       <div className="detail-shell" style={{ minHeight: "100%", background: "#f8fafc", display: "flex", flexDirection: "column" }}>
         <div className="detail-row" style={{ flex: 1, display: "flex" }}>
@@ -147,6 +211,14 @@ export default function DevisDetail({ d, cl, onBack, brand, onChange, onConvertT
             <button onClick={onConvertToInvoice}
               style={{ width: "100%", background: "white", color: "#0f172a", border: "1.5px solid #0f172a", borderRadius: 14, padding: 13, fontSize: 13, fontWeight: 700, cursor: "pointer", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
               📄 Convertir en facture électronique
+            </button>
+          )}
+
+          {/* Acompte (visible si devis envoyé / en signature / accepté) */}
+          {canAcompte && (
+            <button onClick={() => setAcompteModal(true)}
+              style={{ width: "100%", background: "#fff7ed", color: "#c2410c", border: "1.5px solid #fed7aa", borderRadius: 14, padding: 13, fontSize: 13, fontWeight: 700, cursor: "pointer", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              💰 Créer une facture d'acompte
             </button>
           )}
 
