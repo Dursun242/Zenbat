@@ -32,6 +32,5 @@ jobs:
         run: |
           git config user.name "inspect-agent[bot]"
           git config user.email "bot@chantigest-pro"
-          git add RAPPORT_BUGS.md index.html
-          git diff --staged --quiet || git commit -m "🤖 Auto-fix $(date +'%Y-%m-%d %H:%M')"
-          git push
+          git add -A
+          git diff --staged --quiet || git commit -m "🤖 Auto-fix $(date +'%Y-%m-%d %H:%M')" && git push || true
