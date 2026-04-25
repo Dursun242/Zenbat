@@ -74,18 +74,24 @@ export async function renderElementToPdf(el, { filename = "document.pdf" } = {})
   // fraîchement chargées avant la capture.
   await new Promise((r) => requestAnimationFrame(() => r()));
 
+  // Récupère la taille réelle du clone pour une capture pixel-parfait
+  const rect = clone.getBoundingClientRect();
+  const cloneWidth = rect.width || clone.offsetWidth;
+  const cloneHeight = rect.height || clone.offsetHeight;
+
   let canvas;
   try {
     canvas = await html2canvas(clone, {
-      scale: 5,               // 5× pour une netteté maximale (470dpi-ish)
+      scale: 3,               // 3× pour netteté + performance (les fonts seront vectorielles)
       useCORS: true,
-      allowTaint: true,       // Tolère les images sans CORS (fallback si image externe bloquée)
+      allowTaint: true,
       backgroundColor: "#ffffff",
       logging: false,
-      imageTimeout: 20000,    // Augmente le timeout pour laisser le temps à tous les assets
-      windowWidth: 793,       // Force 210mm @ 96dpi = 793px (élimine les variations de zoom)
-      windowHeight: 1122,     // Force 297mm @ 96dpi = 1122px (une page A4)
-      useForeignObjectRendering: false, // Force le mode canvas classique
+      imageTimeout: 20000,
+      windowWidth: cloneWidth,   // Utilise la taille réelle du contenu
+      windowHeight: cloneHeight,
+      useForeignObjectRendering: true, // Rend le texte en SVG (vectoriel, fonts parfaites)
+      removeContainer: true,
     });
   } finally {
     if (clone.parentNode) clone.parentNode.removeChild(clone);
