@@ -156,8 +156,38 @@ export async function generatePdfOnServer(el, { filename = "document.pdf" } = {}
   if (!el) throw new Error("Élément cible introuvable pour le rendu PDF.");
 
   try {
-    // Récupère le HTML de l'élément
-    const html = el.outerHTML;
+    // Clone et optimise le HTML pour Puppeteer (retire les éléments inutiles)
+    const clone = el.cloneNode(true);
+
+    // Retire les animations/transitions pour accélération
+    const style = document.createElement("style");
+    style.textContent = `
+      * {
+        animation: none !important;
+        transition: none !important;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      @media print { * { box-shadow: none !important; } }
+    `;
+    clone.insertBefore(style, clone.firstChild);
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body { margin: 0; padding: 0; background: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif; }
+            @page { size: A4; margin: 0; }
+          </style>
+        </head>
+        <body>
+          ${clone.outerHTML}
+        </body>
+      </html>
+    `;
 
     // Envoie à l'API Puppeteer
     const response = await fetch("/api/generate-pdf", {

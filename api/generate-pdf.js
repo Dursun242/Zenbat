@@ -25,44 +25,44 @@ export default async function handler(req, res) {
     );
 
     const browser = await puppeteer.launch({
-      args: chromium.args,
+      args: [
+        ...chromium.args,
+        "--disable-gpu",
+        "--single-process", // Réduit overhead Chromium
+        "--no-sandbox",
+      ],
       defaultViewport: chromium.defaultViewport,
       executablePath,
-      headless: true,
+      headless: "new",
     });
 
     const page = await browser.newPage();
-    await page.setViewport({ width: 793, height: 1122 });
+    // Dimension exacte A4 en pixels (210mm × 297mm @ 96dpi)
+    await page.setViewport({ width: 794, height: 1123 });
 
-    // Désactive les animations/transitions pour plus rapidité
-    await page.addStyleTag({
-      content: `
-        * {
-          animation: none !important;
-          transition: none !important;
-        }
-      `,
-    });
-
-    // Injecter le HTML avec timeout générique
+    // Injecter le HTML rapidement (sans attendre networkidle)
     await page.setContent(html, {
-      waitUntil: ["domcontentloaded", "networkidle2"],
-      timeout: 30000,
+      waitUntil: "domcontentloaded",
+      timeout: 20000,
     });
 
-    // Attendre que les fonts se chargent
+    // Attendre explicitement les fonts Google
     try {
-      await page.evaluateHandle("document.fonts.ready");
+      await page.evaluateHandle(() => document.fonts.ready);
     } catch (e) {
-      // Ignore si fonts.ready n'est pas disponible
+      console.warn("Font ready not available, continuing...");
     }
 
-    // Générer le PDF avec marges zéro pour maximum fidélité
+    // Petit délai pour que le rendu se stabilise
+    await page.evaluateHandle(() => new Promise(r => setTimeout(r, 500)));
+
+    // Générer le PDF avec qualité maximale
     const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
       margin: { top: 0, right: 0, bottom: 0, left: 0 },
-      preferCSSPageSize: true, // Respecte le CSS page size si défini
+      scale: 1, // Respecte 100% du viewport
+      preferCSSPageSize: false,
     });
 
     await browser.close();
