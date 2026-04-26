@@ -36,6 +36,21 @@ const CAPS = [
     title: 'Vous restez aux commandes',
     desc: `Ajustez, supprimez, relancez l'IA en un clic. Le devis final est toujours le vôtre.`,
   },
+  {
+    icon: '🔔',
+    title: 'Relances de paiement automatiques',
+    desc: 'Vos clients reçoivent des rappels polis et espacés jusqu\'au règlement. Vous n\'avez rien à faire.',
+  },
+  {
+    icon: '💬',
+    title: 'Lien devis partageable WhatsApp',
+    desc: 'Envoyez votre devis directement en lien WhatsApp — votre client signe depuis son téléphone en quelques secondes.',
+  },
+  {
+    icon: '📧',
+    title: 'Newsletters clients',
+    desc: 'Tenez vos clients informés de vos offres saisonnières, promotions ou nouveaux services en un seul envoi.',
+  },
 ]
 
 export default function LandingIA() {
