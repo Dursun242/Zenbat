@@ -21,8 +21,8 @@ facturx.js   my-data-export.js   odoo-sign.js
 Les fichiers dans `/supabase/migrations/` ne s'appliquent **pas automatiquement**.
 L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - Prévenir l'utilisateur à chaque nouvelle migration créée.
-- Dernière migration appliquée : `0015_handle_new_user_trades.sql`
-- Prochaine migration : préfixer avec `0016_`.
+- Dernière migration appliquée : `0022_fix_rls_invoices_update.sql`
+- Prochaine migration : préfixer avec `0023_`.
 
 ### position:fixed et animations CSS transform
 Tout composant React qui contient des enfants `position:fixed` (modales, drawers, toasts)
