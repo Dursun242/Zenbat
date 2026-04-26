@@ -96,7 +96,7 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
   const tvaRate    = franchise ? 0 : (lignes.find(l => l.type_ligne === "ouvrage")?.tva_rate ?? 20);
   const acompteHT  = Math.round(ht * acomptePct) / 100;
   const acompteTTC = Math.round(acompteHT * (1 + tvaRate / 100) * 100) / 100;
-  const canAcompte = onCreateAcompte && lignes.length > 0 && ["envoye","en_signature","accepte"].includes(d.statut);
+  const canAcompte = onCreateAcompte && ht > 0 && ["envoye","en_signature","accepte"].includes(d.statut);
 
   const handleAcompte = async () => {
     if (!acompteHT || acompteLoading) return;

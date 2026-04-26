@@ -9,9 +9,27 @@ export default function AuthScreen({ onEnter }) {
   const searchPappers = async () => {
     if (siret.length < 9) return;
     setSearching(true);
-    await new Promise(r => setTimeout(r, 1200));
-    setCompany({ nom: "Maçonnerie Dupont SAS", ville: "Le Havre", siret, activite: "Construction de maisons individuelles" });
-    setSearching(false);
+    try {
+      const res = await fetch(`https://suggestions.pappers.fr/v2?q=${siret}&cibles=siret`);
+      const data = await res.json();
+      const r = data?.resultats_siret?.[0];
+      if (r) {
+        setCompany({
+          nom:      r.nom_entreprise || r.siege?.nom_entreprise || "",
+          ville:    r.siege?.ville || "",
+          siret:    r.siege?.siret || siret,
+          activite: r.libelle_code_naf || "",
+        });
+      } else {
+        setCompany(null);
+        alert("SIRET introuvable. Vérifiez le numéro ou renseignez votre entreprise manuellement lors de l'inscription.");
+      }
+    } catch {
+      setCompany(null);
+      alert("Impossible de contacter l'API. Renseignez votre entreprise manuellement lors de l'inscription.");
+    } finally {
+      setSearching(false);
+    }
   };
 
   return (
