@@ -136,9 +136,34 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
         <div className="detail-row" style={{ flex: 1, display: "flex" }}>
           <div className="detail-editor" style={{ flex: 1, minWidth: 0 }}>
 
-      <div style={{ background: "white", borderBottom: "1px solid #F0EBE3", padding: "14px 16px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-          <button onClick={onBack} style={{ background: "none", border: "none", color: "#6B6358", fontSize: 20, cursor: "pointer", flexShrink: 0 }}>←</button>
+      <div style={{ background: "white", borderBottom: "1px solid #F0EBE3", padding: "10px 14px" }}>
+        {/* Barre : Retour + actions */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: "#6B6358", fontSize: 13, cursor: "pointer", flexShrink: 0, padding: "4px 0" }}>
+            ← Retour
+          </button>
+          <div style={{ flex: 1 }}/>
+          <div style={{ display: "flex", gap: 5 }}>
+            {!isLocked ? (
+              <button onClick={onDelete}
+                style={{ background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                🗑 Supprimer
+              </button>
+            ) : (
+              <button onClick={onDelete}
+                title="Une facture émise ne peut être que masquée (conservée 10 ans en base, art. L102 B LPF)."
+                style={{ background: "#FAF7F2", color: "#6B6358", border: "1px solid #E8E2D8", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                Masquer
+              </button>
+            )}
+            <button onClick={handleFacturX} disabled={exporting || !lignes.length}
+              style={{ background: exporting || !lignes.length ? "#cbd5e1" : "#1A1612", color: "white", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 700, cursor: exporting || !lignes.length ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
+              {exporting ? "⏳…" : isLocked ? "⬇ Factur-X" : "🔒 Émettre"}
+            </button>
+          </div>
+        </div>
+        {/* Numero + badge */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
           <div style={{ fontSize: 11, color: "#9A8E82", fontFamily: "monospace", flex: 1 }}>{invoice.numero}</div>
           {invoice.invoice_type === "acompte" && (
             <span style={{ fontSize: 9, fontWeight: 700, color: "#c2410c", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 6, padding: "2px 6px" }}>ACOMPTE</span>
@@ -208,29 +233,6 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
           {invoice.statut === "brouillon" ? "👁 Aperçu brouillon" : "Voir le PDF de la facture"}
         </button>
 
-        {/* Actions principales — sous l'aperçu */}
-        <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-          {!isLocked ? (
-            <button onClick={onDelete}
-              style={{ background: "white", border: "1px solid #fecaca", color: "#b91c1c", borderRadius: 12, padding: "12px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
-              Supprimer
-            </button>
-          ) : (
-            <button onClick={onDelete}
-              title="Une facture émise ne peut être que masquée (conservée 10 ans en base, art. L102 B LPF)."
-              style={{ background: "white", border: "1px solid #E8E2D8", color: "#6B6358", borderRadius: 12, padding: "12px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
-              Masquer
-            </button>
-          )}
-          <button onClick={handleFacturX} disabled={exporting || !lignes.length}
-            style={{ flex: 1, background: exporting || !lignes.length ? "#cbd5e1" : "#1A1612", color: "white", border: "none", borderRadius: 12, padding: "12px 16px", fontSize: 13, fontWeight: 700, cursor: exporting || !lignes.length ? "not-allowed" : "pointer", lineHeight: 1.3 }}>
-            {exporting
-              ? "Génération en cours…"
-              : isLocked
-                ? "⬇ Re-télécharger Factur-X"
-                : "🔒 Émettre la facture définitive"}
-          </button>
-        </div>
         {!isLocked && (
           <div style={{ fontSize: 11, color: "#b45309", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 8, padding: "8px 10px", marginBottom: 12, lineHeight: 1.45 }}>
             ⚠ En cliquant sur « Émettre », le PDF + XML Factur-X seront générés et la facture sera <strong>verrouillée définitivement</strong> — plus aucune modification possible (CGI art. 289).
