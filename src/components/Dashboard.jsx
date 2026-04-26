@@ -34,7 +34,7 @@ export default function Dashboard({ stats, devis, clients, goDevis, setTab, bran
         ].map(({ l, v, dot }) => (
           <div key={l} style={{ background: "white", borderRadius: 14, padding: 16, border: "1px solid #f1f5f9", boxShadow: "0 1px 4px rgba(0,0,0,.04)" }}>
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: dot, marginBottom: 10 }}/>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "#0f172a" }}>{v}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#0f172a", fontFamily: "'Syne', sans-serif", letterSpacing: '-0.5px' }}>{v}</div>
             <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{l}</div>
           </div>
         ))}
