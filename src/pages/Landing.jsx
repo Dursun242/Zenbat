@@ -1,361 +1,431 @@
 import PricingSection from '../components/landing/PricingSection'
 
+/* ─── Icônes SVG légères (16×16, stroke terracotta) ─── */
+const Icon = ({ d, d2 }) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+    stroke="#C97B5C" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <path d={d} />{d2 && <path d={d2} />}
+  </svg>
+)
+
+const FEATURES = [
+  { title: 'Agent IA multilingue',          desc: 'Dictez ou tapez en français, arabe, darija, espagnol, anglais… Zenbat rédige le devis en français professionnel en moins de 30 s.',     d: 'M12 2a10 10 0 1 1 0 20A10 10 0 0 1 12 2zm0 6v4l3 3' },
+  { title: 'PDF professionnel instantané',   desc: 'Logo, couleurs, TVA, mentions légales, RIB. Un PDF à votre image prêt à envoyer en un clic.',                                             d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z', d2: 'M14 2v6h6' },
+  { title: 'Signature électronique eIDAS',   desc: 'Envoyez le devis via Odoo Sign. Le client signe depuis son téléphone — vous suivez l\'état en temps réel.',                              d: 'M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z' },
+  { title: 'Application mobile (PWA)',       desc: 'Installez Zenbat sur iPhone ou Android en un tap. Créez vos devis depuis le chantier.',                                                  d: 'M5 2h14a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm7 16h.01' },
+  { title: 'Gestion des clients',            desc: 'Carnet d\'adresses complet. Importez depuis une photo, une carte de visite ou une capture d\'écran.',                                    d: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm14 10v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75' },
+  { title: 'Tableau de bord & CA',           desc: 'Chiffre d\'affaires signé, devis en cours, taux de conversion — toutes vos stats en un coup d\'œil.',                                   d: 'M18 20V10M12 20V4M6 20v-6' },
+  { title: 'Factures & Factur-X 2026',       desc: 'Convertissez un devis en facture en un clic. PDF Factur-X embarqué, conforme à l\'obligation 2026.',                                    d: 'M2 5h20a0 0 0 0 1 0 0v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5zm0 5h20' },
+  { title: 'Conformité légale & TVA',        desc: 'Régime normal ou franchise (art. 293B). Décennale, IBAN, RIB — tout intégré automatiquement.',                                          d: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z' },
+]
+
 export default function Landing({ onLogin, onSignup }) {
   return (
     <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: '#fff', overflowX: 'hidden' }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=Instrument+Serif:ital@0;1&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html { scroll-behavior: smooth; }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        .hero-anim { animation: fadeUp 0.7s ease both; }
-        .hero-anim-2 { animation: fadeUp 0.7s 0.15s ease both; }
-        .hero-anim-3 { animation: fadeUp 0.7s 0.3s ease both; }
-        .phone-float { animation: float 4s ease-in-out infinite; }
-        .nav-btn:hover { opacity: 0.85 !important; }
-        .feature-card:hover { transform: translateY(-4px) !important; box-shadow: 0 20px 60px rgba(15,23,42,.1) !important; }
-        .step-card:hover { border-color: #22c55e !important; }
-        .cta-main:hover { background: #16a34a !important; transform: translateY(-2px); }
-        .cta-secondary:hover { background: #f1f5f9 !important; }
-        .trade-chip:hover { background: #f0fdf4 !important; border-color: #22c55e !important; }
+
+        /* ── Animations ── */
+        @keyframes lp-up   { from { opacity:0; transform:translateY(22px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes lp-pulse { 0%,100% { opacity:1; } 50% { opacity:.35; } }
+        .ha  { animation: lp-up .75s cubic-bezier(.16,1,.3,1) both; }
+        .ha1 { animation: lp-up .75s .13s cubic-bezier(.16,1,.3,1) both; }
+        .ha2 { animation: lp-up .75s .26s cubic-bezier(.16,1,.3,1) both; }
+
+        /* ── Nav ── */
+        .lp-nav-link:hover { color: #0A0A0A !important; }
+        .lp-nav-ghost:hover { background: rgba(10,10,10,.06) !important; }
+        .lp-nav-cta:hover   { background: #B86D4F !important; }
+
+        /* ── Hero CTA ── */
+        .lp-cta-primary:hover   { background: #B86D4F !important; transform: translateY(-2px); box-shadow: 0 10px 28px rgba(201,123,92,.38) !important; }
+        .lp-cta-ghost:hover     { background: rgba(255,255,255,.08) !important; }
+
+        /* ── Features newspaper grid ── */
+        .lp-features-grid {
+          border: 1px solid #EDE8E2;
+          border-radius: 20px;
+          overflow: hidden;
+        }
+        .lp-fi {
+          padding: 32px 28px;
+          border-right: 1px solid #EDE8E2;
+          border-bottom: 1px solid #EDE8E2;
+          transition: background .2s;
+          background: #fff;
+        }
+        .lp-fi:nth-child(2n)      { border-right: none; }
+        .lp-fi:nth-last-child(-n+2){ border-bottom: none; }
+        .lp-fi:hover               { background: #FAF7F2 !important; }
+
+        /* ── Trades ── */
+        .lp-chip:hover { border-color: #C97B5C !important; color: #C97B5C !important; }
+
+        /* ── Final CTA ── */
+        .lp-final-btn:hover { background: #B86D4F !important; transform: translateY(-2px); box-shadow: 0 10px 28px rgba(201,123,92,.40) !important; }
+
+        /* ── Responsive ── */
         @media (max-width: 768px) {
-          .hero-grid { flex-direction: column !important; }
-          .hero-phone { display: none !important; }
-          .features-grid { grid-template-columns: 1fr !important; }
-          .steps-grid { grid-template-columns: 1fr !important; }
-          .pricing-grid { grid-template-columns: 1fr !important; }
-          .nav-links { display: none !important; }
-          .hero-title { font-size: 36px !important; }
-          .section-title { font-size: 28px !important; }
-          .trades-grid { grid-template-columns: repeat(3, 1fr) !important; }
+          .lp-nav-links   { display: none !important; }
+          .lp-hero-title  { font-size: 38px !important; }
+          .lp-section-h2  { font-size: 30px !important; }
+          .lp-stats-grid  { grid-template-columns: repeat(2,1fr) !important; }
+          .lp-feat-grid   { grid-template-columns: 1fr !important; }
+          .lp-feat-grid .lp-fi { border-right: none !important; }
+          .lp-feat-grid .lp-fi:nth-last-child(-n+1) { border-bottom: none !important; }
+          .lp-feat-grid .lp-fi:nth-last-child(-n+2) { border-bottom: 1px solid #EDE8E2 !important; }
+          .lp-steps-grid  { grid-template-columns: 1fr !important; }
+          .lp-trades-grid { grid-template-columns: repeat(2,1fr) !important; }
         }
       `}</style>
 
-      {/* ── NAV ── */}
-      <nav style={{ background: '#0f172a', padding: '0 24px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 1px 0 rgba(255,255,255,.06)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
-          <span style={{ fontWeight: 800, fontSize: 22, letterSpacing: '-0.5px' }}>
-            <span style={{ color: '#22c55e' }}>Zen</span><span style={{ color: '#fff' }}>bat</span>
+      {/* ════════════════════════════════ NAV ════════════════════════════════ */}
+      <nav style={{
+        background: '#FAFAF8', borderBottom: '1px solid #EDE8E2',
+        padding: '0 28px', height: 60,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        position: 'sticky', top: 0, zIndex: 100,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 36 }}>
+          <span style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 22, letterSpacing: '-.3px' }}>
+            <span style={{ color: '#C97B5C' }}>Zen</span><span style={{ color: '#0A0A0A' }}>bat</span>
           </span>
-          <div className="nav-links" style={{ display: 'flex', gap: 24 }}>
-            {[['#features', 'Fonctionnalités'], ['#how', 'Comment ça marche'], ['#pricing', 'Tarifs'], ['/aide', 'Aide']].map(([href, label]) => (
-              <a key={href} href={href} style={{ color: '#94a3b8', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}
-                onMouseOver={e => e.target.style.color = '#fff'} onMouseOut={e => e.target.style.color = '#94a3b8'}>
-                {label}
-              </a>
+          <div className="lp-nav-links" style={{ display: 'flex', gap: 24 }}>
+            {[['#features','Fonctionnalités'],['#how','Comment ça marche'],['#pricing','Tarifs'],['#aide','Aide']].map(([h,l]) => (
+              <a key={h} href={h} className="lp-nav-link" style={{
+                color: '#6B6358', fontSize: 13.5, fontWeight: 500,
+                textDecoration: 'none', transition: 'color .15s',
+              }}>{l}</a>
             ))}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button className="nav-btn" onClick={onLogin}
-            style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #334155', background: 'transparent', color: '#94a3b8', fontSize: 13, fontWeight: 500, cursor: 'pointer', transition: 'opacity .2s' }}>
-            Connexion
-          </button>
-          <button className="nav-btn" onClick={onSignup}
-            style={{ padding: '8px 16px', borderRadius: 8, border: 0, background: '#22c55e', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'opacity .2s' }}>
-            Essai gratuit
-          </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="lp-nav-ghost" onClick={onLogin} style={{
+            padding: '7px 16px', borderRadius: 8, border: 'none',
+            background: 'transparent', color: '#6B6358',
+            fontSize: 13, fontWeight: 500, cursor: 'pointer', transition: 'background .15s',
+          }}>Connexion</button>
+          <button className="lp-nav-cta" onClick={onSignup} style={{
+            padding: '7px 16px', borderRadius: 8, border: 'none',
+            background: '#C97B5C', color: '#fff',
+            fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'background .15s',
+          }}>Essai gratuit</button>
         </div>
       </nav>
 
-      {/* ── HERO ── */}
-      <section style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)', padding: '80px 24px 100px', minHeight: 'calc(100vh - 64px)', display: 'flex', alignItems: 'center', position: 'relative', overflow: 'hidden' }}>
-        {/* Background decoration */}
-        <div style={{ position: 'absolute', top: -100, right: -100, width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle, rgba(34,197,94,.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: -50, left: -50, width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(34,197,94,.05) 0%, transparent 70%)', pointerEvents: 'none' }} />
+      {/* ════════════════════════════════ HERO ════════════════════════════════ */}
+      <section style={{
+        background: '#0D0B09',
+        padding: '96px 28px 120px',
+        minHeight: 'calc(100vh - 60px)',
+        display: 'flex', alignItems: 'center',
+        position: 'relative', overflow: 'hidden',
+      }}>
+        {/* Halo terracotta */}
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'radial-gradient(ellipse 80% 55% at 50% -5%, rgba(201,123,92,.13) 0%, transparent 68%)',
+        }} />
 
-        <div style={{ maxWidth: 1200, margin: '0 auto', width: '100%' }}>
-          <div className="hero-grid" style={{ display: 'flex', alignItems: 'center', gap: 64 }}>
+        <div style={{ maxWidth: 1060, margin: '0 auto', width: '100%', position: 'relative' }}>
 
-            {/* Left copy */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="hero-anim" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(34,197,94,.12)', border: '1px solid rgba(34,197,94,.25)', borderRadius: 20, padding: '6px 14px', marginBottom: 28 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', animation: 'pulse 2s infinite', display: 'inline-block' }} />
-                <span style={{ color: '#4ade80', fontSize: 12, fontWeight: 600, letterSpacing: '0.5px' }}>DISPONIBLE MAINTENANT — 30 JOURS GRATUITS</span>
-              </div>
+          {/* Badge disponibilité */}
+          <div className="ha" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            background: 'rgba(201,123,92,.10)', border: '1px solid rgba(201,123,92,.22)',
+            borderRadius: 20, padding: '6px 14px', marginBottom: 32,
+          }}>
+            <span style={{
+              width: 6, height: 6, borderRadius: '50%', background: '#C97B5C',
+              display: 'inline-block', animation: 'lp-pulse 2.5s ease infinite',
+            }} />
+            <span style={{ color: '#C97B5C', fontSize: 11, fontWeight: 600, letterSpacing: '.7px' }}>
+              DISPONIBLE MAINTENANT — 30 JOURS GRATUITS
+            </span>
+          </div>
 
-              <h1 className="hero-anim hero-title" style={{ fontSize: 52, fontWeight: 900, lineHeight: 1.1, color: '#fff', marginBottom: 20, letterSpacing: '-1.5px' }}>
-                Vos devis BTP<br />
-                <span style={{ color: '#22c55e' }}>en quelques secondes</span><br />
-                grâce à l'IA
-              </h1>
+          {/* Titre éditorial */}
+          <h1 className="ha1 lp-hero-title" style={{
+            fontFamily: "'Instrument Serif', Georgia, serif",
+            fontSize: 62, fontWeight: 400, lineHeight: 1.07,
+            color: '#F5F0EA', letterSpacing: '-1.5px',
+            marginBottom: 24, maxWidth: 680,
+          }}>
+            Vos devis BTP<br />
+            <span style={{ color: '#C97B5C', fontStyle: 'italic' }}>en quelques secondes,</span><br />
+            grâce à l'IA.
+          </h1>
 
-              <p className="hero-anim-2" style={{ fontSize: 18, color: '#94a3b8', lineHeight: 1.7, marginBottom: 36, maxWidth: 500 }}>
-                Décrivez vos prestations dans votre langue (français, arabe, darija, espagnol, anglais…) —
-                Zenbat génère instantanément un devis professionnel prêt à signer.
-              </p>
+          <p className="ha2" style={{
+            fontSize: 17, color: '#7A7470', lineHeight: 1.78,
+            marginBottom: 40, maxWidth: 460,
+          }}>
+            Décrivez vos prestations dans votre langue — français, arabe, darija,
+            espagnol, anglais… Zenbat génère instantanément un devis professionnel prêt à signer.
+          </p>
 
-              <div className="hero-anim-3" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <button className="cta-main" onClick={onSignup}
-                  style={{ padding: '14px 28px', borderRadius: 12, border: 0, background: '#22c55e', color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', transition: 'all .2s', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  Commencer gratuitement
-                  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
-                </button>
-                <button className="cta-secondary" onClick={onLogin}
-                  style={{ padding: '14px 28px', borderRadius: 12, border: '1px solid #334155', background: 'transparent', color: '#fff', fontSize: 16, fontWeight: 600, cursor: 'pointer', transition: 'all .2s' }}>
-                  Se connecter
-                </button>
-              </div>
+          {/* CTAs */}
+          <div className="ha2" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 36 }}>
+            <button className="lp-cta-primary" onClick={onSignup} style={{
+              padding: '13px 28px', borderRadius: 10, border: 'none',
+              background: '#C97B5C', color: '#fff',
+              fontSize: 15, fontWeight: 600, cursor: 'pointer',
+              transition: 'all .2s', display: 'flex', alignItems: 'center', gap: 8,
+              boxShadow: '0 4px 20px rgba(201,123,92,.28)',
+            }}>
+              Commencer gratuitement
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/>
+              </svg>
+            </button>
+            <button className="lp-cta-ghost" onClick={onLogin} style={{
+              padding: '13px 28px', borderRadius: 10,
+              border: '1px solid rgba(255,255,255,.10)', background: 'transparent',
+              color: 'rgba(255,255,255,.55)', fontSize: 15, fontWeight: 500,
+              cursor: 'pointer', transition: 'background .2s',
+            }}>Se connecter</button>
+          </div>
 
-              <div style={{ marginTop: 32, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                {[['✓', 'Sans carte bancaire'], ['✓', '30 jours d\'essai'], ['✓', 'Annulation à tout moment']].map(([icon, text]) => (
-                  <span key={text} style={{ color: '#64748b', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ color: '#22c55e', fontWeight: 700 }}>{icon}</span> {text}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Right — phone mockup */}
-            <div className="hero-phone" style={{ flexShrink: 0 }}>
-              <div className="phone-float" style={{ width: 280, height: 560, background: '#1e293b', borderRadius: 40, border: '6px solid #334155', boxShadow: '0 40px 80px rgba(0,0,0,.5)', padding: 16, position: 'relative', overflow: 'hidden' }}>
-                {/* Notch */}
-                <div style={{ width: 80, height: 24, background: '#0f172a', borderRadius: 12, margin: '0 auto 12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#334155' }} />
-                </div>
-                {/* App header */}
-                <div style={{ background: '#0f172a', borderRadius: 12, padding: '8px 12px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#fff', fontWeight: 800, fontSize: 14 }}><span style={{ color: '#22c55e' }}>Zen</span>bat</span>
-                  <span style={{ background: 'rgba(34,197,94,.15)', color: '#4ade80', fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 10, border: '1px solid rgba(34,197,94,.25)' }}>PRO</span>
-                </div>
-                {/* Devis card */}
-                <div style={{ background: '#0f172a', borderRadius: 12, padding: 12, marginBottom: 8 }}>
-                  <div style={{ fontSize: 10, color: '#64748b', marginBottom: 4 }}>DEV-2025-0042</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 2 }}>Rénovation salle de bain</div>
-                  <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>M. Martin · Paris 15e</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 16, fontWeight: 800, color: '#22c55e' }}>4 850,00 €</span>
-                    <span style={{ background: 'rgba(34,197,94,.15)', color: '#4ade80', fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 10, border: '1px solid rgba(34,197,94,.25)' }}>ACCEPTÉ</span>
-                  </div>
-                </div>
-                {/* Chat input simulation */}
-                <div style={{ background: '#0f172a', borderRadius: 12, padding: 10, marginBottom: 8 }}>
-                  <div style={{ fontSize: 10, color: '#64748b', marginBottom: 6 }}>Agent IA</div>
-                  <div style={{ background: '#1e293b', borderRadius: 8, padding: '6px 10px', marginBottom: 6 }}>
-                    <div style={{ fontSize: 10, color: '#94a3b8', lineHeight: 1.5 }}>Pose carrelage 25€/m² pour 40m², fourniture carrelage 18€/m²…</div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {['Carrelage / Faïence', 'Pose de carrelage'].map(t => (
-                      <div key={t} style={{ background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.2)', borderRadius: 6, padding: '3px 6px', fontSize: 8, color: '#4ade80', fontWeight: 600, whiteSpace: 'nowrap' }}>{t}</div>
-                    ))}
-                  </div>
-                </div>
-                {/* Bottom nav */}
-                <div style={{ position: 'absolute', bottom: 16, left: 16, right: 16, background: '#0f172a', borderRadius: 12, padding: '8px 0', display: 'flex', justifyContent: 'space-around' }}>
-                  {['🏠', '👥', '📄', '🧾', '✨'].map(icon => (
-                    <span key={icon} style={{ fontSize: 14 }}>{icon}</span>
-                  ))}
-                </div>
-              </div>
-            </div>
+          {/* Garanties */}
+          <div className="ha2" style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+            {['Sans carte bancaire', "30 jours d'essai", 'Annulation à tout moment'].map(t => (
+              <span key={t} style={{
+                color: '#4A4642', fontSize: 12.5,
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <circle cx="6.5" cy="6.5" r="5.5" fill="#C97B5C" fillOpacity=".18"/>
+                  <path d="M4 6.5L5.8 8.5L9 4.5" stroke="#C97B5C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                {t}
+              </span>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* ── STATS BAND ── */}
-      <section style={{ background: '#f8fafc', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', padding: '32px 24px' }}>
-        <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: 24 }}>
+      {/* ════════════════════════════════ STATS ════════════════════════════════ */}
+      <section style={{
+        background: '#FAF7F2',
+        borderBottom: '1px solid #EDE8E2',
+        padding: '60px 28px',
+      }}>
+        <div className="lp-stats-grid" style={{
+          maxWidth: 860, margin: '0 auto',
+          display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 24,
+        }}>
           {[
-            ['< 30s', 'Pour générer un devis'],
-            ['100%', 'Conforme TVA France'],
-            ['121+', 'Métiers couverts'],
-            ['19€', 'Par mois TTC tout inclus'],
+            ['< 30 s',  'Pour générer un devis'],
+            ['100 %',   'Conforme TVA France'],
+            ['121+',    'Métiers couverts'],
+            ['19 €',    'Par mois TTC tout inclus'],
           ].map(([stat, label]) => (
             <div key={stat} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 32, fontWeight: 900, color: '#0f172a', letterSpacing: '-1px' }}>{stat}</div>
-              <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>{label}</div>
+              <div style={{
+                fontFamily: "'Instrument Serif', Georgia, serif",
+                fontSize: 44, fontWeight: 400, color: '#0A0A0A',
+                letterSpacing: '-1px', lineHeight: 1, marginBottom: 8,
+              }}>{stat}</div>
+              <div style={{ fontSize: 13, color: '#6B6358', lineHeight: 1.5 }}>{label}</div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ── FEATURES ── */}
-      <section id="features" style={{ padding: '96px 24px', background: '#fff' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 56 }}>
-            <div style={{ display: 'inline-block', background: '#f0fdf4', color: '#16a34a', fontSize: 12, fontWeight: 700, padding: '4px 14px', borderRadius: 20, marginBottom: 16, letterSpacing: '0.5px' }}>FONCTIONNALITÉS</div>
-            <h2 className="section-title" style={{ fontSize: 40, fontWeight: 800, color: '#0f172a', letterSpacing: '-1px', marginBottom: 16 }}>Tout ce dont vous avez besoin</h2>
-            <p style={{ fontSize: 16, color: '#64748b', maxWidth: 520, margin: '0 auto', lineHeight: 1.7 }}>
-              De la description des travaux jusqu'à la signature du devis — tout en un seul outil.
+      {/* ════════════════════════════════ FEATURES ════════════════════════════════ */}
+      <section id="features" style={{ padding: '104px 28px', background: '#fff' }}>
+        <div style={{ maxWidth: 1060, margin: '0 auto' }}>
+
+          <div style={{ textAlign: 'center', marginBottom: 60 }}>
+            <div style={{
+              fontSize: 11, fontWeight: 700, color: '#C97B5C',
+              letterSpacing: '1px', textTransform: 'uppercase', marginBottom: 18,
+            }}>Fonctionnalités</div>
+            <h2 className="lp-section-h2" style={{
+              fontFamily: "'Instrument Serif', Georgia, serif",
+              fontSize: 40, fontWeight: 400, color: '#0A0A0A',
+              letterSpacing: '-.5px', marginBottom: 14, lineHeight: 1.18,
+            }}>Tout ce dont vous avez besoin</h2>
+            <p style={{ fontSize: 15.5, color: '#6B6358', maxWidth: 460, margin: '0 auto', lineHeight: 1.72 }}>
+              De la description des travaux jusqu'à la signature — tout en un seul outil.
             </p>
           </div>
 
-          <div className="features-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 24 }}>
-            {[
-              {
-                icon: '🤖',
-                title: 'Agent IA multilingue',
-                desc: 'Décrivez vos prestations par écrit ou à la voix dans 10 langues (français, arabe, darija, espagnol, anglais, portugais, italien…). Zenbat rédige le devis en français professionnel.',
-                color: '#f0fdf4', border: '#bbf7d0',
-              },
-              {
-                icon: '📄',
-                title: 'PDF professionnel instantané',
-                desc: 'Générez un PDF à votre image en un clic : logo, couleurs, coordonnées, TVA, mentions légales, RIB. Prêt à envoyer au client.',
-                color: '#eff6ff', border: '#bfdbfe',
-              },
-              {
-                icon: '✍️',
-                title: 'Signature électronique',
-                desc: 'Envoyez le devis en signature via Odoo Sign. Le client signe en ligne depuis son téléphone. Vous suivez l\'état en temps réel.',
-                color: '#fdf4ff', border: '#e9d5ff',
-              },
-              {
-                icon: '📱',
-                title: 'Application mobile (PWA)',
-                desc: 'Installez Zenbat sur votre iPhone ou Android en un tap. Créez vos devis depuis le chantier, sans connexion initiale requise.',
-                color: '#fff7ed', border: '#fed7aa',
-              },
-              {
-                icon: '👥',
-                title: 'Gestion des clients',
-                desc: 'Carnet d\'adresses complet : particuliers, artisans, entreprises. Importez depuis une photo, une carte de visite ou une capture d\'écran.',
-                color: '#f0fdf4', border: '#bbf7d0',
-              },
-              {
-                icon: '📊',
-                title: 'Tableau de bord & CA',
-                desc: 'Suivez votre chiffre d\'affaires signé, les devis en cours, votre taux de conversion. Toutes vos stats en un coup d\'œil.',
-                color: '#eff6ff', border: '#bfdbfe',
-              },
-              {
-                icon: '🧾',
-                title: 'Gestion des factures',
-                desc: 'Convertissez un devis accepté en facture en un clic. Générez des PDF conformes, suivez les paiements et préparez-vous à la facturation électronique obligatoire 2026.',
-                color: '#fefce8', border: '#fef08a',
-              },
-              {
-                icon: '🏛️',
-                title: 'Conformité légale & TVA',
-                desc: 'Régime normal ou franchise en base (art. 293B). Mentions légales, assurance décennale, IBAN, RIB — tout est intégré dans vos documents. Conforme Factur-X.',
-                color: '#f0f9ff', border: '#bae6fd',
-              },
-            ].map(({ icon, title, desc, color, border }) => (
-              <div key={title} className="feature-card"
-                style={{ background: color, border: `1px solid ${border}`, borderRadius: 20, padding: 28, transition: 'all .3s' }}>
-                <div style={{ fontSize: 36, marginBottom: 16 }}>{icon}</div>
-                <h3 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>{title}</h3>
-                <p style={{ fontSize: 14, color: '#475569', lineHeight: 1.7 }}>{desc}</p>
+          {/* Grille "journal" — bordures partagées */}
+          <div className="lp-features-grid lp-feat-grid"
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)' }}>
+            {FEATURES.map(({ title, desc, d, d2 }) => (
+              <div key={title} className="lp-fi">
+                <div style={{
+                  width: 38, height: 38, borderRadius: 10,
+                  background: 'rgba(201,123,92,.08)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  marginBottom: 16,
+                }}>
+                  <Icon d={d} d2={d2} />
+                </div>
+                <h3 style={{
+                  fontSize: 15.5, fontWeight: 600, color: '#0A0A0A',
+                  marginBottom: 8, letterSpacing: '-.2px',
+                }}>{title}</h3>
+                <p style={{ fontSize: 13.5, color: '#6B6358', lineHeight: 1.68 }}>{desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── HOW IT WORKS ── */}
-      <section id="how" style={{ padding: '96px 24px', background: '#f8fafc' }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 56 }}>
-            <div style={{ display: 'inline-block', background: '#f0fdf4', color: '#16a34a', fontSize: 12, fontWeight: 700, padding: '4px 14px', borderRadius: 20, marginBottom: 16, letterSpacing: '0.5px' }}>EN 3 ÉTAPES</div>
-            <h2 className="section-title" style={{ fontSize: 40, fontWeight: 800, color: '#0f172a', letterSpacing: '-1px', marginBottom: 16 }}>Simple comme bonjour</h2>
+      {/* ════════════════════════════════ HOW IT WORKS ════════════════════════════════ */}
+      <section id="how" style={{ padding: '104px 28px', background: '#FAF7F2' }}>
+        <div style={{ maxWidth: 960, margin: '0 auto' }}>
+
+          <div style={{ textAlign: 'center', marginBottom: 72 }}>
+            <div style={{
+              fontSize: 11, fontWeight: 700, color: '#C97B5C',
+              letterSpacing: '1px', textTransform: 'uppercase', marginBottom: 18,
+            }}>En 3 étapes</div>
+            <h2 className="lp-section-h2" style={{
+              fontFamily: "'Instrument Serif', Georgia, serif",
+              fontSize: 40, fontWeight: 400, color: '#0A0A0A',
+              letterSpacing: '-.5px', lineHeight: 1.18,
+            }}>Simple comme bonjour</h2>
           </div>
 
-          <div className="steps-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
+          <div className="lp-steps-grid" style={{
+            display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 56,
+          }}>
             {[
-              {
-                n: '01',
-                icon: '💬',
-                title: 'Décrivez les travaux',
-                desc: 'Tapez ou dictez les travaux dans la langue de votre choix. Ex : "Pose de carrelage 25€/m² pour 40m², fourniture 18€/m²"',
-              },
-              {
-                n: '02',
-                icon: '⚡',
-                title: 'L\'IA génère le devis',
-                desc: 'En moins de 30 secondes, Zenbat structure chaque ligne : désignation, quantité, prix unitaire, TVA, total HT.',
-              },
-              {
-                n: '03',
-                icon: '✅',
-                title: 'Envoyez & faites signer',
-                desc: 'Générez le PDF, envoyez-le par email ou directement en signature électronique. Suivez l\'état depuis l\'appli.',
-              },
-            ].map(({ n, icon, title, desc }) => (
-              <div key={n} className="step-card"
-                style={{ background: '#fff', border: '2px solid #e2e8f0', borderRadius: 20, padding: 28, transition: 'border-color .2s', position: 'relative' }}>
-                <div style={{ position: 'absolute', top: 20, right: 20, fontSize: 44, fontWeight: 900, color: '#f1f5f9', letterSpacing: '-2px', lineHeight: 1 }}>{n}</div>
-                <div style={{ fontSize: 40, marginBottom: 16 }}>{icon}</div>
-                <h3 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>{title}</h3>
-                <p style={{ fontSize: 14, color: '#64748b', lineHeight: 1.7 }}>{desc}</p>
+              { n: '01', title: 'Décrivez les travaux',    desc: "Tapez ou dictez dans la langue de votre choix. Ex : « Pose de carrelage 25 €/m² pour 40 m², fourniture 18 €/m² »" },
+              { n: '02', title: "L'IA génère le devis",    desc: "En moins de 30 secondes, Zenbat structure chaque ligne : désignation, quantité, prix unitaire, TVA, total HT." },
+              { n: '03', title: 'Envoyez & faites signer', desc: "PDF prêt en un clic. Envoyez par email ou en signature électronique et suivez l'état depuis l'appli." },
+            ].map(({ n, title, desc }) => (
+              <div key={n}>
+                <div style={{
+                  fontFamily: "'Instrument Serif', Georgia, serif",
+                  fontSize: 72, fontWeight: 400, color: 'rgba(10,10,10,.07)',
+                  letterSpacing: '-3px', lineHeight: 1, marginBottom: 16,
+                }}>{n}</div>
+                <h3 style={{
+                  fontSize: 16.5, fontWeight: 600, color: '#0A0A0A',
+                  marginBottom: 10, letterSpacing: '-.2px',
+                }}>{title}</h3>
+                <p style={{ fontSize: 14, color: '#6B6358', lineHeight: 1.72 }}>{desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── TRADES ── */}
-      <section style={{ padding: '80px 24px', background: '#fff' }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto', textAlign: 'center' }}>
-          <div style={{ display: 'inline-block', background: '#f0fdf4', color: '#16a34a', fontSize: 12, fontWeight: 700, padding: '4px 14px', borderRadius: 20, marginBottom: 16, letterSpacing: '0.5px' }}>TOUS SECTEURS D'ACTIVITÉ</div>
-          <h2 className="section-title" style={{ fontSize: 36, fontWeight: 800, color: '#0f172a', letterSpacing: '-1px', marginBottom: 12 }}>Votre métier, votre IA</h2>
-          <p style={{ fontSize: 15, color: '#64748b', marginBottom: 40, maxWidth: 560, margin: '0 auto 40px' }}>
-            BTP, beauté, tech, restauration, santé… Zenbat s'adapte à vos métiers déclarés. L'IA génère des devis cohérents avec votre activité.
+      {/* ════════════════════════════════ TRADES ════════════════════════════════ */}
+      <section style={{ padding: '88px 28px', background: '#fff' }}>
+        <div style={{ maxWidth: 960, margin: '0 auto', textAlign: 'center' }}>
+          <div style={{
+            fontSize: 11, fontWeight: 700, color: '#C97B5C',
+            letterSpacing: '1px', textTransform: 'uppercase', marginBottom: 18,
+          }}>Tous secteurs</div>
+          <h2 className="lp-section-h2" style={{
+            fontFamily: "'Instrument Serif', Georgia, serif",
+            fontSize: 36, fontWeight: 400, color: '#0A0A0A',
+            letterSpacing: '-.5px', marginBottom: 14, lineHeight: 1.2,
+          }}>Votre métier, votre IA</h2>
+          <p style={{
+            fontSize: 15, color: '#6B6358', lineHeight: 1.72,
+            maxWidth: 480, margin: '0 auto 44px',
+          }}>
+            BTP, beauté, tech, restauration… Zenbat s'adapte à vos métiers déclarés et génère des devis cohérents avec votre activité.
           </p>
-          <div className="trades-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, maxWidth: 900, margin: '0 auto' }}>
+
+          <div className="lp-trades-grid" style={{
+            display: 'grid', gridTemplateColumns: 'repeat(4,1fr)',
+            gap: 7, maxWidth: 880, margin: '0 auto',
+          }}>
             {[
-              ['🧱','Maçonnerie'],['🚰','Plomberie'],['⚡','Électricité'],['🎨','Peinture'],
-              ['🪵','Charpente'],['❄️','Climatisation'],['🟦','Carrelage'],['🌳','Paysagisme'],
-              ['✂️','Coiffure'],['💅','Esthétique'],['💻','Développement web'],['📸','Photographie'],
-              ['🍕','Restauration'],['🥐','Boulangerie'],['🚗','Mécanique auto'],['📦','Déménagement'],
-              ['💆','Kinésithérapie'],['🎓','Formation'],['🧹','Nettoyage'],['🐾','Toilettage animal'],
-              ['🔥','Chauffage'],['🛁','Sanitaire'],['🏠','Couverture'],['🍳','Cuisine / Agencement'],
-            ].map(([icon, label]) => (
-              <div key={label} className="trade-chip"
-                style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '10px 8px', fontSize: 12, fontWeight: 500, color: '#475569', display: 'flex', alignItems: 'center', gap: 6, transition: 'all .2s', cursor: 'default' }}>
-                <span style={{ fontSize: 16 }}>{icon}</span>
-                <span style={{ lineHeight: 1.3 }}>{label}</span>
+              'Maçonnerie','Plomberie','Électricité','Peinture',
+              'Charpente','Climatisation','Carrelage','Paysagisme',
+              'Coiffure','Esthétique','Développement web','Photographie',
+              'Restauration','Boulangerie','Mécanique auto','Déménagement',
+              'Kinésithérapie','Formation','Nettoyage','Toilettage animal',
+              'Chauffage','Sanitaire','Couverture','Cuisine / Agencement',
+            ].map(label => (
+              <div key={label} className="lp-chip" style={{
+                border: '1px solid #EDE8E2', borderRadius: 8,
+                padding: '9px 10px', fontSize: 12.5, fontWeight: 500,
+                color: '#6B6358', background: '#fff',
+                transition: 'border-color .18s, color .18s',
+                textAlign: 'center', lineHeight: 1.4, cursor: 'default',
+              }}>
+                {label}
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── PRICING ── */}
+      {/* ════════════════════════════════ PRICING ════════════════════════════════ */}
       <PricingSection />
 
-      {/* ── FINAL CTA ── */}
-      <section style={{ background: '#0f172a', padding: '96px 24px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 800, height: 800, borderRadius: '50%', background: 'radial-gradient(circle, rgba(34,197,94,.06) 0%, transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'relative', zIndex: 1, maxWidth: 600, margin: '0 auto' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🏗️</div>
-          <h2 style={{ fontSize: 40, fontWeight: 900, color: '#fff', letterSpacing: '-1.5px', marginBottom: 16, lineHeight: 1.2 }}>
-            Prêt à gagner du temps<br />sur vos devis ?
+      {/* ════════════════════════════════ FINAL CTA ════════════════════════════════ */}
+      <section style={{
+        background: '#0D0B09', padding: '108px 28px',
+        textAlign: 'center', position: 'relative', overflow: 'hidden',
+      }}>
+        <div style={{
+          position: 'absolute', top: '50%', left: '50%', pointerEvents: 'none',
+          transform: 'translate(-50%, -50%)',
+          width: 700, height: 700, borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(201,123,92,.09) 0%, transparent 62%)',
+        }} />
+        <div style={{ position: 'relative', maxWidth: 560, margin: '0 auto' }}>
+          <h2 style={{
+            fontFamily: "'Instrument Serif', Georgia, serif",
+            fontSize: 46, fontWeight: 400, color: '#F5F0EA',
+            letterSpacing: '-1px', marginBottom: 18, lineHeight: 1.13,
+          }}>
+            Prêt à gagner du temps<br />
+            <span style={{ color: '#C97B5C', fontStyle: 'italic' }}>sur vos devis ?</span>
           </h2>
-          <p style={{ fontSize: 16, color: '#94a3b8', marginBottom: 36, lineHeight: 1.7 }}>
+          <p style={{ fontSize: 15.5, color: '#5A5550', marginBottom: 36, lineHeight: 1.75 }}>
             Rejoignez les artisans et indépendants qui utilisent Zenbat.<br />
             Aucune carte bancaire requise pour l'essai.
           </p>
-          <button className="cta-main" onClick={onSignup}
-            style={{ padding: '16px 36px', borderRadius: 14, border: 0, background: '#22c55e', color: '#fff', fontSize: 18, fontWeight: 700, cursor: 'pointer', transition: 'all .2s' }}>
+          <button className="lp-final-btn" onClick={onSignup} style={{
+            padding: '14px 36px', borderRadius: 12, border: 'none',
+            background: '#C97B5C', color: '#fff',
+            fontSize: 16, fontWeight: 600, cursor: 'pointer',
+            transition: 'all .2s', boxShadow: '0 4px 20px rgba(201,123,92,.28)',
+          }}>
             Créer mon compte gratuitement
           </button>
         </div>
       </section>
 
-      {/* ── FOOTER ── */}
-      <footer style={{ background: '#020617', padding: '32px 24px', textAlign: 'center' }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-          <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.5px' }}>
-            <span style={{ color: '#22c55e' }}>Zen</span><span style={{ color: '#475569' }}>bat</span>
+      {/* ════════════════════════════════ FOOTER ════════════════════════════════ */}
+      <footer style={{ background: '#080706', padding: '28px 28px' }}>
+        <div style={{
+          maxWidth: 1000, margin: '0 auto',
+          display: 'flex', justifyContent: 'space-between',
+          alignItems: 'center', flexWrap: 'wrap', gap: 16,
+        }}>
+          <span style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 20, letterSpacing: '-.3px' }}>
+            <span style={{ color: '#C97B5C' }}>Zen</span><span style={{ color: '#3A3632' }}>bat</span>
           </span>
-          <span style={{ color: '#334155', fontSize: 13 }}>© 2026 Zenbat — SaaS de devis & facturation</span>
-          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-            <a href="/aide" style={{ color: '#475569', fontSize: 13, textDecoration: 'none' }}
-              onMouseOver={e => e.target.style.color = '#94a3b8'} onMouseOut={e => e.target.style.color = '#475569'}>
-              Aide
-            </a>
-            <a href="/cgu" style={{ color: '#475569', fontSize: 13, textDecoration: 'none' }}
-              onMouseOver={e => e.target.style.color = '#94a3b8'} onMouseOut={e => e.target.style.color = '#475569'}>
-              CGU
-            </a>
-            <a href="mailto:Zenbat76@gmail.com" style={{ color: '#475569', fontSize: 13, textDecoration: 'none' }}
-              onMouseOver={e => e.target.style.color = '#94a3b8'} onMouseOut={e => e.target.style.color = '#475569'}>
-              Contact
-            </a>
-            <button onClick={onLogin} style={{ background: 'none', border: 'none', color: '#475569', fontSize: 13, cursor: 'pointer' }}
-              onMouseOver={e => e.target.style.color = '#94a3b8'} onMouseOut={e => e.target.style.color = '#475569'}>
+          <span style={{ color: '#2E2A26', fontSize: 12 }}>© 2026 Zenbat</span>
+          <div style={{ display: 'flex', gap: 20 }}>
+            {[['#','Aide'],['/cgu','CGU'],['mailto:Zenbat76@gmail.com','Contact']].map(([href, label]) => (
+              <a key={label} href={href} style={{ color: '#3A3632', fontSize: 13, textDecoration: 'none' }}
+                onMouseOver={e => e.target.style.color = '#6B6358'}
+                onMouseOut={e => e.target.style.color = '#3A3632'}>
+                {label}
+              </a>
+            ))}
+            <button onClick={onLogin} style={{
+              background: 'none', border: 'none', color: '#3A3632',
+              fontSize: 13, cursor: 'pointer',
+            }}
+              onMouseOver={e => e.target.style.color = '#6B6358'}
+              onMouseOut={e => e.target.style.color = '#3A3632'}>
               Connexion
             </button>
           </div>
