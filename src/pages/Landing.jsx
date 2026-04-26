@@ -7,8 +7,9 @@ import LandingMetiers  from '../components/landing/LandingMetiers'
 import LandingRelance  from '../components/landing/LandingRelance'
 import LandingHow      from '../components/landing/LandingHow'
 import PricingSection  from '../components/landing/PricingSection'
-import LandingFAQ      from '../components/landing/LandingFAQ'
-import LandingFooter   from '../components/landing/LandingFooter'
+import LandingFAQ        from '../components/landing/LandingFAQ'
+import LandingNewsletter from '../components/landing/LandingNewsletter'
+import LandingFooter     from '../components/landing/LandingFooter'
 
 function WhatsAppButton() {
   const [hovered, setHovered] = useState(false)
@@ -83,8 +84,9 @@ export default function Landing({ onLogin, onSignup }) {
       <LandingRelance />
       <LandingHow     />
       <PricingSection />
-      <LandingFAQ     />
-      <LandingFooter  onSignup={onSignup} />
+      <LandingFAQ        />
+      <LandingNewsletter />
+      <LandingFooter     onSignup={onSignup} />
       <WhatsAppButton />
     </div>
   )
