@@ -61,12 +61,15 @@ export default function LandingIA() {
   const ref = useRef(null)
 
   useEffect(() => {
+    const show = () => setVisible(true)
     const io = new IntersectionObserver(
-      ([e]) => { if (e.isIntersecting) setVisible(true) },
-      { threshold: 0.15 }
+      ([e]) => { if (e.isIntersecting) show() },
+      { threshold: 0.01 }
     )
     if (ref.current) io.observe(ref.current)
-    return () => io.disconnect()
+    // Fallback : affiche quoi qu'il arrive après 500ms
+    const t = setTimeout(show, 500)
+    return () => { io.disconnect(); clearTimeout(t) }
   }, [])
 
   // Animation loop
