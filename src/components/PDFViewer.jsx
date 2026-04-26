@@ -7,7 +7,7 @@ const Ix = {
   odoo: <svg width="15" height="15" viewBox="0 0 24 24" fill="#714B67"><circle cx="12" cy="12" r="3"/><circle cx="4" cy="12" r="3"/><circle cx="20" cy="12" r="3"/></svg>,
 }
 
-export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageReady, onSendOdoo, sending=false, sent=false, kind="devis", noDownload=false, inline=false }) {
+export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageReady, onSendOdoo, sending=false, sent=false, kind="devis", noDownload=false, inline=false, onMarkSent, onMarkSignature }) {
   const isAvoir  = kind === "facture" && !!d?.avoir_of_invoice_id;
   const docLabel = isAvoir ? "FACTURE D'AVOIR" : kind === "facture" ? "FACTURE" : "DEVIS";
   const MM_TO_PX = 3.7795275591
@@ -331,12 +331,26 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
         {/* Toolbar inline */}
         <div style={{ background: "#1A1612", padding: "8px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
           <span style={{ color: "#9A8E82", fontSize: 12, fontWeight: 500 }}>{d.numero}.pdf</span>
-          {!noDownload && (
-            <button onClick={download}
-              style={{ background: "#22c55e", color: "white", border: "none", borderRadius: 8, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-              ⬇ Télécharger
-            </button>
-          )}
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            {onMarkSent && d.statut === "brouillon" && (
+              <button onClick={() => { onMarkSent(); onClose?.() }}
+                style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                ✉️ Marquer envoyé
+              </button>
+            )}
+            {onMarkSignature && ["brouillon","envoye"].includes(d.statut) && (
+              <button onClick={() => { onMarkSignature(); onClose?.() }}
+                style={{ background: "#faf5ff", color: "#6b21a8", border: "1px solid #e9d5ff", borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                🖊 Passer en signature
+              </button>
+            )}
+            {!noDownload && (
+              <button onClick={download}
+                style={{ background: "#22c55e", color: "white", border: "none", borderRadius: 8, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                ⬇ Télécharger
+              </button>
+            )}
+          </div>
         </div>
         {/* PDF scroll */}
         <div ref={wrapRef} style={{ background: "#dde1e7", padding: "20px 14px", overflowY: "auto", flex: 1, boxSizing: "border-box" }}>
@@ -385,6 +399,19 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
             <button onClick={()=>setUserZoom(1)} style={{background:"none",border:"none",color:"#9A8E82",padding:"0 8px",fontSize:11,fontWeight:600,cursor:"pointer",minWidth:44}} aria-label="Réinitialiser zoom">{Math.round(scale*100)}%</button>
             <button onClick={()=>setUserZoom(z=>Math.min(3,+(z+0.25).toFixed(2)))} style={{background:"none",border:"none",color:"#9A8E82",width:30,height:30,fontSize:16,cursor:"pointer",padding:0}} aria-label="Zoomer">+</button>
           </div>
+          {onMarkSent && d.statut === "brouillon" && (
+            <button onClick={() => { onMarkSent(); onClose?.() }}
+              style={{background:"#eff6ff",color:"#1d4ed8",border:"1px solid #bfdbfe",borderRadius:10,padding:"7px 10px",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+              ✉️
+            </button>
+          )}
+          {onMarkSignature && ["brouillon","envoye"].includes(d.statut) && (
+            <button onClick={() => { onMarkSignature(); onClose?.() }}
+              style={{background:"#faf5ff",color:"#6b21a8",border:"1px solid #e9d5ff",borderRadius:10,padding:"7px 10px",fontSize:12,fontWeight:700,cursor:"pointer"}}
+              title="Passer en signature">
+              🖊
+            </button>
+          )}
           {!noDownload && (
             <button
               onClick={async () => {

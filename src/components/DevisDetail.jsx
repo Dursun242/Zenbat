@@ -125,7 +125,10 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
         <PDFViewer d={d} cl={cl} brand={brand} onClose={() => setShowPDF(false)}
           onSendOdoo={!["accepte", "refuse"].includes(d.statut) ? sendOdoo : undefined}
           sending={sending}
-          sent={!!signUrl || d.statut === "en_signature"}/>
+          sent={!!signUrl || d.statut === "en_signature"}
+          onMarkSent={d.statut === "brouillon" ? () => onChange({ ...d, statut: "envoye" }) : undefined}
+          onMarkSignature={["brouillon","envoye"].includes(d.statut) ? () => onChange({ ...d, statut: "en_signature" }) : undefined}
+        />
       )}
 
       {acompteModal && (
@@ -329,20 +332,6 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
 
           {/* Actions statut */}
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {/* brouillon → envoyé */}
-            {d.statut === "brouillon" && !isRemplace && (
-              <button onClick={() => onChange({ ...d, statut: "envoye" })}
-                style={{ width: "100%", background: "#eff6ff", color: "#1d4ed8", border: "1.5px solid #bfdbfe", borderRadius: 12, padding: 12, fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                ✉️ Marquer comme envoyé
-              </button>
-            )}
-            {/* brouillon / envoyé → en signature */}
-            {["brouillon", "envoye"].includes(d.statut) && !isRemplace && (
-              <button onClick={() => onChange({ ...d, statut: "en_signature" })}
-                style={{ width: "100%", background: "#faf5ff", color: "#6b21a8", border: "1.5px solid #e9d5ff", borderRadius: 12, padding: 12, fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                🖊 Passer en signature
-              </button>
-            )}
             {signUrl && (
               <div style={{ background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 12, padding: "12px 14px" }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: "#7c3aed", marginBottom: 5, display: "flex", alignItems: "center", gap: 5 }}>
