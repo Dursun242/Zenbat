@@ -1,3 +1,5 @@
+import PricingSection from '../components/landing/PricingSection'
+
 export default function Landing({ onLogin, onSignup }) {
   return (
     <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: '#fff', overflowX: 'hidden' }}>
@@ -311,59 +313,7 @@ export default function Landing({ onLogin, onSignup }) {
       </section>
 
       {/* ── PRICING ── */}
-      <section id="pricing" style={{ padding: '96px 24px', background: '#f8fafc' }}>
-        <div style={{ maxWidth: 800, margin: '0 auto', textAlign: 'center' }}>
-          <div style={{ display: 'inline-block', background: '#f0fdf4', color: '#16a34a', fontSize: 12, fontWeight: 700, padding: '4px 14px', borderRadius: 20, marginBottom: 16, letterSpacing: '0.5px' }}>TARIFS</div>
-          <h2 className="section-title" style={{ fontSize: 40, fontWeight: 800, color: '#0f172a', letterSpacing: '-1px', marginBottom: 12 }}>Simple et transparent</h2>
-          <p style={{ fontSize: 16, color: '#64748b', marginBottom: 48 }}>Commencez gratuitement, passez Pro quand vous êtes prêt.</p>
-
-          <div className="pricing-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 24, textAlign: 'left' }}>
-            {/* Free */}
-            <div style={{ background: '#fff', border: '2px solid #e2e8f0', borderRadius: 24, padding: 32 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#64748b', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Essai gratuit</div>
-              <div style={{ fontSize: 42, fontWeight: 900, color: '#0f172a', letterSpacing: '-2px', marginBottom: 4 }}>0€</div>
-              <div style={{ fontSize: 14, color: '#94a3b8', marginBottom: 24 }}>pendant 30 jours</div>
-              <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
-                {['Devis illimités', 'Agent IA inclus', 'PDF professionnel', 'Gestion clients', 'Application mobile'].map(f => (
-                  <li key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: '#475569' }}>
-                    <span style={{ color: '#22c55e', fontWeight: 700, fontSize: 16 }}>✓</span> {f}
-                  </li>
-                ))}
-              </ul>
-              <button onClick={onSignup}
-                style={{ width: '100%', padding: '12px 0', borderRadius: 12, border: '2px solid #0f172a', background: 'transparent', color: '#0f172a', fontSize: 15, fontWeight: 600, cursor: 'pointer', transition: 'all .2s' }}
-                onMouseOver={e => { e.currentTarget.style.background = '#0f172a'; e.currentTarget.style.color = '#fff'; }}
-                onMouseOut={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#0f172a'; }}>
-                Commencer gratuitement
-              </button>
-            </div>
-
-            {/* Pro */}
-            <div style={{ background: '#0f172a', border: '2px solid #22c55e', borderRadius: 24, padding: 32, position: 'relative', overflow: 'hidden' }}>
-              <div style={{ position: 'absolute', top: 16, right: 16, background: '#22c55e', color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 10, letterSpacing: '0.5px' }}>RECOMMANDÉ</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#4ade80', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Pro</div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 4 }}>
-                <span style={{ fontSize: 42, fontWeight: 900, color: '#fff', letterSpacing: '-2px' }}>19€</span>
-                <span style={{ fontSize: 14, color: '#94a3b8' }}>/mois TTC</span>
-              </div>
-              <div style={{ fontSize: 14, color: '#64748b', marginBottom: 24 }}>Sans engagement</div>
-              <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
-                {['Tout de l\'essai gratuit', 'Devis illimités sans limite', 'Signature Odoo Sign', 'Support prioritaire', 'Mises à jour IA incluses'].map(f => (
-                  <li key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: '#cbd5e1' }}>
-                    <span style={{ color: '#22c55e', fontWeight: 700, fontSize: 16 }}>✓</span> {f}
-                  </li>
-                ))}
-              </ul>
-              <button onClick={onSignup}
-                style={{ width: '100%', padding: '12px 0', borderRadius: 12, border: 0, background: '#22c55e', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', transition: 'background .2s' }}
-                onMouseOver={e => e.currentTarget.style.background = '#16a34a'}
-                onMouseOut={e => e.currentTarget.style.background = '#22c55e'}>
-                Passer Pro →
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
+      <PricingSection />
 
       {/* ── FINAL CTA ── */}
       <section style={{ background: '#0f172a', padding: '96px 24px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
