@@ -593,7 +593,7 @@ export default function App() {
 
         {/* Contenu principal */}
         <div className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "64px" }}>
-        {["clients","client_detail","devis","devis_detail","factures","factures_detail"].includes(tab) && (
+        {["devis","devis_detail","factures","factures_detail"].includes(tab) && (
           <SearchBar devis={devis} clients={clients} invoices={invoices} goDevis={goDevis} goClient={goClient} goInvoice={goInvoice}/>
         )}
         {tab === "dashboard"     && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}
