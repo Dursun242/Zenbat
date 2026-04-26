@@ -117,7 +117,7 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
           .detail-shell{height:100%;min-height:unset !important;overflow:hidden}
           .detail-row{height:100%}
           .detail-editor{overflow-y:auto}
-          .detail-preview{display:flex !important;flex-direction:column;width:46%;flex-shrink:0;border-left:1px solid #E8E2D8;overflow-y:auto}
+          .detail-preview{display:flex !important;flex-direction:column;width:58%;flex-shrink:0;border-left:1px solid #E8E2D8;overflow-y:auto}
           .detail-pdf-btn{display:none !important}
         }
       `}</style>
