@@ -181,7 +181,7 @@ export default function LandingMetiers() {
           style={{
             fontFamily: "'Syne', sans-serif",
             fontSize: "42px",
-            fontWeight: 700,
+            fontWeight: 400,
             color: COLORS.ink,
             margin: "0 0 16px 0",
             lineHeight: 1.1,

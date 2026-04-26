@@ -83,10 +83,9 @@ export default function LandingFooter({ onSignup }) {
           style={{
             fontFamily:  "'Syne', sans-serif",
             fontSize:    48,
-            fontWeight:  700,
+            fontWeight:  400,
             color:       C.creamlight,
             lineHeight:  1.15,
-            letterSpacing: "-1px",
             margin:      0,
             maxWidth:    720,
             marginLeft:  'auto',

@@ -229,9 +229,9 @@ export default function LandingRelance() {
             style={{
               fontFamily: "'Syne', sans-serif",
               fontSize: 42,
-              fontWeight: 700,
+              fontWeight: 400,
               color: C.ink,
-              letterSpacing: "-1px",
+              letterSpacing: "-0.5px",
               lineHeight: 1.15,
               margin: "0 0 20px 0",
             }}
