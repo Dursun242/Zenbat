@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "./lib/auth.jsx";
 import {
   listClients, createClient as apiCreateClient, updateClient as apiUpdateClient, deleteClient as apiDeleteClient,
-  listDevisWithLignes, getDevis, createDevis as apiCreateDevis, updateDevis as apiUpdateDevis, replaceLignes, deleteDevis as apiDeleteDevis,
+  listDevisWithLignes, getDevis, createDevis as apiCreateDevis, updateDevis as apiUpdateDevis, replaceLignes, deleteDevis as apiDeleteDevis, createIndiceDevis as apiCreateIndice,
   listInvoices, createInvoice as apiCreateInvoice, updateInvoice as apiUpdateInvoice, replaceInvoiceLignes, deleteInvoice as apiDeleteInvoice, nextInvoiceNumber, createAvoirFromInvoice as apiCreateAvoir, createAcompteFromDevis as apiCreateAcompte,
   updateMyProfile, getMyProfile, saveBrandData,
 } from "./lib/api";
@@ -270,6 +270,23 @@ export default function App() {
     };
     await onCreateDevis(copy);
     goDevis(newId);
+  };
+
+  const onCreateIndice = async (sourceId) => {
+    if (!user) { showErr("Vous devez être connecté."); return; }
+    try {
+      const src = devis.find(d => d.id === sourceId);
+      if (!src) throw new Error("Devis introuvable");
+      const created = await apiCreateIndice(src);
+      // Marque la source comme remplacée dans le state local
+      setDevis(prev => prev.map(d => d.id === sourceId && d.statut !== "remplace"
+        ? { ...d, statut: "remplace" } : d));
+      setDevis(prev => [{ ...created }, ...prev]);
+      goDevis(created.id);
+    } catch (e) {
+      console.error("[create indice]", e);
+      showErr(e?.message || "Impossible de créer l'indice");
+    }
   };
 
   const onDeleteDevis = async (id) => {
@@ -604,6 +621,16 @@ export default function App() {
             onConvertToInvoice={() => onCreateInvoiceFromDevis(selD)}
             onCreateAcompte={onCreateAcompte}
             onDuplicate={() => onDuplicateDevis(selD)}
+            onCreateIndice={() => onCreateIndice(selD)}
+            groupVersions={(() => {
+              const cur = devis.find(x => x.id === selD);
+              if (!cur) return [];
+              const rootId = cur.root_devis_id || cur.id;
+              return devis
+                .filter(x => x.id === rootId || x.root_devis_id === rootId)
+                .sort((a, b) => !a.indice ? -1 : !b.indice ? 1 : a.indice.localeCompare(b.indice));
+            })()}
+            goDevis={goDevis}
             autoOpenPDF={autoOpenPDF === selD}
             onAutoOpenPDFConsumed={() => setAutoOpenPDF(null)}
             loading={loadingDevis.has(selD)}/>

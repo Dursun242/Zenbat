@@ -164,6 +164,74 @@ export async function getDevis(id) {
   })
 }
 
+function nextIndiceLetter(usedLetters) {
+  for (const c of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') {
+    if (!usedLetters.includes(c)) return c;
+  }
+  return 'A';
+}
+
+export async function createIndiceDevis(source) {
+  const { data: { user } } = await supabase.auth.getUser();
+  const rootId     = source.root_devis_id || source.id;
+  const baseNumero = source.numero.replace(/ [A-Z]$/, '');
+
+  // Récupère les lettres déjà utilisées dans ce groupe
+  const { data: existing } = await supabase
+    .from('devis')
+    .select('indice')
+    .or(`id.eq.${rootId},root_devis_id.eq.${rootId}`)
+    .not('indice', 'is', null);
+  const usedLetters = (existing || []).map(d => d.indice).filter(Boolean);
+  const nextLetter  = nextIndiceLetter(usedLetters);
+
+  // Crée le nouvel indice
+  const { data: created, error } = await supabase
+    .from('devis')
+    .insert({
+      owner_id:       user.id,
+      root_devis_id:  rootId,
+      indice:         nextLetter,
+      numero:         `${baseNumero} ${nextLetter}`,
+      objet:          source.objet,
+      client_id:      source.client_id,
+      ville_chantier: source.ville_chantier,
+      statut:         'brouillon',
+      montant_ht:     source.montant_ht,
+      tva_rate:       source.tva_rate,
+      date_emission:  new Date().toISOString().split('T')[0],
+    })
+    .select()
+    .single();
+  if (error) throw error;
+
+  // Copie les lignes depuis la source
+  if (source.lignes?.length) {
+    const rows = source.lignes.map((l, i) => ({
+      devis_id:     created.id,
+      owner_id:     user.id,
+      position:     l.position ?? i,
+      type_ligne:   l.type_ligne,
+      lot:          l.lot ?? null,
+      designation:  l.designation,
+      unite:        l.unite ?? null,
+      quantite:     l.quantite ?? 0,
+      prix_unitaire:l.prix_unitaire ?? 0,
+      tva_rate:     l.tva_rate ?? 20,
+    }));
+    await supabase.from('lignes_devis').insert(rows);
+  }
+
+  // Passe la version active précédente en "remplace"
+  await supabase
+    .from('devis')
+    .update({ statut: 'remplace' })
+    .eq('id', source.id)
+    .neq('statut', 'remplace');
+
+  return { ...created, lignes: (source.lignes || []).map(l => ({ ...l })) };
+}
+
 export async function createDevis(devis, lignes = []) {
   const { data: { user } } = await supabase.auth.getUser()
   const { data: d, error } = await supabase

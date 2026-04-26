@@ -6,7 +6,7 @@ import LignesEditor from "./LignesEditor.jsx";
 import PDFViewer from "./PDFViewer.jsx";
 import ClientPickerModal from "./app/ClientPickerModal.jsx";
 
-export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChange, onConvertToInvoice, onCreateAcompte, onDuplicate, loading, autoOpenPDF, onAutoOpenPDFConsumed }) {
+export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChange, onConvertToInvoice, onCreateAcompte, onDuplicate, onCreateIndice, groupVersions = [], goDevis, loading, autoOpenPDF, onAutoOpenPDFConsumed }) {
   const [showPDF,        setShowPDF]        = useState(false);
   const [sending,        setSending]        = useState(false);
   const [signUrl,        setSignUrl]        = useState(d?.odoo_sign_url || null);
@@ -27,6 +27,7 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
 
   if (loading) return <LoadingSkeleton/>;
 
+  const isRemplace = d.statut === "remplace";
   const lignes = d.lignes || [];
   const ht = lignes.filter(l => l.type_ligne === "ouvrage")
     .reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0), 0);
@@ -202,9 +203,42 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
               <Badge s={d.statut}/>
             </div>
           </div>
+
+          {/* Navigation entre versions du dossier */}
+          {groupVersions.length > 1 && (
+            <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+              {groupVersions.map(v => {
+                const isCurrent = v.id === d.id;
+                return (
+                  <button key={v.id} onClick={() => !isCurrent && goDevis(v.id)}
+                    style={{ padding: "4px 10px", borderRadius: 20, border: "none", fontSize: 11, fontWeight: 700,
+                      cursor: isCurrent ? "default" : "pointer",
+                      background: isCurrent ? (brand.color || "#22c55e") : "#f1f5f9",
+                      color: isCurrent ? "white" : "#64748b",
+                      boxShadow: isCurrent ? `0 2px 8px ${brand.color || "#22c55e"}44` : "none" }}>
+                    {v.indice || "Initial"}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Bannière version remplacée */}
+          {isRemplace && (
+            <div style={{ background: "#f5f3ff", border: "1px solid #e9d5ff", borderRadius: 10,
+              padding: "8px 12px", marginBottom: 10, fontSize: 11, color: "#6b21a8",
+              display: "flex", alignItems: "center", gap: 8 }}>
+              <span>🔒</span>
+              <span><strong>Version remplacée</strong> — consultation uniquement. Créez un nouvel indice pour modifier.</span>
+            </div>
+          )}
+
           {/* Client */}
-          <button onClick={() => setClientPicker(true)}
-            style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "7px 10px", marginBottom: 8, cursor: "pointer", textAlign: "left" }}>
+          <button onClick={() => !isRemplace && setClientPicker(true)} disabled={isRemplace}
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: 8,
+              background: isRemplace ? "#f1f5f9" : "#f8fafc",
+              border: "1px solid #e2e8f0", borderRadius: 10, padding: "7px 10px", marginBottom: 8,
+              cursor: isRemplace ? "not-allowed" : "pointer", textAlign: "left" }}>
             <span style={{ fontSize: 16 }}>👤</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -218,16 +252,18 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
           <label style={{ display: "block", fontSize: 10, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>OBJET</label>
           <input
             value={d.objet || ""}
-            onChange={e => onChange({ ...d, objet: e.target.value })}
+            onChange={e => !isRemplace && onChange({ ...d, objet: e.target.value })}
+            readOnly={isRemplace}
             placeholder="Objet du devis"
-            style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box" }}
+            style={{ fontSize: 15, fontWeight: 700, color: isRemplace ? "#94a3b8" : "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, background: isRemplace ? "#f1f5f9" : "#f8fafc", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box", cursor: isRemplace ? "not-allowed" : "text" }}
           />
           <label style={{ display: "block", fontSize: 10, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>CHANTIER</label>
           <input
             value={d.ville_chantier || ""}
-            onChange={e => onChange({ ...d, ville_chantier: e.target.value })}
+            onChange={e => !isRemplace && onChange({ ...d, ville_chantier: e.target.value })}
+            readOnly={isRemplace}
             placeholder="Ville / chantier"
-            style={{ fontSize: 13, color: "#64748b", border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", boxSizing: "border-box" }}
+            style={{ fontSize: 13, color: isRemplace ? "#94a3b8" : "#64748b", border: "1px solid #e2e8f0", borderRadius: 8, background: isRemplace ? "#f1f5f9" : "#f8fafc", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", boxSizing: "border-box", cursor: isRemplace ? "not-allowed" : "text" }}
           />
         </div>
 
@@ -237,6 +273,14 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
             style={{ width: "100%", background: `linear-gradient(135deg,${ac}ee,${ac})`, color: "white", border: "none", borderRadius: 16, padding: 16, fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, cursor: "pointer", boxShadow: `0 6px 20px ${ac}44`, marginBottom: 12 }}>
             {I.pdf} Voir le PDF du devis
           </button>
+
+          {/* Nouvel indice */}
+          {onCreateIndice && d.statut !== "accepte" && (
+            <button onClick={onCreateIndice}
+              style={{ width: "100%", background: "#f5f3ff", color: "#6b21a8", border: "1.5px solid #e9d5ff", borderRadius: 14, padding: 13, fontSize: 13, fontWeight: 700, cursor: "pointer", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              ✦ Créer un nouvel indice
+            </button>
+          )}
 
           {/* Dupliquer */}
           {onDuplicate && (
@@ -262,8 +306,8 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
             </button>
           )}
 
-          {/* Éditeur de lignes */}
-          <LignesEditor lignes={lignes} onChange={updateLignes} ac={ac} vatRegime={brand?.vatRegime}/>
+          {/* Éditeur de lignes (lecture seule si remplacé) */}
+          <LignesEditor lignes={lignes} onChange={isRemplace ? undefined : updateLignes} ac={ac} vatRegime={brand?.vatRegime} readOnly={isRemplace}/>
 
           {/* Récapitulatif lots */}
           {Object.keys(lotsResume).length > 0 && (
