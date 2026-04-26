@@ -8,21 +8,7 @@
 // pour que l'utilisateur soit authentifié via Supabase.
 
 import { createClient } from "@supabase/supabase-js";
-
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "")
-  .split(",").map(s => s.trim()).filter(Boolean);
-
-function cors(req, res) {
-  const origin = req.headers.origin || "";
-  const isProd  = process.env.VERCEL_ENV === "production";
-  const allowed = isProd
-    ? (ALLOWED_ORIGINS.includes(origin) ? origin : (ALLOWED_ORIGINS[0] || ""))
-    : origin;
-  if (allowed) res.setHeader("Access-Control-Allow-Origin", allowed);
-  res.setHeader("Vary", "Origin");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
-}
+import { cors } from "./_cors.js"
 
 const B2B_TIMEOUT_MS = 10000;
 
@@ -61,7 +47,7 @@ async function b2b(method, path, body) {
 }
 
 export default async function handler(req, res) {
-  cors(req, res);
+  cors(req, res, { methods: "POST, OPTIONS" });
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 

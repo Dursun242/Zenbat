@@ -4,6 +4,7 @@ import { fmt, uid } from "../lib/utils.js";
 import { tradesLabels } from "../lib/trades.js";
 import { buildDevisHistorySummary } from "../lib/devisHistory.js";
 import { supabase } from "../lib/supabase.js";
+import { getToken } from "../lib/getToken.js";
 import { SR_LANGS, MIC_LANG_KEY, pickInitialLang } from "../lib/agentIA/speech.js";
 import { buildAgentGreeting, quickStartsFor } from "../lib/agentIA/sectors.js";
 import { buildSystemPrompt } from "../lib/agentIA/prompt.js";
@@ -133,6 +134,9 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       messages: newMsgs.slice(-10).map(m => ({ role: m.role, content: m.content })),
     };
 
+    const token = await getToken();
+    const authHeaders = token ? { "Authorization": `Bearer ${token}` } : {};
+
     let raw = "";
     let apiError = null;
     const fetchStartTime = Date.now();
@@ -141,7 +145,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     const streamResponse = async () => {
       const res = await fetch("/api/claude", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({ ...body, stream: true }),
       });
       if (!res.ok) {
@@ -188,7 +192,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     const nonStreamResponse = async () => {
       const res = await fetch("/api/claude", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => null);

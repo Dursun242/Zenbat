@@ -1,7 +1,5 @@
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "")
-  .split(",")
-  .map(s => s.trim())
-  .filter(Boolean);
+import { createClient } from "@supabase/supabase-js";
+import { cors } from "./_cors.js";
 
 const ALLOWED_MODELS = [
   "claude-haiku-4-5-20251001",
@@ -9,28 +7,37 @@ const ALLOWED_MODELS = [
   "claude-sonnet-4-5",
 ];
 
-function resolveOrigin(req) {
-  const origin = req.headers.origin || "";
-  if (process.env.VERCEL_ENV !== "production") return origin;
-  if (ALLOWED_ORIGINS.includes(origin)) return origin;
-  return ALLOWED_ORIGINS[0] || "";
-}
+const MAX_SYSTEM_CHARS  = 20_000;
+const MAX_MESSAGES_CHARS = 40_000;
 
 export default async function handler(req, res) {
-  const origin = resolveOrigin(req);
-  if (origin) res.setHeader("Access-Control-Allow-Origin", origin);
-  res.setHeader("Vary", "Origin");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  cors(req, res, { methods: "POST, OPTIONS", auth: true });
 
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  if (!process.env.ANTHROPIC_KEY) {
-    return res.status(500).json({ error: "ANTHROPIC_KEY non configurée côté serveur" });
-  }
+  // ── Auth Supabase ───────────────────────────────────────────────────────────
+  const token = req.headers.authorization?.replace("Bearer ", "");
+  if (!token) return res.status(401).json({ error: "Non authentifié" });
 
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey)
+    return res.status(500).json({ error: "Supabase non configuré" });
+
+  const admin = createClient(supabaseUrl, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data: { user }, error: authErr } = await admin.auth.getUser(token);
+  if (authErr || !user) return res.status(401).json({ error: "Token invalide" });
+
+  // ── Clé Anthropic ────────────────────────────────────────────────────────────
+  if (!process.env.ANTHROPIC_KEY)
+    return res.status(500).json({ error: "ANTHROPIC_KEY non configurée côté serveur" });
+
+  // ── Validation des paramètres ────────────────────────────────────────────────
   const { model, max_tokens, messages, system, stream, temperature, top_p } = req.body || {};
+
   if (!model || typeof model !== "string" || !ALLOWED_MODELS.includes(model))
     return res.status(400).json({ error: "Paramètre 'model' manquant ou non autorisé" });
   if (!max_tokens || typeof max_tokens !== "number" || max_tokens < 1 || max_tokens > 8000)
@@ -42,6 +49,14 @@ export default async function handler(req, res) {
   if (top_p !== undefined && (typeof top_p !== "number" || top_p < 0 || top_p > 1))
     return res.status(400).json({ error: "Paramètre 'top_p' invalide (0–1)" });
 
+  // Limite de taille pour maîtriser les coûts tokens
+  if (system && system.length > MAX_SYSTEM_CHARS)
+    return res.status(400).json({ error: `system trop long (max ${MAX_SYSTEM_CHARS} caractères)` });
+  const messagesSize = messages.reduce((s, m) => s + String(m.content || "").length, 0);
+  if (messagesSize > MAX_MESSAGES_CHARS)
+    return res.status(400).json({ error: `messages trop longs (max ${MAX_MESSAGES_CHARS} caractères)` });
+
+  // ── Appel Anthropic ──────────────────────────────────────────────────────────
   const payload = { model, max_tokens, messages };
   if (system && typeof system === "string") payload.system = system;
   if (stream === true) payload.stream = true;
@@ -57,8 +72,8 @@ export default async function handler(req, res) {
       upstream = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "x-api-key": process.env.ANTHROPIC_KEY,
+          "Content-Type":      "application/json",
+          "x-api-key":         process.env.ANTHROPIC_KEY,
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify(payload),
@@ -68,34 +83,43 @@ export default async function handler(req, res) {
       clearTimeout(timeout);
     }
 
-    const upstreamData = await upstream.json();
+    // ── Streaming SSE ────────────────────────────────────────────────────────
+    // IMPORTANT : ne jamais appeler upstream.json() avant de lire upstream.body.
+    // json() consomme le ReadableStream — le pipe SSE lirait alors un stream vide.
+    if (stream === true) {
+      if (upstream.ok) {
+        res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+        res.setHeader("Cache-Control", "no-cache, no-transform");
+        res.setHeader("Connection", "keep-alive");
+        res.setHeader("X-Accel-Buffering", "no");
+        res.flushHeaders?.();
 
-    if (stream === true && upstream.ok && upstream.body) {
-      res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
-      res.setHeader("Cache-Control", "no-cache, no-transform");
-      res.setHeader("Connection", "keep-alive");
-      res.setHeader("X-Accel-Buffering", "no");
-      res.flushHeaders?.();
-
-      const reader = upstream.body.getReader();
-      try {
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          res.write(value);
-          res.flush?.();
+        const reader = upstream.body.getReader();
+        try {
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            res.write(value);
+            res.flush?.();
+          }
+        } catch {
+          // client abort ou erreur réseau — on ferme proprement
         }
-      } catch {
-        // client abort or upstream error — end cleanly
+        return res.end();
+      } else {
+        // Erreur Anthropic sur une requête stream : on lit le JSON d'erreur
+        const errorData = await upstream.json().catch(() => null);
+        return res.status(upstream.status).json(errorData);
       }
-      return res.end();
     }
 
+    // ── Non-streaming ────────────────────────────────────────────────────────
+    const upstreamData = await upstream.json();
     return res.status(upstream.status).json(upstreamData);
+
   } catch (err) {
-    if (err?.name === "AbortError") {
+    if (err?.name === "AbortError")
       return res.status(504).json({ error: "Délai dépassé — Claude API n'a pas répondu en 28 secondes" });
-    }
     return res.status(502).json({ error: "Upstream Anthropic unreachable" });
   }
 }

@@ -1,16 +1,10 @@
 import { useState, useEffect } from "react"
 import { useAuth } from "../lib/auth.jsx"
-import { supabase } from "../lib/supabase.js"
+import { getToken } from "../lib/getToken.js"
 import { fmtEur, fmtD, fmtDT, pct, relTime, SC, SL, SORT_OPTS } from "../lib/admin/format.js"
 import DeleteUserModal from "./admin/DeleteUserModal.jsx"
 import UserDetailDrawer from "./admin/UserDetailDrawer.jsx"
 
-// Toujours récupérer un token frais — le state React peut être périmé
-// si le token a été renouvelé silencieusement en arrière-plan.
-async function getToken() {
-  const { data: { session } } = await supabase.auth.getSession()
-  return session?.access_token ?? null
-}
 
 export default function AdminPanel({ onBack }) {
   const { session, user: currentUser } = useAuth()

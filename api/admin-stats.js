@@ -1,24 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
-
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
-  .split(',').map(s => s.trim()).filter(Boolean)
-
-function cors(req, res) {
-  const origin = req.headers.origin || ''
-  // Jamais de wildcard, même en preview : en dev on reflète l'origine appelante
-  // (si présente), en prod on whitelist strictement.
-  const isProd  = process.env.VERCEL_ENV === 'production'
-  const allowed = isProd
-    ? (ALLOWED_ORIGINS.includes(origin) ? origin : (ALLOWED_ORIGINS[0] || ''))
-    : origin
-  if (allowed) res.setHeader('Access-Control-Allow-Origin', allowed)
-  res.setHeader('Vary', 'Origin')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
-}
+import { cors } from "./_cors.js"
 
 export default async function handler(req, res) {
-  cors(req, res)
+  cors(req, res, { methods: "GET, OPTIONS" })
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 

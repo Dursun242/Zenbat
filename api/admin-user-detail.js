@@ -6,21 +6,7 @@
 // string ou body). Charge en parallèle via service_role key.
 
 import { createClient } from '@supabase/supabase-js'
-
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
-  .split(',').map(s => s.trim()).filter(Boolean)
-
-function cors(req, res) {
-  const origin = req.headers.origin || ''
-  const isProd  = process.env.VERCEL_ENV === 'production'
-  const allowed = isProd
-    ? (ALLOWED_ORIGINS.includes(origin) ? origin : (ALLOWED_ORIGINS[0] || ''))
-    : origin
-  if (allowed) res.setHeader('Access-Control-Allow-Origin', allowed)
-  res.setHeader('Vary', 'Origin')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
-}
+import { cors } from "./_cors.js"
 
 // Exécute une requête Supabase en tolérant l'absence de table (ex: migration
 // 0012 non appliquée sur l'env courant). Renvoie { data: [], error } au lieu
@@ -36,7 +22,7 @@ async function safe(q) {
 }
 
 export default async function handler(req, res) {
-  cors(req, res)
+  cors(req, res, { methods: "GET, OPTIONS" })
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 

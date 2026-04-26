@@ -1,19 +1,11 @@
+import { cors } from "./_cors.js";
+
 // Proxy vers Odoo Sign — authentifie, upload le PDF, crée une demande de signature
 // Variables d'environnement requises côté Vercel :
 //   ODOO_URL       ex: https://zenbat.odoo.com
 //   ODOO_DB        ex: zenbat
 //   ODOO_USERNAME  ex: admin@zenbat.fr
 //   ODOO_API_KEY   ex: <API key générée dans Odoo → Préférences → Compte>
-
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "")
-  .split(",").map(s => s.trim()).filter(Boolean);
-
-function resolveOrigin(req) {
-  const origin = req.headers.origin || "";
-  if (process.env.VERCEL_ENV !== "production") return origin;
-  if (ALLOWED_ORIGINS.includes(origin)) return origin;
-  return ALLOWED_ORIGINS[0] || "";
-}
 
 const ODOO_CALL_TIMEOUT_MS = 10000;
 
@@ -58,11 +50,7 @@ async function odooLogin({ base, db, username, password }) {
 }
 
 export default async function handler(req, res) {
-  const origin = resolveOrigin(req);
-  if (origin) res.setHeader("Access-Control-Allow-Origin", origin);
-  res.setHeader("Vary", "Origin");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  cors(req, res, { methods: "POST, OPTIONS", auth: false });
 
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
