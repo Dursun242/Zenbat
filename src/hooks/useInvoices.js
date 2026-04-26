@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { calcInvoiceTotals } from "../lib/invoiceCalc.js";
 import {
   listInvoices,
   createInvoice as apiCreateInvoice,
@@ -45,10 +46,7 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
     if (!d) { showErr("Devis introuvable"); return; }
     try {
       const numero = await nextInvoiceNumber().catch(() => `FAC-${new Date().getFullYear()}-${String(invoices.length + 1).padStart(4, "0")}`);
-      const ouvrages  = (d.lignes || []).filter(l => l.type_ligne === "ouvrage");
-      const franchise = brand.vatRegime === "franchise";
-      const ht  = ouvrages.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0);
-      const tva = ouvrages.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * Number(l.tva_rate ?? (franchise ? 0 : 20)) / 100, 0);
+      const { ht, tva } = calcInvoiceTotals(d.lignes, brand.vatRegime);
       const saved = await apiCreateInvoice(
         {
           devis_id: d.id, client_id: d.client_id, numero, objet: d.objet,
