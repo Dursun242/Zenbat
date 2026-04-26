@@ -1,34 +1,37 @@
 import { useState, useEffect } from "react"
 import { useAuth } from "../lib/auth.jsx"
 import { getToken } from "../lib/getToken.js"
-import { fmtEur, fmtD, fmtDT, pct, relTime, SC, SL, SORT_OPTS } from "../lib/admin/format.js"
-import DeleteUserModal from "./admin/DeleteUserModal.jsx"
-import UserDetailDrawer from "./admin/UserDetailDrawer.jsx"
-
+import { fmtD } from "../lib/admin/format.js"
+import AdminKPIs         from "./admin/AdminKPIs.jsx"
+import AdminUsersTable   from "./admin/AdminUsersTable.jsx"
+import AdminErrorLogs    from "./admin/AdminErrorLogs.jsx"
+import AdminNegativeLogs from "./admin/AdminNegativeLogs.jsx"
+import AdminConversations from "./admin/AdminConversations.jsx"
+import DeleteUserModal   from "./admin/DeleteUserModal.jsx"
+import UserDetailDrawer  from "./admin/UserDetailDrawer.jsx"
 
 export default function AdminPanel({ onBack }) {
   const { session, user: currentUser } = useAuth()
-  const [stats,      setStats]      = useState(null)
-  const [loading,    setLoading]    = useState(true)
-  const [error,      setError]      = useState(null)
-  const [iaLogs,     setIaLogs]     = useState(null)
-  const [logsLoading,setLogsLoading]= useState(false)
-  const [iaNegs,     setIaNegs]     = useState(null)
-  const [negsLoading,setNegsLoading]= useState(false)
-  const [negFilter,  setNegFilter]  = useState("all") // all | ai_refusal | user_negative
-  const [iaConvs,    setIaConvs]    = useState(null)
-  const [convsLoading,setConvsLoading]= useState(false)
-  const [openConvUser,setOpenConvUser]= useState(null)
-  const [convSearch, setConvSearch] = useState("")
-  const [userSearch, setUserSearch] = useState("")
-  const [sortBy,     setSortBy]     = useState("joined")
-  const [deleteTarget, setDeleteTarget] = useState(null) // { id, name, email, devisTotal, caTotal }
+  const [stats,        setStats]        = useState(null)
+  const [loading,      setLoading]      = useState(true)
+  const [error,        setError]        = useState(null)
+  const [iaLogs,       setIaLogs]       = useState(null)
+  const [logsLoading,  setLogsLoading]  = useState(false)
+  const [iaNegs,       setIaNegs]       = useState(null)
+  const [negsLoading,  setNegsLoading]  = useState(false)
+  const [negFilter,    setNegFilter]    = useState("all")
+  const [iaConvs,      setIaConvs]      = useState(null)
+  const [convsLoading, setConvsLoading] = useState(false)
+  const [openConvUser, setOpenConvUser] = useState(null)
+  const [convSearch,   setConvSearch]   = useState("")
+  const [userSearch,   setUserSearch]   = useState("")
+  const [sortBy,       setSortBy]       = useState("joined")
+  const [deleteTarget, setDeleteTarget] = useState(null)
   const [confirmInput, setConfirmInput] = useState("")
   const [deleting,     setDeleting]     = useState(false)
   const [deleteError,  setDeleteError]  = useState(null)
-  // Drill-down utilisateur
-  const [detailUser,   setDetailUser]   = useState(null)   // entrée du tableau usersDetail
-  const [detailData,   setDetailData]   = useState(null)   // payload renvoyé par /api/admin-user-detail
+  const [detailUser,   setDetailUser]   = useState(null)
+  const [detailData,   setDetailData]   = useState(null)
   const [detailLoading,setDetailLoading]= useState(false)
   const [detailError,  setDetailError]  = useState(null)
   const [detailTab,    setDetailTab]    = useState("overview")
@@ -39,9 +42,7 @@ export default function AdminPanel({ onBack }) {
     setLoading(true); setError(null)
     try {
       const token = await getToken()
-      const res = await fetch("/api/admin-stats", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res  = await fetch("/api/admin-stats", { headers: { Authorization: `Bearer ${token}` } })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || "Erreur serveur")
       setStats(data)
@@ -53,9 +54,7 @@ export default function AdminPanel({ onBack }) {
     setLogsLoading(true)
     try {
       const token = await getToken()
-      const res = await fetch("/api/admin-ia-data?type=logs", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res  = await fetch("/api/admin-ia-data?type=logs", { headers: { Authorization: `Bearer ${token}` } })
       const data = await res.json()
       if (res.ok) setIaLogs(data.logs || [])
     } catch {} finally { setLogsLoading(false) }
@@ -65,9 +64,7 @@ export default function AdminPanel({ onBack }) {
     setNegsLoading(true)
     try {
       const token = await getToken()
-      const res = await fetch("/api/admin-ia-data?type=negatives", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res  = await fetch("/api/admin-ia-data?type=negatives", { headers: { Authorization: `Bearer ${token}` } })
       const data = await res.json()
       if (res.ok) setIaNegs(data.logs || [])
     } catch {} finally { setNegsLoading(false) }
@@ -77,9 +74,7 @@ export default function AdminPanel({ onBack }) {
     setConvsLoading(true)
     try {
       const token = await getToken()
-      const res = await fetch("/api/admin-ia-data?type=conversations", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res  = await fetch("/api/admin-ia-data?type=conversations", { headers: { Authorization: `Bearer ${token}` } })
       const data = await res.json()
       if (res.ok) setIaConvs(data.conversations || [])
     } catch {} finally { setConvsLoading(false) }
@@ -92,9 +87,7 @@ export default function AdminPanel({ onBack }) {
     setDetailTab("overview"); setDetailLoading(true)
     try {
       const token = await getToken()
-      const res = await fetch(`/api/admin-user-detail?userId=${encodeURIComponent(u.id)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res  = await fetch(`/api/admin-user-detail?userId=${encodeURIComponent(u.id)}`, { headers: { Authorization: `Bearer ${token}` } })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || "Erreur serveur")
       setDetailData(data)
@@ -104,6 +97,7 @@ export default function AdminPanel({ onBack }) {
       setDetailLoading(false)
     }
   }
+
   const closeDetail = () => { setDetailUser(null); setDetailData(null); setDetailError(null) }
   const closeDelete = () => { if (deleting) return; setDeleteTarget(null); setConfirmInput(""); setDeleteError(null) }
 
@@ -112,17 +106,13 @@ export default function AdminPanel({ onBack }) {
     setDeleting(true); setDeleteError(null)
     try {
       const token = await getToken()
-      const res = await fetch("/api/admin-delete-user", {
+      const res  = await fetch("/api/admin-delete-user", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ userId: deleteTarget.id, confirmEmail: confirmInput }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || "Erreur serveur")
-      // Retire localement et rafraîchit
       setStats(s => s ? { ...s, usersDetail: s.usersDetail.filter(u => u.id !== deleteTarget.id) } : s)
       setDeleteTarget(null); setConfirmInput("")
       load()
@@ -144,382 +134,45 @@ export default function AdminPanel({ onBack }) {
       return (b[sortBy] || 0) - (a[sortBy] || 0)
     })
 
-  const card = (label, value, sub, color="#0f172a", small=false) => (
-    <div style={{background:"white", borderRadius:14, padding:"14px 16px", boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
-      <div style={{fontSize:10, color:"#94a3b8", marginBottom:4}}>{label}</div>
-      <div style={{fontSize:small?13:22, fontWeight:800, color, lineHeight:1}}>{value}</div>
-      {sub && <div style={{fontSize:10, color:"#cbd5e1", marginTop:4}}>{sub}</div>}
-    </div>
-  )
-
   return (
-    <div style={{minHeight:"100%", background:"#f8fafc", paddingBottom:40}}>
-      <div style={{background:"#0f172a", padding:"14px 18px", display:"flex", alignItems:"center", gap:12, position:"sticky", top:0, zIndex:10}}>
-        <button onClick={onBack} style={{background:"none", border:"none", color:"#94a3b8", cursor:"pointer", padding:4}}>
+    <div style={{ minHeight: "100%", background: "#f8fafc", paddingBottom: 40 }}>
+      <div style={{ background: "#0f172a", padding: "14px 18px", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, zIndex: 10 }}>
+        <button onClick={onBack} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", padding: 4 }}>
           <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12,5 5,12 12,19"/></svg>
         </button>
-        <div style={{flex:1}}>
-          <div style={{color:"white", fontWeight:700, fontSize:16}}>Panel Admin</div>
-          <div style={{color:"#475569", fontSize:10}}>Vue globale Zenbat</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ color: "white", fontWeight: 700, fontSize: 16 }}>Panel Admin</div>
+          <div style={{ color: "#475569", fontSize: 10 }}>Vue globale Zenbat</div>
         </div>
-        <button onClick={load} style={{background:"#1e293b", border:"1px solid #334155", borderRadius:8, padding:"5px 10px", color:"#94a3b8", fontSize:11, cursor:"pointer"}}>↻ Actualiser</button>
+        <button onClick={load} style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8, padding: "5px 10px", color: "#94a3b8", fontSize: 11, cursor: "pointer" }}>↻ Actualiser</button>
       </div>
 
-      {loading && <div style={{padding:40, textAlign:"center", color:"#94a3b8", fontSize:13}}>Chargement…</div>}
-
+      {loading && <div style={{ padding: 40, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>Chargement…</div>}
       {error && (
-        <div style={{margin:18, background:"#fef2f2", border:"1px solid #fecaca", borderRadius:12, padding:16, color:"#991b1b", fontSize:13}}>
+        <div style={{ margin: 18, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: 16, color: "#991b1b", fontSize: 13 }}>
           ❌ {error}
         </div>
       )}
 
       {stats && (
-        <div style={{padding:16}}>
-          <div style={{fontSize:10, fontWeight:700, color:"#94a3b8", letterSpacing:"0.5px", textTransform:"uppercase", marginBottom:8}}>Revenus & Croissance</div>
-          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:16}}>
-            {card("MRR (abonnements)", fmtEur(stats.users.mrr), `${stats.users.pro} abonné(s) Pro × 19 €`, "#22c55e", true)}
-            {card("CA signé HT", fmtEur(stats.devis.caAccepte), `${stats.devis.byStatut.accepte} devis acceptés`, "#0ea5e9", true)}
-            {card("CA en cours HT", fmtEur(stats.devis.caEnCours), "envoyés + signature", "#f59e0b", true)}
-            {card("Valeur moy. devis", fmtEur(stats.devis.avgDevisValue), "sur devis acceptés", "#7c3aed", true)}
-          </div>
-
-          <div style={{fontSize:10, fontWeight:700, color:"#94a3b8", letterSpacing:"0.5px", textTransform:"uppercase", marginBottom:8}}>Utilisateurs</div>
-          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:16}}>
-            {card("Total inscrits",  stats.users.total.toLocaleString("fr-FR"),      `+${stats.users.newThisMonth} ce mois / +${stats.users.newLast7} cette semaine`)}
-            {card("Abonnés Pro",     stats.users.pro.toLocaleString("fr-FR"),         `${pct(stats.users.pro, stats.users.total)}% de conversion`, "#22c55e")}
-            {card("Actifs (≥1 devis)", stats.users.activeUsers.toLocaleString("fr-FR"), `${pct(stats.users.activeUsers, stats.users.total)}% des inscrits`, "#0ea5e9")}
-            {card("Essai ≤7j restants", stats.users.trialEndingSoon.toLocaleString("fr-FR"), "à relancer en priorité", "#f59e0b")}
-          </div>
-          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:16}}>
-            {card("Appels IA total", stats.users.totalAiUsed.toLocaleString("fr-FR"), `moy. ${stats.users.total ? Math.round(stats.users.totalAiUsed/stats.users.total) : 0} / user`, "#7c3aed")}
-            {card("Inscrits mois-1", stats.users.newLastMonth.toLocaleString("fr-FR"), "mois précédent")}
-          </div>
-
-          <div style={{fontSize:10, fontWeight:700, color:"#94a3b8", letterSpacing:"0.5px", textTransform:"uppercase", marginBottom:8}}>Devis cette semaine</div>
-          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:16}}>
-            {card("Créés (7j)", stats.devis.devisLast7.toLocaleString("fr-FR"), `vs ${stats.devis.devisPrev7} sem. précédente`)}
-            {card("Tendance",
-              stats.devis.trendDevis !== null ? `${stats.devis.trendDevis > 0 ? "+" : ""}${stats.devis.trendDevis}%` : "—",
-              "vs 7 jours précédents",
-              stats.devis.trendDevis > 0 ? "#22c55e" : stats.devis.trendDevis < 0 ? "#ef4444" : "#64748b"
-            )}
-            {card("Total devis", stats.devis.total.toLocaleString("fr-FR"), `+${stats.devis.devisMonth} ce mois`)}
-            {card("Taux conversion", `${stats.devis.txConversion}%`, `${stats.devis.byStatut.accepte} acceptés / ${stats.devis.total} total`, "#22c55e")}
-          </div>
-
-          <div style={{background:"white", borderRadius:14, padding:16, marginBottom:16, boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
-            <div style={{fontWeight:700, fontSize:13, color:"#0f172a", marginBottom:14}}>Entonnoir de conversion</div>
-            {[
-              { label:"Inscrits",           n: stats.funnel.inscrits,    color:"#0ea5e9" },
-              { label:"Ont créé un devis",  n: stats.funnel.avecDevis,   color:"#7c3aed" },
-              { label:"Ont envoyé un devis",n: stats.funnel.devisEnvoye, color:"#f59e0b" },
-              { label:"Devis accepté",      n: stats.funnel.devisAccepte,color:"#22c55e" },
-            ].map((step, i, arr) => {
-              const base = arr[0].n || 1
-              const w    = Math.round((step.n / base) * 100)
-              return (
-                <div key={step.label} style={{marginBottom:10}}>
-                  <div style={{display:"flex", justifyContent:"space-between", marginBottom:3}}>
-                    <span style={{fontSize:12, color:"#374151"}}>{step.label}</span>
-                    <span style={{fontSize:12, fontWeight:700, color:step.color}}>{step.n} <span style={{color:"#cbd5e1", fontWeight:400}}>({w}%)</span></span>
-                  </div>
-                  <div style={{height:8, background:"#f1f5f9", borderRadius:4, overflow:"hidden"}}>
-                    <div style={{height:"100%", width:`${w}%`, background:step.color, borderRadius:4, minWidth:step.n>0?6:0, transition:"width .4s"}}/>
-                  </div>
-                  {i < arr.length - 1 && (
-                    <div style={{textAlign:"right", fontSize:9, color:"#94a3b8", marginTop:2}}>
-                      ↓ {arr[i+1].n > 0 ? `${pct(arr[i+1].n, step.n)}% passent à l'étape suivante` : "aucun"}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-
-          <div style={{background:"white", borderRadius:14, padding:16, marginBottom:16, boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
-            <div style={{fontWeight:700, fontSize:13, color:"#0f172a", marginBottom:12}}>Répartition des devis par statut</div>
-            {Object.entries(stats.devis.byStatut).map(([s, n]) => (
-              <div key={s} style={{marginBottom:10}}>
-                <div style={{display:"flex", justifyContent:"space-between", marginBottom:3}}>
-                  <span style={{fontSize:12, color:"#374151"}}>{{ brouillon:"Brouillon", envoye:"Envoyé", en_signature:"En signature", accepte:"Accepté", refuse:"Refusé" }[s]}</span>
-                  <span style={{fontSize:12, fontWeight:600, color:SC[s]}}>{n} ({pct(n, stats.devis.total)}%)</span>
-                </div>
-                <div style={{height:6, background:"#f1f5f9", borderRadius:3, overflow:"hidden"}}>
-                  <div style={{height:"100%", width:`${pct(n, stats.devis.total)}%`, background:SC[s], borderRadius:3, minWidth:n>0?4:0}}/>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{background:"white", borderRadius:14, overflow:"hidden", marginBottom:16, boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
-            <div style={{padding:"12px 16px", borderBottom:"1px solid #f1f5f9", display:"flex", alignItems:"center", gap:8, flexWrap:"wrap"}}>
-              <div style={{fontWeight:700, fontSize:13, color:"#0f172a", flex:1}}>Utilisateurs ({filteredUsers.length})</div>
-              <input value={userSearch} onChange={e => setUserSearch(e.target.value)} placeholder="Chercher…"
-                style={{border:"1px solid #e2e8f0", borderRadius:8, padding:"4px 10px", fontSize:12, color:"#0f172a", background:"#f8fafc", width:120}}/>
-              <select value={sortBy} onChange={e => setSortBy(e.target.value)}
-                style={{border:"1px solid #e2e8f0", borderRadius:8, padding:"4px 8px", fontSize:11, color:"#374151", background:"#f8fafc"}}>
-                {SORT_OPTS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
-              </select>
-            </div>
-
-            {filteredUsers.length === 0 && (
-              <div style={{padding:24, textAlign:"center", color:"#94a3b8", fontSize:12}}>Aucun utilisateur</div>
-            )}
-
-            {filteredUsers.map((u, i) => (
-              <div key={u.id} style={{padding:"12px 16px", borderBottom:"1px solid #f8fafc", background:i%2===0?"white":"#fafbfc", cursor:"pointer"}}
-                onClick={(e) => { if (!e.target.closest("button")) openDetail(u); }}>
-                <div style={{display:"flex", alignItems:"center", gap:8, marginBottom:6}}>
-                  <div style={{flex:1, minWidth:0}}>
-                    <div style={{fontSize:13, fontWeight:700, color:"#0f172a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
-                      {u.fullName || u.name}
-                    </div>
-                    {u.fullName && u.name && u.fullName !== u.name && (
-                      <div style={{fontSize:11, color:"#475569", fontWeight:500, marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{u.name}</div>
-                    )}
-                    <div style={{fontSize:10, color:"#94a3b8", marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{u.email}</div>
-                  </div>
-                  <div style={{textAlign:"right", flexShrink:0}}>
-                    <span style={{fontSize:9, fontWeight:700, padding:"2px 7px", borderRadius:20, display:"inline-block", background:u.plan==="pro"?"rgba(34,197,94,.12)":"#f1f5f9", color:u.plan==="pro"?"#15803d":"#64748b"}}>
-                      {u.plan==="pro"?"PRO":"FREE"}
-                    </span>
-                    {u.daysLeft !== null && u.daysLeft <= 10 && (
-                      <div style={{fontSize:9, color: u.daysLeft<=3?"#ef4444":"#f59e0b", marginTop:2, fontWeight:600}}>{u.daysLeft}j restants</div>
-                    )}
-                  </div>
-                </div>
-                <div style={{display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:6}}>
-                  {[
-                    { l:"CA signé",   v: fmtEur(u.caTotal),                  c: u.caTotal > 0 ? "#0ea5e9" : "#cbd5e1" },
-                    { l:"Devis",      v: u.devisTotal,                        c: u.devisTotal > 0 ? "#374151" : "#cbd5e1" },
-                    { l:"Taux conv.", v: u.devisTotal ? `${u.txConv}%` : "—", c: u.txConv >= 50 ? "#22c55e" : "#94a3b8" },
-                    { l:"IA",         v: `${u.ai_used}×`,                     c: u.ai_used > 5 ? "#7c3aed" : "#94a3b8" },
-                  ].map(m => (
-                    <div key={m.l} style={{background:"#f8fafc", borderRadius:8, padding:"5px 8px", textAlign:"center"}}>
-                      <div style={{fontSize:9, color:"#94a3b8"}}>{m.l}</div>
-                      <div style={{fontSize:12, fontWeight:700, color:m.c, marginTop:1}}>{m.v}</div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{display:"flex", gap:10, marginTop:7, alignItems:"center", flexWrap:"wrap"}}>
-                  <div style={{fontSize:9, color:"#94a3b8"}}>
-                    Inscrit <span style={{color:"#64748b", fontWeight:600}}>{fmtDT(u.joined)}</span>
-                    {" · "}Vu <span style={{color:"#64748b", fontWeight:600}}>{relTime(u.lastSignIn)}</span>
-                    {u.lastDevis && <>{" · "}Devis <span style={{color:"#64748b", fontWeight:600}}>{relTime(u.lastDevis)}</span></>}
-                  </div>
-                  {u.devisTotal > 0 && (
-                    <div style={{display:"flex", gap:3, marginLeft:"auto"}}>
-                      {Object.entries(u.byStatut).filter(([,n]) => n > 0).map(([s, n]) => (
-                        <span key={s} title={`${SL[s]}: ${n}`} style={{fontSize:9, padding:"1px 5px", borderRadius:10, background:`${SC[s]}22`, color:SC[s], fontWeight:700}}>
-                          {SL[s]} {n}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {u.id !== currentUser?.id && (
-                    <button onClick={() => openDelete(u)}
-                      title="Supprimer définitivement ce compte"
-                      style={{marginLeft:u.devisTotal>0?0:"auto", background:"#fef2f2", border:"1px solid #fecaca", color:"#b91c1c", borderRadius:8, padding:"3px 8px", fontSize:10, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:4}}>
-                      <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
-                      Supprimer
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Journal des erreurs IA */}
-          <div style={{background:"white", borderRadius:14, overflow:"hidden", marginBottom:16, boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
-            <div style={{padding:"12px 16px", borderBottom:"1px solid #f1f5f9", display:"flex", alignItems:"center", gap:8}}>
-              <div style={{fontWeight:700, fontSize:13, color:"#0f172a", flex:1}}>
-                Erreurs Agent IA {iaLogs ? `(${iaLogs.length})` : ""}
-              </div>
-              <button onClick={loadLogs} disabled={logsLoading}
-                style={{background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:8, padding:"4px 10px", fontSize:11, color:"#475569", cursor:"pointer", fontWeight:600}}>
-                {logsLoading ? "…" : "↻"}
-              </button>
-            </div>
-            {iaLogs === null && !logsLoading && (
-              <div style={{padding:16, textAlign:"center", fontSize:11, color:"#94a3b8"}}>Appliquez la migration 0004 pour activer le journal.</div>
-            )}
-            {iaLogs && iaLogs.length === 0 && (
-              <div style={{padding:16, textAlign:"center", fontSize:11, color:"#94a3b8"}}>Aucune erreur enregistrée 🎉</div>
-            )}
-            {iaLogs && iaLogs.slice(0, 50).map((l, i) => (
-              <div key={l.id} style={{padding:"10px 16px", borderBottom:"1px solid #f8fafc", background:i%2===0?"white":"#fafbfc"}}>
-                <div style={{display:"flex", alignItems:"baseline", gap:8, marginBottom:3, flexWrap:"wrap"}}>
-                  <span style={{fontSize:11, fontWeight:700, color:"#0f172a", overflow:"hidden", textOverflow:"ellipsis"}}>{l.name}</span>
-                  <span style={{fontSize:9, color:"#94a3b8"}}>{l.email}</span>
-                  <span style={{marginLeft:"auto", fontSize:9, color:"#94a3b8"}}>{fmtDT(l.created_at)} · {new Date(l.created_at).toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"})}</span>
-                </div>
-                <div style={{fontSize:11, color:"#b91c1c", fontFamily:"ui-monospace,monospace", wordBreak:"break-word"}}>{l.error}</div>
-                {l.user_message && (
-                  <div style={{fontSize:10, color:"#64748b", marginTop:4, fontStyle:"italic", overflow:"hidden", textOverflow:"ellipsis"}}>
-                    « {l.user_message.slice(0, 180)}{l.user_message.length > 180 ? "…" : ""} »
-                  </div>
-                )}
-                {l.history_len != null && (
-                  <div style={{fontSize:9, color:"#94a3b8", marginTop:3}}>
-                    Historique : {l.history_len} msg · Streaming : {l.stream_tried ? "tenté" : "non"}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Réponses négatives (refus IA + messages usagers) */}
-          <div style={{background:"white", borderRadius:14, overflow:"hidden", marginBottom:16, boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
-            <div style={{padding:"12px 16px", borderBottom:"1px solid #f1f5f9", display:"flex", alignItems:"center", gap:8, flexWrap:"wrap"}}>
-              <div style={{fontWeight:700, fontSize:13, color:"#0f172a", flex:1}}>
-                Réponses négatives {iaNegs ? `(${iaNegs.filter(n => negFilter === "all" || n.kind === negFilter).length})` : ""}
-              </div>
-              <select value={negFilter} onChange={e => setNegFilter(e.target.value)}
-                style={{border:"1px solid #e2e8f0", borderRadius:8, padding:"4px 8px", fontSize:11, color:"#374151", background:"#f8fafc"}}>
-                <option value="all">Tous</option>
-                <option value="ai_refusal">Refus IA</option>
-                <option value="user_negative">Mécontent</option>
-              </select>
-              <button onClick={loadNegs} disabled={negsLoading}
-                style={{background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:8, padding:"4px 10px", fontSize:11, color:"#475569", cursor:"pointer", fontWeight:600}}>
-                {negsLoading ? "…" : "↻"}
-              </button>
-            </div>
-            {iaNegs === null && !negsLoading && (
-              <div style={{padding:16, textAlign:"center", fontSize:11, color:"#94a3b8"}}>Appliquez la migration 0005 pour activer ce journal.</div>
-            )}
-            {iaNegs && iaNegs.filter(n => negFilter === "all" || n.kind === negFilter).length === 0 && (
-              <div style={{padding:16, textAlign:"center", fontSize:11, color:"#94a3b8"}}>Aucun signal négatif sur cette période 🎉</div>
-            )}
-            {iaNegs && iaNegs.filter(n => negFilter === "all" || n.kind === negFilter).slice(0, 50).map((n, i) => {
-              const isRefusal = n.kind === "ai_refusal"
-              const bg  = isRefusal ? "#f1f5f9" : "#fef2f2"
-              const fg  = isRefusal ? "#475569" : "#b91c1c"
-              const tag = isRefusal ? "Refus IA" : "Usager mécontent"
-              return (
-                <div key={n.id} style={{padding:"10px 16px", borderBottom:"1px solid #f8fafc", background:i%2===0?"white":"#fafbfc"}}>
-                  <div style={{display:"flex", alignItems:"baseline", gap:8, marginBottom:3, flexWrap:"wrap"}}>
-                    <span style={{fontSize:9, fontWeight:700, padding:"2px 7px", borderRadius:20, background:bg, color:fg}}>{tag}</span>
-                    <span style={{fontSize:11, fontWeight:700, color:"#0f172a", overflow:"hidden", textOverflow:"ellipsis"}}>{n.name}</span>
-                    <span style={{fontSize:9, color:"#94a3b8"}}>{n.email}</span>
-                    <span style={{marginLeft:"auto", fontSize:9, color:"#94a3b8"}}>{fmtDT(n.created_at)} · {new Date(n.created_at).toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"})}</span>
-                  </div>
-                  {n.user_message && (
-                    <div style={{fontSize:11, color:"#0f172a", marginTop:4, wordBreak:"break-word"}}>
-                      <span style={{fontSize:9, color:"#94a3b8", fontWeight:600, marginRight:6}}>USR</span>
-                      « {n.user_message.slice(0, 220)}{n.user_message.length > 220 ? "…" : ""} »
-                    </div>
-                  )}
-                  {n.ai_response && (
-                    <div style={{fontSize:11, color:"#475569", marginTop:4, fontStyle:"italic", wordBreak:"break-word"}}>
-                      <span style={{fontSize:9, color:"#94a3b8", fontWeight:600, marginRight:6, fontStyle:"normal"}}>IA</span>
-                      {n.ai_response.slice(0, 220)}{n.ai_response.length > 220 ? "…" : ""}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Conversations IA compte-par-compte */}
-          {(() => {
-            // Groupe les conversations par owner_id, trie les users par
-            // dernière activité, et filtre par recherche nom/email.
-            const byUser = new Map()
-            for (const c of (iaConvs || [])) {
-              const key = c.owner_id || "anon"
-              if (!byUser.has(key)) byUser.set(key, { owner_id: key, name: c.name, email: c.email, items: [] })
-              byUser.get(key).items.push(c)
-            }
-            const groups = Array.from(byUser.values())
-              .map(g => ({ ...g, items: [...g.items].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)) }))
-              .filter(g => {
-                if (!convSearch) return true
-                const q = convSearch.toLowerCase()
-                return (g.name || "").toLowerCase().includes(q) || (g.email || "").toLowerCase().includes(q)
-              })
-              .sort((a, b) => new Date(b.items.at(-1)?.created_at || 0) - new Date(a.items.at(-1)?.created_at || 0))
-            const totalMsg = (iaConvs || []).length
-
-            return (
-              <div style={{background:"white", borderRadius:14, overflow:"hidden", marginBottom:16, boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
-                <div style={{padding:"12px 16px", borderBottom:"1px solid #f1f5f9", display:"flex", alignItems:"center", gap:8, flexWrap:"wrap"}}>
-                  <div style={{fontWeight:700, fontSize:13, color:"#0f172a", flex:1}}>
-                    Conversations IA{iaConvs ? ` (${totalMsg} msg · ${groups.length} compte${groups.length > 1 ? "s" : ""})` : ""}
-                  </div>
-                  <input value={convSearch} onChange={e => setConvSearch(e.target.value)} placeholder="Filtrer…"
-                    style={{border:"1px solid #e2e8f0", borderRadius:8, padding:"4px 10px", fontSize:12, color:"#0f172a", background:"#f8fafc", width:120}}/>
-                  <button onClick={loadConvs} disabled={convsLoading}
-                    style={{background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:8, padding:"4px 10px", fontSize:11, color:"#475569", cursor:"pointer", fontWeight:600}}>
-                    {convsLoading ? "…" : "↻"}
-                  </button>
-                </div>
-
-                {iaConvs === null && !convsLoading && (
-                  <div style={{padding:16, textAlign:"center", fontSize:11, color:"#94a3b8"}}>Appliquez la migration 0006 pour activer ce journal.</div>
-                )}
-                {iaConvs && groups.length === 0 && (
-                  <div style={{padding:16, textAlign:"center", fontSize:11, color:"#94a3b8"}}>Aucune conversation pour l'instant.</div>
-                )}
-
-                {groups.map((g, i) => {
-                  const open = openConvUser === g.owner_id
-                  const last = g.items.at(-1)
-                  const firstDevis = g.items.filter(x => x.had_devis).length
-                  return (
-                    <div key={g.owner_id} style={{borderBottom:"1px solid #f8fafc", background:i%2===0?"white":"#fafbfc"}}>
-                      <button onClick={() => setOpenConvUser(open ? null : g.owner_id)}
-                        style={{width:"100%", background:"none", border:"none", padding:"12px 16px", textAlign:"left", cursor:"pointer", display:"flex", alignItems:"center", gap:10}}>
-                        <div style={{flex:1, minWidth:0}}>
-                          <div style={{fontSize:12, fontWeight:700, color:"#0f172a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{g.name || "—"}</div>
-                          <div style={{fontSize:10, color:"#94a3b8", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{g.email || "—"}</div>
-                        </div>
-                        <div style={{textAlign:"right", flexShrink:0, display:"flex", gap:6, alignItems:"center"}}>
-                          <span style={{fontSize:9, padding:"2px 7px", borderRadius:20, background:"#f1f5f9", color:"#475569", fontWeight:700}}>
-                            {g.items.length} msg
-                          </span>
-                          {firstDevis > 0 && (
-                            <span style={{fontSize:9, padding:"2px 7px", borderRadius:20, background:"rgba(34,197,94,.12)", color:"#15803d", fontWeight:700}} title="devis générés">
-                              ✓ {firstDevis}
-                            </span>
-                          )}
-                          <span style={{fontSize:9, color:"#94a3b8", minWidth:40, textAlign:"right"}}>{relTime(last?.created_at)}</span>
-                          <span style={{color:open ? "#22c55e" : "#cbd5e1", fontSize:14, lineHeight:1, transition:"transform .2s", transform:open ? "rotate(45deg)" : "rotate(0)"}}>+</span>
-                        </div>
-                      </button>
-
-                      {open && (
-                        <div style={{padding:"0 16px 14px 16px", display:"flex", flexDirection:"column", gap:8, animation:"fadeUp .18s ease both"}}>
-                          {g.items.map(turn => (
-                            <div key={turn.id} style={{display:"flex", flexDirection:"column", gap:4}}>
-                              {turn.user_message && (
-                                <div style={{alignSelf:"flex-end", maxWidth:"88%", background:"#0f172a", color:"white", borderRadius:"12px 12px 3px 12px", padding:"7px 11px", fontSize:12, lineHeight:1.5, wordBreak:"break-word"}}>
-                                  {turn.user_message}
-                                </div>
-                              )}
-                              {turn.ai_response && (
-                                <div style={{alignSelf:"flex-start", maxWidth:"88%", background:"#f8fafc", color:"#1e293b", border:"1px solid #f1f5f9", borderRadius:"12px 12px 12px 3px", padding:"7px 11px", fontSize:12, lineHeight:1.5, wordBreak:"break-word"}}>
-                                  {turn.ai_response}
-                                  {turn.had_devis && <span style={{display:"inline-block", marginLeft:6, fontSize:9, padding:"1px 6px", borderRadius:10, background:"rgba(34,197,94,.12)", color:"#15803d", fontWeight:700, verticalAlign:"middle"}}>devis ✓</span>}
-                                </div>
-                              )}
-                              <div style={{fontSize:9, color:"#cbd5e1", alignSelf:"center", marginTop:1}}>
-                                {fmtDT(turn.created_at)} · {new Date(turn.created_at).toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"})}
-                                {turn.trade_names && ` · ${turn.trade_names}`}
-                                {turn.model && ` · ${turn.model.replace(/^claude-/, "")}`}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )
-          })()}
-
-          <div style={{textAlign:"center", fontSize:10, color:"#cbd5e1"}}>
+        <div style={{ padding: 16 }}>
+          <AdminKPIs stats={stats} />
+          <AdminUsersTable
+            users={filteredUsers}
+            userSearch={userSearch}    setUserSearch={setUserSearch}
+            sortBy={sortBy}            setSortBy={setSortBy}
+            currentUserId={currentUser?.id}
+            onOpenDetail={openDetail}  onOpenDelete={openDelete}
+          />
+          <AdminErrorLogs    iaLogs={iaLogs}  loading={logsLoading}  onRefresh={loadLogs} />
+          <AdminNegativeLogs iaNegs={iaNegs}  loading={negsLoading}  negFilter={negFilter} setNegFilter={setNegFilter} onRefresh={loadNegs} />
+          <AdminConversations
+            iaConvs={iaConvs}      loading={convsLoading}
+            convSearch={convSearch} setConvSearch={setConvSearch}
+            openConvUser={openConvUser} setOpenConvUser={setOpenConvUser}
+            onRefresh={loadConvs}
+          />
+          <div style={{ textAlign: "center", fontSize: 10, color: "#cbd5e1" }}>
             Données du {fmtD(stats.generatedAt)} à {new Date(stats.generatedAt).toLocaleTimeString("fr-FR")}
           </div>
         </div>
@@ -527,12 +180,8 @@ export default function AdminPanel({ onBack }) {
 
       {detailUser && (
         <UserDetailDrawer
-          user={detailUser}
-          data={detailData}
-          loading={detailLoading}
-          error={detailError}
-          tab={detailTab}
-          onTabChange={setDetailTab}
+          user={detailUser}    data={detailData}       loading={detailLoading}
+          error={detailError}  tab={detailTab}         onTabChange={setDetailTab}
           onClose={closeDetail}
           onRequestDelete={() => { closeDetail(); openDelete(detailUser); }}
           currentUserId={currentUser?.id}
@@ -541,12 +190,8 @@ export default function AdminPanel({ onBack }) {
 
       {deleteTarget && (
         <DeleteUserModal
-          target={deleteTarget}
-          confirmInput={confirmInput}
-          setConfirmInput={setConfirmInput}
-          deleting={deleting}
-          error={deleteError}
-          onClose={closeDelete}
+          target={deleteTarget}  confirmInput={confirmInput}  setConfirmInput={setConfirmInput}
+          deleting={deleting}    error={deleteError}          onClose={closeDelete}
           onConfirm={confirmDelete}
         />
       )}

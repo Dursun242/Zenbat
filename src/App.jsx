@@ -1,35 +1,34 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuth } from "./lib/auth.jsx";
-import {
-  listClients, createClient as apiCreateClient, updateClient as apiUpdateClient, deleteClient as apiDeleteClient,
-  listDevisWithLignes, getDevis, createDevis as apiCreateDevis, updateDevis as apiUpdateDevis, replaceLignes, deleteDevis as apiDeleteDevis, createIndiceDevis as apiCreateIndice,
-  listInvoices, createInvoice as apiCreateInvoice, updateInvoice as apiUpdateInvoice, replaceInvoiceLignes, deleteInvoice as apiDeleteInvoice, nextInvoiceNumber, createAvoirFromInvoice as apiCreateAvoir, createAcompteFromDevis as apiCreateAcompte,
-  updateMyProfile, getMyProfile, saveBrandData,
-} from "./lib/api";
-import { uid } from "./lib/utils.js";
-import { DEFAULT_DEMO_BRAND, DEFAULT_BRAND, DEMO_CLIENTS, DEMO_DEVIS } from "./lib/constants.js";
-import { TRIAL_DAYS, hydrateFromMetadata } from "./lib/appShell.js";
+import { TRIAL_DAYS } from "./lib/appShell.js";
 
-import Logo        from "./components/ui/Logo.jsx";
-import { I }       from "./components/ui/icons.jsx";
-import Toast       from "./components/app/Toast.jsx";
-import BottomNav   from "./components/app/BottomNav.jsx";
-import SearchBar   from "./components/app/SearchBar.jsx";
+import { useSaveState } from "./hooks/useSaveState.js";
+import { useToast }     from "./hooks/useToast.js";
+import { useBrand }     from "./hooks/useBrand.js";
+import { useClients }   from "./hooks/useClients.js";
+import { useDevis }     from "./hooks/useDevis.js";
+import { useInvoices }  from "./hooks/useInvoices.js";
+
+import Logo          from "./components/ui/Logo.jsx";
+import { I }         from "./components/ui/icons.jsx";
+import Toast         from "./components/app/Toast.jsx";
+import BottomNav     from "./components/app/BottomNav.jsx";
+import SearchBar     from "./components/app/SearchBar.jsx";
 import SaveIndicator from "./components/app/SaveIndicator.jsx";
-import Dashboard   from "./components/Dashboard.jsx";
-import ClientsList from "./components/ClientsList.jsx";
-import ClientDetail from "./components/ClientDetail.jsx";
-import DevisList   from "./components/DevisList.jsx";
-import DevisDetail from "./components/DevisDetail.jsx";
+import Dashboard     from "./components/Dashboard.jsx";
+import ClientsList   from "./components/ClientsList.jsx";
+import ClientDetail  from "./components/ClientDetail.jsx";
+import DevisList     from "./components/DevisList.jsx";
+import DevisDetail   from "./components/DevisDetail.jsx";
 import InvoicesList  from "./components/InvoicesList.jsx";
 import InvoiceDetail from "./components/InvoiceDetail.jsx";
-import AgentIA     from "./components/AgentIA.jsx";
-import AdminPanel  from "./components/AdminPanel.jsx";
-import Onboarding       from "./pages/Onboarding.jsx";
+import AgentIA       from "./components/AgentIA.jsx";
+import AdminPanel    from "./components/AdminPanel.jsx";
+import Onboarding        from "./pages/Onboarding.jsx";
 import TradesQuickPicker from "./pages/TradesQuickPicker.jsx";
-import AuthScreen       from "./pages/AuthScreen.jsx";
-import PaywallScreen    from "./pages/PaywallScreen.jsx";
-import PWAInstallScreen from "./pages/PWAInstallScreen.jsx";
+import AuthScreen        from "./pages/AuthScreen.jsx";
+import PaywallScreen     from "./pages/PaywallScreen.jsx";
+import PWAInstallScreen  from "./pages/PWAInstallScreen.jsx";
 
 const NAV = [
   { id: "dashboard", label: "Accueil",  icon: I.trend },
@@ -40,420 +39,38 @@ const NAV = [
 ];
 
 export default function App() {
-  const [screen, setScreen]   = useState("app");
-  const [tab,    setTab]      = useState("dashboard");
-  const [selD,   setSelD]     = useState(null);
-  const [selC,   setSelC]     = useState(null);
-  const [plan,   setPlan]     = useState("free");
-  const [toast,  setToast]    = useState(null);
-  const [saveState, setSaveState] = useState("idle"); // idle | saving | saved
-  const saveResetTimer = useRef(null);
-  const markSaving = useCallback(() => {
-    clearTimeout(saveResetTimer.current);
-    setSaveState("saving");
-  }, []);
-  const markSaved = useCallback(() => {
-    clearTimeout(saveResetTimer.current);
-    setSaveState("saved");
-    saveResetTimer.current = setTimeout(() => setSaveState("idle"), 1800);
-  }, []);
-  const [loadingDevis, setLoadingDevis] = useState(new Set());
-  const [autoOpenPDF,  setAutoOpenPDF]  = useState(null); // devis id à ouvrir en PDF
-  const [showPwa, setShowPwa] = useState(false);
+  const [screen, setScreen] = useState("app");
+  const [tab,    setTab]    = useState("dashboard");
+  const [selC,   setSelC]   = useState(null);
+  const [plan,   setPlan]   = useState("free");
+  const [showPwa,setShowPwa]= useState(false);
   const deferredPrompt = useRef(null);
 
-  const [brand, setBrandState] = useState(() => {
-    try {
-      const stored = localStorage.getItem("zenbat_brand");
-      if (stored) return { ...DEFAULT_DEMO_BRAND, ...JSON.parse(stored) };
-    } catch {}
-    return DEFAULT_DEMO_BRAND;
-  });
-
-  const brandSaveTimer = useRef(null);
-  const setBrand = useCallback((updater) => {
-    setBrandState(prev => {
-      const next = typeof updater === "function" ? updater(prev) : updater;
-      try { localStorage.setItem("zenbat_brand", JSON.stringify(next)); } catch {}
-      // Sync complète vers Supabase (debounce 600 ms pour ne pas surcharger en cas
-      // de saisie rapide dans l'onboarding) — remplace l'ancienne sync partielle.
-      clearTimeout(brandSaveTimer.current);
-      brandSaveTimer.current = setTimeout(() => {
-        saveBrandData(next).catch(err => console.warn("[brand sync]", err));
-      }, 600);
-      return next;
-    });
-  }, []);
-
-  const [clients,  setClients]  = useState(DEMO_CLIENTS);
-  const [devis,    setDevis]    = useState(DEMO_DEVIS);
-  const [invoices, setInvoices] = useState([]);
-  const [selI,     setSelI]     = useState(null);
-
-  const showUndo = useCallback((label, onUndo) => {
-    setToast(prev => {
-      if (prev?.timer) clearTimeout(prev.timer);
-      const timer = setTimeout(() => setToast(null), 6000);
-      return { label, onUndo, timer };
-    });
-  }, []);
-
-  const showErr = useCallback((label) => {
-    setToast(prev => {
-      if (prev?.timer) clearTimeout(prev.timer);
-      const timer = setTimeout(() => setToast(null), 5000);
-      return { label, isError: true, timer };
-    });
-  }, []);
-
-  const dismissToast = () => setToast(prev => { if (prev?.timer) clearTimeout(prev.timer); return null; });
-
   const { user, signOut } = useAuth();
+  const { saveState, setSaveState, markSaving, markSaved } = useSaveState();
+  const { toast, showUndo, showErr, dismissToast } = useToast();
+  const saveCallbacks = { markSaving, markSaved, setSaveState, showErr };
+
+  const { brand, setBrand }                             = useBrand(user, setScreen);
+  const { clients, setClients, onSaveClient, onDeleteClient, onRestoreClient } = useClients(user, saveCallbacks);
+  const {
+    devis, setDevis, selD, setSelD, loadingDevis, autoOpenPDF, setAutoOpenPDF,
+    onSaveDevis, onCreateDevis, onDuplicateDevis, onCreateIndice, onDeleteDevis, goDevis,
+  } = useDevis(user, { ...saveCallbacks, setTab });
+  const {
+    invoices, selI, onSaveInvoice, onCreateInvoiceFromDevis, onCreateEmptyInvoice,
+    onCreateAcompte, onCreateAvoir, onDeleteInvoice, goInvoice,
+  } = useInvoices(user, devis, brand, { ...saveCallbacks, setTab });
+
   const isAdmin = !!user?.email && !!import.meta.env.VITE_ADMIN_EMAIL &&
     user.email.trim().toLowerCase() === import.meta.env.VITE_ADMIN_EMAIL.trim().toLowerCase();
 
-  // Capture l'événement beforeinstallprompt pour Android
+  // Capture beforeinstallprompt for Android PWA
   useEffect(() => {
     const handler = e => { e.preventDefault(); deferredPrompt.current = e; };
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
-
-  // Chargement initial depuis Supabase
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const [cs, ds] = await Promise.all([listClients(), listDevisWithLignes()]);
-        if (cancelled) return;
-        setClients(cs.length ? cs : []);
-        setDevis(ds.length ? ds : []);
-      } catch (err) {
-        console.error("[Zenbat] chargement données :", err);
-        if (!cancelled) showErr("Erreur de chargement — vérifiez votre connexion");
-      }
-      // Charge les factures séparément : si la migration 0005 n'est pas
-      // appliquée, on échoue silencieusement sans bloquer le reste.
-      try {
-        const inv = await listInvoices();
-        if (!cancelled) setInvoices(inv || []);
-      } catch (err) {
-        if (!cancelled) console.warn("[Zenbat] factures indisponibles :", err.message);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [user?.id]);
-
-  // Chargement du profil brand depuis Supabase au login.
-  // Supabase est la source de vérité — écrase le localStorage pour que les
-  // données survivent à un changement de navigateur / appareil.
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    getMyProfile()
-      .then(profile => {
-        if (cancelled) return;
-        if (profile?.brand_data && Object.keys(profile.brand_data).length > 0) {
-          const merged = { ...DEFAULT_BRAND, ...profile.brand_data };
-          setBrandState(merged);
-          try { localStorage.setItem("zenbat_brand", JSON.stringify(merged)); } catch {}
-        } else {
-          // Nouveau compte (brand_data vide en DB) : on pré-remplit depuis
-          // les métadonnées d'inscription (prénom + nom + société) et on
-          // redirige vers la sélection des métiers AVANT d'atterrir sur
-          // le Dashboard. Fonctionne quel que soit le flow (Signup par
-          // email, AuthScreen legacy, OAuth futur…).
-          hydrateFromMetadata(user, setBrand);
-          setScreen("trades_picker");
-        }
-      })
-      .catch(err => {
-        if (cancelled) return;
-        console.warn("[brand load]", err);
-        // Fallback si Supabase échoue : on tente quand même le pré-remplissage
-        hydrateFromMetadata(user, setBrand);
-      });
-    return () => { cancelled = true; };
-  }, [user?.id, setBrand]);
-
-  // Sauvegarde différée des devis
-  const saveTimers = useRef({});
-  const scheduleDevisSave = (d, immediate = false, saveLignes = false) => {
-    if (!user) return;
-    const run = async () => {
-      markSaving();
-      try {
-        const { lignes: dl, client, created_at, updated_at, id: _id, ...fields } = d;
-        await apiUpdateDevis(d.id, fields);
-        if (saveLignes) {
-          await replaceLignes(d.id, (dl || []).map(({ id, created_at, ...l }) => l));
-        }
-        markSaved();
-      } catch (err) { console.error("[save devis]", err); showErr("Impossible de sauvegarder le devis"); setSaveState("idle"); }
-    };
-    if (immediate) { run(); return; }
-    clearTimeout(saveTimers.current[d.id]);
-    saveTimers.current[d.id] = setTimeout(run, 800);
-  };
-
-  // ── CRUD clients ─────────────────────────────────────────
-  const onSaveClient = async (c) => {
-    const isNew = !clients.some(x => x.id === c.id);
-    setClients(prev => isNew ? [c, ...prev] : prev.map(x => x.id === c.id ? c : x));
-    if (!user) return;
-    markSaving();
-    try {
-      const { created_at, updated_at, ...fields } = c;
-      if (isNew) await apiCreateClient(fields);
-      else       await apiUpdateClient(c.id, fields);
-      markSaved();
-    } catch (err) { console.error("[save client]", err); showErr("Impossible de sauvegarder le contact"); setSaveState("idle"); }
-  };
-
-  const onDeleteClient = async (id) => {
-    const victim = clients.find(x => x.id === id);
-    const idx    = clients.findIndex(x => x.id === id);
-    setClients(prev => prev.filter(x => x.id !== id));
-    if (user) apiDeleteClient(id).catch(e => { console.error("[delete client]", e); showErr("Impossible de supprimer le contact"); });
-    return { victim, idx };
-  };
-
-  const onRestoreClient = (victim, idx) => {
-    setClients(prev => { const n = [...prev]; n.splice(Math.min(idx, n.length), 0, victim); return n; });
-    if (user) {
-      const { created_at, updated_at, ...fields } = victim;
-      apiCreateClient(fields).catch(e => console.error("[restore client]", e));
-    }
-  };
-
-  // ── CRUD devis ────────────────────────────────────────────
-  const onSaveDevis = (d, saveLignes = false) => {
-    setDevis(prev => prev.map(x => x.id === d.id ? d : x));
-    scheduleDevisSave(d, false, saveLignes);
-  };
-
-  const onCreateDevis = async (d) => {
-    setDevis(prev => [d, ...prev]);
-    if (!user) return;
-    try {
-      const { lignes: dl, client, created_at, updated_at, ...fields } = d;
-      const saved = await apiCreateDevis(fields, (dl || []).map(({ id, created_at, ...l }) => l));
-      if (dl?.length) {
-        const fresh = await getDevis(saved.id);
-        if (fresh && !fresh.lignes?.length) {
-          await replaceLignes(saved.id, (dl || []).map(({ id, created_at, ...l }) => l));
-        }
-        if (fresh?.lignes?.length) {
-          setDevis(prev => prev.map(x => x.id === d.id ? { ...x, lignes: fresh.lignes } : x));
-        }
-      }
-    } catch (err) { console.error("[create devis]", err); showErr("Erreur lors de l'enregistrement du devis"); }
-  };
-
-  const onDuplicateDevis = async (sourceId) => {
-    const src = devis.find(d => d.id === sourceId);
-    if (!src) return;
-    const newId    = uid();
-    const newNumero = `DEV-${new Date().getFullYear()}-${String(devis.length + 1).padStart(4, "0")}`;
-    const copy = {
-      id:            newId,
-      numero:        newNumero,
-      objet:         src.objet ? `Copie – ${src.objet}` : "Copie",
-      client_id:     src.client_id,
-      ville_chantier:src.ville_chantier,
-      statut:        "brouillon",
-      montant_ht:    src.montant_ht,
-      tva_rate:      src.tva_rate,
-      date_emission: new Date().toISOString().split("T")[0],
-      lignes:        (src.lignes || []).map(l => ({ ...l, id: uid() })),
-    };
-    await onCreateDevis(copy);
-    goDevis(newId);
-  };
-
-  const onCreateIndice = async (sourceId) => {
-    if (!user) { showErr("Vous devez être connecté."); return; }
-    try {
-      const src = devis.find(d => d.id === sourceId);
-      if (!src) throw new Error("Devis introuvable");
-      const created = await apiCreateIndice(src);
-      // Marque la source comme remplacée dans le state local
-      setDevis(prev => prev.map(d => d.id === sourceId && d.statut !== "remplace"
-        ? { ...d, statut: "remplace" } : d));
-      setDevis(prev => [{ ...created }, ...prev]);
-      goDevis(created.id);
-    } catch (e) {
-      console.error("[create indice]", e);
-      showErr(e?.message || "Impossible de créer l'indice");
-    }
-  };
-
-  const onDeleteDevis = async (id) => {
-    if (!user) {
-      setDevis(prev => prev.filter(x => x.id !== id));
-      return;
-    }
-    try {
-      await apiDeleteDevis(id);
-      setDevis(prev => prev.filter(x => x.id !== id));
-    } catch (e) {
-      console.error("[delete devis]", e);
-      showErr(e?.message || "Impossible de supprimer le devis");
-    }
-  };
-
-  // ── CRUD factures ────────────────────────────────────────
-  const goInvoice = id => { setSelI(id); setTab("factures_detail"); };
-
-  const onSaveInvoice = (inv, saveLignes = false) => {
-    setInvoices(prev => prev.map(x => x.id === inv.id ? inv : x));
-    if (!user) return;
-    const { lignes: il, created_at, updated_at, ...fields } = inv;
-    markSaving();
-    const p1 = apiUpdateInvoice(inv.id, fields);
-    const p2 = saveLignes
-      ? replaceInvoiceLignes(inv.id, (il || []).map(({ id, created_at, ...l }) => l))
-      : Promise.resolve();
-    Promise.all([p1, p2]).then(
-      () => markSaved(),
-      (e) => { console.error("[save invoice]", e); showErr("Impossible de sauvegarder la facture"); setSaveState("idle"); },
-    );
-  };
-
-  const onCreateInvoiceFromDevis = async (devisId) => {
-    const d = devis.find(x => x.id === devisId);
-    if (!d) { showErr("Devis introuvable"); return; }
-    try {
-      const numero = await nextInvoiceNumber().catch(() => `FAC-${new Date().getFullYear()}-${String(invoices.length + 1).padStart(4, "0")}`);
-      const ouvrages = (d.lignes || []).filter(l => l.type_ligne === "ouvrage");
-      const franchise = brand.vatRegime === "franchise";
-      const ht  = ouvrages.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0);
-      const tva = ouvrages.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * Number(l.tva_rate ?? (franchise ? 0 : 20)) / 100, 0);
-      const saved = await apiCreateInvoice(
-        {
-          devis_id:       d.id,
-          client_id:      d.client_id,
-          numero,
-          objet:          d.objet,
-          operation_type: "service",
-          statut:         "brouillon",
-          montant_ht:     ht,
-          montant_tva:    tva,
-          montant_ttc:    ht + tva,
-          ville_chantier: d.ville_chantier,
-          date_emission:  new Date().toISOString().split("T")[0],
-          date_echeance:  new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
-        },
-        (d.lignes || []).map(({ id, created_at, ...l }) => l),
-      );
-      const full = { ...saved, lignes: d.lignes || [] };
-      setInvoices(prev => [full, ...prev]);
-      goInvoice(saved.id);
-    } catch (err) {
-      console.error("[create invoice from devis]", err);
-      showErr(err.message?.includes("does not exist") ? "Migration 0005 non appliquée côté Supabase" : "Impossible de créer la facture");
-    }
-  };
-
-  const onCreateEmptyInvoice = async () => {
-    try {
-      const numero = await nextInvoiceNumber().catch(() => `FAC-${new Date().getFullYear()}-${String(invoices.length + 1).padStart(4, "0")}`);
-      const saved = await apiCreateInvoice(
-        {
-          numero,
-          objet: "Nouvelle facture",
-          operation_type: "service",
-          statut: "brouillon",
-          montant_ht: 0, montant_tva: 0, montant_ttc: 0,
-          date_emission: new Date().toISOString().split("T")[0],
-          date_echeance: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
-        },
-        [],
-      );
-      setInvoices(prev => [{ ...saved, lignes: [] }, ...prev]);
-      goInvoice(saved.id);
-    } catch (err) {
-      console.error("[create empty invoice]", err);
-      showErr(err.message?.includes("does not exist") ? "Migration 0005 non appliquée côté Supabase" : "Impossible de créer la facture");
-    }
-  };
-
-  const onCreateAcompte = async (devisId, montantHT, tvaRate) => {
-    if (!user) { showErr("Vous devez être connecté."); return; }
-    try {
-      const found = devis.find(d => d.id === devisId);
-      if (!found) throw new Error("Devis introuvable");
-      const saved = await apiCreateAcompte(found, montantHT, tvaRate, brand?.vatRegime);
-      const fresh = await listInvoices();
-      setInvoices(fresh);
-      goInvoice(saved.id);
-    } catch (e) {
-      console.error("[create acompte]", e);
-      showErr(e?.message || "Impossible de créer l'acompte");
-    }
-  };
-
-  const onCreateAvoir = async (invoiceId) => {
-    if (!user) { showErr("Vous devez être connecté."); return; }
-    try {
-      const newId = await apiCreateAvoir(invoiceId);
-      // Recharge la liste pour récupérer l'avoir fraîchement créé côté DB
-      const fresh = await listInvoices();
-      setInvoices(fresh);
-      goInvoice(newId);
-    } catch (e) {
-      console.error("[create avoir]", e);
-      showErr(e?.message || "Impossible de créer l'avoir");
-    }
-  };
-
-  const onDeleteInvoice = async (id) => {
-    if (!user) {
-      setInvoices(prev => prev.filter(x => x.id !== id));
-      setTab("factures");
-      return;
-    }
-    try {
-      await apiDeleteInvoice(id);
-      setInvoices(prev => prev.filter(x => x.id !== id));
-      setTab("factures");
-    } catch (e) {
-      console.error("[delete invoice]", e);
-      showErr(e?.message || "Impossible de supprimer la facture");
-    }
-  };
-
-  // Navigation vers un devis (rechargement depuis DB)
-  const goDevis = id => {
-    setSelD(id); setTab("devis_detail");
-    if (!user) return;
-    setLoadingDevis(prev => { const n = new Set(prev); n.add(id); return n; });
-    getDevis(id)
-      .then(fresh => {
-        setLoadingDevis(prev => { const n = new Set(prev); n.delete(id); return n; });
-        if (!fresh) return;
-        setDevis(prev => prev.map(x => {
-          if (x.id !== id) return x;
-          const dbLignes    = fresh.lignes    || [];
-          const stateLignes = x.lignes        || [];
-          if (dbLignes.length > 0)    return { ...x, lignes: dbLignes, montant_ht: fresh.montant_ht ?? x.montant_ht };
-          if (stateLignes.length > 0) {
-            replaceLignes(id, stateLignes.map(({ id: _, created_at: __, ...l }) => l))
-              .catch(err => { console.error("[goDevis] retry lignes:", err); showErr("Erreur de synchronisation des lignes"); });
-            return x;
-          }
-          return { ...x, montant_ht: fresh.montant_ht ?? x.montant_ht };
-        }));
-      })
-      .catch(err => {
-        setLoadingDevis(prev => { const n = new Set(prev); n.delete(id); return n; });
-        console.error("[goDevis reload]", err);
-        showErr("Impossible de charger le devis — vérifiez votre connexion");
-      });
-  };
-
-  const goClient = id => { setSelC(id); setTab("client_detail"); };
 
   const handleSignOut = () => {
     if (!window.confirm("Se déconnecter ?")) return;
@@ -461,9 +78,8 @@ export default function App() {
     signOut();
   };
 
-  // Trial
-  const trialStart  = user?.created_at ? new Date(user.created_at).getTime() : null;
-  const daysLeft    = trialStart !== null ? Math.max(0, TRIAL_DAYS - Math.floor((Date.now() - trialStart) / 86400000)) : TRIAL_DAYS;
+  const trialStart   = user?.created_at ? new Date(user.created_at).getTime() : null;
+  const daysLeft     = trialStart !== null ? Math.max(0, TRIAL_DAYS - Math.floor((Date.now() - trialStart) / 86400000)) : TRIAL_DAYS;
   const trialExpired = plan === "free" && daysLeft === 0;
 
   const stats = {
@@ -475,32 +91,25 @@ export default function App() {
 
   const activeNav = NAV.find(n => tab.startsWith(n.id))?.id || "dashboard";
 
-  // ── Écrans hors dashboard ─────────────────────────────────
+  // ── Écrans hors dashboard ──────────────────────────────────
   if (screen === "auth") return <AuthScreen onEnter={(co, isSignup) => {
     setBrand(b => ({ ...b, companyName: co || "" }));
     setShowPwa(!!isSignup);
-    // Nouveau parcours : signup → mini-étape "métiers" → (pwa) → app.
-    // Login existant (isSignup=false) → directement app.
     setScreen(isSignup ? "trades_picker" : "app");
   }}/>;
   if (screen === "trades_picker") return <TradesQuickPicker
     brand={brand}
     setBrand={setBrand}
-    onDone={() => {
-      // Fresh signup terminé : on ouvre directement l'Agent IA avec un
-      // exemple pré-rempli (géré dans AgentIA via brand.freshSignupExample).
-      setTab("agent");
-      setScreen(showPwa ? "pwa_install" : "app");
-    }}
+    onDone={() => { setTab("agent"); setScreen(showPwa ? "pwa_install" : "app"); }}
     onSkip={() => {
       setBrand(b => ({ ...b, initialSetupDoneAt: new Date().toISOString() }));
       setTab("agent");
       setScreen(showPwa ? "pwa_install" : "app");
     }}
   />;
-  if (screen === "onboarding") return <Onboarding brand={brand} setBrand={setBrand} onDone={() => setScreen(showPwa ? "pwa_install" : "app")}/>;
+  if (screen === "onboarding")  return <Onboarding brand={brand} setBrand={setBrand} onDone={() => setScreen(showPwa ? "pwa_install" : "app")}/>;
   if (screen === "pwa_install") return <PWAInstallScreen deferredPrompt={deferredPrompt.current} onDone={() => { setShowPwa(false); setScreen("app"); }}/>;
-  if (screen === "paywall")    return <PaywallScreen daysLeft={daysLeft} onBack={() => setScreen("app")} onSubscribe={() => { setPlan("pro"); setScreen("app"); }}/>;
+  if (screen === "paywall")     return <PaywallScreen daysLeft={daysLeft} onBack={() => setScreen("app")} onSubscribe={() => { setPlan("pro"); setScreen("app"); }}/>;
 
   return (
     <div style={{ fontFamily: "'DM Sans',sans-serif", height: "100dvh", display: "flex", flexDirection: "column", background: "#f8fafc", overflow: "hidden" }}>
@@ -568,7 +177,7 @@ export default function App() {
         </button>
       )}
 
-      {/* Body : sidebar (desktop) + contenu */}
+      {/* Body */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
 
         {/* Sidebar desktop */}
@@ -593,86 +202,84 @@ export default function App() {
 
         {/* Contenu principal */}
         <div className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "64px" }}>
-        {["devis","devis_detail","factures","factures_detail"].includes(tab) && (
-          <SearchBar devis={devis} clients={clients} invoices={invoices} goDevis={goDevis} goClient={goClient} goInvoice={goInvoice}/>
-        )}
-        {tab === "dashboard"     && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}
-                                       onOpenProfile={() => setScreen("onboarding")}
-                                       onOpenPWAInstall={() => setScreen("pwa_install")}/>}
-        {tab === "clients"       && <ClientsList clients={clients} onSave={onSaveClient} onDelete={onDeleteClient} onRestore={onRestoreClient} goClient={goClient} showUndo={showUndo}/>}
-        {tab === "client_detail" && selC && (
-          <ClientDetail
-            c={clients.find(x => x.id === selC)}
-            clientDevis={devis.filter(d => d.client_id === selC)}
-            onBack={() => setTab("clients")}
-            goDevis={goDevis}
-            onUpdate={onSaveClient}
-            onDelete={async () => { await onDeleteClient(selC); setTab("clients"); }}/>
-        )}
-        {tab === "devis"         && <DevisList devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} onDelete={onDeleteDevis}/>}
-        {tab === "devis_detail"  && selD && (
-          <DevisDetail
-            d={devis.find(x => x.id === selD)}
-            cl={clients.find(c => c.id === devis.find(x => x.id === selD)?.client_id)}
-            clients={clients}
-            onBack={() => setTab("devis")}
-            brand={brand}
-            onChange={onSaveDevis}
-            onConvertToInvoice={() => onCreateInvoiceFromDevis(selD)}
-            onCreateAcompte={onCreateAcompte}
-            onDuplicate={() => onDuplicateDevis(selD)}
-            onCreateIndice={() => onCreateIndice(selD)}
-            groupVersions={(() => {
-              const cur = devis.find(x => x.id === selD);
-              if (!cur) return [];
-              const rootId = cur.root_devis_id || cur.id;
-              return devis
-                .filter(x => x.id === rootId || x.root_devis_id === rootId)
-                .sort((a, b) => !a.indice ? -1 : !b.indice ? 1 : a.indice.localeCompare(b.indice));
-            })()}
-            goDevis={goDevis}
-            autoOpenPDF={autoOpenPDF === selD}
-            onAutoOpenPDFConsumed={() => setAutoOpenPDF(null)}
-            loading={loadingDevis.has(selD)}/>
-        )}
-        {tab === "factures"         && <InvoicesList invoices={invoices} clients={clients} goInvoice={goInvoice} onCreateEmpty={onCreateEmptyInvoice} onDelete={onDeleteInvoice}/>}
-        {tab === "factures_detail"   && selI && (() => {
-          const inv = invoices.find(x => x.id === selI);
-          if (!inv) return null;
-          const linkedDevis = inv.devis_id ? devis.find(d => d.id === inv.devis_id) : null;
-          const invoiceWithRef = linkedDevis ? { ...inv, devis_numero: linkedDevis.numero } : inv;
-          return (
-            <InvoiceDetail
-              invoice={invoiceWithRef}
-              client={clients.find(c => c.id === inv.client_id)}
+          {["devis", "devis_detail", "factures", "factures_detail"].includes(tab) && (
+            <SearchBar devis={devis} clients={clients} invoices={invoices} goDevis={goDevis} goClient={id => { setSelC(id); setTab("client_detail"); }} goInvoice={goInvoice}/>
+          )}
+          {tab === "dashboard"     && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}
+                                         onOpenProfile={() => setScreen("onboarding")}
+                                         onOpenPWAInstall={() => setScreen("pwa_install")}/>}
+          {tab === "clients"       && <ClientsList clients={clients} onSave={onSaveClient} onDelete={onDeleteClient} onRestore={onRestoreClient} goClient={id => { setSelC(id); setTab("client_detail"); }} showUndo={showUndo}/>}
+          {tab === "client_detail" && selC && (
+            <ClientDetail
+              c={clients.find(x => x.id === selC)}
+              clientDevis={devis.filter(d => d.client_id === selC)}
+              onBack={() => setTab("clients")}
+              goDevis={goDevis}
+              onUpdate={onSaveClient}
+              onDelete={async () => { await onDeleteClient(selC); setTab("clients"); }}/>
+          )}
+          {tab === "devis"        && <DevisList devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} onDelete={onDeleteDevis}/>}
+          {tab === "devis_detail" && selD && (
+            <DevisDetail
+              d={devis.find(x => x.id === selD)}
+              cl={clients.find(c => c.id === devis.find(x => x.id === selD)?.client_id)}
               clients={clients}
+              onBack={() => setTab("devis")}
               brand={brand}
-              invoices={invoices}
-              onBack={() => setTab("factures")}
-              onChange={onSaveInvoice}
-              onCreateAvoir={onCreateAvoir}
-              onDelete={() => { if (confirm("Supprimer cette facture ?")) onDeleteInvoice(inv.id); }}/>
-          );
-        })()}
-        {tab === "agent"         && (
-          <AgentIA
-            devis={devis}
-            onCreateDevis={onCreateDevis}
-            clients={clients}
-            onSaveClient={onSaveClient}
-            plan={plan}
-            trialExpired={trialExpired}
-            onPaywall={() => setScreen("paywall")}
-            setTab={setTab}
-            onOpenDevisPDF={(id) => { setAutoOpenPDF(id); setSelD(id); setTab("devis_detail"); }}
-            brand={brand}/>
-        )}
-        {tab === "admin"         && isAdmin && <AdminPanel onBack={() => setTab("dashboard")}/>}
-        </div>{/* end app-content */}
-      </div>{/* end body */}
+              onChange={onSaveDevis}
+              onConvertToInvoice={() => onCreateInvoiceFromDevis(selD)}
+              onCreateAcompte={onCreateAcompte}
+              onDuplicate={() => onDuplicateDevis(selD)}
+              onCreateIndice={() => onCreateIndice(selD)}
+              groupVersions={(() => {
+                const cur    = devis.find(x => x.id === selD);
+                if (!cur) return [];
+                const rootId = cur.root_devis_id || cur.id;
+                return devis
+                  .filter(x => x.id === rootId || x.root_devis_id === rootId)
+                  .sort((a, b) => !a.indice ? -1 : !b.indice ? 1 : a.indice.localeCompare(b.indice));
+              })()}
+              goDevis={goDevis}
+              autoOpenPDF={autoOpenPDF === selD}
+              onAutoOpenPDFConsumed={() => setAutoOpenPDF(null)}
+              loading={loadingDevis.has(selD)}/>
+          )}
+          {tab === "factures"        && <InvoicesList invoices={invoices} clients={clients} goInvoice={goInvoice} onCreateEmpty={onCreateEmptyInvoice} onDelete={onDeleteInvoice}/>}
+          {tab === "factures_detail" && selI && (() => {
+            const inv = invoices.find(x => x.id === selI);
+            if (!inv) return null;
+            const linkedDevis = inv.devis_id ? devis.find(d => d.id === inv.devis_id) : null;
+            return (
+              <InvoiceDetail
+                invoice={linkedDevis ? { ...inv, devis_numero: linkedDevis.numero } : inv}
+                client={clients.find(c => c.id === inv.client_id)}
+                clients={clients}
+                brand={brand}
+                invoices={invoices}
+                onBack={() => setTab("factures")}
+                onChange={onSaveInvoice}
+                onCreateAvoir={onCreateAvoir}
+                onDelete={() => { if (confirm("Supprimer cette facture ?")) onDeleteInvoice(inv.id); }}/>
+            );
+          })()}
+          {tab === "agent" && (
+            <AgentIA
+              devis={devis}
+              onCreateDevis={onCreateDevis}
+              clients={clients}
+              onSaveClient={onSaveClient}
+              plan={plan}
+              trialExpired={trialExpired}
+              onPaywall={() => setScreen("paywall")}
+              setTab={setTab}
+              onOpenDevisPDF={(id) => { setAutoOpenPDF(id); goDevis(id); }}
+              brand={brand}/>
+          )}
+          {tab === "admin" && isAdmin && <AdminPanel onBack={() => setTab("dashboard")}/>}
+        </div>
+      </div>
 
       <Toast toast={toast} onDismiss={dismissToast}/>
-
       <BottomNav items={NAV} activeNav={activeNav} onSelect={setTab} plan={plan} daysLeft={daysLeft}/>
     </div>
   );
