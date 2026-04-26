@@ -144,7 +144,7 @@ export default function App() {
 
       {/* Header */}
       <header style={{ background: "#1A1612", padding: "calc(10px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 10px calc(18px + env(safe-area-inset-left))", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-        <Logo size={20} white/>
+        <Logo size={24} white/>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {isAdmin && (
             <button onClick={() => setTab("admin")} title="Panel Admin"
