@@ -7,7 +7,9 @@ import LandingRelance  from '../components/landing/LandingRelance'
 import LandingHow      from '../components/landing/LandingHow'
 import PricingSection  from '../components/landing/PricingSection'
 import LandingFAQ      from '../components/landing/LandingFAQ'
+import LandingContact  from '../components/landing/LandingContact'
 import LandingFooter   from '../components/landing/LandingFooter'
+import LandingWhatsApp from '../components/landing/LandingWhatsApp'
 
 export default function Landing({ onLogin, onSignup }) {
   return (
@@ -21,7 +23,9 @@ export default function Landing({ onLogin, onSignup }) {
       <LandingHow     />
       <PricingSection />
       <LandingFAQ     />
+      <LandingContact />
       <LandingFooter  onSignup={onSignup} />
+      <LandingWhatsApp />
     </div>
   )
 }
