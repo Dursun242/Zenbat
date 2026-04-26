@@ -63,6 +63,7 @@ function StatItem({ prefix, number, numberSuffix, label, animate, isInView }) {
         style={{
           fontFamily: "'Syne', sans-serif",
           fontSize: "48px",
+          fontWeight: 800,
           color: COLORS.ink,
           letterSpacing: "-2px",
           lineHeight: 1,

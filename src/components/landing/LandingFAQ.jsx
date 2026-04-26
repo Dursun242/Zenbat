@@ -78,9 +78,10 @@ export default function LandingFAQ() {
             style={{
               fontFamily:   "'Syne', sans-serif",
               fontSize:     40,
-              fontWeight:   400,
+              fontWeight:   700,
               color:        C.ink,
               lineHeight:   1.2,
+              letterSpacing: "-0.5px",
               marginBottom: 48,
               marginTop:    0,
             }}

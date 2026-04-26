@@ -30,7 +30,7 @@ const STEPS = [
     title: null,
     titleNode: (
       <>
-        <em style={{ color: C.terra, fontStyle: "italic" }}>Encaissez</em>
+        <em style={{ color: C.terra, fontFamily: "'Playfair Display', Georgia, serif", fontStyle: "italic", fontWeight: 400 }}>Encaissez</em>
         {" et dormez"}
       </>
     ),
@@ -60,9 +60,9 @@ export default function LandingHow() {
           style={{
             fontFamily: "'Syne', sans-serif",
             fontSize: 42,
-            fontWeight: 400,
+            fontWeight: 700,
             color: C.ink,
-            letterSpacing: "-0.5px",
+            letterSpacing: "-1px",
             lineHeight: 1.15,
             margin: "0 0 64px 0",
             textAlign: "center",

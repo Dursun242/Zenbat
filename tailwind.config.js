@@ -10,9 +10,10 @@ export default {
         border: '#E8E2D8',
       },
       fontFamily: {
-        serif: ['"Syne"', 'sans-serif'],
-        sans:  ['Inter', 'system-ui', 'sans-serif'],
-        mono:  ['"JetBrains Mono"', 'monospace'],
+        serif:  ['"Syne"', 'sans-serif'],
+        sans:   ['Inter', 'system-ui', 'sans-serif'],
+        mono:   ['"JetBrains Mono"', 'monospace'],
+        accent: ['"Playfair Display"', 'Georgia', 'serif'],
       },
     },
   },
