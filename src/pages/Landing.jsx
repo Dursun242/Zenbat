@@ -66,7 +66,7 @@ function WhatsAppButton() {
           overflow:     'hidden',
         }}
       >
-        Nous écrire
+        WhatsApp
       </span>
     </a>
   )
