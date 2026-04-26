@@ -1,0 +1,22 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Inter', system-ui, sans-serif; }
+}
+
+@keyframes lp-blink  { 0%,100% { opacity: 0; } 50% { opacity: 1; } }
+@keyframes lp-pulse  { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.15); opacity: .7; } }
+@keyframes lp-badge  { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+
+/* Focus visible global */
+button:focus-visible, a:focus-visible {
+  outline: 2px solid #C97B5C;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
