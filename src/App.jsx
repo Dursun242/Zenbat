@@ -113,7 +113,7 @@ export default function App() {
   if (screen === "paywall")     return <PaywallScreen daysLeft={daysLeft} onBack={() => setScreen("app")} onSubscribe={(type) => { setPlan("pro"); setBillingType(type); setScreen("app"); }}/>;
 
   return (
-    <div style={{ fontFamily: "'DM Sans',sans-serif", height: "100dvh", display: "flex", flexDirection: "column", background: "#f8fafc", overflow: "hidden" }}>
+    <div style={{ fontFamily: "Inter, system-ui, sans-serif", height: "100dvh", display: "flex", flexDirection: "column", background: "#f8fafc", overflow: "hidden" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700&family=Space+Grotesk:wght@400;600;700&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
