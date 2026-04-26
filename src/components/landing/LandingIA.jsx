@@ -19,7 +19,7 @@ const CAPS = [
   {
     icon: '🎙️',
     title: '12 langues reconnues',
-    desc: 'Dictez en français, anglais, espagnol, arabe… L'IA transcrit et restructure dans la langue de votre devis.',
+    desc: `Dictez en français, anglais, espagnol, arabe… L'IA transcrit et restructure dans la langue de votre devis.`,
   },
   {
     icon: '🏗️',
@@ -29,12 +29,12 @@ const CAPS = [
   {
     icon: '🧾',
     title: 'TVA et mentions auto',
-    desc: 'Franchise, auto-liquidation, TVA réduite… L'IA applique le bon régime selon votre profil et le contexte.',
+    desc: `Franchise, auto-liquidation, TVA réduite… L'IA applique le bon régime selon votre profil et le contexte.`,
   },
   {
     icon: '✏️',
     title: 'Vous restez aux commandes',
-    desc: 'Ajustez, supprimez, relancez l'IA en un clic. Le devis final est toujours le vôtre.',
+    desc: `Ajustez, supprimez, relancez l'IA en un clic. Le devis final est toujours le vôtre.`,
   },
 ]
 
