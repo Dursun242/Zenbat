@@ -71,7 +71,7 @@ export default function PWAInstallScreen({ deferredPrompt, onDone }) {
     : "Accédez à vos devis en un tap, même sans connexion internet.";
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "'DM Sans',sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#1A1612", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "'DM Sans',sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}@keyframes popIn{0%{opacity:0;transform:scale(.92) translateY(8px)}100%{opacity:1;transform:scale(1) translateY(0)}}@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}`}</style>
 
       <div style={{ width: "100%", maxWidth: 380, textAlign: "center", animation: "popIn .3s ease both" }}>
@@ -87,7 +87,7 @@ export default function PWAInstallScreen({ deferredPrompt, onDone }) {
         <h2 style={{ color: "white", fontSize: 22, fontWeight: 800, marginBottom: 10, lineHeight: 1.25 }}>
           {title}
         </h2>
-        <p style={{ color: "#64748b", fontSize: 13, lineHeight: 1.6, marginBottom: 28 }}>
+        <p style={{ color: "#6B6358", fontSize: 13, lineHeight: 1.6, marginBottom: 28 }}>
           {subtitle}
         </p>
 
@@ -95,7 +95,7 @@ export default function PWAInstallScreen({ deferredPrompt, onDone }) {
 
           {isIOS ? (
             <>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 16, textAlign: "center" }}>3 étapes dans Safari</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1612", marginBottom: 16, textAlign: "center" }}>3 étapes dans Safari</div>
               {IOS_STEPS.map((step, i) => (
                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: i < 2 ? 16 : 0 }}>
                   <div style={{ flexShrink: 0, width: 42, height: 42, borderRadius: 12, background: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center", color: "#22c55e", position: "relative" }}>
@@ -103,23 +103,23 @@ export default function PWAInstallScreen({ deferredPrompt, onDone }) {
                     <span style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: "50%", background: "#22c55e", color: "white", fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{i + 1}</span>
                   </div>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{step.label}</div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{step.sub}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1612" }}>{step.label}</div>
+                    <div style={{ fontSize: 11, color: "#9A8E82", marginTop: 2 }}>{step.sub}</div>
                   </div>
                 </div>
               ))}
-              <div style={{ marginTop: 18, background: "#f8fafc", borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ marginTop: 18, background: "#FAF7F2", borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
                 <span style={{ fontSize: 18 }}>⚠️</span>
-                <span style={{ fontSize: 11, color: "#64748b", lineHeight: 1.5 }}>Fonctionne uniquement depuis <strong style={{ color: "#0f172a" }}>Safari</strong> sur iPhone</span>
+                <span style={{ fontSize: 11, color: "#6B6358", lineHeight: 1.5 }}>Fonctionne uniquement depuis <strong style={{ color: "#1A1612" }}>Safari</strong> sur iPhone</span>
               </div>
-              <button onClick={onDone} style={{ width: "100%", marginTop: 16, background: "#0f172a", color: "white", border: "none", borderRadius: 12, padding: 14, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+              <button onClick={onDone} style={{ width: "100%", marginTop: 16, background: "#1A1612", color: "white", border: "none", borderRadius: 12, padding: 14, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 C'est fait — Continuer →
               </button>
             </>
           ) : isDesktop && !deferredPrompt ? (
             // Desktop sans prompt automatique → guide manuel
             <>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 16, textAlign: "center" }}>3 clics dans Chrome ou Edge</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1612", marginBottom: 16, textAlign: "center" }}>3 clics dans Chrome ou Edge</div>
               {DESKTOP_STEPS.map((step, i) => (
                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: i < 2 ? 16 : 0 }}>
                   <div style={{ flexShrink: 0, width: 42, height: 42, borderRadius: 12, background: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center", color: "#22c55e", position: "relative" }}>
@@ -127,23 +127,23 @@ export default function PWAInstallScreen({ deferredPrompt, onDone }) {
                     <span style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: "50%", background: "#22c55e", color: "white", fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{i + 1}</span>
                   </div>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{step.label}</div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{step.sub}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1612" }}>{step.label}</div>
+                    <div style={{ fontSize: 11, color: "#9A8E82", marginTop: 2 }}>{step.sub}</div>
                   </div>
                 </div>
               ))}
-              <div style={{ marginTop: 18, background: "#f8fafc", borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ marginTop: 18, background: "#FAF7F2", borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
                 <span style={{ fontSize: 18 }}>💡</span>
-                <span style={{ fontSize: 11, color: "#64748b", lineHeight: 1.5 }}>Fonctionne avec <strong style={{ color: "#0f172a" }}>Chrome</strong> et <strong style={{ color: "#0f172a" }}>Edge</strong></span>
+                <span style={{ fontSize: 11, color: "#6B6358", lineHeight: 1.5 }}>Fonctionne avec <strong style={{ color: "#1A1612" }}>Chrome</strong> et <strong style={{ color: "#1A1612" }}>Edge</strong></span>
               </div>
-              <button onClick={onDone} style={{ width: "100%", marginTop: 16, background: "#0f172a", color: "white", border: "none", borderRadius: 12, padding: 14, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+              <button onClick={onDone} style={{ width: "100%", marginTop: 16, background: "#1A1612", color: "white", border: "none", borderRadius: 12, padding: 14, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 C'est fait — Continuer →
               </button>
             </>
           ) : (
             // Android ou Desktop avec prompt automatique
             <>
-              <div style={{ fontSize: 13, color: "#64748b", marginBottom: 16, textAlign: "center", lineHeight: 1.6 }}>
+              <div style={{ fontSize: 13, color: "#6B6358", marginBottom: 16, textAlign: "center", lineHeight: 1.6 }}>
                 {isDesktop
                   ? "Installez Zenbat en un clic pour l'utiliser comme une vraie application."
                   : "Ajoutez Zenbat à votre écran d'accueil pour y accéder instantanément."}
@@ -164,7 +164,7 @@ export default function PWAInstallScreen({ deferredPrompt, onDone }) {
               )}
 
               {!deferredPrompt && !installed && (
-                <p style={{ fontSize: 11, color: "#94a3b8", textAlign: "center", marginTop: 10, lineHeight: 1.5 }}>
+                <p style={{ fontSize: 11, color: "#9A8E82", textAlign: "center", marginTop: 10, lineHeight: 1.5 }}>
                   Votre navigateur ne supporte pas l'installation automatique.<br/>
                   Utilisez Chrome ou Edge pour installer.
                 </p>
@@ -173,7 +173,7 @@ export default function PWAInstallScreen({ deferredPrompt, onDone }) {
           )}
         </div>
 
-        <button onClick={onDone} style={{ background: "none", border: "none", color: "#475569", fontSize: 12, cursor: "pointer", padding: 8 }}>
+        <button onClick={onDone} style={{ background: "none", border: "none", color: "#6B6358", fontSize: 12, cursor: "pointer", padding: 8 }}>
           Pas maintenant
         </button>
       </div>

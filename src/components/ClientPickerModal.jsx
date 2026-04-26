@@ -34,33 +34,33 @@ export default function ClientPickerModal({ clients, ac, fontFamily, onSaveClien
         style={{ width: "100%", maxWidth: 520, background: "white", borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: "18px 18px 22px", maxHeight: "85vh", overflowY: "auto", boxShadow: "0 -8px 30px rgba(0,0,0,.2)" }}>
 
         <div style={{ width: 36, height: 4, background: "#cbd5e1", borderRadius: 2, margin: "0 auto 14px" }}/>
-        <div style={{ fontFamily, fontSize: 16, fontWeight: 800, color: "#0f172a", marginBottom: 4 }}>{TX.pickClientTitle}</div>
-        <div style={{ fontSize: 12, color: "#64748b", marginBottom: 14 }}>{TX.pickClientHint}</div>
+        <div style={{ fontFamily, fontSize: 16, fontWeight: 800, color: "#1A1612", marginBottom: 4 }}>{TX.pickClientTitle}</div>
+        <div style={{ fontSize: 12, color: "#6B6358", marginBottom: 14 }}>{TX.pickClientHint}</div>
 
         {!creating ? (
           <>
             <input value={q} onChange={e => setQ(e.target.value)} placeholder={TX.searchClient}
-              style={{ width: "100%", padding: "10px 12px", border: "1px solid #e2e8f0", borderRadius: 10, fontSize: 13, marginBottom: 10, boxSizing: "border-box" }}/>
+              style={{ width: "100%", padding: "10px 12px", border: "1px solid #E8E2D8", borderRadius: 10, fontSize: 13, marginBottom: 10, boxSizing: "border-box" }}/>
 
-            <div style={{ maxHeight: 260, overflowY: "auto", border: "1px solid #f1f5f9", borderRadius: 10, marginBottom: 10 }}>
+            <div style={{ maxHeight: 260, overflowY: "auto", border: "1px solid #F0EBE3", borderRadius: 10, marginBottom: 10 }}>
               {filtered.length === 0 ? (
-                <div style={{ padding: "18px 14px", textAlign: "center", color: "#94a3b8", fontSize: 12 }}>{TX.noClientsYet}</div>
+                <div style={{ padding: "18px 14px", textAlign: "center", color: "#9A8E82", fontSize: 12 }}>{TX.noClientsYet}</div>
               ) : filtered.map(c => (
                 <button key={c.id} onClick={() => onPick(c.id)}
-                  style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", width: "100%", padding: "10px 14px", background: "none", border: "none", borderBottom: "1px solid #f1f5f9", cursor: "pointer", textAlign: "left" }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{displayName(c)}</span>
-                  <span style={{ fontSize: 11, color: "#64748b" }}>{[c.email, c.ville].filter(Boolean).join(" · ") || "—"}</span>
+                  style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", width: "100%", padding: "10px 14px", background: "none", border: "none", borderBottom: "1px solid #F0EBE3", cursor: "pointer", textAlign: "left" }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#1A1612" }}>{displayName(c)}</span>
+                  <span style={{ fontSize: 11, color: "#6B6358" }}>{[c.email, c.ville].filter(Boolean).join(" · ") || "—"}</span>
                 </button>
               ))}
             </div>
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button onClick={() => setCreating(true)}
-                style={{ flex: 1, minWidth: 140, background: "#f1f5f9", color: "#0f172a", border: "none", borderRadius: 10, padding: 11, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                style={{ flex: 1, minWidth: 140, background: "#F0EBE3", color: "#1A1612", border: "none", borderRadius: 10, padding: 11, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                 {TX.newClientInline}
               </button>
               <button onClick={() => onPick(null)}
-                style={{ flex: 1, minWidth: 140, background: "none", color: "#64748b", border: "1px solid #e2e8f0", borderRadius: 10, padding: 11, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
+                style={{ flex: 1, minWidth: 140, background: "none", color: "#6B6358", border: "1px solid #E8E2D8", borderRadius: 10, padding: 11, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
                 {TX.noClientOpt}
               </button>
             </div>
@@ -68,14 +68,14 @@ export default function ClientPickerModal({ clients, ac, fontFamily, onSaveClien
         ) : (
           <>
             <input value={newC.nom} onChange={e => setNewC({ ...newC, nom: e.target.value })} placeholder={TX.newClientName} autoFocus
-              style={{ width: "100%", padding: "10px 12px", border: "1px solid #e2e8f0", borderRadius: 10, fontSize: 13, marginBottom: 8, boxSizing: "border-box" }}/>
+              style={{ width: "100%", padding: "10px 12px", border: "1px solid #E8E2D8", borderRadius: 10, fontSize: 13, marginBottom: 8, boxSizing: "border-box" }}/>
             <input value={newC.email} onChange={e => setNewC({ ...newC, email: e.target.value })} placeholder={TX.newClientEmail} type="email"
-              style={{ width: "100%", padding: "10px 12px", border: "1px solid #e2e8f0", borderRadius: 10, fontSize: 13, marginBottom: 8, boxSizing: "border-box" }}/>
+              style={{ width: "100%", padding: "10px 12px", border: "1px solid #E8E2D8", borderRadius: 10, fontSize: 13, marginBottom: 8, boxSizing: "border-box" }}/>
             <input value={newC.telephone} onChange={e => setNewC({ ...newC, telephone: e.target.value })} placeholder={TX.newClientPhone} type="tel"
-              style={{ width: "100%", padding: "10px 12px", border: "1px solid #e2e8f0", borderRadius: 10, fontSize: 13, marginBottom: 12, boxSizing: "border-box" }}/>
+              style={{ width: "100%", padding: "10px 12px", border: "1px solid #E8E2D8", borderRadius: 10, fontSize: 13, marginBottom: 12, boxSizing: "border-box" }}/>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => { setCreating(false); setNewC({ nom: "", email: "", telephone: "" }); }}
-                style={{ flex: 1, background: "none", color: "#64748b", border: "1px solid #e2e8f0", borderRadius: 10, padding: 11, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
+                style={{ flex: 1, background: "none", color: "#6B6358", border: "1px solid #E8E2D8", borderRadius: 10, padding: 11, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
                 {TX.cancel}
               </button>
               <button onClick={createAndPick} disabled={!newC.nom.trim()}

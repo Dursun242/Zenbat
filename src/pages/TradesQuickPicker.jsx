@@ -51,7 +51,7 @@ export default function TradesQuickPicker({ brand, setBrand, onDone, onSkip }) {
   }
 
   return (
-    <div style={{minHeight:"100vh",background:"#0f172a",fontFamily:"'DM Sans',sans-serif",display:"flex",flexDirection:"column"}}>
+    <div style={{minHeight:"100vh",background:"#1A1612",fontFamily:"'DM Sans',sans-serif",display:"flex",flexDirection:"column"}}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;margin:0;padding:0}input,button{font-family:inherit}@keyframes popIn{0%{opacity:0;transform:scale(.94)}100%{opacity:1;transform:scale(1)}}`}</style>
 
       <div style={{padding:"calc(14px + env(safe-area-inset-top)) 20px 0"}}>
@@ -60,7 +60,7 @@ export default function TradesQuickPicker({ brand, setBrand, onDone, onSkip }) {
             <span style={{color:"#22c55e"}}>Zen</span><span style={{color:"#fff"}}>bat</span>
           </span>
           <button onClick={onSkip}
-            style={{background:"transparent",border:"1px solid #334155",color:"#64748b",borderRadius:20,padding:"5px 12px",fontSize:11,cursor:"pointer"}}>
+            style={{background:"transparent",border:"1px solid #3D3028",color:"#6B6358",borderRadius:20,padding:"5px 12px",fontSize:11,cursor:"pointer"}}>
             Passer cette étape
           </button>
         </div>
@@ -75,7 +75,7 @@ export default function TradesQuickPicker({ brand, setBrand, onDone, onSkip }) {
           <p style={{fontSize:14,color:"#cbd5e1",lineHeight:1.6,marginBottom:12}}>
             Plus vous en ajoutez, plus l'Agent IA produit des devis <strong style={{color:"white"}}>précis et professionnels</strong> dès le premier essai.
           </p>
-          <div style={{display:"flex",flexDirection:"column",gap:6,fontSize:12,color:"#94a3b8",lineHeight:1.5}}>
+          <div style={{display:"flex",flexDirection:"column",gap:6,fontSize:12,color:"#9A8E82",lineHeight:1.5}}>
             <div>✓ Vocabulaire technique exact à votre métier</div>
             <div>✓ Tarifs du marché 2025 pré-calibrés</div>
             <div>✓ Unités et lots adaptés (m², ml, forfait, h…)</div>
@@ -97,7 +97,7 @@ export default function TradesQuickPicker({ brand, setBrand, onDone, onSkip }) {
         {/* Champ de saisie */}
         {local.length < MAX_TRADES && (
           <div style={{position:"relative",marginBottom:14}}>
-            <span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"#64748b"}}>
+            <span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"#6B6358"}}>
               <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             </span>
             <input
@@ -109,20 +109,20 @@ export default function TradesQuickPicker({ brand, setBrand, onDone, onSkip }) {
               onBlur={()=>setTimeout(()=>setShowSuggest(false),150)}
               autoFocus
               placeholder="Ex : Électricité, Coiffure, Plomberie, Dev web…"
-              style={{width:"100%",background:"#1e293b",border:`1.5px solid ${showSuggest && tradeInput?"#22c55e":"#334155"}`,borderRadius:(showSuggest && (suggestions.length>0 || showExact))?"12px 12px 0 0":"12px",padding:"13px 40px 13px 40px",fontSize:14,color:"white",outline:"none",transition:"border-color .15s"}}
+              style={{width:"100%",background:"#2A231C",border:`1.5px solid ${showSuggest && tradeInput?"#22c55e":"#3D3028"}`,borderRadius:(showSuggest && (suggestions.length>0 || showExact))?"12px 12px 0 0":"12px",padding:"13px 40px 13px 40px",fontSize:14,color:"white",outline:"none",transition:"border-color .15s"}}
             />
             {tradeInput && (
               <button onMouseDown={e=>{e.preventDefault();setTradeInput("");setShowSuggest(false)}}
-                style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#64748b",cursor:"pointer",fontSize:20,lineHeight:1}}>×</button>
+                style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#6B6358",cursor:"pointer",fontSize:20,lineHeight:1}}>×</button>
             )}
 
             {/* Dropdown suggestions */}
             {showSuggest && tradeInput.trim() && (suggestions.length > 0 || showExact) && (
-              <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#1e293b",border:"1.5px solid #22c55e",borderTop:"none",borderRadius:"0 0 12px 12px",overflow:"hidden",zIndex:100,boxShadow:"0 8px 24px rgba(0,0,0,.4)",maxHeight:240,overflowY:"auto"}}>
+              <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#2A231C",border:"1.5px solid #22c55e",borderTop:"none",borderRadius:"0 0 12px 12px",overflow:"hidden",zIndex:100,boxShadow:"0 8px 24px rgba(0,0,0,.4)",maxHeight:240,overflowY:"auto"}}>
                 {suggestions.map((s,i)=>(
                   <button key={s} onMouseDown={()=>addTrade(s)}
                     style={{width:"100%",background:"none",border:"none",padding:"11px 14px",textAlign:"left",color:"#cbd5e1",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:8,borderTop:i>0?"1px solid rgba(255,255,255,.05)":"none"}}>
-                    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{color:"#475569",flexShrink:0}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{color:"#6B6358",flexShrink:0}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                     {s}
                   </button>
                 ))}
@@ -141,11 +141,11 @@ export default function TradesQuickPicker({ brand, setBrand, onDone, onSkip }) {
         {/* Exemples rapides */}
         {local.length === 0 && !tradeInput && (
           <>
-            <div style={{fontSize:10,fontWeight:600,color:"#475569",letterSpacing:"1px",textTransform:"uppercase",marginBottom:8}}>Populaires</div>
+            <div style={{fontSize:10,fontWeight:600,color:"#6B6358",letterSpacing:"1px",textTransform:"uppercase",marginBottom:8}}>Populaires</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
               {TRADE_EXAMPLES.map(t => (
                 <button key={t} onClick={()=>addTrade(t)}
-                  style={{background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",borderRadius:18,padding:"6px 12px",fontSize:12,cursor:"pointer"}}>
+                  style={{background:"#2A231C",border:"1px solid #3D3028",color:"#9A8E82",borderRadius:18,padding:"6px 12px",fontSize:12,cursor:"pointer"}}>
                   + {t}
                 </button>
               ))}
@@ -153,20 +153,20 @@ export default function TradesQuickPicker({ brand, setBrand, onDone, onSkip }) {
           </>
         )}
 
-        <div style={{marginTop:16,fontSize:11,color:"#64748b",textAlign:"right"}}>
+        <div style={{marginTop:16,fontSize:11,color:"#6B6358",textAlign:"right"}}>
           {local.length === 0 ? "Aucun métier ajouté" : `${local.length} métier${local.length>1?"s":""} sélectionné${local.length>1?"s":""}`}
           {local.length >= MAX_TRADES && <span style={{color:"#f59e0b",marginLeft:6}}>· max atteint</span>}
         </div>
 
-        <div style={{marginTop:24,background:"#1e293b",border:"1px solid #334155",borderRadius:12,padding:14,fontSize:11,color:"#94a3b8",lineHeight:1.6}}>
+        <div style={{marginTop:24,background:"#2A231C",border:"1px solid #3D3028",borderRadius:12,padding:14,fontSize:11,color:"#9A8E82",lineHeight:1.6}}>
           💡 Vous pourrez compléter le reste de votre profil (coordonnées, logo, mentions légales, RGPD) plus tard via <strong style={{color:"#cbd5e1"}}>Mon profil</strong> — en attendant, vous pouvez déjà créer vos premiers devis.
         </div>
       </div>
 
       {/* Barre d'action fixe */}
-      <div style={{position:"fixed",bottom:0,left:0,right:0,background:"#0f172a",borderTop:"1px solid #1e293b",padding:"14px 20px calc(14px + env(safe-area-inset-bottom))"}}>
+      <div style={{position:"fixed",bottom:0,left:0,right:0,background:"#1A1612",borderTop:"1px solid #2A231C",padding:"14px 20px calc(14px + env(safe-area-inset-bottom))"}}>
         <button onClick={save} disabled={!canContinue}
-          style={{width:"100%",background:canContinue?"#22c55e":"#334155",color:canContinue?"white":"#64748b",border:"none",borderRadius:14,padding:"14px",fontSize:15,fontWeight:700,cursor:canContinue?"pointer":"not-allowed",transition:"all .15s"}}>
+          style={{width:"100%",background:canContinue?"#22c55e":"#3D3028",color:canContinue?"white":"#6B6358",border:"none",borderRadius:14,padding:"14px",fontSize:15,fontWeight:700,cursor:canContinue?"pointer":"not-allowed",transition:"all .15s"}}>
           {canContinue ? "✓ Commencer à utiliser Zenbat" : "Ajoutez au moins un métier"}
         </button>
       </div>

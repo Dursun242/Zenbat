@@ -7,21 +7,21 @@ export function Logo({ size = 22, white = false }) {
   return (
     <span style={{ fontWeight: 800, fontSize: size, letterSpacing: "-0.5px" }}>
       <span style={{ color: "#22c55e" }}>Zen</span>
-      <span style={{ color: white ? "white" : "#0f172a" }}>bat</span>
+      <span style={{ color: white ? "white" : "#1A1612" }}>bat</span>
     </span>
   );
 }
 
 export function Field({ dark, label, val, onChange, placeholder, type = "text", hint, required, invalid }) {
-  const borderColor = invalid ? "#ef4444" : dark ? "#334155" : "#e2e8f0";
+  const borderColor = invalid ? "#ef4444" : dark ? "#3D3028" : "#E8E2D8";
   return (
     <div>
-      <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 600, color: dark ? "#94a3b8" : "#64748b", marginBottom: 6 }}>
+      <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 600, color: dark ? "#9A8E82" : "#6B6358", marginBottom: 6 }}>
         <span>{label}{required && <span style={{ color: "#ef4444", marginLeft: 2 }}>*</span>}</span>
       </label>
       <input type={type} value={val || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        style={{ width: "100%", background: dark ? "#1e293b" : "white", border: `1px solid ${borderColor}`, borderRadius: 12, padding: "10px 14px", fontSize: 13, color: dark ? "white" : "#0f172a", outline: "none" }}/>
-      {hint && <div style={{ fontSize: 10, color: invalid ? "#fca5a5" : "#64748b", marginTop: 5, lineHeight: 1.4 }}>{invalid ? "⚠ " : "💡 "}{hint}</div>}
+        style={{ width: "100%", background: dark ? "#2A231C" : "white", border: `1px solid ${borderColor}`, borderRadius: 12, padding: "10px 14px", fontSize: 13, color: dark ? "white" : "#1A1612", outline: "none" }}/>
+      {hint && <div style={{ fontSize: 10, color: invalid ? "#fca5a5" : "#6B6358", marginTop: 5, lineHeight: 1.4 }}>{invalid ? "⚠ " : "💡 "}{hint}</div>}
     </div>
   );
 }
@@ -32,7 +32,7 @@ export const FONTS = [
   { id: "tech",    label: "Tech",    sample: "Space Grotesk" },
 ];
 
-export const COLORS = ["#22c55e", "#3b82f6", "#f97316", "#8b5cf6", "#ef4444", "#0891b2", "#0f172a", "#d97706"];
+export const COLORS = ["#22c55e", "#3b82f6", "#f97316", "#8b5cf6", "#ef4444", "#0891b2", "#1A1612", "#d97706"];
 
 export const STEPS = [
   { title: "Votre identité",       short: "Identité",  subtitle: "Informations qui apparaîtront en en-tête de tous vos devis." },

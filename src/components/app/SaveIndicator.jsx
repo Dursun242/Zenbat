@@ -8,7 +8,7 @@ export default function SaveIndicator({ state }) {
   if (state === "idle" || !state) return null;
   const saving = state === "saving";
   const label  = saving ? "Enregistrement…" : "Enregistré";
-  const color  = saving ? "#94a3b8" : "#4ade80";
+  const color  = saving ? "#9A8E82" : "#4ade80";
   const bg     = saving ? "rgba(148,163,184,.14)" : "rgba(34,197,94,.14)";
   const border = saving ? "rgba(148,163,184,.25)" : "rgba(34,197,94,.25)";
   return (

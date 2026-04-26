@@ -118,7 +118,7 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
           .detail-shell{height:100%;min-height:unset !important;overflow:hidden}
           .detail-row{height:100%}
           .detail-editor{overflow-y:auto}
-          .detail-preview{display:flex !important;flex-direction:column;width:46%;flex-shrink:0;border-left:1px solid #e2e8f0;overflow-y:auto}
+          .detail-preview{display:flex !important;flex-direction:column;width:46%;flex-shrink:0;border-left:1px solid #E8E2D8;overflow-y:auto}
           .detail-pdf-btn{display:none !important}
         }
       `}</style>
@@ -132,14 +132,14 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
           onSelect={c => onChange({ ...invoice, client_id: c?.id ?? null })}
           onClose={() => setClientPicker(false)}/>
       )}
-      <div className="detail-shell" style={{ background: "#f8fafc", minHeight: "100%", display: "flex", flexDirection: "column" }}>
+      <div className="detail-shell" style={{ background: "#FAF7F2", minHeight: "100%", display: "flex", flexDirection: "column" }}>
         <div className="detail-row" style={{ flex: 1, display: "flex" }}>
           <div className="detail-editor" style={{ flex: 1, minWidth: 0 }}>
 
-      <div style={{ background: "white", borderBottom: "1px solid #f1f5f9", padding: "14px 16px" }}>
+      <div style={{ background: "white", borderBottom: "1px solid #F0EBE3", padding: "14px 16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-          <button onClick={onBack} style={{ background: "none", border: "none", color: "#64748b", fontSize: 20, cursor: "pointer", flexShrink: 0 }}>←</button>
-          <div style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace", flex: 1 }}>{invoice.numero}</div>
+          <button onClick={onBack} style={{ background: "none", border: "none", color: "#6B6358", fontSize: 20, cursor: "pointer", flexShrink: 0 }}>←</button>
+          <div style={{ fontSize: 11, color: "#9A8E82", fontFamily: "monospace", flex: 1 }}>{invoice.numero}</div>
           {invoice.invoice_type === "acompte" && (
             <span style={{ fontSize: 9, fontWeight: 700, color: "#c2410c", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 6, padding: "2px 6px" }}>ACOMPTE</span>
           )}
@@ -173,32 +173,32 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
         )}
         {/* Client */}
         <button onClick={() => !isLocked && setClientPicker(true)} disabled={isLocked}
-          style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: isLocked ? "#f1f5f9" : "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "7px 10px", marginBottom: 8, cursor: isLocked ? "not-allowed" : "pointer", textAlign: "left" }}>
+          style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: isLocked ? "#F0EBE3" : "#FAF7F2", border: "1px solid #E8E2D8", borderRadius: 10, padding: "7px 10px", marginBottom: 8, cursor: isLocked ? "not-allowed" : "pointer", textAlign: "left" }}>
           <span style={{ fontSize: 16 }}>👤</span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: isLocked ? "#94a3b8" : "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {client ? (client.raison_sociale || `${client.prenom || ""} ${client.nom || ""}`.trim()) : <span style={{ color: "#94a3b8", fontStyle: "italic" }}>Sans client</span>}
+            <div style={{ fontSize: 12, fontWeight: 600, color: isLocked ? "#9A8E82" : "#1A1612", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {client ? (client.raison_sociale || `${client.prenom || ""} ${client.nom || ""}`.trim()) : <span style={{ color: "#9A8E82", fontStyle: "italic" }}>Sans client</span>}
             </div>
-            {client?.email && <div style={{ fontSize: 11, color: "#94a3b8" }}>{client.email}</div>}
+            {client?.email && <div style={{ fontSize: 11, color: "#9A8E82" }}>{client.email}</div>}
           </div>
-          {!isLocked && <span style={{ fontSize: 11, color: "#94a3b8", flexShrink: 0 }}>Changer ›</span>}
+          {!isLocked && <span style={{ fontSize: 11, color: "#9A8E82", flexShrink: 0 }}>Changer ›</span>}
         </button>
 
-        <label style={{ display: "block", fontSize: 10, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>OBJET</label>
+        <label style={{ display: "block", fontSize: 10, color: "#9A8E82", fontWeight: 600, marginBottom: 2 }}>OBJET</label>
         <input
           value={invoice.objet || ""}
           onChange={e => onChange({ ...invoice, objet: e.target.value })}
           disabled={isLocked}
           placeholder="Objet de la facture"
-          style={{ fontSize: 14, fontWeight: 700, color: isLocked ? "#94a3b8" : "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, background: isLocked ? "#f1f5f9" : "#f8fafc", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box", cursor: isLocked ? "not-allowed" : "text" }}
+          style={{ fontSize: 14, fontWeight: 700, color: isLocked ? "#9A8E82" : "#1A1612", border: "1px solid #E8E2D8", borderRadius: 8, background: isLocked ? "#F0EBE3" : "#FAF7F2", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box", cursor: isLocked ? "not-allowed" : "text" }}
         />
-        <label style={{ display: "block", fontSize: 10, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>CHANTIER</label>
+        <label style={{ display: "block", fontSize: 10, color: "#9A8E82", fontWeight: 600, marginBottom: 2 }}>CHANTIER</label>
         <input
           value={invoice.ville_chantier || ""}
           onChange={e => onChange({ ...invoice, ville_chantier: e.target.value })}
           disabled={isLocked}
           placeholder="Ville / chantier"
-          style={{ fontSize: 13, color: "#64748b", border: "1px solid #e2e8f0", borderRadius: 8, background: isLocked ? "#f1f5f9" : "#f8fafc", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", boxSizing: "border-box", cursor: isLocked ? "not-allowed" : "text" }}
+          style={{ fontSize: 13, color: "#6B6358", border: "1px solid #E8E2D8", borderRadius: 8, background: isLocked ? "#F0EBE3" : "#FAF7F2", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", boxSizing: "border-box", cursor: isLocked ? "not-allowed" : "text" }}
         />
       </div>
 
@@ -218,12 +218,12 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
           ) : (
             <button onClick={onDelete}
               title="Une facture émise ne peut être que masquée (conservée 10 ans en base, art. L102 B LPF)."
-              style={{ background: "white", border: "1px solid #e2e8f0", color: "#64748b", borderRadius: 12, padding: "12px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
+              style={{ background: "white", border: "1px solid #E8E2D8", color: "#6B6358", borderRadius: 12, padding: "12px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
               Masquer
             </button>
           )}
           <button onClick={handleFacturX} disabled={exporting || !lignes.length}
-            style={{ flex: 1, background: exporting || !lignes.length ? "#cbd5e1" : "#0f172a", color: "white", border: "none", borderRadius: 12, padding: "12px 16px", fontSize: 13, fontWeight: 700, cursor: exporting || !lignes.length ? "not-allowed" : "pointer", lineHeight: 1.3 }}>
+            style={{ flex: 1, background: exporting || !lignes.length ? "#cbd5e1" : "#1A1612", color: "white", border: "none", borderRadius: 12, padding: "12px 16px", fontSize: 13, fontWeight: 700, cursor: exporting || !lignes.length ? "not-allowed" : "pointer", lineHeight: 1.3 }}>
             {exporting
               ? "Génération en cours…"
               : isLocked
@@ -249,15 +249,15 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
 
         <LignesEditor lignes={lignes} onChange={updateLignes} ac={ac} vatRegime={brand.vatRegime}/>
 
-        <div style={{ background: "white", borderRadius: 14, border: "1px solid #f1f5f9", padding: 14, marginBottom: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b", marginBottom: 6 }}>
-            <span>Total HT</span><span style={{ color: "#0f172a", fontWeight: 600 }}>{fmt(ht)}</span>
+        <div style={{ background: "white", borderRadius: 14, border: "1px solid #F0EBE3", padding: 14, marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#6B6358", marginBottom: 6 }}>
+            <span>Total HT</span><span style={{ color: "#1A1612", fontWeight: 600 }}>{fmt(ht)}</span>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b", marginBottom: 6 }}>
-            <span>TVA</span><span style={{ color: "#0f172a", fontWeight: 600 }}>{fmt(tva)}</span>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#6B6358", marginBottom: 6 }}>
+            <span>TVA</span><span style={{ color: "#1A1612", fontWeight: 600 }}>{fmt(tva)}</span>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, paddingTop: 6, borderTop: "1px solid #f1f5f9", marginTop: 6 }}>
-            <span style={{ fontWeight: 700, color: "#0f172a" }}>Total TTC</span>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, paddingTop: 6, borderTop: "1px solid #F0EBE3", marginTop: 6 }}>
+            <span style={{ fontWeight: 700, color: "#1A1612" }}>Total TTC</span>
             <span style={{ fontWeight: 700, color: ac }}>{fmt(ttc)}</span>
           </div>
           {retenue > 0 && (
@@ -266,30 +266,30 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
                 <span>Retenue de garantie {invoice.retenue_garantie_pct}%</span>
                 <span>−{fmt(retenue)}</span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, paddingTop: 6, borderTop: "1px solid #f1f5f9", marginTop: 6 }}>
-                <span style={{ fontWeight: 700, color: "#0f172a" }}>Net à payer</span>
-                <span style={{ fontWeight: 700, color: "#0f172a" }}>{fmt(netAPayer)}</span>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, paddingTop: 6, borderTop: "1px solid #F0EBE3", marginTop: 6 }}>
+                <span style={{ fontWeight: 700, color: "#1A1612" }}>Net à payer</span>
+                <span style={{ fontWeight: 700, color: "#1A1612" }}>{fmt(netAPayer)}</span>
               </div>
             </>
           )}
         </div>
 
-        <div style={{ background: "white", borderRadius: 14, border: "1px solid #f1f5f9", padding: 14, marginBottom: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>Spécificités BTP</div>
+        <div style={{ background: "white", borderRadius: 14, border: "1px solid #F0EBE3", padding: 14, marginBottom: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#1A1612", marginBottom: 10 }}>Spécificités BTP</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <div>
-                <div style={{ fontSize: 10, color: "#64748b", marginBottom: 4 }}>Type d'opération</div>
+                <div style={{ fontSize: 10, color: "#6B6358", marginBottom: 4 }}>Type d'opération</div>
                 <select value={invoice.operation_type || "service"}
                   onChange={e => onChange({ ...invoice, operation_type: e.target.value }, false)}
                   disabled={isLocked}
-                  style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "7px 8px", fontSize: 12, background: isLocked ? "#f1f5f9" : "white", cursor: isLocked ? "not-allowed" : "pointer" }}>
+                  style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "7px 8px", fontSize: 12, background: isLocked ? "#F0EBE3" : "white", cursor: isLocked ? "not-allowed" : "pointer" }}>
                   <option value="service">Prestation de service</option>
                   <option value="vente">Vente de biens</option>
                   <option value="mixte">Mixte</option>
                 </select>
               </div>
               <div>
-                <div style={{ fontSize: 10, color: "#64748b", marginBottom: 4 }}>Retenue garantie (%)</div>
+                <div style={{ fontSize: 10, color: "#6B6358", marginBottom: 4 }}>Retenue garantie (%)</div>
                 <input type="number" min="0" max="5" step="0.5"
                   value={invoice.retenue_garantie_pct || 0}
                   onChange={e => {
@@ -297,7 +297,7 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
                     onChange({ ...invoice, retenue_garantie_pct: pct, retenue_garantie_eur: Math.round(ttc * pct) / 100 }, false);
                   }}
                   disabled={isLocked}
-                  style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "7px 8px", fontSize: 12, background: isLocked ? "#f1f5f9" : "white", cursor: isLocked ? "not-allowed" : "text" }}/>
+                  style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "7px 8px", fontSize: 12, background: isLocked ? "#F0EBE3" : "white", cursor: isLocked ? "not-allowed" : "text" }}/>
               </div>
             </div>
           </div>

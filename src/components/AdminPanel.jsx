@@ -135,19 +135,19 @@ export default function AdminPanel({ onBack }) {
     })
 
   return (
-    <div style={{ minHeight: "100%", background: "#f8fafc", paddingBottom: 40 }}>
-      <div style={{ background: "#0f172a", padding: "14px 18px", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, zIndex: 10 }}>
-        <button onClick={onBack} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", padding: 4 }}>
+    <div style={{ minHeight: "100%", background: "#FAF7F2", paddingBottom: 40 }}>
+      <div style={{ background: "#1A1612", padding: "14px 18px", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, zIndex: 10 }}>
+        <button onClick={onBack} style={{ background: "none", border: "none", color: "#9A8E82", cursor: "pointer", padding: 4 }}>
           <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12,5 5,12 12,19"/></svg>
         </button>
         <div style={{ flex: 1 }}>
           <div style={{ color: "white", fontWeight: 700, fontSize: 16 }}>Panel Admin</div>
-          <div style={{ color: "#475569", fontSize: 10 }}>Vue globale Zenbat</div>
+          <div style={{ color: "#6B6358", fontSize: 10 }}>Vue globale Zenbat</div>
         </div>
-        <button onClick={load} style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8, padding: "5px 10px", color: "#94a3b8", fontSize: 11, cursor: "pointer" }}>↻ Actualiser</button>
+        <button onClick={load} style={{ background: "#2A231C", border: "1px solid #3D3028", borderRadius: 8, padding: "5px 10px", color: "#9A8E82", fontSize: 11, cursor: "pointer" }}>↻ Actualiser</button>
       </div>
 
-      {loading && <div style={{ padding: 40, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>Chargement…</div>}
+      {loading && <div style={{ padding: 40, textAlign: "center", color: "#9A8E82", fontSize: 13 }}>Chargement…</div>}
       {error && (
         <div style={{ margin: 18, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: 16, color: "#991b1b", fontSize: 13 }}>
           ❌ {error}

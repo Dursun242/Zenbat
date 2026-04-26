@@ -124,7 +124,7 @@ export default function PaywallScreen({ daysLeft = 0, onBack, onSubscribe }) {
               <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "#22c55e" }}>
                 {CHECK}
               </div>
-              <span style={{ fontSize: 13, color: "#374151" }}>{f}</span>
+              <span style={{ fontSize: 13, color: "#3D3028" }}>{f}</span>
             </div>
           ))}
 
@@ -142,7 +142,7 @@ export default function PaywallScreen({ daysLeft = 0, onBack, onSubscribe }) {
           </p>
         </div>
 
-        <button onClick={onBack} style={{ background: "none", border: "none", color: "#475569", fontSize: 12, cursor: "pointer" }}>← Retour</button>
+        <button onClick={onBack} style={{ background: "none", border: "none", color: "#6B6358", fontSize: 12, cursor: "pointer" }}>← Retour</button>
       </div>
     </div>
   );

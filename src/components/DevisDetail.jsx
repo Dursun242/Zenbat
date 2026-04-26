@@ -116,7 +116,7 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
           .detail-shell{height:100%;min-height:unset !important;overflow:hidden}
           .detail-row{height:100%}
           .detail-editor{overflow-y:auto}
-          .detail-preview{display:flex !important;flex-direction:column;width:46%;flex-shrink:0;border-left:1px solid #e2e8f0;overflow-y:auto}
+          .detail-preview{display:flex !important;flex-direction:column;width:46%;flex-shrink:0;border-left:1px solid #E8E2D8;overflow-y:auto}
           .detail-pdf-btn{display:none !important}
         }
       `}</style>
@@ -131,36 +131,36 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 200, display: "flex", alignItems: "flex-end", justifyContent: "center" }}
           onClick={e => { if (e.target === e.currentTarget) setAcompteModal(false); }}>
           <div style={{ background: "white", borderRadius: "20px 20px 0 0", padding: 24, width: "100%", maxWidth: 480 }}>
-            <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a", marginBottom: 4 }}>Facture d'acompte</div>
-            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 20 }}>Devis {d.numero} · Total HT {fmt(ht)}</div>
+            <div style={{ fontWeight: 700, fontSize: 16, color: "#1A1612", marginBottom: 4 }}>Facture d'acompte</div>
+            <div style={{ fontSize: 12, color: "#6B6358", marginBottom: 20 }}>Devis {d.numero} · Total HT {fmt(ht)}</div>
 
-            <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b", display: "block", marginBottom: 8 }}>POURCENTAGE DE L'ACOMPTE</label>
+            <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6358", display: "block", marginBottom: 8 }}>POURCENTAGE DE L'ACOMPTE</label>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
               <input type="range" min={1} max={100} value={acomptePct}
                 onChange={e => setAcomptePct(Number(e.target.value))}
                 style={{ flex: 1, accentColor: ac }}/>
-              <div style={{ display: "flex", alignItems: "center", gap: 4, border: "1px solid #e2e8f0", borderRadius: 10, padding: "6px 10px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, border: "1px solid #E8E2D8", borderRadius: 10, padding: "6px 10px" }}>
                 <input type="number" min={1} max={100} value={acomptePct}
                   onChange={e => setAcomptePct(Math.min(100, Math.max(1, Number(e.target.value))))}
-                  style={{ width: 48, border: "none", outline: "none", fontSize: 15, fontWeight: 700, textAlign: "right", fontFamily: "inherit", color: "#0f172a" }}/>
-                <span style={{ color: "#64748b", fontSize: 14 }}>%</span>
+                  style={{ width: 48, border: "none", outline: "none", fontSize: 15, fontWeight: 700, textAlign: "right", fontFamily: "inherit", color: "#1A1612" }}/>
+                <span style={{ color: "#6B6358", fontSize: 14 }}>%</span>
               </div>
             </div>
 
-            <div style={{ background: "#f8fafc", borderRadius: 14, padding: "14px 16px", marginBottom: 20 }}>
+            <div style={{ background: "#FAF7F2", borderRadius: 14, padding: "14px 16px", marginBottom: 20 }}>
               {franchise ? (
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 13, color: "#64748b" }}>Montant (TVA non applicable)</span>
+                  <span style={{ fontSize: 13, color: "#6B6358" }}>Montant (TVA non applicable)</span>
                   <span style={{ fontSize: 14, fontWeight: 700, color: ac }}>{fmt(acompteHT)}</span>
                 </div>
               ) : (
                 <>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                    <span style={{ fontSize: 13, color: "#64748b" }}>Montant HT</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{fmt(acompteHT)}</span>
+                    <span style={{ fontSize: 13, color: "#6B6358" }}>Montant HT</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#1A1612" }}>{fmt(acompteHT)}</span>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ fontSize: 13, color: "#64748b" }}>Montant TTC ({tvaRate}%)</span>
+                    <span style={{ fontSize: 13, color: "#6B6358" }}>Montant TTC ({tvaRate}%)</span>
                     <span style={{ fontSize: 14, fontWeight: 700, color: ac }}>{fmt(acompteTTC)}</span>
                   </div>
                 </>
@@ -169,11 +169,11 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
 
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => setAcompteModal(false)}
-                style={{ flex: 1, background: "#f1f5f9", border: "none", borderRadius: 14, padding: 14, fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#64748b" }}>
+                style={{ flex: 1, background: "#F0EBE3", border: "none", borderRadius: 14, padding: 14, fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#6B6358" }}>
                 Annuler
               </button>
               <button onClick={handleAcompte} disabled={acompteLoading}
-                style={{ flex: 2, background: acompteLoading ? "#94a3b8" : ac, border: "none", borderRadius: 14, padding: 14, fontSize: 14, fontWeight: 700, cursor: acompteLoading ? "not-allowed" : "pointer", color: "white" }}>
+                style={{ flex: 2, background: acompteLoading ? "#9A8E82" : ac, border: "none", borderRadius: 14, padding: 14, fontSize: 14, fontWeight: 700, cursor: acompteLoading ? "not-allowed" : "pointer", color: "white" }}>
                 {acompteLoading ? "Création…" : `Créer l'acompte (${fmt(acompteTTC)} TTC)`}
               </button>
             </div>
@@ -187,19 +187,19 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
           onSelect={c => onChange({ ...d, client_id: c?.id ?? null })}
           onClose={() => setClientPicker(false)}/>
       )}
-      <div className="detail-shell" style={{ minHeight: "100%", background: "#f8fafc", display: "flex", flexDirection: "column" }}>
+      <div className="detail-shell" style={{ minHeight: "100%", background: "#FAF7F2", display: "flex", flexDirection: "column" }}>
         <div className="detail-row" style={{ flex: 1, display: "flex" }}>
           <div className="detail-editor fu" style={{ flex: 1, minWidth: 0 }}>
         {/* En-tête */}
-        <div style={{ background: "white", borderBottom: "1px solid #f1f5f9", padding: "13px 18px" }}>
-          <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#64748b", fontSize: 13, marginBottom: 12, cursor: "pointer" }}>
+        <div style={{ background: "white", borderBottom: "1px solid #F0EBE3", padding: "13px 18px" }}>
+          <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#6B6358", fontSize: 13, marginBottom: 12, cursor: "pointer" }}>
             {I.back} Retour
           </button>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <div style={{ fontSize: 10, color: "#94a3b8", fontFamily: "monospace" }}>{d.numero}</div>
+            <div style={{ fontSize: 10, color: "#9A8E82", fontFamily: "monospace" }}>{d.numero}</div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>{fmt(ht)}</span>
-              <span style={{ fontSize: 10, color: "#94a3b8" }}>HT</span>
+              <span style={{ fontSize: 18, fontWeight: 700, color: "#1A1612" }}>{fmt(ht)}</span>
+              <span style={{ fontSize: 10, color: "#9A8E82" }}>HT</span>
               <Badge s={d.statut}/>
             </div>
           </div>
@@ -213,8 +213,8 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
                   <button key={v.id} onClick={() => !isCurrent && goDevis(v.id)}
                     style={{ padding: "4px 10px", borderRadius: 20, border: "none", fontSize: 11, fontWeight: 700,
                       cursor: isCurrent ? "default" : "pointer",
-                      background: isCurrent ? (brand.color || "#22c55e") : "#f1f5f9",
-                      color: isCurrent ? "white" : "#64748b",
+                      background: isCurrent ? (brand.color || "#22c55e") : "#F0EBE3",
+                      color: isCurrent ? "white" : "#6B6358",
                       boxShadow: isCurrent ? `0 2px 8px ${brand.color || "#22c55e"}44` : "none" }}>
                     {v.indice || "Initial"}
                   </button>
@@ -236,34 +236,34 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
           {/* Client */}
           <button onClick={() => !isRemplace && setClientPicker(true)} disabled={isRemplace}
             style={{ width: "100%", display: "flex", alignItems: "center", gap: 8,
-              background: isRemplace ? "#f1f5f9" : "#f8fafc",
-              border: "1px solid #e2e8f0", borderRadius: 10, padding: "7px 10px", marginBottom: 8,
+              background: isRemplace ? "#F0EBE3" : "#FAF7F2",
+              border: "1px solid #E8E2D8", borderRadius: 10, padding: "7px 10px", marginBottom: 8,
               cursor: isRemplace ? "not-allowed" : "pointer", textAlign: "left" }}>
             <span style={{ fontSize: 16 }}>👤</span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {cl ? (cl.raison_sociale || `${cl.prenom || ""} ${cl.nom || ""}`.trim()) : <span style={{ color: "#94a3b8", fontStyle: "italic" }}>Sans client</span>}
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1612", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {cl ? (cl.raison_sociale || `${cl.prenom || ""} ${cl.nom || ""}`.trim()) : <span style={{ color: "#9A8E82", fontStyle: "italic" }}>Sans client</span>}
               </div>
-              {cl?.email && <div style={{ fontSize: 11, color: "#94a3b8" }}>{cl.email}</div>}
+              {cl?.email && <div style={{ fontSize: 11, color: "#9A8E82" }}>{cl.email}</div>}
             </div>
-            <span style={{ fontSize: 11, color: "#94a3b8", flexShrink: 0 }}>Changer ›</span>
+            <span style={{ fontSize: 11, color: "#9A8E82", flexShrink: 0 }}>Changer ›</span>
           </button>
 
-          <label style={{ display: "block", fontSize: 10, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>OBJET</label>
+          <label style={{ display: "block", fontSize: 10, color: "#9A8E82", fontWeight: 600, marginBottom: 2 }}>OBJET</label>
           <input
             value={d.objet || ""}
             onChange={e => !isRemplace && onChange({ ...d, objet: e.target.value })}
             readOnly={isRemplace}
             placeholder="Objet du devis"
-            style={{ fontSize: 15, fontWeight: 700, color: isRemplace ? "#94a3b8" : "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, background: isRemplace ? "#f1f5f9" : "#f8fafc", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box", cursor: isRemplace ? "not-allowed" : "text" }}
+            style={{ fontSize: 15, fontWeight: 700, color: isRemplace ? "#9A8E82" : "#1A1612", border: "1px solid #E8E2D8", borderRadius: 8, background: isRemplace ? "#F0EBE3" : "#FAF7F2", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box", cursor: isRemplace ? "not-allowed" : "text" }}
           />
-          <label style={{ display: "block", fontSize: 10, color: "#94a3b8", fontWeight: 600, marginBottom: 2 }}>CHANTIER</label>
+          <label style={{ display: "block", fontSize: 10, color: "#9A8E82", fontWeight: 600, marginBottom: 2 }}>CHANTIER</label>
           <input
             value={d.ville_chantier || ""}
             onChange={e => !isRemplace && onChange({ ...d, ville_chantier: e.target.value })}
             readOnly={isRemplace}
             placeholder="Ville / chantier"
-            style={{ fontSize: 13, color: isRemplace ? "#94a3b8" : "#64748b", border: "1px solid #e2e8f0", borderRadius: 8, background: isRemplace ? "#f1f5f9" : "#f8fafc", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", boxSizing: "border-box", cursor: isRemplace ? "not-allowed" : "text" }}
+            style={{ fontSize: 13, color: isRemplace ? "#9A8E82" : "#6B6358", border: "1px solid #E8E2D8", borderRadius: 8, background: isRemplace ? "#F0EBE3" : "#FAF7F2", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", boxSizing: "border-box", cursor: isRemplace ? "not-allowed" : "text" }}
           />
         </div>
 
@@ -285,7 +285,7 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
           {/* Dupliquer */}
           {onDuplicate && (
             <button onClick={onDuplicate}
-              style={{ width: "100%", background: "white", color: "#64748b", border: "1.5px solid #e2e8f0", borderRadius: 14, padding: 13, fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              style={{ width: "100%", background: "white", color: "#6B6358", border: "1.5px solid #E8E2D8", borderRadius: 14, padding: 13, fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
               📋 Dupliquer ce devis
             </button>
           )}
@@ -293,7 +293,7 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
           {/* Conversion en facture (visible dès qu'il y a au moins une ligne) */}
           {onConvertToInvoice && lignes.length > 0 && (
             <button onClick={onConvertToInvoice}
-              style={{ width: "100%", background: "white", color: "#0f172a", border: "1.5px solid #0f172a", borderRadius: 14, padding: 13, fontSize: 13, fontWeight: 700, cursor: "pointer", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              style={{ width: "100%", background: "white", color: "#1A1612", border: "1.5px solid #1A1612", borderRadius: 14, padding: 13, fontSize: 13, fontWeight: 700, cursor: "pointer", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
               📄 Convertir en facture électronique
             </button>
           )}
@@ -311,16 +311,16 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
 
           {/* Récapitulatif lots */}
           {Object.keys(lotsResume).length > 0 && (
-            <div style={{ background: "white", borderRadius: 14, border: "1px solid #f1f5f9", overflow: "hidden", marginBottom: 12 }}>
-              <div style={{ padding: "12px 16px", borderBottom: "1px solid #f8fafc", fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Récapitulatif par lot</div>
+            <div style={{ background: "white", borderRadius: 14, border: "1px solid #F0EBE3", overflow: "hidden", marginBottom: 12 }}>
+              <div style={{ padding: "12px 16px", borderBottom: "1px solid #FAF7F2", fontWeight: 600, fontSize: 13, color: "#1A1612" }}>Récapitulatif par lot</div>
               {Object.entries(lotsResume).map(([lot, mt]) => (
-                <div key={lot} style={{ padding: "10px 16px", borderBottom: "1px solid #f8fafc", display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 12, color: "#374151" }}>{lot}</span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "#0f172a" }}>{fmt(mt)}</span>
+                <div key={lot} style={{ padding: "10px 16px", borderBottom: "1px solid #FAF7F2", display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 12, color: "#3D3028" }}>{lot}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#1A1612" }}>{fmt(mt)}</span>
                 </div>
               ))}
-              <div style={{ padding: "12px 16px", background: "#f8fafc", display: "flex", justifyContent: "space-between" }}>
-                <span style={{ fontWeight: 700, fontSize: 13, color: "#0f172a" }}>Total HT</span>
+              <div style={{ padding: "12px 16px", background: "#FAF7F2", display: "flex", justifyContent: "space-between" }}>
+                <span style={{ fontWeight: 700, fontSize: 13, color: "#1A1612" }}>Total HT</span>
                 <span style={{ fontWeight: 700, fontSize: 14, color: ac }}>{fmt(ht)}</span>
               </div>
             </div>
@@ -352,11 +352,11 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
 
           {/* Log Odoo Sign */}
           {showLog && log.length > 0 && (
-            <div style={{ background: "#0f172a", borderRadius: 14, padding: 14, marginTop: 14 }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: "#475569", marginBottom: 8, fontFamily: "monospace" }}>LOG ODOO SIGN</div>
+            <div style={{ background: "#1A1612", borderRadius: 14, padding: 14, marginTop: 14 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: "#6B6358", marginBottom: 8, fontFamily: "monospace" }}>LOG ODOO SIGN</div>
               {log.map((l, i) => (
-                <div key={i} style={{ fontFamily: "monospace", fontSize: 11, marginBottom: 3, display: "flex", gap: 8, color: l.msg.startsWith("✓") || l.msg.startsWith("🎉") ? "#4ade80" : l.msg.startsWith("❌") ? "#f87171" : "#94a3b8" }}>
-                  <span style={{ color: "#475569" }}>{l.t}</span><span>{l.msg}</span>
+                <div key={i} style={{ fontFamily: "monospace", fontSize: 11, marginBottom: 3, display: "flex", gap: 8, color: l.msg.startsWith("✓") || l.msg.startsWith("🎉") ? "#4ade80" : l.msg.startsWith("❌") ? "#f87171" : "#9A8E82" }}>
+                  <span style={{ color: "#6B6358" }}>{l.t}</span><span>{l.msg}</span>
                 </div>
               ))}
             </div>
@@ -380,11 +380,11 @@ function LoadingSkeleton() {
   return (
     <div style={{ padding: 18, animation: "fadeUp .2s ease both" }}>
       <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}`}</style>
-      <div style={{ height: 16, width: 80, background: "#e2e8f0", borderRadius: 8, marginBottom: 20, animation: "pulse 1.5s ease infinite" }}/>
+      <div style={{ height: 16, width: 80, background: "#E8E2D8", borderRadius: 8, marginBottom: 20, animation: "pulse 1.5s ease infinite" }}/>
       {[200, 140, 160, 120].map((w, i) => (
-        <div key={i} style={{ height: i === 0 ? 28 : 14, width: `${w}px`, background: "#e2e8f0", borderRadius: 8, marginBottom: i === 0 ? 8 : 14, animation: "pulse 1.5s ease infinite" }}/>
+        <div key={i} style={{ height: i === 0 ? 28 : 14, width: `${w}px`, background: "#E8E2D8", borderRadius: 8, marginBottom: i === 0 ? 8 : 14, animation: "pulse 1.5s ease infinite" }}/>
       ))}
-      <div style={{ height: 44, background: "#e2e8f0", borderRadius: 12, marginTop: 24, animation: "pulse 1.5s ease infinite" }}/>
+      <div style={{ height: 44, background: "#E8E2D8", borderRadius: 12, marginTop: 24, animation: "pulse 1.5s ease infinite" }}/>
     </div>
   );
 }

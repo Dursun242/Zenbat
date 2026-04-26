@@ -2,16 +2,16 @@ import { useState } from 'react'
 import { useAuth } from '../lib/auth.jsx'
 
 const styles = {
-  wrap:  { minHeight:'100vh', display:'grid', placeItems:'center', padding:24, background:'#f8fafc', fontFamily:'system-ui,sans-serif' },
+  wrap:  { minHeight:'100vh', display:'grid', placeItems:'center', padding:24, background:'#FAF7F2', fontFamily:'system-ui,sans-serif' },
   card:  { width:'100%', maxWidth:420, background:'#fff', borderRadius:16, padding:32, boxShadow:'0 8px 24px rgba(15,23,42,.08)' },
-  title: { margin:0, fontSize:24, fontWeight:700, color:'#0f172a' },
-  sub:   { marginTop:4, marginBottom:24, fontSize:14, color:'#64748b' },
-  label: { display:'block', fontSize:12, fontWeight:600, color:'#334155', marginBottom:6 },
-  input: { width:'100%', padding:'12px 14px', border:'1px solid #e2e8f0', borderRadius:10, fontSize:14, outline:'none', boxSizing:'border-box' },
-  btn:   { width:'100%', padding:'12px 14px', border:0, borderRadius:10, fontSize:14, fontWeight:600, cursor:'pointer', background:'#0f172a', color:'#fff', marginTop:16 },
+  title: { margin:0, fontSize:24, fontWeight:700, color:'#1A1612' },
+  sub:   { marginTop:4, marginBottom:24, fontSize:14, color:'#6B6358' },
+  label: { display:'block', fontSize:12, fontWeight:600, color:'#3D3028', marginBottom:6 },
+  input: { width:'100%', padding:'12px 14px', border:'1px solid #E8E2D8', borderRadius:10, fontSize:14, outline:'none', boxSizing:'border-box' },
+  btn:   { width:'100%', padding:'12px 14px', border:0, borderRadius:10, fontSize:14, fontWeight:600, cursor:'pointer', background:'#1A1612', color:'#fff', marginTop:16 },
   err:   { background:'#fef2f2', color:'#991b1b', padding:10, borderRadius:10, fontSize:13, marginTop:12 },
   ok:    { background:'#ecfdf5', color:'#065f46', padding:10, borderRadius:10, fontSize:13, marginTop:12 },
-  hint:  { fontSize:12, color:'#94a3b8', marginTop:6 },
+  hint:  { fontSize:12, color:'#9A8E82', marginTop:6 },
 }
 
 export default function ResetPassword() {

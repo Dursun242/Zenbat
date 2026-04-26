@@ -441,7 +441,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   const visibleLignes = lignes.slice(0, visibleCount);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#f8fafc" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#FAF7F2" }}>
       <style>{`
         @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
         @keyframes slideIn{from{opacity:0;transform:translateX(-14px) scale(.97)}to{opacity:1;transform:translateX(0) scale(1)}}
@@ -450,7 +450,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       `}</style>
 
       {/* ═══ HAUT : aperçu devis en cours ═══════════════════ */}
-      <div style={{ flexShrink: 0, background: "white", borderBottom: "2px solid #f1f5f9", minHeight: 110, maxHeight: "45%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ flexShrink: 0, background: "white", borderBottom: "2px solid #F0EBE3", minHeight: 110, maxHeight: "45%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
         {/* En-tête branding */}
         <div style={{ background: ac, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
@@ -470,16 +470,16 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
 
         {/* Objet du devis */}
         {objet && (
-          <div style={{ background: "#0f172a", padding: "6px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ background: "#1A1612", padding: "6px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             {editingObjet
               ? <input autoFocus defaultValue={objet}
                   onBlur={e => { setObjet(e.target.value.trim() || objet); setEditingObjet(false); }}
                   onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEditingObjet(false); }}
-                  style={{ flex: 1, fontFamily, fontSize: 12, fontWeight: 600, color: "#0f172a", background: "white", border: "none", outline: "none", borderRadius: 4, padding: "2px 6px" }} />
+                  style={{ flex: 1, fontFamily, fontSize: 12, fontWeight: 600, color: "#1A1612", background: "white", border: "none", outline: "none", borderRadius: 4, padding: "2px 6px" }} />
               : <span onClick={() => setEditingObjet(true)} title="Cliquer pour modifier"
                   style={{ fontFamily, color: "rgba(255,255,255,.9)", fontSize: 12, fontWeight: 600, cursor: "text", flex: 1 }}>{objet}</span>
             }
-            <span style={{ color: "#64748b", fontSize: 10, marginLeft: 8, flexShrink: 0 }}>{lignes.filter(l => l.type_ligne === "ouvrage").length} ligne{lignes.filter(l => l.type_ligne === "ouvrage").length > 1 ? "s" : ""}</span>
+            <span style={{ color: "#6B6358", fontSize: 10, marginLeft: 8, flexShrink: 0 }}>{lignes.filter(l => l.type_ligne === "ouvrage").length} ligne{lignes.filter(l => l.type_ligne === "ouvrage").length > 1 ? "s" : ""}</span>
           </div>
         )}
 
@@ -488,17 +488,17 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
           {visibleLignes.length === 0 ? (
             <div style={{ padding: "20px 16px", textAlign: "center" }}>
               <div style={{ fontSize: 24, marginBottom: 8 }}>📋</div>
-              <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>Les lignes du devis apparaîtront ici</div>
+              <div style={{ fontSize: 12, color: "#9A8E82", fontWeight: 500 }}>Les lignes du devis apparaîtront ici</div>
               <div style={{ fontSize: 11, color: "#cbd5e1", marginTop: 4 }}>Décrivez votre besoin ci-dessous</div>
             </div>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead style={{ position: "sticky", top: 0, background: "white", zIndex: 1 }}>
-                <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
-                  <th style={{ textAlign: "left",  padding: "6px 14px", fontSize: 9, fontWeight: 600, color: "#94a3b8", letterSpacing: "1px" }}>DÉSIGNATION</th>
-                  <th style={{ textAlign: "right", padding: "6px 8px",  fontSize: 9, fontWeight: 600, color: "#94a3b8", width: 50 }}>QTÉ</th>
-                  <th style={{ textAlign: "right", padding: "6px 8px",  fontSize: 9, fontWeight: 600, color: "#94a3b8", width: 65 }}>P.U. HT</th>
-                  <th style={{ textAlign: "right", padding: "6px 14px", fontSize: 9, fontWeight: 600, color: "#94a3b8", width: 75 }}>TOTAL HT</th>
+                <tr style={{ borderBottom: "1px solid #F0EBE3" }}>
+                  <th style={{ textAlign: "left",  padding: "6px 14px", fontSize: 9, fontWeight: 600, color: "#9A8E82", letterSpacing: "1px" }}>DÉSIGNATION</th>
+                  <th style={{ textAlign: "right", padding: "6px 8px",  fontSize: 9, fontWeight: 600, color: "#9A8E82", width: 50 }}>QTÉ</th>
+                  <th style={{ textAlign: "right", padding: "6px 8px",  fontSize: 9, fontWeight: 600, color: "#9A8E82", width: 65 }}>P.U. HT</th>
+                  <th style={{ textAlign: "right", padding: "6px 14px", fontSize: 9, fontWeight: 600, color: "#9A8E82", width: 75 }}>TOTAL HT</th>
                   <th style={{ width: 28 }}/>
                 </tr>
               </thead>
@@ -513,17 +513,17 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
                   );
                   const total = (l.quantite || 0) * (l.prix_unitaire || 0);
                   return (
-                    <tr key={l.id} style={{ borderBottom: "1px solid #f8fafc", animation: "rowPop .3s cubic-bezier(.34,1.3,.64,1) both", animationDelay: `${idx * 0.06}s` }}>
+                    <tr key={l.id} style={{ borderBottom: "1px solid #FAF7F2", animation: "rowPop .3s cubic-bezier(.34,1.3,.64,1) both", animationDelay: `${idx * 0.06}s` }}>
                       <td style={{ padding: "8px 14px" }}>
                         {editing?.id === l.id && editing?.field === "designation"
                           ? <input autoFocus defaultValue={l.designation}
                               onBlur={e => { updateLigne(l.id, "designation", e.target.value.trim() || l.designation); setEditing(null); }}
                               onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEditing(null); }}
-                              style={{ fontSize: 12, fontWeight: 500, color: "#1e293b", width: "100%", border: "none", outline: `2px solid ${ac}`, borderRadius: 4, padding: "2px 4px", background: "#f0fdf4", fontFamily }} />
+                              style={{ fontSize: 12, fontWeight: 500, color: "#2A231C", width: "100%", border: "none", outline: `2px solid ${ac}`, borderRadius: 4, padding: "2px 4px", background: "#f0fdf4", fontFamily }} />
                           : <div onClick={() => setEditing({ id: l.id, field: "designation" })} title="Cliquer pour modifier"
-                              style={{ fontSize: 12, fontWeight: 500, color: "#1e293b", fontFamily, cursor: "text" }}>{l.designation}</div>
+                              style={{ fontSize: 12, fontWeight: 500, color: "#2A231C", fontFamily, cursor: "text" }}>{l.designation}</div>
                         }
-                        <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 1, display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ fontSize: 10, color: "#9A8E82", marginTop: 1, display: "flex", alignItems: "center", gap: 6 }}>
                           <span>{l.unite}</span>
                           <button
                             onClick={() => {
@@ -535,35 +535,35 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
                             }}
                             disabled={brand.vatRegime === "franchise"}
                             title={brand.vatRegime === "franchise" ? "Franchise en base (art. 293 B du CGI)" : "Cliquer pour changer le taux de TVA"}
-                            style={{ background: "#eef2f7", color: "#475569", border: "none", borderRadius: 4, padding: "1px 6px", fontSize: 9, fontWeight: 600, cursor: brand.vatRegime === "franchise" ? "default" : "pointer" }}>
+                            style={{ background: "#F0EBE3", color: "#6B6358", border: "none", borderRadius: 4, padding: "1px 6px", fontSize: 9, fontWeight: 600, cursor: brand.vatRegime === "franchise" ? "default" : "pointer" }}>
                             TVA {(l.tva_rate ?? (brand.vatRegime === "franchise" ? 0 : 20)).toString().replace(".", ",")}%
                           </button>
                         </div>
                       </td>
-                      <td style={{ padding: "8px", textAlign: "right", fontSize: 12, color: "#374151", fontWeight: 600 }}>
+                      <td style={{ padding: "8px", textAlign: "right", fontSize: 12, color: "#3D3028", fontWeight: 600 }}>
                         {editing?.id === l.id && editing?.field === "quantite"
                           ? <input autoFocus type="number" defaultValue={l.quantite} min="0"
                               onBlur={e => { updateLigne(l.id, "quantite", parseFloat(e.target.value) || 0); setEditing(null); }}
                               onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEditing(null); }}
-                              style={{ width: 50, textAlign: "right", border: "none", outline: `2px solid ${ac}`, borderRadius: 4, fontSize: 12, fontWeight: 600, color: "#374151", background: "#f0fdf4", padding: "2px 4px" }} />
+                              style={{ width: 50, textAlign: "right", border: "none", outline: `2px solid ${ac}`, borderRadius: 4, fontSize: 12, fontWeight: 600, color: "#3D3028", background: "#f0fdf4", padding: "2px 4px" }} />
                           : <span onClick={() => setEditing({ id: l.id, field: "quantite" })} title="Cliquer pour modifier" style={{ cursor: "text" }}>{l.quantite}</span>
                         }
                       </td>
-                      <td style={{ padding: "8px", textAlign: "right", fontSize: 11, color: "#64748b" }}>
+                      <td style={{ padding: "8px", textAlign: "right", fontSize: 11, color: "#6B6358" }}>
                         {editing?.id === l.id && editing?.field === "prix"
                           ? <input autoFocus type="number" defaultValue={l.prix_unitaire} min="0" step="0.01"
                               onBlur={e => { updateLigne(l.id, "prix_unitaire", parseFloat(e.target.value) || 0); setEditing(null); }}
                               onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEditing(null); }}
-                              style={{ width: 65, textAlign: "right", border: "none", outline: `2px solid ${ac}`, borderRadius: 4, fontSize: 11, color: "#64748b", background: "#f0fdf4", padding: "2px 4px" }} />
+                              style={{ width: 65, textAlign: "right", border: "none", outline: `2px solid ${ac}`, borderRadius: 4, fontSize: 11, color: "#6B6358", background: "#f0fdf4", padding: "2px 4px" }} />
                           : <span onClick={() => setEditing({ id: l.id, field: "prix" })} title="Cliquer pour modifier" style={{ cursor: "text" }}>{fmt(l.prix_unitaire)}</span>
                         }
                       </td>
-                      <td style={{ padding: "8px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: "#0f172a" }}>{fmt(total)}</td>
+                      <td style={{ padding: "8px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: "#1A1612" }}>{fmt(total)}</td>
                       <td style={{ padding: "4px" }}>
                         <button onClick={() => deleteLigne(l.id)}
-                          style={{ background: "none", border: "none", cursor: "pointer", color: "#e2e8f0", fontSize: 14, lineHeight: 1, padding: "2px 4px" }}
+                          style={{ background: "none", border: "none", cursor: "pointer", color: "#E8E2D8", fontSize: 14, lineHeight: 1, padding: "2px 4px" }}
                           onMouseOver={e => e.target.style.color = "#ef4444"}
-                          onMouseOut={e => e.target.style.color = "#e2e8f0"}>×</button>
+                          onMouseOut={e => e.target.style.color = "#E8E2D8"}>×</button>
                       </td>
                     </tr>
                   );
@@ -588,7 +588,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
                       {[0, 1, 2].map(i => (
                         <div key={i} style={{ width: 5, height: 5, borderRadius: "50%", background: ac, animation: `bounce .8s ease ${i * 150}ms infinite` }}/>
                       ))}
-                      <span style={{ fontSize: 10, color: "#94a3b8", marginLeft: 4 }}>Ajout en cours…</span>
+                      <span style={{ fontSize: 10, color: "#9A8E82", marginLeft: 4 }}>Ajout en cours…</span>
                     </div>
                   </td></tr>
                 )}
@@ -598,16 +598,16 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
               {ht > 0 && visibleCount >= lignes.length && (
                 <tfoot>
                   <tr style={{ borderTop: `2px solid ${ac}` }}>
-                    <td colSpan={3} style={{ padding: "8px 14px", fontSize: 12, fontWeight: 700, color: "#0f172a", fontFamily }}>Total HT</td>
+                    <td colSpan={3} style={{ padding: "8px 14px", fontSize: 12, fontWeight: 700, color: "#1A1612", fontFamily }}>Total HT</td>
                     <td style={{ padding: "8px 14px", textAlign: "right", fontSize: 14, fontWeight: 800, color: ac, fontFamily, animation: "totalCount .4s ease both" }}>{fmt(ht)}</td>
                     <td/>
                   </tr>
                   {tvaRows.map(row => (
-                    <tr key={row.rate} style={{ background: "#f8fafc" }}>
-                      <td colSpan={3} style={{ padding: "4px 14px", fontSize: 11, color: "#64748b" }}>
+                    <tr key={row.rate} style={{ background: "#FAF7F2" }}>
+                      <td colSpan={3} style={{ padding: "4px 14px", fontSize: 11, color: "#6B6358" }}>
                         TVA {row.rate.toString().replace(".", ",")}% <span style={{ color: "#cbd5e1", fontSize: 10 }}>(sur {fmt(row.base)})</span>
                       </td>
-                      <td style={{ padding: "4px 14px", textAlign: "right", fontSize: 11, color: "#64748b" }}>{fmt(row.montant)}</td>
+                      <td style={{ padding: "4px 14px", textAlign: "right", fontSize: 11, color: "#6B6358" }}>{fmt(row.montant)}</td>
                       <td/>
                     </tr>
                   ))}
@@ -624,9 +624,9 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
 
         {/* Boutons Enregistrer / Effacer */}
         {lignes.length > 0 && visibleCount >= lignes.length && (
-          <div style={{ padding: "10px 14px", borderTop: "1px solid #f1f5f9", display: "flex", gap: 8, flexShrink: 0, animation: "fadeUp .3s ease both" }}>
+          <div style={{ padding: "10px 14px", borderTop: "1px solid #F0EBE3", display: "flex", gap: 8, flexShrink: 0, animation: "fadeUp .3s ease both" }}>
             <button onClick={() => { setLignes([]); setObjet(""); }}
-              style={{ flex: 1, background: "none", border: "1px solid #e2e8f0", borderRadius: 10, padding: 9, fontSize: 12, color: "#64748b", cursor: "pointer", fontWeight: 500 }}>
+              style={{ flex: 1, background: "none", border: "1px solid #E8E2D8", borderRadius: 10, padding: 9, fontSize: 12, color: "#6B6358", cursor: "pointer", fontWeight: 500 }}>
               {TX.clearQuote}
             </button>
             <button onClick={() => setPickingClient(true)}
@@ -658,10 +658,10 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
                 maxWidth: "82%",
                 borderRadius: m.role === "user" ? "16px 16px 3px 16px" : "16px 16px 16px 3px",
                 padding: "9px 13px", fontSize: 12, lineHeight: 1.55,
-                background: m.role === "user" ? "#0f172a" : "white",
-                color: m.role === "user" ? "white" : "#1e293b",
+                background: m.role === "user" ? "#1A1612" : "white",
+                color: m.role === "user" ? "white" : "#2A231C",
                 boxShadow: m.role === "assistant" ? "0 1px 4px rgba(0,0,0,.07)" : "none",
-                border: m.role === "assistant" ? "1px solid #f1f5f9" : "none",
+                border: m.role === "assistant" ? "1px solid #F0EBE3" : "none",
               }}>
                 {m.content.split("\n").map((line, j, arr) => (
                   <span key={j}>{line.replace(/\*([^*]+)\*/g, "$1")}{j < arr.length - 1 && <br/>}</span>
@@ -686,7 +686,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
                       display: "flex", alignItems: "center", gap: 8,
                       background: `linear-gradient(135deg, ${ac}18, ${ac}08)`,
                       border: `1px solid ${ac}44`,
-                      color: "#0f172a",
+                      color: "#1A1612",
                       borderRadius: 12,
                       padding: "11px 14px",
                       fontSize: 13,
@@ -699,12 +699,12 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
                     }}
                     onMouseOver={e => e.currentTarget.style.background = `linear-gradient(135deg, ${ac}28, ${ac}12)`}
                     onMouseOut={e => e.currentTarget.style.background = `linear-gradient(135deg, ${ac}18, ${ac}08)`}>
-                    <div style={{ flex: 1, color: "#1e293b" }}>{q}</div>
+                    <div style={{ flex: 1, color: "#2A231C" }}>{q}</div>
                     <span style={{ color: ac, fontSize: 16, flexShrink: 0, fontWeight: 700 }}>→</span>
                   </button>
                 ))}
               </div>
-              <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8, marginLeft: 4 }}>
+              <div style={{ fontSize: 11, color: "#9A8E82", marginTop: 8, marginLeft: 4 }}>
                 Ou décrivez votre besoin ci-dessous (écrit ou vocal).
               </div>
             </div>
@@ -713,7 +713,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
           {loading && msgs[msgs.length - 1]?.role !== "assistant" && (
             <div style={{ display: "flex", alignItems: "flex-end", gap: 6 }}>
               <div style={{ width: 24, height: 24, borderRadius: "50%", background: ac + "22", border: `1px solid ${ac}44`, display: "flex", alignItems: "center", justifyContent: "center", color: ac, fontSize: 12 }}>✦</div>
-              <div style={{ background: "white", border: "1px solid #f1f5f9", borderRadius: "16px 16px 16px 3px", padding: "10px 14px", display: "flex", gap: 4, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
+              <div style={{ background: "white", border: "1px solid #F0EBE3", borderRadius: "16px 16px 16px 3px", padding: "10px 14px", display: "flex", gap: 4, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
                 {[0, 140, 280].map(d => <div key={d} style={{ width: 6, height: 6, borderRadius: "50%", background: ac, animation: `bounce 1s ease ${d}ms infinite` }}/>)}
               </div>
             </div>
@@ -721,18 +721,18 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
         </div>
 
         {/* Zone de saisie */}
-        <div style={{ padding: "10px 14px 12px", background: "white", borderTop: "1px solid #f1f5f9", flexShrink: 0, position: "relative" }}>
+        <div style={{ padding: "10px 14px 12px", background: "white", borderTop: "1px solid #F0EBE3", flexShrink: 0, position: "relative" }}>
           <style>{`
             @keyframes micPulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,.55),0 6px 18px rgba(239,68,68,.45)}70%{box-shadow:0 0 0 16px rgba(239,68,68,0),0 6px 18px rgba(239,68,68,.45)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0),0 6px 18px rgba(239,68,68,.45)}}
             @keyframes micWave{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
           `}</style>
 
           {/* Champ texte + envoyer */}
-          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: "#f8fafc", borderRadius: 14, border: `1.5px solid ${listening ? "#ef4444" : (input.trim() ? ac : "#e2e8f0")}`, padding: "8px 10px", transition: "border-color .2s" }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: "#FAF7F2", borderRadius: 14, border: `1.5px solid ${listening ? "#ef4444" : (input.trim() ? ac : "#E8E2D8")}`, padding: "8px 10px", transition: "border-color .2s" }}>
             <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
               placeholder={listening ? "Écoute en cours…" : TX.inputPlaceholder}
-              rows={1} style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 16, color: "#1e293b", resize: "none", fontFamily: "inherit", lineHeight: 1.5, maxHeight: 120, overflowY: "auto" }}/>
+              rows={1} style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 16, color: "#2A231C", resize: "none", fontFamily: "inherit", lineHeight: 1.5, maxHeight: 120, overflowY: "auto" }}/>
             <button onClick={send} disabled={!input.trim() || loading}
               style={{ width: 34, height: 34, borderRadius: 10, background: input.trim() && !loading ? ac : "#d1fae5", border: "none", display: "flex", alignItems: "center", justifyContent: "center", color: "white", cursor: "pointer", transition: "background .2s", flexShrink: 0 }}>
               {I.send}
@@ -743,13 +743,13 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 8, position: "relative" }}>
             <button
               onClick={() => setLangMenu(v => !v)}
-              style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 20, padding: "3px 9px", fontSize: 11, fontWeight: 600, color: "#334155", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+              style={{ background: "#F0EBE3", border: "1px solid #E8E2D8", borderRadius: 20, padding: "3px 9px", fontSize: 11, fontWeight: 600, color: "#3D3028", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
               <span>{currentLang.flag}</span>
               <span>{currentLang.label}</span>
-              <span style={{ fontSize: 9, color: "#94a3b8" }}>▾</span>
+              <span style={{ fontSize: 9, color: "#9A8E82" }}>▾</span>
             </button>
 
-            <span style={{ fontSize: 11, color: listening ? "#ef4444" : "#64748b", fontWeight: 500 }}>
+            <span style={{ fontSize: 11, color: listening ? "#ef4444" : "#6B6358", fontWeight: 500 }}>
               {listening ? "Parlez, je transcris…" : (micSupported ? "Appuyez pour dicter" : "Vocal indisponible")}
             </span>
 
@@ -782,10 +782,10 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
             {langMenu && (
               <>
                 <div onClick={() => setLangMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }}/>
-                <div style={{ position: "absolute", bottom: "calc(100% + 6px)", left: 0, background: "white", border: "1px solid #e2e8f0", borderRadius: 12, boxShadow: "0 10px 28px rgba(15,23,42,.18)", padding: 4, zIndex: 41, maxHeight: 260, overflowY: "auto", minWidth: 180 }}>
+                <div style={{ position: "absolute", bottom: "calc(100% + 6px)", left: 0, background: "white", border: "1px solid #E8E2D8", borderRadius: 12, boxShadow: "0 10px 28px rgba(15,23,42,.18)", padding: 4, zIndex: 41, maxHeight: 260, overflowY: "auto", minWidth: 180 }}>
                   {SR_LANGS.map(l => (
                     <button key={l.code} onClick={() => pickLang(l.code)}
-                      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: l.code === micLang ? "#f0fdf4" : "none", border: "none", padding: "8px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, color: "#0f172a", textAlign: "left" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: l.code === micLang ? "#f0fdf4" : "none", border: "none", padding: "8px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, color: "#1A1612", textAlign: "left" }}>
                       <span style={{ fontSize: 14 }}>{l.flag}</span>
                       <span style={{ fontWeight: l.code === micLang ? 700 : 500, flex: 1 }}>{l.label}</span>
                       {l.code === micLang && <span style={{ color: ac, fontSize: 12 }}>✓</span>}

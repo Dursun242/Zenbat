@@ -7,20 +7,20 @@ export default function CelebrateModal({ seconds, fontFamily, ac, onClose, onSav
       <div onClick={e => e.stopPropagation()}
         style={{ background: "white", borderRadius: 20, maxWidth: 380, width: "100%", padding: 24, textAlign: "center", boxShadow: "0 30px 60px rgba(0,0,0,.35)", animation: "popIn .3s cubic-bezier(.34,1.56,.64,1) both" }}>
         <div style={{ fontSize: 56, lineHeight: 1, marginBottom: 8 }}>🎉</div>
-        <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", fontFamily, marginBottom: 6 }}>
+        <div style={{ fontSize: 18, fontWeight: 800, color: "#1A1612", fontFamily, marginBottom: 6 }}>
           Votre premier devis est prêt&nbsp;!
         </div>
         {seconds > 0 && (
-          <div style={{ fontSize: 12, color: "#64748b", marginBottom: 14 }}>
+          <div style={{ fontSize: 12, color: "#6B6358", marginBottom: 14 }}>
             Généré en {seconds} seconde{seconds > 1 ? "s" : ""}. Pas mal pour un début 💪
           </div>
         )}
-        <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.6, marginBottom: 16 }}>
+        <div style={{ fontSize: 12, color: "#6B6358", lineHeight: 1.6, marginBottom: 16 }}>
           Ajustez librement les lignes ci-dessus, puis enregistrez-le. Vous pourrez l'envoyer à votre client en signature ou le télécharger en PDF.
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={onClose}
-            style={{ flex: 1, background: "#f1f5f9", color: "#374151", border: "none", borderRadius: 12, padding: 11, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+            style={{ flex: 1, background: "#F0EBE3", color: "#3D3028", border: "none", borderRadius: 12, padding: 11, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
             Continuer
           </button>
           <button onClick={onSave}

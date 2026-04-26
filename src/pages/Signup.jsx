@@ -247,7 +247,7 @@ export default function Signup({ onSwitchToLogin, onBack }) {
                 <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                   {TRADE_EXAMPLES.map(t => (
                     <button key={t} onClick={()=>addTrade(t)}
-                      style={{background:'#FAF7F2',border:'1px solid #E8E2D8',color:'#475569',borderRadius:18,padding:'6px 12px',fontSize:12,cursor:'pointer'}}>
+                      style={{background:'#FAF7F2',border:'1px solid #E8E2D8',color:'#6B6358',borderRadius:18,padding:'6px 12px',fontSize:12,cursor:'pointer'}}>
                       + {t}
                     </button>
                   ))}

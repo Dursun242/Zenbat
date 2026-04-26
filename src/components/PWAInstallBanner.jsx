@@ -37,7 +37,7 @@ export default function PWAInstallBanner({ onOpenInstall }) {
 
   return (
     <div style={{
-      background: "linear-gradient(135deg,#0f172a,#1e293b)",
+      background: "linear-gradient(135deg,#1A1612,#2A231C)",
       borderRadius: 14, padding: 14, marginBottom: 14,
       display: "flex", alignItems: "center", gap: 12,
       boxShadow: "0 4px 14px rgba(15,23,42,.15)",
@@ -57,7 +57,7 @@ export default function PWAInstallBanner({ onOpenInstall }) {
         <div style={{ color: "white", fontSize: 13, fontWeight: 700, marginBottom: 2 }}>
           Installez Zenbat sur votre {isIOS ? "iPhone" : "téléphone"}
         </div>
-        <div style={{ color: "#94a3b8", fontSize: 11, lineHeight: 1.4 }}>
+        <div style={{ color: "#9A8E82", fontSize: 11, lineHeight: 1.4 }}>
           Accès hors-ligne, lancement en un tap
         </div>
       </div>
@@ -75,7 +75,7 @@ export default function PWAInstallBanner({ onOpenInstall }) {
         style={{
           position: "absolute", top: 6, right: 8,
           background: "none", border: "none",
-          color: "#64748b", fontSize: 16, cursor: "pointer",
+          color: "#6B6358", fontSize: 16, cursor: "pointer",
           padding: "2px 6px", lineHeight: 1
         }}>
         ×

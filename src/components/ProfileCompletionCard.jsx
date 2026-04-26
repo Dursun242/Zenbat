@@ -14,7 +14,7 @@ export default function ProfileCompletionCard({ brand, onOpenProfile }) {
   return (
     <div style={{
       background: "white", borderRadius: 14, padding: 16,
-      border: `1.5px solid ${missingCritical.length > 0 ? "#fed7aa" : "#e2e8f0"}`,
+      border: `1.5px solid ${missingCritical.length > 0 ? "#fed7aa" : "#E8E2D8"}`,
       marginBottom: 14, boxShadow: "0 1px 4px rgba(0,0,0,.04)"
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
@@ -27,14 +27,14 @@ export default function ProfileCompletionCard({ brand, onOpenProfile }) {
           {percent}%
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1612", display: "flex", alignItems: "center", gap: 6 }}>
             Profil entreprise
             <span style={{
               fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20,
               background: `${level.color}15`, color: level.color
             }}>{level.label}</span>
           </div>
-          <div style={{ fontSize: 11, color: "#64748b", marginTop: 2, lineHeight: 1.4 }}>
+          <div style={{ fontSize: 11, color: "#6B6358", marginTop: 2, lineHeight: 1.4 }}>
             {missingCritical.length > 0
               ? `${missingCritical.length} info${missingCritical.length > 1 ? "s" : ""} critique${missingCritical.length > 1 ? "s" : ""} manquante${missingCritical.length > 1 ? "s" : ""} pour des devis conformes`
               : "Ajoutez les dernières infos pour un rendu 100% pro"}
@@ -43,7 +43,7 @@ export default function ProfileCompletionCard({ brand, onOpenProfile }) {
       </div>
 
       {/* Barre de progression */}
-      <div style={{ height: 6, background: "#f1f5f9", borderRadius: 3, overflow: "hidden", marginBottom: 12 }}>
+      <div style={{ height: 6, background: "#F0EBE3", borderRadius: 3, overflow: "hidden", marginBottom: 12 }}>
         <div style={{
           height: "100%", width: `${percent}%`,
           background: level.color, borderRadius: 3, transition: "width .4s ease"
@@ -57,15 +57,15 @@ export default function ProfileCompletionCard({ brand, onOpenProfile }) {
           return (
             <div key={f.key} style={{
               display: "flex", alignItems: "flex-start", gap: 8,
-              padding: "6px 0", borderTop: i === 0 ? "none" : "1px solid #f8fafc"
+              padding: "6px 0", borderTop: i === 0 ? "none" : "1px solid #FAF7F2"
             }}>
               <span style={{
-                color: isCritical ? "#f97316" : "#94a3b8",
+                color: isCritical ? "#f97316" : "#9A8E82",
                 fontSize: 14, fontWeight: 700, flexShrink: 0, marginTop: 1
               }}>{isCritical ? "!" : "•"}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "#0f172a" }}>{f.label}</div>
-                <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 1, lineHeight: 1.4 }}>{f.impact}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1612" }}>{f.label}</div>
+                <div style={{ fontSize: 10, color: "#9A8E82", marginTop: 1, lineHeight: 1.4 }}>{f.impact}</div>
               </div>
             </div>
           );
@@ -73,7 +73,7 @@ export default function ProfileCompletionCard({ brand, onOpenProfile }) {
         {hasMore && (
           <button onClick={() => setExpanded(true)}
             style={{
-              background: "none", border: "none", color: "#64748b",
+              background: "none", border: "none", color: "#6B6358",
               fontSize: 11, fontWeight: 600, cursor: "pointer",
               padding: "6px 0 0", textDecoration: "underline"
             }}>
@@ -84,7 +84,7 @@ export default function ProfileCompletionCard({ brand, onOpenProfile }) {
 
       <button onClick={onOpenProfile}
         style={{
-          width: "100%", background: "#0f172a", color: "white",
+          width: "100%", background: "#1A1612", color: "white",
           border: "none", borderRadius: 10, padding: "10px 14px",
           fontSize: 12, fontWeight: 700, cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center", gap: 6

@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 const styles = {
-  wrap: { minHeight:'100vh', display:'grid', placeItems:'center', padding:24, background:'#f8fafc', fontFamily:'system-ui,sans-serif' },
-  box:  { textAlign:'center', color:'#334155' },
+  wrap: { minHeight:'100vh', display:'grid', placeItems:'center', padding:24, background:'#FAF7F2', fontFamily:'system-ui,sans-serif' },
+  box:  { textAlign:'center', color:'#3D3028' },
   err:  { color:'#991b1b', maxWidth:420 },
 }
 

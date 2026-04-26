@@ -85,7 +85,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
   const tva = tvaRows.reduce((s, row) => s + row.montant, 0)
   const ttc = ht + tva
   const fontFamily = brand.fontStyle==="elegant"?"Playfair Display":brand.fontStyle==="tech"?"Space Grotesk":"DM Sans"
-  const navy = "#1e3a5f"
+  const navy = "#1A1612"
   const baseDate = d.date_emission ? new Date(d.date_emission) : new Date()
   const validUntil = isNaN(baseDate.getTime()) ? new Date() : baseDate
   validUntil.setDate(validUntil.getDate() + (brand.validityDays || 30))
@@ -114,12 +114,12 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
           {!brand.logo && <div style={{fontWeight:800,fontSize:16,color:navy}}>{brand.companyName||"Votre Entreprise"}</div>}
         </div>
         <div style={{textAlign:"right"}}>
-          <div style={{color:"#94a3b8",fontSize:10,fontWeight:600,letterSpacing:"2px"}}>{docLabel}</div>
+          <div style={{color:"#9A8E82",fontSize:10,fontWeight:600,letterSpacing:"2px"}}>{docLabel}</div>
           <div style={{color:navy,fontWeight:800,fontSize:20,marginTop:2}}>{d.numero}</div>
-          <div style={{color:"#64748b",fontSize:10,marginTop:6}}>Émis le <strong style={{color:"#1a1a1a"}}>{fmtD(d.date_emission)}</strong></div>
+          <div style={{color:"#6B6358",fontSize:10,marginTop:6}}>Émis le <strong style={{color:"#1a1a1a"}}>{fmtD(d.date_emission)}</strong></div>
           {kind === "facture"
-            ? d.date_echeance && <div style={{color:"#64748b",fontSize:10}}>Échéance <strong style={{color:"#1a1a1a"}}>{fmtD(d.date_echeance)}</strong></div>
-            : <div style={{color:"#64748b",fontSize:10}}>Valide jusqu'au <strong style={{color:"#1a1a1a"}}>{fmtD(validUntil.toISOString())}</strong></div>
+            ? d.date_echeance && <div style={{color:"#6B6358",fontSize:10}}>Échéance <strong style={{color:"#1a1a1a"}}>{fmtD(d.date_echeance)}</strong></div>
+            : <div style={{color:"#6B6358",fontSize:10}}>Valide jusqu'au <strong style={{color:"#1a1a1a"}}>{fmtD(validUntil.toISOString())}</strong></div>
           }
         </div>
       </div>
@@ -138,7 +138,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
       </div>
 
       {(d.ville_chantier||d.objet)&&(
-        <div style={{background:"#f8f9fb",border:"1px solid #e5e7eb",borderRadius:4,padding:"6px 10px",marginBottom:10,fontSize:9.5,color:"#374151"}}>
+        <div style={{background:"#f8f9fb",border:"1px solid #e5e7eb",borderRadius:4,padding:"6px 10px",marginBottom:10,fontSize:9.5,color:"#3D3028"}}>
           {d.objet && <div><strong>Objet :</strong> {d.objet}</div>}
           {d.ville_chantier && <div><strong>Chantier :</strong> {d.ville_chantier}</div>}
         </div>
@@ -160,7 +160,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
           {filteredLignes.map((l,i)=>{
             if(l.type_ligne==="lot") return (
               <tr key={l.id}>
-                <td colSpan={6} style={{padding:"6px 8px",fontWeight:700,fontSize:9.5,color:navy,textTransform:"uppercase",letterSpacing:".5px",borderBottom:`1px solid ${navy}33`,background:"#eef2f7"}}>{l.designation}</td>
+                <td colSpan={6} style={{padding:"6px 8px",fontWeight:700,fontSize:9.5,color:navy,textTransform:"uppercase",letterSpacing:".5px",borderBottom:`1px solid ${navy}33`,background:"#F0EBE3"}}>{l.designation}</td>
               </tr>
             )
             const total = (l.quantite||0)*(l.prix_unitaire||0)
@@ -188,7 +188,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
                 <td style={{padding:"3px 8px",textAlign:"right"}}>{fmt(row.montant)}</td>
               </tr>
             ))}
-            <tr style={{background:"#eef2f7",borderTop:`2px solid ${navy}`}}>
+            <tr style={{background:"#F0EBE3",borderTop:`2px solid ${navy}`}}>
               <td style={{padding:"6px 8px",fontWeight:800,color:navy,fontSize:10.5}}>TOTAL TTC</td>
               <td style={{padding:"6px 8px",textAlign:"right",fontWeight:800,color:navy,fontSize:11.5}}>{fmt(ttc)}</td>
             </tr>
@@ -209,7 +209,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
       {(d.observations||brand.defaultObservations)&&(
         <div style={{marginBottom:10}}>
           <div style={{fontSize:9,fontWeight:700,color:navy,marginBottom:3,letterSpacing:"1px",textTransform:"uppercase"}}>Observations</div>
-          <div style={{fontSize:9.5,color:"#374151",lineHeight:1.55}}>{d.observations||brand.defaultObservations}</div>
+          <div style={{fontSize:9.5,color:"#3D3028",lineHeight:1.55}}>{d.observations||brand.defaultObservations}</div>
         </div>
       )}
 
@@ -219,13 +219,13 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
           {brand.paymentTerms && (
             <div style={{background:"#f8f9fb",borderRadius:4,padding:"8px 10px",border:"1px solid #e5e7eb"}}>
               <div style={{fontSize:9,fontWeight:700,color:navy,marginBottom:4,letterSpacing:"1px",textTransform:"uppercase"}}>Conditions</div>
-              <div style={{fontSize:9.5,color:"#374151",lineHeight:1.55}}>{brand.paymentTerms}</div>
+              <div style={{fontSize:9.5,color:"#3D3028",lineHeight:1.55}}>{brand.paymentTerms}</div>
             </div>
           )}
           {(brand.rib||brand.iban) && (
             <div style={{background:"#f8f9fb",borderRadius:4,padding:"8px 10px",border:"1px solid #e5e7eb"}}>
               <div style={{fontSize:9,fontWeight:700,color:navy,marginBottom:4,letterSpacing:"1px",textTransform:"uppercase"}}>Coordonnées bancaires</div>
-              {brand.rib&&<div style={{fontSize:9.5,color:"#374151",marginBottom:2}}>{brand.rib}</div>}
+              {brand.rib&&<div style={{fontSize:9.5,color:"#3D3028",marginBottom:2}}>{brand.rib}</div>}
               {brand.iban&&<div style={{fontSize:9,color:"#4b5563",fontFamily:"monospace",lineHeight:1.5}}>IBAN : {brand.iban}</div>}
               {brand.bic&&<div style={{fontSize:9,color:"#4b5563",fontFamily:"monospace"}}>BIC : {brand.bic}</div>}
             </div>
@@ -328,8 +328,8 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         {/* Toolbar inline */}
-        <div style={{ background: "#0f172a", padding: "8px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-          <span style={{ color: "#94a3b8", fontSize: 12, fontWeight: 500 }}>{d.numero}.pdf</span>
+        <div style={{ background: "#1A1612", padding: "8px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <span style={{ color: "#9A8E82", fontSize: 12, fontWeight: 500 }}>{d.numero}.pdf</span>
           {!noDownload && (
             <button onClick={download}
               style={{ background: "#22c55e", color: "white", border: "none", borderRadius: 8, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
@@ -373,16 +373,16 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
         }
       `}</style>
 
-      <div className="pdf-toolbar" style={{background:"#0f172a",padding:"calc(12px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 12px calc(18px + env(safe-area-inset-left))",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+      <div className="pdf-toolbar" style={{background:"#1A1612",padding:"calc(12px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 12px calc(18px + env(safe-area-inset-left))",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{color:"#22c55e"}}>{Ix.pdf}</div>
           <span style={{color:"white",fontSize:13,fontWeight:600}}>{d.numero}.pdf</span>
         </div>
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
-          <div style={{display:"flex",background:"#1e293b",borderRadius:10,overflow:"hidden"}}>
-            <button onClick={()=>setUserZoom(z=>Math.max(0.5,+(z-0.25).toFixed(2)))} style={{background:"none",border:"none",color:"#94a3b8",width:30,height:30,fontSize:16,cursor:"pointer",padding:0}} aria-label="Dézoomer">−</button>
-            <button onClick={()=>setUserZoom(1)} style={{background:"none",border:"none",color:"#94a3b8",padding:"0 8px",fontSize:11,fontWeight:600,cursor:"pointer",minWidth:44}} aria-label="Réinitialiser zoom">{Math.round(scale*100)}%</button>
-            <button onClick={()=>setUserZoom(z=>Math.min(3,+(z+0.25).toFixed(2)))} style={{background:"none",border:"none",color:"#94a3b8",width:30,height:30,fontSize:16,cursor:"pointer",padding:0}} aria-label="Zoomer">+</button>
+          <div style={{display:"flex",background:"#2A231C",borderRadius:10,overflow:"hidden"}}>
+            <button onClick={()=>setUserZoom(z=>Math.max(0.5,+(z-0.25).toFixed(2)))} style={{background:"none",border:"none",color:"#9A8E82",width:30,height:30,fontSize:16,cursor:"pointer",padding:0}} aria-label="Dézoomer">−</button>
+            <button onClick={()=>setUserZoom(1)} style={{background:"none",border:"none",color:"#9A8E82",padding:"0 8px",fontSize:11,fontWeight:600,cursor:"pointer",minWidth:44}} aria-label="Réinitialiser zoom">{Math.round(scale*100)}%</button>
+            <button onClick={()=>setUserZoom(z=>Math.min(3,+(z+0.25).toFixed(2)))} style={{background:"none",border:"none",color:"#9A8E82",width:30,height:30,fontSize:16,cursor:"pointer",padding:0}} aria-label="Zoomer">+</button>
           </div>
           {!noDownload && (
             <button
@@ -411,11 +411,11 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
               {generatingPdf ? "⏳" : "⬇"}
             </button>
           )}
-          <button onClick={onClose} style={{background:"#1e293b",color:"#94a3b8",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer"}}>{Ix.x}</button>
+          <button onClick={onClose} style={{background:"#2A231C",color:"#9A8E82",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer"}}>{Ix.x}</button>
         </div>
       </div>
 
-      <div className="pdf-scroll" ref={wrapRef} style={{flex:1,overflow:"auto",padding:"16px 16px calc(20px + env(safe-area-inset-bottom))",background:"#1e293b"}}>
+      <div className="pdf-scroll" ref={wrapRef} style={{flex:1,overflow:"auto",padding:"16px 16px calc(20px + env(safe-area-inset-bottom))",background:"#2A231C"}}>
         <div className="pdf-page-wrap" style={{width:`calc(210mm * ${scale})`,height:pageH?`${pageH}px`:"auto",margin:"0 auto",position:"relative"}}>
           <div ref={pageRef} className="pdf-page" style={{background:"white",width:"210mm",minHeight:"297mm",boxShadow:"0 20px 60px rgba(0,0,0,.5)",padding:"10mm",fontFamily,color:"#1a1a1a",fontSize:11,lineHeight:1.5,boxSizing:"border-box",transform:`scale(${scale})`,transformOrigin:"top left",position:"absolute",top:0,left:0}}>
             {pageBody}
@@ -424,8 +424,8 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
       </div>
 
       {onSendOdoo && (
-        <div style={{flexShrink:0,padding:"12px 18px calc(12px + env(safe-area-inset-bottom))",background:"#0f172a",borderTop:"1px solid #1e293b",display:"flex",gap:10}}>
-          <button onClick={onClose} style={{background:"#1e293b",color:"#94a3b8",border:"none",borderRadius:12,padding:"12px 16px",fontSize:13,fontWeight:600,cursor:"pointer",flexShrink:0}}>← Retour</button>
+        <div style={{flexShrink:0,padding:"12px 18px calc(12px + env(safe-area-inset-bottom))",background:"#1A1612",borderTop:"1px solid #2A231C",display:"flex",gap:10}}>
+          <button onClick={onClose} style={{background:"#2A231C",color:"#9A8E82",border:"none",borderRadius:12,padding:"12px 16px",fontSize:13,fontWeight:600,cursor:"pointer",flexShrink:0}}>← Retour</button>
           <button onClick={sent ? undefined : onSendOdoo} disabled={sending||sent}
             style={{flex:1,background:sent?"#166534":sending?"#4b3557":"#714B67",color:"white",border:"none",borderRadius:12,padding:"12px",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:8,cursor:(sending||sent)?"default":"pointer",transition:"background .4s"}}>
             {sent
@@ -443,8 +443,8 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
         <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300}}>
           <div style={{background:"white",borderRadius:12,padding:"24px 32px",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,.3)"}}>
             <div style={{display:"inline-block",width:32,height:32,border:"3px solid #e5e7eb",borderTopColor:"#22c55e",borderRadius:"50%",animation:"spin 1s linear infinite",marginBottom:16}}/>
-            <p style={{fontSize:14,fontWeight:600,color:"#0f172a",margin:"12px 0 4px"}}>Génération du PDF en cours…</p>
-            <p style={{fontSize:12,color:"#64748b"}}>Cela peut prendre quelques secondes</p>
+            <p style={{fontSize:14,fontWeight:600,color:"#1A1612",margin:"12px 0 4px"}}>Génération du PDF en cours…</p>
+            <p style={{fontSize:12,color:"#6B6358"}}>Cela peut prendre quelques secondes</p>
           </div>
         </div>
       )}

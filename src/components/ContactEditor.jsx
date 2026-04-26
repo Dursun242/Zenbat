@@ -5,13 +5,13 @@ import { createPortal } from "react-dom";
 function Field({ label, val, onChange, type = "text", placeholder = "" }) {
   return (
     <div>
-      <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#64748b", marginBottom: 6 }}>{label}</label>
+      <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#6B6358", marginBottom: 6 }}>{label}</label>
       <input
         type={type}
         value={val || ""}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        style={{ width: "100%", background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: "10px 14px", fontSize: 13, color: "#0f172a", outline: "none", boxSizing: "border-box" }}
+        style={{ width: "100%", background: "white", border: "1px solid #E8E2D8", borderRadius: 12, padding: "10px 14px", fontSize: 13, color: "#1A1612", outline: "none", boxSizing: "border-box" }}
       />
     </div>
   );
@@ -33,21 +33,21 @@ export default function ContactEditor({ c, onSave, onClose }) {
         display: "flex", flexDirection: "column",
       }}>
 
-        <div style={{ padding: "14px 18px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
+        <div style={{ padding: "14px 18px", borderBottom: "1px solid #F0EBE3", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#1A1612" }}>
             {c.raison_sociale || c.nom ? "Modifier le contact" : "Nouveau contact"}
           </div>
-          <button onClick={onClose} style={{ background: "#f1f5f9", border: "none", borderRadius: 10, width: 32, height: 32, cursor: "pointer", fontSize: 14, color: "#64748b" }}>✕</button>
+          <button onClick={onClose} style={{ background: "#F0EBE3", border: "none", borderRadius: 10, width: 32, height: 32, cursor: "pointer", fontSize: 14, color: "#6B6358" }}>✕</button>
         </div>
 
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
           {/* Type */}
           <div>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#64748b", marginBottom: 6 }}>TYPE</label>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#6B6358", marginBottom: 6 }}>TYPE</label>
             <div style={{ display: "flex", gap: 6 }}>
               {[["particulier", "Particulier"], ["artisan", "Artisan"], ["entreprise", "Entreprise"]].map(([id, lbl]) => (
                 <button key={id} onClick={() => set("type", id)}
-                  style={{ flex: 1, padding: 8, borderRadius: 10, border: `1.5px solid ${form.type === id ? "#0f172a" : "#e2e8f0"}`, background: form.type === id ? "#0f172a" : "white", color: form.type === id ? "white" : "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                  style={{ flex: 1, padding: 8, borderRadius: 10, border: `1.5px solid ${form.type === id ? "#1A1612" : "#E8E2D8"}`, background: form.type === id ? "#1A1612" : "white", color: form.type === id ? "white" : "#6B6358", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                   {lbl}
                 </button>
               ))}
@@ -86,15 +86,15 @@ export default function ContactEditor({ c, onSave, onClose }) {
           )}
 
           <div>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#64748b", marginBottom: 6 }}>NOTES</label>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#6B6358", marginBottom: 6 }}>NOTES</label>
             <textarea value={form.notes || ""} onChange={e => set("notes", e.target.value)} rows={2}
-              style={{ width: "100%", background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: "10px 14px", fontSize: 13, color: "#0f172a", outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }}/>
+              style={{ width: "100%", background: "white", border: "1px solid #E8E2D8", borderRadius: 12, padding: "10px 14px", fontSize: 13, color: "#1A1612", outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }}/>
           </div>
         </div>
 
-        <div style={{ padding: "12px 16px calc(12px + env(safe-area-inset-bottom))", borderTop: "1px solid #f1f5f9", display: "flex", gap: 10, flexShrink: 0 }}>
+        <div style={{ padding: "12px 16px calc(12px + env(safe-area-inset-bottom))", borderTop: "1px solid #F0EBE3", display: "flex", gap: 10, flexShrink: 0 }}>
           <button onClick={onClose}
-            style={{ flex: 1, background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, fontSize: 13, fontWeight: 600, color: "#475569", cursor: "pointer" }}>
+            style={{ flex: 1, background: "white", border: "1px solid #E8E2D8", borderRadius: 12, padding: 12, fontSize: 13, fontWeight: 600, color: "#6B6358", cursor: "pointer" }}>
             Annuler
           </button>
           <button onClick={() => isValid && onSave(form)} disabled={!isValid}

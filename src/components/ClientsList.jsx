@@ -144,7 +144,7 @@ Règles :
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <button onClick={() => setEditing(c)} aria-label="Modifier"
-                style={{ background: "#F0EBE3", border: "none", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 14, color: "#475569" }}>✏️</button>
+                style={{ background: "#F0EBE3", border: "none", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 14, color: "#6B6358" }}>✏️</button>
               <button onClick={() => deleteContact(c.id)} aria-label="Supprimer"
                 style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 14 }}>🗑️</button>
             </div>

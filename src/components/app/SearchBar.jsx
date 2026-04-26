@@ -69,7 +69,7 @@ export default function SearchBar({ devis = [], clients = [], invoices = [], goD
   return (
     <div ref={wrapRef} style={{ position: "relative", padding: "10px 14px 0" }}>
       <div style={{ position: "relative" }}>
-        <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", pointerEvents: "none" }}>
+        <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "#9A8E82", pointerEvents: "none" }}>
           {ICONS.search}
         </span>
         <input
@@ -83,14 +83,14 @@ export default function SearchBar({ devis = [], clients = [], invoices = [], goD
             width: "100%", boxSizing: "border-box",
             paddingLeft: 34, paddingRight: 12, paddingTop: 9, paddingBottom: 9,
             fontSize: 14, borderRadius: 12,
-            border: "1px solid #e2e8f0", background: "white",
-            outline: "none", color: "#0f172a", fontFamily: "inherit",
-            boxShadow: open && query.length >= 2 ? "0 0 0 2px #e2e8f0" : "none",
+            border: "1px solid #E8E2D8", background: "white",
+            outline: "none", color: "#1A1612", fontFamily: "inherit",
+            boxShadow: open && query.length >= 2 ? "0 0 0 2px #E8E2D8" : "none",
           }}
         />
         {q && (
           <button onClick={() => { setQ(""); setOpen(false); inputRef.current?.focus(); }}
-            style={{ position: "absolute", right: 9, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: 2 }}>
+            style={{ position: "absolute", right: 9, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#9A8E82", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: 2 }}>
             ×
           </button>
         )}
@@ -99,11 +99,11 @@ export default function SearchBar({ devis = [], clients = [], invoices = [], goD
       {open && query.length >= 2 && (
         <div style={{
           position: "absolute", top: "calc(100% + 4px)", left: 14, right: 14,
-          background: "white", borderRadius: 14, border: "1px solid #e2e8f0",
+          background: "white", borderRadius: 14, border: "1px solid #E8E2D8",
           boxShadow: "0 8px 32px rgba(0,0,0,.12)", zIndex: 100, overflow: "hidden",
         }}>
           {results.length === 0 ? (
-            <div style={{ padding: "14px 16px", fontSize: 13, color: "#94a3b8", textAlign: "center" }}>
+            <div style={{ padding: "14px 16px", fontSize: 13, color: "#9A8E82", textAlign: "center" }}>
               Aucun résultat pour « {q} »
             </div>
           ) : results.map((r, i) => (
@@ -111,10 +111,10 @@ export default function SearchBar({ devis = [], clients = [], invoices = [], goD
               style={{
                 width: "100%", display: "flex", alignItems: "center", gap: 10,
                 padding: "10px 14px", background: "none", border: "none",
-                borderTop: i > 0 ? "1px solid #f1f5f9" : "none",
+                borderTop: i > 0 ? "1px solid #F0EBE3" : "none",
                 cursor: "pointer", textAlign: "left",
               }}
-              onMouseOver={e => e.currentTarget.style.background = "#f8fafc"}
+              onMouseOver={e => e.currentTarget.style.background = "#FAF7F2"}
               onMouseOut={e => e.currentTarget.style.background = "none"}
             >
               <span style={{
@@ -126,11 +126,11 @@ export default function SearchBar({ devis = [], clients = [], invoices = [], goD
                 {ICONS[r.type]}
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1612", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {r.label}
                 </div>
                 {r.sub && (
-                  <div style={{ fontSize: 11, color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <div style={{ fontSize: 11, color: "#9A8E82", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {r.sub}
                   </div>
                 )}

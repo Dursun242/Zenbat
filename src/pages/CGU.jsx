@@ -60,16 +60,16 @@ export default function CGU() {
   const go = (href) => { window.location.href = href }
 
   return (
-    <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: "#f8fafc", minHeight: "100vh" }}>
+    <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: "#FAF7F2", minHeight: "100vh" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');*{box-sizing:border-box;margin:0;padding:0}`}</style>
 
       {/* Header */}
-      <div style={{ background: "#0f172a", padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ background: "#1A1612", padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontWeight: 800, fontSize: 20 }}>
           <span style={{ color: "#22c55e" }}>Zen</span><span style={{ color: "#fff" }}>bat</span>
         </span>
         <button onClick={() => go("/")}
-          style={{ background: "transparent", border: "1px solid #334155", color: "#94a3b8", borderRadius: 8, padding: "6px 14px", fontSize: 13, cursor: "pointer" }}>
+          style={{ background: "transparent", border: "1px solid #3D3028", color: "#9A8E82", borderRadius: 8, padding: "6px 14px", fontSize: 13, cursor: "pointer" }}>
           ← Retour
         </button>
       </div>
@@ -80,27 +80,27 @@ export default function CGU() {
           <div style={{ display: "inline-block", background: "#f0fdf4", color: "#16a34a", fontSize: 11, fontWeight: 700, padding: "3px 12px", borderRadius: 20, marginBottom: 12, letterSpacing: "0.5px" }}>
             VERSION {CGU_VERSION} — {CGU_DATE.toUpperCase()}
           </div>
-          <h1 style={{ fontSize: 32, fontWeight: 800, color: "#0f172a", letterSpacing: "-1px", marginBottom: 8 }}>
+          <h1 style={{ fontSize: 32, fontWeight: 800, color: "#1A1612", letterSpacing: "-1px", marginBottom: 8 }}>
             Conditions Générales d'Utilisation
           </h1>
-          <p style={{ fontSize: 15, color: "#64748b", lineHeight: 1.7 }}>
+          <p style={{ fontSize: 15, color: "#6B6358", lineHeight: 1.7 }}>
             Veuillez lire attentivement les présentes conditions avant d'utiliser Zenbat.
           </p>
         </div>
 
         {articles.map(({ n, title, body }) => (
-          <div key={n} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: "24px 28px", marginBottom: 16 }}>
+          <div key={n} style={{ background: "#fff", border: "1px solid #E8E2D8", borderRadius: 16, padding: "24px 28px", marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 12 }}>
-              <span style={{ background: "#0f172a", color: "#22c55e", fontWeight: 800, fontSize: 13, borderRadius: 8, padding: "4px 10px", flexShrink: 0 }}>
+              <span style={{ background: "#1A1612", color: "#22c55e", fontWeight: 800, fontSize: 13, borderRadius: 8, padding: "4px 10px", flexShrink: 0 }}>
                 Art. {n}
               </span>
-              <h2 style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", lineHeight: 1.3 }}>{title}</h2>
+              <h2 style={{ fontSize: 17, fontWeight: 700, color: "#1A1612", lineHeight: 1.3 }}>{title}</h2>
             </div>
-            <p style={{ fontSize: 14, color: "#475569", lineHeight: 1.8, whiteSpace: "pre-line" }}>{body}</p>
+            <p style={{ fontSize: 14, color: "#6B6358", lineHeight: 1.8, whiteSpace: "pre-line" }}>{body}</p>
           </div>
         ))}
 
-        <div style={{ marginTop: 32, textAlign: "center", color: "#94a3b8", fontSize: 12 }}>
+        <div style={{ marginTop: 32, textAlign: "center", color: "#9A8E82", fontSize: 12 }}>
           © 2026 Zenbat · Tous droits réservés
         </div>
       </div>

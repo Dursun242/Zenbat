@@ -9,7 +9,7 @@ import Landing from './pages/Landing.jsx'
 import CGU from './pages/CGU.jsx'
 
 const loader = {
-  wrap: { minHeight:'100vh', display:'grid', placeItems:'center', background:'#f8fafc', color:'#64748b', fontFamily:'system-ui,sans-serif' },
+  wrap: { minHeight:'100vh', display:'grid', placeItems:'center', background:'#FAF7F2', color:'#6B6358', fontFamily:'system-ui,sans-serif' },
 }
 
 export default function Root() {
