@@ -7,7 +7,8 @@ import AdminUsersTable   from "./admin/AdminUsersTable.jsx"
 import AdminErrorLogs    from "./admin/AdminErrorLogs.jsx"
 import AdminNegativeLogs from "./admin/AdminNegativeLogs.jsx"
 import AdminConversations from "./admin/AdminConversations.jsx"
-import DeleteUserModal   from "./admin/DeleteUserModal.jsx"
+import AdminNewsletter    from "./admin/AdminNewsletter.jsx"
+import DeleteUserModal    from "./admin/DeleteUserModal.jsx"
 import UserDetailDrawer  from "./admin/UserDetailDrawer.jsx"
 
 export default function AdminPanel({ onBack }) {
@@ -20,8 +21,10 @@ export default function AdminPanel({ onBack }) {
   const [iaNegs,       setIaNegs]       = useState(null)
   const [negsLoading,  setNegsLoading]  = useState(false)
   const [negFilter,    setNegFilter]    = useState("all")
-  const [iaConvs,      setIaConvs]      = useState(null)
-  const [convsLoading, setConvsLoading] = useState(false)
+  const [iaConvs,          setIaConvs]          = useState(null)
+  const [convsLoading,     setConvsLoading]     = useState(false)
+  const [newsletter,       setNewsletter]       = useState(null)
+  const [newsletterLoading,setNewsletterLoading]= useState(false)
   const [openConvUser, setOpenConvUser] = useState(null)
   const [convSearch,   setConvSearch]   = useState("")
   const [userSearch,   setUserSearch]   = useState("")
@@ -36,7 +39,7 @@ export default function AdminPanel({ onBack }) {
   const [detailError,  setDetailError]  = useState(null)
   const [detailTab,    setDetailTab]    = useState("overview")
 
-  useEffect(() => { if (session) { load(); loadLogs(); loadNegs(); loadConvs() } }, [session?.access_token])
+  useEffect(() => { if (session) { load(); loadLogs(); loadNegs(); loadConvs(); loadNewsletter() } }, [session?.access_token])
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -78,6 +81,16 @@ export default function AdminPanel({ onBack }) {
       const data = await res.json()
       if (res.ok) setIaConvs(data.conversations || [])
     } catch {} finally { setConvsLoading(false) }
+  }
+
+  const loadNewsletter = async () => {
+    setNewsletterLoading(true)
+    try {
+      const token = await getToken()
+      const res  = await fetch("/api/admin-ia-data?type=newsletter", { headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json()
+      if (res.ok) setNewsletter(data.subscribers || [])
+    } catch {} finally { setNewsletterLoading(false) }
   }
 
   const openDelete = (u) => { setDeleteTarget(u); setConfirmInput(""); setDeleteError(null) }
@@ -171,6 +184,10 @@ export default function AdminPanel({ onBack }) {
             convSearch={convSearch} setConvSearch={setConvSearch}
             openConvUser={openConvUser} setOpenConvUser={setOpenConvUser}
             onRefresh={loadConvs}
+          />
+          <AdminNewsletter
+            subscribers={newsletter}  loading={newsletterLoading}
+            onRefresh={loadNewsletter}
           />
           <div style={{ textAlign: "center", fontSize: 10, color: "#cbd5e1" }}>
             Données du {fmtD(stats.generatedAt)} à {new Date(stats.generatedAt).toLocaleTimeString("fr-FR")}

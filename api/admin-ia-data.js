@@ -29,13 +29,25 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: "Accès réservé à l'administrateur" })
 
   const type = (req.query.type || '').toString().trim()
+
+  // Cas spécial : newsletter (pas de jointure profil/auth)
+  if (type === 'newsletter') {
+    const { data: rows, error: re } = await admin
+      .from('newsletter_subscribers')
+      .select('id, email, source, created_at')
+      .order('created_at', { ascending: false })
+      .limit(1000)
+    if (re) return res.status(500).json({ error: re.message })
+    return res.status(200).json({ subscribers: rows || [], generatedAt: new Date().toISOString() })
+  }
+
   const tableMap = {
     conversations: { table: 'ia_conversations', limit: 500, key: 'conversations' },
     logs:          { table: 'ia_error_logs',    limit: 200, key: 'logs' },
     negatives:     { table: 'ia_negative_logs', limit: 200, key: 'logs' },
   }
   const cfg = tableMap[type]
-  if (!cfg) return res.status(400).json({ error: "Paramètre 'type' invalide (conversations | logs | negatives)" })
+  if (!cfg) return res.status(400).json({ error: "Paramètre 'type' invalide (conversations | logs | negatives | newsletter)" })
 
   const [
     { data: rows,     error: re },
