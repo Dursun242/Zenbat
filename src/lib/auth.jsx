@@ -11,7 +11,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     supabase.auth.getSession()
       .then(({ data }) => setSession(data.session))
-      .catch(() => {})
+      .catch((e) => console.error('[auth] getSession failed:', e?.message))
       .finally(() => setLoading(false))
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {

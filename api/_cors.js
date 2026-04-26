@@ -13,7 +13,7 @@ export function cors(req, res, { methods = "POST, OPTIONS", auth = true } = {}) 
   const origin = req.headers.origin || "";
   const isProd  = process.env.VERCEL_ENV === "production";
   const allowed = isProd
-    ? (ALLOWED_ORIGINS.includes(origin) ? origin : (ALLOWED_ORIGINS[0] || ""))
+    ? (ALLOWED_ORIGINS.includes(origin) ? origin : "")
     : origin;
   if (allowed) res.setHeader("Access-Control-Allow-Origin", allowed);
   res.setHeader("Vary", "Origin");

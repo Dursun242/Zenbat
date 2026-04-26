@@ -79,20 +79,23 @@ export default function Signup({ onSwitchToLogin, onBack }) {
   // ── Création du compte ────────────────────────────────────
   const submit = async () => {
     setError(null); setLoading(true)
-    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim()
-    const { error } = await signUpWithPassword(email, password, {
-      first_name:      firstName.trim(),
-      last_name:       lastName.trim(),
-      full_name:       fullName,
-      company_name:    company,
-      trades:          trades,
-      cgu_version:     CGU_VERSION,
-      cgu_accepted_at: new Date().toISOString(),
-    })
-    setLoading(false)
-    if (error) { setError(error.message); setStep(1); return }
-    saveCguAcceptance(CGU_VERSION).catch(() => {})
-    setSent(true)
+    try {
+      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim()
+      const { error } = await signUpWithPassword(email, password, {
+        first_name:      firstName.trim(),
+        last_name:       lastName.trim(),
+        full_name:       fullName,
+        company_name:    company,
+        trades:          trades,
+        cgu_version:     CGU_VERSION,
+        cgu_accepted_at: new Date().toISOString(),
+      })
+      if (error) { setError(error.message); setStep(1); return }
+      saveCguAcceptance(CGU_VERSION).catch(() => {})
+      setSent(true)
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (sent) {
