@@ -85,7 +85,8 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
   const tva = tvaRows.reduce((s, row) => s + row.montant, 0)
   const ttc = ht + tva
   const fontFamily = brand.fontStyle==="elegant"?"Playfair Display":brand.fontStyle==="tech"?"Space Grotesk":"DM Sans"
-  const navy = "#1A1612"
+  const navy  = "#1A1612"
+  const terra = "#C97B5C"
   const baseDate = d.date_emission ? new Date(d.date_emission) : new Date()
   const validUntil = isNaN(baseDate.getTime()) ? new Date() : baseDate
   validUntil.setDate(validUntil.getDate() + (brand.validityDays || 30))
@@ -108,10 +109,10 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
 
   const pageBody = (
     <>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12,paddingBottom:10,borderBottom:`2px solid ${navy}`}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12,paddingBottom:10,borderBottom:`2px solid ${terra}`}}>
         <div>
           {brand.logo && <img src={brand.logo} alt="" style={{height:44,maxWidth:180,objectFit:"contain",display:"block",marginBottom:6}}/>}
-          {!brand.logo && <div style={{fontWeight:800,fontSize:16,color:navy}}>{brand.companyName||"Votre Entreprise"}</div>}
+          {!brand.logo && <div style={{fontWeight:800,fontSize:16,color:terra}}>{brand.companyName||"Votre Entreprise"}</div>}
         </div>
         <div style={{textAlign:"right"}}>
           <div style={{color:"#9A8E82",fontSize:10,fontWeight:600,letterSpacing:"2px"}}>{docLabel}</div>
@@ -144,10 +145,10 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
         </div>
       )}
 
-      <div style={{fontSize:10,fontWeight:700,color:navy,marginBottom:6,letterSpacing:"1px",textTransform:"uppercase"}}>Détail des prestations</div>
+      <div style={{fontSize:10,fontWeight:700,color:terra,marginBottom:6,letterSpacing:"1px",textTransform:"uppercase"}}>Détail des prestations</div>
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,marginBottom:12}}>
         <thead>
-          <tr style={{background:navy,color:"white"}}>
+          <tr style={{background:terra,color:"white"}}>
             <th style={{textAlign:"left",padding:"6px 8px",fontWeight:600}}>Description</th>
             <th style={{textAlign:"center",padding:"6px 5px",fontWeight:600,width:44}}>Unité</th>
             <th style={{textAlign:"center",padding:"6px 5px",fontWeight:600,width:38}}>Qté</th>
@@ -160,7 +161,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
           {filteredLignes.map((l,i)=>{
             if(l.type_ligne==="lot") return (
               <tr key={l.id}>
-                <td colSpan={6} style={{padding:"6px 8px",fontWeight:700,fontSize:9.5,color:navy,textTransform:"uppercase",letterSpacing:".5px",borderBottom:`1px solid ${navy}33`,background:"#F0EBE3"}}>{l.designation}</td>
+                <td colSpan={6} style={{padding:"6px 8px",fontWeight:700,fontSize:9.5,color:terra,textTransform:"uppercase",letterSpacing:".5px",borderBottom:`1px solid ${terra}44`,background:"#F0EBE3"}}>{l.designation}</td>
               </tr>
             )
             const total = (l.quantite||0)*(l.prix_unitaire||0)
@@ -188,9 +189,9 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
                 <td style={{padding:"3px 8px",textAlign:"right"}}>{fmt(row.montant)}</td>
               </tr>
             ))}
-            <tr style={{background:"#F0EBE3",borderTop:`2px solid ${navy}`}}>
-              <td style={{padding:"6px 8px",fontWeight:800,color:navy,fontSize:10.5}}>TOTAL TTC</td>
-              <td style={{padding:"6px 8px",textAlign:"right",fontWeight:800,color:navy,fontSize:11.5}}>{fmt(ttc)}</td>
+            <tr style={{background:"#F0EBE3",borderTop:`2px solid ${terra}`}}>
+              <td style={{padding:"6px 8px",fontWeight:800,color:terra,fontSize:10.5}}>TOTAL TTC</td>
+              <td style={{padding:"6px 8px",textAlign:"right",fontWeight:800,color:terra,fontSize:11.5}}>{fmt(ttc)}</td>
             </tr>
             {kind === "facture" && Number(d.retenue_garantie_eur) > 0 && (<>
               <tr>
@@ -208,7 +209,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
 
       {(d.observations||brand.defaultObservations)&&(
         <div style={{marginBottom:10}}>
-          <div style={{fontSize:9,fontWeight:700,color:navy,marginBottom:3,letterSpacing:"1px",textTransform:"uppercase"}}>Observations</div>
+          <div style={{fontSize:9,fontWeight:700,color:terra,marginBottom:3,letterSpacing:"1px",textTransform:"uppercase"}}>Observations</div>
           <div style={{fontSize:9.5,color:"#3D3028",lineHeight:1.55}}>{d.observations||brand.defaultObservations}</div>
         </div>
       )}
@@ -218,13 +219,13 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
         <div style={{display:"grid",gridTemplateColumns:brand.paymentTerms&&(brand.rib||brand.iban)?"1fr 1fr":"1fr",gap:10,marginBottom:10}}>
           {brand.paymentTerms && (
             <div style={{background:"#f8f9fb",borderRadius:4,padding:"8px 10px",border:"1px solid #e5e7eb"}}>
-              <div style={{fontSize:9,fontWeight:700,color:navy,marginBottom:4,letterSpacing:"1px",textTransform:"uppercase"}}>Conditions</div>
+              <div style={{fontSize:9,fontWeight:700,color:terra,marginBottom:4,letterSpacing:"1px",textTransform:"uppercase"}}>Conditions</div>
               <div style={{fontSize:9.5,color:"#3D3028",lineHeight:1.55}}>{brand.paymentTerms}</div>
             </div>
           )}
           {(brand.rib||brand.iban) && (
             <div style={{background:"#f8f9fb",borderRadius:4,padding:"8px 10px",border:"1px solid #e5e7eb"}}>
-              <div style={{fontSize:9,fontWeight:700,color:navy,marginBottom:4,letterSpacing:"1px",textTransform:"uppercase"}}>Coordonnées bancaires</div>
+              <div style={{fontSize:9,fontWeight:700,color:terra,marginBottom:4,letterSpacing:"1px",textTransform:"uppercase"}}>Coordonnées bancaires</div>
               {brand.rib&&<div style={{fontSize:9.5,color:"#3D3028",marginBottom:2}}>{brand.rib}</div>}
               {brand.iban&&<div style={{fontSize:9,color:"#4b5563",fontFamily:"monospace",lineHeight:1.5}}>IBAN : {brand.iban}</div>}
               {brand.bic&&<div style={{fontSize:9,color:"#4b5563",fontFamily:"monospace"}}>BIC : {brand.bic}</div>}
