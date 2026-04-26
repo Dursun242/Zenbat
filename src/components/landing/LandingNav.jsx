@@ -211,9 +211,9 @@ export default function LandingNav({ onLogin, onSignup }) {
             <span
               style={{
                 fontFamily:    "'Syne', sans-serif",
-                fontSize:      22,
+                fontSize:      26,
                 fontWeight:    400,
-                letterSpacing: '-.3px',
+                letterSpacing: '-.5px',
                 lineHeight:    1,
               }}
             >
