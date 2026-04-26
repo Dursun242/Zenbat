@@ -106,7 +106,7 @@ export const TX = {
   seeAll:          "Voir tout →",
   aiAgent:         "Agent IA — Créer un devis",
   aiDesc:          "Décrivez votre besoin, je génère le devis",
-  signedCA:        "CA signé HT",
+  signedCA:        "CA accepté HT",
   inProgress:      "En cours",
   accepted:        "Acceptés",
   saveQuote:       "✓ Enregistrer le devis",

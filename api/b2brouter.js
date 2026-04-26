@@ -24,12 +24,16 @@ function cors(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
 }
 
+const B2B_TIMEOUT_MS = 10000;
+
 async function b2b(method, path, body) {
   const base    = (process.env.B2B_API_URL || "https://api-staging.b2brouter.net").replace(/\/$/, "");
   const apiKey  = process.env.B2B_API_KEY;
   const version = process.env.B2B_API_VERSION || "2026-03-02";
   if (!apiKey) throw new Error("B2B_API_KEY non configurée");
 
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), B2B_TIMEOUT_MS);
   const res = await fetch(`${base}${path}`, {
     method,
     headers: {
@@ -39,7 +43,8 @@ async function b2b(method, path, body) {
       "X-B2B-API-Version": version,
     },
     body: body ? JSON.stringify(body) : undefined,
-  });
+    signal: ctrl.signal,
+  }).finally(() => clearTimeout(t));
 
   const text = await res.text();
   let data = null;
@@ -63,7 +68,7 @@ export default async function handler(req, res) {
   const token = req.headers.authorization?.replace("Bearer ", "");
   if (!token) return res.status(401).json({ error: "Non authentifié" });
 
-  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey)
     return res.status(500).json({ error: "Supabase non configuré" });

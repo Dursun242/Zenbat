@@ -49,7 +49,7 @@ export default async function handler(req, res) {
   const b2bStatus = event?.status || event?.data?.status || event?.type;
   if (!b2bId) return res.status(400).json({ error: "invoice_id manquant dans l'event" });
 
-  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey)
     return res.status(500).json({ error: "Supabase non configuré" });

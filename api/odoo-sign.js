@@ -15,8 +15,16 @@ function resolveOrigin(req) {
   return ALLOWED_ORIGINS[0] || "";
 }
 
+const ODOO_CALL_TIMEOUT_MS = 10000;
+
+function odooFetch(url, init) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ODOO_CALL_TIMEOUT_MS);
+  return fetch(url, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(t));
+}
+
 async function odooCall({ base, db, uid, password, model, method, args=[], kwargs={} }) {
-  const res = await fetch(`${base}/jsonrpc`, {
+  const res = await odooFetch(`${base}/jsonrpc`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -35,7 +43,7 @@ async function odooCall({ base, db, uid, password, model, method, args=[], kwarg
 }
 
 async function odooLogin({ base, db, username, password }) {
-  const res = await fetch(`${base}/jsonrpc`, {
+  const res = await odooFetch(`${base}/jsonrpc`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

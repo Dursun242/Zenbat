@@ -130,7 +130,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       // et prix plus stables pour une même demande (audit recommandation).
       temperature: 0.2,
       system: buildSystemPrompt({ brand, historySummary }),
-      messages: newMsgs.map(m => ({ role: m.role, content: m.content })),
+      messages: newMsgs.slice(-10).map(m => ({ role: m.role, content: m.content })),
     };
 
     let raw = "";
@@ -170,8 +170,6 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
               if (msg.type === "content_block_delta" && msg.delta?.type === "text_delta") {
                 if (!firstChunkTime) {
                   firstChunkTime = Date.now() - fetchStartTime;
-                  // Log timing perçu (TTFB — Time To First Byte)
-                  console.log(`[AgentIA] TTFB=${firstChunkTime}ms, model=${CLAUDE_MODEL}`);
                 }
                 raw += msg.delta.text || "";
                 const cut     = raw.indexOf("<DEVIS>");
@@ -265,19 +263,15 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
           if (parsed.objet) setObjet(parsed.objet);
           setLignes(finalLignes);
 
-          // Tout premier devis jamais généré sur ce compte (stocké localement) :
-          // on déclenche une modale festive pour marquer le moment.
-          try {
-            const celebratedAt = localStorage.getItem("zenbat_first_devis_celebrated_at");
-            if (!celebratedAt && finalLignes.some(l => l.type_ligne === "ouvrage")) {
-              const elapsed = celebrateStartRef.current
-                ? Math.max(1, Math.round((Date.now() - celebrateStartRef.current) / 1000))
-                : 0;
-              celebrateSecondsRef.current = elapsed;
-              localStorage.setItem("zenbat_first_devis_celebrated_at", new Date().toISOString());
-              setCelebrate(true);
-            }
-          } catch {}
+          // Tout premier devis jamais généré sur ce compte :
+          // on déclenche une modale festive si aucun devis n'existe encore en DB.
+          if (devis.length === 0 && finalLignes.some(l => l.type_ligne === "ouvrage")) {
+            const elapsed = celebrateStartRef.current
+              ? Math.max(1, Math.round((Date.now() - celebrateStartRef.current) / 1000))
+              : 0;
+            celebrateSecondsRef.current = elapsed;
+            setCelebrate(true);
+          }
         } catch { /* JSON mal formé — on ignore */ }
       }
 

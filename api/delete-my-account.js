@@ -39,7 +39,7 @@ export default async function handler(req, res) {
     const token = req.headers.authorization?.replace('Bearer ', '')
     if (!token) return res.status(401).json({ error: 'Non authentifié' })
 
-    const supabaseUrl = process.env.VITE_SUPABASE_URL
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
     const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
     if (!supabaseUrl || !serviceKey)
       return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY non configurée' })

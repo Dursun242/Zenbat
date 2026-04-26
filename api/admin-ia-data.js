@@ -25,7 +25,7 @@ export default async function handler(req, res) {
   const token = req.headers.authorization?.replace('Bearer ', '')
   if (!token) return res.status(401).json({ error: 'Non authentifié' })
 
-  const supabaseUrl = process.env.VITE_SUPABASE_URL
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
   const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
   const adminEmail  = process.env.ADMIN_EMAIL
 
