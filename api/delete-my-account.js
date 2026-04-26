@@ -97,7 +97,6 @@ export default async function handler(req, res) {
     console.error('[delete-my-account] unhandled:', err)
     return res.status(500).json({
       error: err?.message || String(err) || 'Erreur interne inconnue',
-      stack: process.env.VERCEL_ENV === 'production' ? undefined : (err?.stack || null),
     })
   }
 }
