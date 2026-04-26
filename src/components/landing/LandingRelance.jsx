@@ -227,7 +227,7 @@ export default function LandingRelance() {
 
           <h2
             style={{
-              fontFamily: "'Instrument Serif', Georgia, serif",
+              fontFamily: "'Syne', sans-serif",
               fontSize: 42,
               fontWeight: 400,
               color: C.ink,

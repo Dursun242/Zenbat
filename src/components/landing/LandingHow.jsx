@@ -58,7 +58,7 @@ export default function LandingHow() {
         {/* Section title */}
         <h2
           style={{
-            fontFamily: "'Instrument Serif', Georgia, serif",
+            fontFamily: "'Syne', sans-serif",
             fontSize: 42,
             fontWeight: 400,
             color: C.ink,
@@ -103,7 +103,7 @@ export default function LandingHow() {
               {/* Big faint number */}
               <div
                 style={{
-                  fontFamily: "'Instrument Serif', Georgia, serif",
+                  fontFamily: "'Syne', sans-serif",
                   fontSize: 80,
                   fontWeight: 400,
                   color: "rgba(201,123,92,.12)",

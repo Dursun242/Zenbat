@@ -210,7 +210,7 @@ export default function LandingNav({ onLogin, onSignup }) {
           >
             <span
               style={{
-                fontFamily:    "'Instrument Serif', Georgia, 'Times New Roman', serif",
+                fontFamily:    "'Syne', sans-serif",
                 fontSize:      22,
                 fontWeight:    400,
                 letterSpacing: '-.3px',

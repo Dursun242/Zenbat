@@ -111,7 +111,7 @@ function Card({ card, isMobile }) {
 
       <div
         style={{
-          fontFamily: "'Instrument Serif', Georgia, serif",
+          fontFamily: "'Syne', sans-serif",
           fontSize: "22px",
           color: COLORS.ink,
           lineHeight: 1.2,
@@ -179,7 +179,7 @@ export default function LandingMetiers() {
         {/* H2 */}
         <h2
           style={{
-            fontFamily: "'Instrument Serif', Georgia, serif",
+            fontFamily: "'Syne', sans-serif",
             fontSize: "42px",
             color: COLORS.ink,
             margin: "0 0 16px 0",

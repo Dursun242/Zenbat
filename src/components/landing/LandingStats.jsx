@@ -61,7 +61,7 @@ function StatItem({ prefix, number, numberSuffix, label, animate, isInView }) {
     >
       <div
         style={{
-          fontFamily: "'Instrument Serif', Georgia, serif",
+          fontFamily: "'Syne', sans-serif",
           fontSize: "48px",
           color: COLORS.ink,
           letterSpacing: "-2px",

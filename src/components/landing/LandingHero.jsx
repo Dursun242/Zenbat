@@ -204,7 +204,7 @@ export default function LandingHero({ onSignup }) {
           <motion.h1
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.65, delay: 0.1, ease: [.16,1,.3,1] }}
-            style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: mobile ? 40 : 64, fontWeight: 400, lineHeight: 1.08, color: '#1A1612', letterSpacing: '-1.5px', marginBottom: 22 }}>
+            style={{ fontFamily: "'Syne', sans-serif", fontSize: mobile ? 40 : 64, fontWeight: 400, lineHeight: 1.08, color: '#1A1612', letterSpacing: '-1.5px', marginBottom: 22 }}>
             Dictez vos devis.<br />
             Encaissez vos factures.<br />
             <span style={{ color: '#C97B5C', fontStyle: 'italic' }}>Sans y penser.</span>

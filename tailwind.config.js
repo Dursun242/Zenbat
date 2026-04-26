@@ -10,7 +10,7 @@ export default {
         border: '#E8E2D8',
       },
       fontFamily: {
-        serif: ['"Instrument Serif"', 'Georgia', 'serif'],
+        serif: ['"Syne"', 'sans-serif'],
         sans:  ['Inter', 'system-ui', 'sans-serif'],
         mono:  ['"JetBrains Mono"', 'monospace'],
       },

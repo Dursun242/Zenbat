@@ -76,7 +76,7 @@ export default function LandingFAQ() {
           {/* Title */}
           <h2
             style={{
-              fontFamily:   "'Instrument Serif', Georgia, 'Times New Roman', serif",
+              fontFamily:   "'Syne', sans-serif",
               fontSize:     40,
               fontWeight:   400,
               color:        C.ink,

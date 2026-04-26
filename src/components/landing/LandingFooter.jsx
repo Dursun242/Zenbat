@@ -81,7 +81,7 @@ export default function LandingFooter({ onSignup }) {
       >
         <h2
           style={{
-            fontFamily:  "'Instrument Serif', Georgia, 'Times New Roman', serif",
+            fontFamily:  "'Syne', sans-serif",
             fontSize:    48,
             fontWeight:  400,
             color:       C.creamlight,
@@ -148,7 +148,7 @@ export default function LandingFooter({ onSignup }) {
           <div style={{ marginBottom: 36 }}>
             <div
               style={{
-                fontFamily:    "'Instrument Serif', Georgia, 'Times New Roman', serif",
+                fontFamily:    "'Syne', sans-serif",
                 fontSize:      22,
                 fontWeight:    700,
                 letterSpacing: '-.3px',

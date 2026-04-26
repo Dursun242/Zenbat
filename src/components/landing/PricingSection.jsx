@@ -182,7 +182,7 @@ export default function PricingSection() {
           </div>
 
           <h2 style={{
-            fontFamily:    "'Instrument Serif', Georgia, 'Times New Roman', serif",
+            fontFamily:    "'Syne', sans-serif",
             fontSize:      44,
             fontWeight:    700,
             color:         '#0A0A0A',
@@ -315,7 +315,7 @@ export default function PricingSection() {
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
                 <span style={{
                   ...priceAnim,
-                  fontFamily:    "'Instrument Serif', Georgia, serif",
+                  fontFamily:    "'Syne', sans-serif",
                   fontSize:      52,
                   fontWeight:    700,
                   color:         '#0A0A0A',
@@ -411,7 +411,7 @@ export default function PricingSection() {
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
                 <span style={{
                   ...priceAnim,
-                  fontFamily:    "'Instrument Serif', Georgia, serif",
+                  fontFamily:    "'Syne', sans-serif",
                   fontSize:      52,
                   fontWeight:    700,
                   color:         '#0A0A0A',
