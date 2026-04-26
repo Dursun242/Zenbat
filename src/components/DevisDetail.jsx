@@ -195,10 +195,48 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
         <div className="detail-row" style={{ flex: 1, display: "flex" }}>
           <div className="detail-editor fu" style={{ flex: 1, minWidth: 0 }}>
         {/* En-tête */}
-        <div style={{ background: "white", borderBottom: "1px solid #F0EBE3", padding: "13px 18px" }}>
-          <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#6B6358", fontSize: 13, marginBottom: 12, cursor: "pointer" }}>
-            {I.back} Retour
-          </button>
+        <div style={{ background: "white", borderBottom: "1px solid #F0EBE3", padding: "10px 14px" }}>
+          {/* Barre principale : Retour + actions */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: "#6B6358", fontSize: 13, cursor: "pointer", flexShrink: 0, padding: "4px 0" }}>
+              {I.back} Retour
+            </button>
+            <div style={{ flex: 1 }}/>
+            {/* Actions compactes */}
+            <div style={{ display: "flex", gap: 5, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              {onDuplicate && (
+                <button onClick={onDuplicate}
+                  style={{ background: "#FAF7F2", color: "#6B6358", border: "1px solid #E8E2D8", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  📋 Dupliquer
+                </button>
+              )}
+              {onConvertToInvoice && lignes.length > 0 && (
+                <button onClick={onConvertToInvoice}
+                  style={{ background: "#FAF7F2", color: "#1A1612", border: "1px solid #E8E2D8", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  📄 Facturer
+                </button>
+              )}
+              {onCreateIndice && d.statut !== "accepte" && !isRemplace && (
+                <button onClick={onCreateIndice}
+                  style={{ background: "#f5f3ff", color: "#6b21a8", border: "1px solid #e9d5ff", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  ✦ Nouvel indice
+                </button>
+              )}
+              {d.statut === "brouillon" && !isRemplace && (
+                <button onClick={() => onChange({ ...d, statut: "envoye" })}
+                  style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  ✉️ Envoyé
+                </button>
+              )}
+              {["brouillon","envoye"].includes(d.statut) && !isRemplace && (
+                <button onClick={() => onChange({ ...d, statut: "en_signature" })}
+                  style={{ background: "#faf5ff", color: "#6b21a8", border: "1px solid #e9d5ff", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  🖊 Signature
+                </button>
+              )}
+            </div>
+          </div>
+          {/* Numero + montant + badge */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
             <div style={{ fontSize: 10, color: "#9A8E82", fontFamily: "monospace" }}>{d.numero}</div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -277,30 +315,6 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
             style={{ width: "100%", background: `linear-gradient(135deg,${ac}ee,${ac})`, color: "white", border: "none", borderRadius: 16, padding: 16, fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, cursor: "pointer", boxShadow: `0 6px 20px ${ac}44`, marginBottom: 12 }}>
             {I.pdf} Voir le PDF du devis
           </button>
-
-          {/* Nouvel indice */}
-          {onCreateIndice && d.statut !== "accepte" && (
-            <button onClick={onCreateIndice}
-              style={{ width: "100%", background: "#f5f3ff", color: "#6b21a8", border: "1.5px solid #e9d5ff", borderRadius: 14, padding: 13, fontSize: 13, fontWeight: 700, cursor: "pointer", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              ✦ Créer un nouvel indice
-            </button>
-          )}
-
-          {/* Dupliquer */}
-          {onDuplicate && (
-            <button onClick={onDuplicate}
-              style={{ width: "100%", background: "white", color: "#6B6358", border: "1.5px solid #E8E2D8", borderRadius: 14, padding: 13, fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              📋 Dupliquer ce devis
-            </button>
-          )}
-
-          {/* Conversion en facture (visible dès qu'il y a au moins une ligne) */}
-          {onConvertToInvoice && lignes.length > 0 && (
-            <button onClick={onConvertToInvoice}
-              style={{ width: "100%", background: "white", color: "#1A1612", border: "1.5px solid #1A1612", borderRadius: 14, padding: 13, fontSize: 13, fontWeight: 700, cursor: "pointer", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              📄 Convertir en facture électronique
-            </button>
-          )}
 
           {/* Acompte (visible si devis envoyé / en signature / accepté) */}
           {canAcompte && (
