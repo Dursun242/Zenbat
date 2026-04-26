@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 // ← Remplacez par votre numéro WhatsApp (format international, sans le +)
-const WA_NUMBER = '33600000000'
+const WA_NUMBER = '33679116085'
 const WA_MSG    = encodeURIComponent('Bonjour ! Je souhaite en savoir plus sur Zenbat.')
 
 function WhatsAppIcon() {
