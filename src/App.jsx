@@ -42,7 +42,8 @@ export default function App() {
   const [screen, setScreen] = useState("app");
   const [tab,    setTab]    = useState("dashboard");
   const [selC,   setSelC]   = useState(null);
-  const [plan,   setPlan]   = useState("free");
+  const [plan,      setPlan]      = useState("free");   // "free" | "pro"
+  const [billingType, setBillingType] = useState(null); // "monthly" | "biannual" — défini à l'abonnement
   const [showPwa,setShowPwa]= useState(false);
   const deferredPrompt = useRef(null);
 
@@ -109,7 +110,7 @@ export default function App() {
   />;
   if (screen === "onboarding")  return <Onboarding brand={brand} setBrand={setBrand} onDone={() => setScreen(showPwa ? "pwa_install" : "app")}/>;
   if (screen === "pwa_install") return <PWAInstallScreen deferredPrompt={deferredPrompt.current} onDone={() => { setShowPwa(false); setScreen("app"); }}/>;
-  if (screen === "paywall")     return <PaywallScreen daysLeft={daysLeft} onBack={() => setScreen("app")} onSubscribe={() => { setPlan("pro"); setScreen("app"); }}/>;
+  if (screen === "paywall")     return <PaywallScreen daysLeft={daysLeft} onBack={() => setScreen("app")} onSubscribe={(type) => { setPlan("pro"); setBillingType(type); setScreen("app"); }}/>;
 
   return (
     <div style={{ fontFamily: "'DM Sans',sans-serif", height: "100dvh", display: "flex", flexDirection: "column", background: "#f8fafc", overflow: "hidden" }}>
