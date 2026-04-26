@@ -184,7 +184,7 @@ export default function Onboarding({ brand, setBrand, onDone }) {
       </div>
 
       <div style={{flex:1,padding:"24px 20px 120px",overflowY:"auto"}}>
-        <h2 style={{color:"white",fontSize:24,fontWeight:800,marginBottom:6,letterSpacing:"-0.3px"}} className="pop">{STEPS[step].title}</h2>
+        <h2 style={{color:"white",fontSize:24,fontWeight:600,marginBottom:6,letterSpacing:"-0.5px",fontFamily:"'Syne',sans-serif"}} className="pop">{STEPS[step].title}</h2>
         <p style={{color:"#94a3b8",fontSize:13,marginBottom:24,lineHeight:1.5}}>{STEPS[step].subtitle}</p>
 
         {step===0&&(

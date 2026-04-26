@@ -20,7 +20,7 @@ export default function InvoicesList({ invoices, clients, goInvoice, onCreateEmp
     <div style={{ padding: 18 }} className="fu">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: "#0f172a" }}>Factures</h1>
+          <h1 style={{ fontSize: 20, fontWeight: 600, color: "#0f172a", fontFamily: "'Syne', sans-serif", letterSpacing: '-0.3px' }}>Factures</h1>
           <p style={{ color: "#94a3b8", fontSize: 11, marginTop: 2 }}>
             {invoices.length} facture{invoices.length > 1 ? "s" : ""} · Facturation électronique 2026
           </p>

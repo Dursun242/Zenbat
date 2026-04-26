@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { useAuth } from '../lib/auth.jsx'
 
 const styles = {
-  wrap:   { minHeight:'100vh', display:'grid', placeItems:'center', padding:24, background:'#f8fafc', fontFamily:'system-ui,sans-serif' },
+  wrap:   { minHeight:'100vh', display:'grid', placeItems:'center', padding:24, background:'#f8fafc', fontFamily:'Inter,system-ui,sans-serif' },
   card:   { width:'100%', maxWidth:420, background:'#fff', borderRadius:16, padding:32, boxShadow:'0 8px 24px rgba(15,23,42,.08)' },
-  title:  { margin:0, fontSize:24, fontWeight:700, color:'#0f172a' },
+  title:  { margin:0, fontSize:24, fontWeight:600, color:'#0f172a', fontFamily:"'Syne',sans-serif", letterSpacing:'-0.5px' },
   sub:    { marginTop:4, marginBottom:24, fontSize:14, color:'#64748b' },
   label:  { display:'block', fontSize:12, fontWeight:600, color:'#334155', marginBottom:6 },
   input:  { width:'100%', padding:'12px 14px', border:'1px solid #e2e8f0', borderRadius:10, fontSize:14, outline:'none', boxSizing:'border-box' },

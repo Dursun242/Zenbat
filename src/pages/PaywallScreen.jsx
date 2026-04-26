@@ -41,22 +41,18 @@ export default function PaywallScreen({ daysLeft = 0, onBack, onSubscribe }) {
   const plan    = PLANS[billing];
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'DM Sans',sans-serif" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
-        *{box-sizing:border-box;margin:0;padding:0}
-        @keyframes popIn{0%{opacity:0;transform:scale(.94) translateY(4px)}100%{opacity:1;transform:scale(1) translateY(0)}}
-      `}</style>
+    <div style={{ minHeight: "100vh", background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "Inter, system-ui, sans-serif" }}>
+      <style>{`*{box-sizing:border-box;margin:0;padding:0}@keyframes popIn{0%{opacity:0;transform:scale(.94) translateY(4px)}100%{opacity:1;transform:scale(1) translateY(0)}}`}</style>
 
       <div style={{ width: "100%", maxWidth: 360, textAlign: "center" }}>
 
         {/* Logo */}
-        <div style={{ marginBottom: 20, fontSize: 32, fontWeight: 800 }}>
+        <div style={{ marginBottom: 20, fontSize: 32, fontWeight: 800, fontFamily: "'Syne', sans-serif", letterSpacing: '-1px' }}>
           <span style={{ color: "#22c55e" }}>Zen</span><span style={{ color: "white" }}>bat</span>
         </div>
 
         {/* Titre */}
-        <h2 style={{ color: "white", fontSize: 20, fontWeight: 700, marginBottom: 8 }}>
+        <h2 style={{ color: "white", fontSize: 20, fontWeight: 600, marginBottom: 8, fontFamily: "'Syne', sans-serif", letterSpacing: '-0.3px' }}>
           {expired ? "Période d'essai terminée" : `Encore ${daysLeft} jour${daysLeft > 1 ? "s" : ""} d'essai`}
         </h2>
         <p style={{ color: "#64748b", fontSize: 13, marginBottom: 24, lineHeight: 1.6 }}>

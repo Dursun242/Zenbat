@@ -33,16 +33,12 @@ export default function AuthScreen({ onEnter }) {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'DM Sans',sans-serif" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
-        *{box-sizing:border-box;margin:0;padding:0}
-        @keyframes spin{to{transform:rotate(360deg)}}
-      `}</style>
+    <div style={{ minHeight: "100vh", background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "Inter, system-ui, sans-serif" }}>
+      <style>{`*{box-sizing:border-box;margin:0;padding:0}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
       <div style={{ width: "100%", maxWidth: 360 }}>
         <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <div style={{ marginBottom: 14, fontSize: 38, fontWeight: 800, letterSpacing: "-1px" }}>
+          <div style={{ marginBottom: 14, fontSize: 38, fontWeight: 800, letterSpacing: "-1.5px", fontFamily: "'Syne', sans-serif" }}>
             <span style={{ color: "#22c55e" }}>Zen</span><span style={{ color: "white" }}>bat</span>
           </div>
           <p style={{ color: "#64748b", fontSize: 12 }}>Devis BTP · Simple · Rapide · Professionnel</p>
