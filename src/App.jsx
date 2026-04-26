@@ -113,12 +113,12 @@ export default function App() {
   if (screen === "paywall")     return <PaywallScreen daysLeft={daysLeft} onBack={() => setScreen("app")} onSubscribe={(type) => { setPlan("pro"); setBillingType(type); setScreen("app"); }}/>;
 
   return (
-    <div style={{ fontFamily: "Inter, system-ui, sans-serif", height: "100dvh", display: "flex", flexDirection: "column", background: "#f8fafc", overflow: "hidden" }}>
+    <div style={{ fontFamily: "Inter, system-ui, sans-serif", height: "100dvh", display: "flex", flexDirection: "column", background: "#FAF7F2", overflow: "hidden" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,400;1,700&family=Space+Grotesk:wght@400;600;700&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
-        html,body{background:#0f172a}
-        ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#e2e8f0;border-radius:2px}
+        html,body{background:#1A1612}
+        ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#E8E2D8;border-radius:2px}
         @keyframes fadeUp{from{opacity:0}to{opacity:1}}
         @keyframes popIn{0%{opacity:0;transform:scale(.92) translateY(6px)}100%{opacity:1;transform:scale(1) translateY(0)}}
         @keyframes spin{to{transform:rotate(360deg)}}
@@ -138,34 +138,34 @@ export default function App() {
           .app-toast{bottom:24px !important;left:auto !important;right:24px !important;max-width:380px}
         }
         @media (max-width:1023px){.app-sidebar{display:none !important}}
-        .app-sidebar button:hover{background:rgba(255,255,255,.05) !important;color:#94a3b8 !important}
+        .app-sidebar button:hover{background:rgba(255,255,255,.05) !important;color:#9A8E82 !important}
         .app-sidebar button.active-nav:hover{background:rgba(34,197,94,.15) !important;color:#22c55e !important}
       `}</style>
 
       {/* Header */}
-      <header style={{ background: "#0f172a", padding: "calc(10px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 10px calc(18px + env(safe-area-inset-left))", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+      <header style={{ background: "#1A1612", padding: "calc(10px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 10px calc(18px + env(safe-area-inset-left))", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
         <Logo size={20} white/>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {isAdmin && (
             <button onClick={() => setTab("admin")} title="Panel Admin"
-              style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8, padding: "5px 10px", display: "flex", alignItems: "center", gap: 5, color: "#f59e0b", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+              style={{ background: "#2A231C", border: "1px solid #3D3028", borderRadius: 8, padding: "5px 10px", display: "flex", alignItems: "center", gap: 5, color: "#f59e0b", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
               ⚙ Admin
             </button>
           )}
           <button onClick={() => setScreen("onboarding")}
-            style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8, padding: "5px 10px", display: "flex", alignItems: "center", gap: 5, color: "#94a3b8", fontSize: 11, fontWeight: 500, cursor: "pointer" }}>
+            style={{ background: "#2A231C", border: "1px solid #3D3028", borderRadius: 8, padding: "5px 10px", display: "flex", alignItems: "center", gap: 5, color: "#9A8E82", fontSize: 11, fontWeight: 500, cursor: "pointer" }}>
             {I.paint} Mon profil
           </button>
           {user && (
             <button onClick={handleSignOut} title="Se déconnecter"
-              style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8, padding: "5px 8px", display: "flex", alignItems: "center", color: "#ef4444", cursor: "pointer" }}>
+              style={{ background: "#2A231C", border: "1px solid #3D3028", borderRadius: 8, padding: "5px 8px", display: "flex", alignItems: "center", color: "#ef4444", cursor: "pointer" }}>
               {I.logout}
             </button>
           )}
           <SaveIndicator state={saveState}/>
           {plan === "pro"
             ? <span style={{ background: "rgba(34,197,94,.15)", color: "#4ade80", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, border: "1px solid rgba(34,197,94,.25)" }}>PRO</span>
-            : <span style={{ background: daysLeft <= 7 ? "rgba(249,115,22,.15)" : "#1e293b", color: daysLeft <= 7 ? "#fb923c" : "#94a3b8", fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 20, border: daysLeft <= 7 ? "1px solid rgba(249,115,22,.25)" : "none" }}>Essai · {daysLeft}j</span>
+            : <span style={{ background: daysLeft <= 7 ? "rgba(249,115,22,.15)" : "#2A231C", color: daysLeft <= 7 ? "#fb923c" : "#9A8E82", fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 20, border: daysLeft <= 7 ? "1px solid rgba(249,115,22,.25)" : "none" }}>Essai · {daysLeft}j</span>
           }
         </div>
       </header>
@@ -182,13 +182,13 @@ export default function App() {
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
 
         {/* Sidebar desktop */}
-        <nav className="app-sidebar" style={{ display: "none", width: 220, flexDirection: "column", background: "#0f172a", borderRight: "1px solid rgba(255,255,255,.06)", flexShrink: 0, paddingTop: 8, overflowY: "auto" }}>
+        <nav className="app-sidebar" style={{ display: "none", width: 220, flexDirection: "column", background: "#1A1612", borderRight: "1px solid rgba(255,255,255,.06)", flexShrink: 0, paddingTop: 8, overflowY: "auto" }}>
           {NAV.map(({ id, label, icon }) => {
             const active = activeNav === id;
             return (
               <button key={id} onClick={() => setTab(id)}
                 className={active ? "active-nav" : ""}
-                style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", background: active ? "rgba(34,197,94,.1)" : "transparent", border: "none", borderLeft: `3px solid ${active ? "#22c55e" : "transparent"}`, color: active ? "#22c55e" : "#64748b", cursor: "pointer", width: "100%", textAlign: "left", fontSize: 14, fontWeight: active ? 600 : 400, transition: "all .15s", position: "relative" }}>
+                style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", background: active ? "rgba(34,197,94,.1)" : "transparent", border: "none", borderLeft: `3px solid ${active ? "#22c55e" : "transparent"}`, color: active ? "#22c55e" : "#6B6358", cursor: "pointer", width: "100%", textAlign: "left", fontSize: 14, fontWeight: active ? 600 : 400, transition: "all .15s", position: "relative" }}>
                 {icon}
                 <span>{label}</span>
                 {id === "agent" && plan === "free" && daysLeft <= 7 && (

@@ -33,7 +33,7 @@ export default function AuthScreen({ onEnter }) {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "Inter, system-ui, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#1A1612", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "Inter, system-ui, sans-serif" }}>
       <style>{`*{box-sizing:border-box;margin:0;padding:0}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
       <div style={{ width: "100%", maxWidth: 360 }}>
@@ -41,15 +41,15 @@ export default function AuthScreen({ onEnter }) {
           <div style={{ marginBottom: 14, fontSize: 38, fontWeight: 800, letterSpacing: "-1.5px", fontFamily: "'Syne', sans-serif" }}>
             <span style={{ color: "#22c55e" }}>Zen</span><span style={{ color: "white" }}>bat</span>
           </div>
-          <p style={{ color: "#64748b", fontSize: 12 }}>Devis BTP · Simple · Rapide · Professionnel</p>
+          <p style={{ color: "#6B6358", fontSize: 12 }}>Devis BTP · Simple · Rapide · Professionnel</p>
         </div>
 
         <div style={{ background: "white", borderRadius: 24, padding: 24, boxShadow: "0 24px 48px rgba(0,0,0,.3)" }}>
           {/* Onglets */}
-          <div style={{ display: "flex", background: "#f1f5f9", borderRadius: 12, padding: 4, marginBottom: 20 }}>
+          <div style={{ display: "flex", background: "#F0EBE3", borderRadius: 12, padding: 4, marginBottom: 20 }}>
             {[["login", "Se connecter"], ["signup", "Créer un compte"]].map(([m, l]) => (
               <button key={m} onClick={() => setMode(m)}
-                style={{ flex: 1, padding: 8, borderRadius: 10, border: "none", fontSize: 12, fontWeight: 600, background: mode === m ? "white" : "transparent", color: mode === m ? "#0f172a" : "#94a3b8", cursor: "pointer", boxShadow: mode === m ? "0 1px 3px rgba(0,0,0,.1)" : "none" }}>
+                style={{ flex: 1, padding: 8, borderRadius: 10, border: "none", fontSize: 12, fontWeight: 600, background: mode === m ? "white" : "transparent", color: mode === m ? "#1A1612" : "#9A8E82", cursor: "pointer", boxShadow: mode === m ? "0 1px 3px rgba(0,0,0,.1)" : "none" }}>
                 {l}
               </button>
             ))}
@@ -58,10 +58,10 @@ export default function AuthScreen({ onEnter }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {mode === "signup" && (
               <div>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#64748b", marginBottom: 6 }}>SIRET — Identification Pappers</label>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#6B6358", marginBottom: 6 }}>SIRET — Identification Pappers</label>
                 <div style={{ display: "flex", gap: 8 }}>
                   <input value={siret} onChange={e => setSiret(e.target.value.replace(/\D/g, ""))} placeholder="14 chiffres" maxLength={14}
-                    style={{ flex: 1, border: "1px solid #e2e8f0", borderRadius: 12, padding: "10px 12px", fontSize: 13, outline: "none" }}/>
+                    style={{ flex: 1, border: "1px solid #E8E2D8", borderRadius: 12, padding: "10px 12px", fontSize: 13, outline: "none" }}/>
                   <button onClick={searchPappers} disabled={siret.length < 9 || searching}
                     style={{ background: siret.length >= 9 ? "#22c55e" : "#d1fae5", color: "white", border: "none", borderRadius: 12, padding: "10px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", minWidth: 68 }}>
                     {searching
@@ -79,10 +79,10 @@ export default function AuthScreen({ onEnter }) {
             )}
 
             <input type="email" placeholder="Email"
-              style={{ width: "100%", border: "1px solid #e2e8f0", borderRadius: 12, padding: "10px 14px", fontSize: 13, outline: "none" }}/>
+              style={{ width: "100%", border: "1px solid #E8E2D8", borderRadius: 12, padding: "10px 14px", fontSize: 13, outline: "none" }}/>
             <input type="password" placeholder="Mot de passe"
               onKeyDown={e => e.key === "Enter" && onEnter(company?.nom || null, mode === "signup")}
-              style={{ width: "100%", border: "1px solid #e2e8f0", borderRadius: 12, padding: "10px 14px", fontSize: 13, outline: "none" }}/>
+              style={{ width: "100%", border: "1px solid #E8E2D8", borderRadius: 12, padding: "10px 14px", fontSize: 13, outline: "none" }}/>
             <button onClick={() => onEnter(company?.nom || null, mode === "signup")}
               style={{ width: "100%", background: "#22c55e", color: "white", border: "none", borderRadius: 12, padding: 13, fontSize: 13, fontWeight: 700, marginTop: 4, cursor: "pointer" }}>
               {mode === "login" ? "Se connecter →" : "Créer mon compte gratuit →"}
@@ -90,13 +90,13 @@ export default function AuthScreen({ onEnter }) {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0" }}>
-            <hr style={{ flex: 1, border: "none", borderTop: "1px solid #f1f5f9" }}/>
+            <hr style={{ flex: 1, border: "none", borderTop: "1px solid #F0EBE3" }}/>
             <span style={{ color: "#cbd5e1", fontSize: 11 }}>ou</span>
-            <hr style={{ flex: 1, border: "none", borderTop: "1px solid #f1f5f9" }}/>
+            <hr style={{ flex: 1, border: "none", borderTop: "1px solid #F0EBE3" }}/>
           </div>
 
           <button onClick={() => onEnter(null, false)}
-            style={{ width: "100%", border: "1px solid #e2e8f0", borderRadius: 12, padding: 11, fontSize: 12, fontWeight: 600, background: "white", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: "#374151", cursor: "pointer" }}>
+            style={{ width: "100%", border: "1px solid #E8E2D8", borderRadius: 12, padding: 11, fontSize: 12, fontWeight: 600, background: "white", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: "#374151", cursor: "pointer" }}>
             <svg width="16" height="16" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
               <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -107,7 +107,7 @@ export default function AuthScreen({ onEnter }) {
           </button>
 
           {mode === "signup" && (
-            <p style={{ textAlign: "center", fontSize: 11, color: "#94a3b8", marginTop: 14 }}>Essai 30 jours gratuit · puis 19€/mois HT</p>
+            <p style={{ textAlign: "center", fontSize: 11, color: "#9A8E82", marginTop: 14 }}>Essai 30 jours gratuit · puis 19€/mois HT</p>
           )}
         </div>
       </div>

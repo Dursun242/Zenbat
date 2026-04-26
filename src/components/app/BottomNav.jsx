@@ -1,12 +1,12 @@
 // Navigation principale mobile (bottom nav). Masquée en desktop via .app-bottom-nav.
 export default function BottomNav({ items, activeNav, onSelect, plan, daysLeft }) {
   return (
-    <nav className="app-bottom-nav" style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#0f172a", borderTop: "1px solid rgba(255,255,255,.06)", display: "flex", zIndex: 50 }}>
+    <nav className="app-bottom-nav" style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#1A1612", borderTop: "1px solid rgba(255,255,255,.06)", display: "flex", zIndex: 50 }}>
       {items.map(({ id, label, icon }) => {
         const active = activeNav === id;
         return (
           <button key={id} onClick={() => onSelect(id)}
-            style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, padding: "10px 0", background: "none", border: "none", color: active ? "#22c55e" : "#64748b", position: "relative", cursor: "pointer" }}>
+            style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, padding: "10px 0", background: "none", border: "none", color: active ? "#22c55e" : "#6B6358", position: "relative", cursor: "pointer" }}>
             {active && <span style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: 28, height: 2.5, background: "#22c55e", borderRadius: 2 }}/>}
             <div style={{ position: "relative" }}>
               {icon}

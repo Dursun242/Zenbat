@@ -9,7 +9,7 @@ function clientName(c) {
 }
 
 function IndiceChip({ indice }) {
-  if (!indice) return <span style={{ fontSize: 10, color: "#94a3b8" }}>Initial</span>;
+  if (!indice) return <span style={{ fontSize: 10, color: "#9A8E82" }}>Initial</span>;
   return (
     <span style={{ fontSize: 10, fontWeight: 700, color: "#6b21a8", background: "#f5f3ff",
       border: "1px solid #e9d5ff", borderRadius: 5, padding: "1px 6px" }}>
@@ -24,19 +24,19 @@ function DevisRow({ d, cl, goDevis, onDelete, confirmDelete, setConfirmDelete })
   return (
     <div style={{ position: "relative" }}>
       <div
-        style={{ padding: "13px 16px", borderBottom: "1px solid #f8fafc", cursor: "pointer",
+        style={{ padding: "13px 16px", borderBottom: "1px solid #FAF7F2", cursor: "pointer",
           display: "flex", justifyContent: "space-between", alignItems: "center" }}
         onMouseOver={e => e.currentTarget.style.background = "#fafafa"}
         onMouseOut={e  => e.currentTarget.style.background = "white"}>
         <div onClick={() => goDevis(d.id)} style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a",
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1612",
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {d.objet || "—"}
           </div>
-          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{clientName(cl)}</div>
+          <div style={{ fontSize: 11, color: "#9A8E82", marginTop: 2 }}>{clientName(cl)}</div>
         </div>
         <div style={{ textAlign: "right", marginLeft: 12, flexShrink: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{fmt(d.montant_ht)}</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#1A1612" }}>{fmt(d.montant_ht)}</div>
           <div style={{ marginTop: 4 }}><Badge s={d.statut}/></div>
         </div>
         {d.statut === "brouillon" && onDelete && (
@@ -52,11 +52,11 @@ function DevisRow({ d, cl, goDevis, onDelete, confirmDelete, setConfirmDelete })
           background: "white", borderRadius: 8, border: "1px solid #e5e7eb",
           boxShadow: "0 4px 12px rgba(0,0,0,.15)", padding: "10px 12px", zIndex: 100,
           minWidth: 200, animation: "popIn .2s ease" }}>
-          <div style={{ fontSize: 12, color: "#64748b", marginBottom: 8 }}>Supprimer ce brouillon ?</div>
+          <div style={{ fontSize: 12, color: "#6B6358", marginBottom: 8 }}>Supprimer ce brouillon ?</div>
           <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
             <button onClick={() => setConfirmDelete(null)}
-              style={{ padding: "4px 10px", borderRadius: 4, border: "1px solid #e2e8f0",
-                background: "white", color: "#0f172a", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+              style={{ padding: "4px 10px", borderRadius: 4, border: "1px solid #E8E2D8",
+                background: "white", color: "#1A1612", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
               Annuler
             </button>
             <button onClick={() => { onDelete(d.id); setConfirmDelete(null); }}
@@ -85,14 +85,14 @@ function DossierCard({ versions, cl, goDevis, onDelete }) {
     });
 
   return (
-    <div style={{ borderBottom: "1px solid #f8fafc" }}>
+    <div style={{ borderBottom: "1px solid #FAF7F2" }}>
       {/* Ligne principale — version active */}
       <div style={{ padding: "13px 16px", display: "flex", alignItems: "center", gap: 8,
         background: open ? "#fafafa" : "white" }}>
         {/* Chevron expand */}
         <button onClick={() => setOpen(o => !o)}
           style={{ background: "none", border: "none", padding: "2px 4px", cursor: "pointer",
-            color: "#94a3b8", fontSize: 12, flexShrink: 0, lineHeight: 1,
+            color: "#9A8E82", fontSize: 12, flexShrink: 0, lineHeight: 1,
             transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }}>
           ▶
         </button>
@@ -104,13 +104,13 @@ function DossierCard({ versions, cl, goDevis, onDelete }) {
         <div onClick={() => goDevis(active.id)}
           style={{ flex: 1, minWidth: 0, cursor: "pointer" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#0f172a",
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#1A1612",
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {active.objet || "—"}
             </span>
             <IndiceChip indice={active.indice}/>
           </div>
-          <div style={{ fontSize: 11, color: "#94a3b8" }}>
+          <div style={{ fontSize: 11, color: "#9A8E82" }}>
             {clientName(cl)} · {versions.length} version{versions.length > 1 ? "s" : ""}
           </div>
         </div>
@@ -118,7 +118,7 @@ function DossierCard({ versions, cl, goDevis, onDelete }) {
         {/* Montant + badge */}
         <div onClick={() => goDevis(active.id)}
           style={{ textAlign: "right", flexShrink: 0, cursor: "pointer" }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{fmt(active.montant_ht)}</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#1A1612" }}>{fmt(active.montant_ht)}</div>
           <div style={{ marginTop: 4 }}><Badge s={active.statut}/></div>
         </div>
       </div>
@@ -128,16 +128,16 @@ function DossierCard({ versions, cl, goDevis, onDelete }) {
         <div key={v.id}
           onClick={() => goDevis(v.id)}
           style={{ padding: "9px 16px 9px 44px", display: "flex", alignItems: "center", gap: 8,
-            background: "#f8fafc", cursor: "pointer", borderTop: "1px solid #f1f5f9" }}
-          onMouseOver={e => e.currentTarget.style.background = "#f1f5f9"}
-          onMouseOut={e  => e.currentTarget.style.background = "#f8fafc"}>
+            background: "#FAF7F2", cursor: "pointer", borderTop: "1px solid #F0EBE3" }}
+          onMouseOver={e => e.currentTarget.style.background = "#F0EBE3"}
+          onMouseOut={e  => e.currentTarget.style.background = "#FAF7F2"}>
           <span style={{ color: "#cbd5e1", fontSize: 11, flexShrink: 0 }}>└</span>
           <IndiceChip indice={v.indice}/>
-          <span style={{ fontSize: 12, color: "#64748b", flex: 1,
+          <span style={{ fontSize: 12, color: "#6B6358", flex: 1,
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {v.numero}
           </span>
-          <span style={{ fontSize: 12, color: "#94a3b8", flexShrink: 0 }}>{fmt(v.montant_ht)}</span>
+          <span style={{ fontSize: 12, color: "#9A8E82", flexShrink: 0 }}>{fmt(v.montant_ht)}</span>
           <Badge s={v.statut}/>
         </div>
       ))}
@@ -192,8 +192,8 @@ export default function DevisList({ devis, clients, goDevis, setTab, onDelete })
     <div style={{ padding: 18 }} className="fu">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 600, color: "#0f172a", fontFamily: "'Syne', sans-serif", letterSpacing: '-0.3px' }}>Devis</h1>
-          <p style={{ color: "#94a3b8", fontSize: 11, marginTop: 2 }}>{total} affaire{total > 1 ? "s" : ""}</p>
+          <h1 style={{ fontSize: 20, fontWeight: 600, color: "#1A1612", fontFamily: "'Syne', sans-serif", letterSpacing: '-0.3px' }}>Devis</h1>
+          <p style={{ color: "#9A8E82", fontSize: 11, marginTop: 2 }}>{total} affaire{total > 1 ? "s" : ""}</p>
         </div>
         <button onClick={() => setTab("agent")}
           style={{ background: "#22c55e", color: "white", border: "none", borderRadius: 12,
@@ -208,17 +208,17 @@ export default function DevisList({ devis, clients, goDevis, setTab, onDelete })
           <button key={s} onClick={() => setFiltre(s)}
             style={{ flexShrink: 0, padding: "5px 12px", borderRadius: 20, border: "none",
               fontSize: 11, fontWeight: 600, cursor: "pointer",
-              background: filtre === s ? "#0f172a" : "white",
-              color: filtre === s ? "white" : "#64748b",
+              background: filtre === s ? "#1A1612" : "white",
+              color: filtre === s ? "white" : "#6B6358",
               boxShadow: filtre === s ? "none" : "0 1px 3px rgba(0,0,0,.06)" }}>
             {s === "tous" ? "Tous" : STATUT[s]?.label}
           </button>
         ))}
       </div>
 
-      <div style={{ background: "white", borderRadius: 14, border: "1px solid #f1f5f9", overflow: "hidden" }}>
+      <div style={{ background: "white", borderRadius: 14, border: "1px solid #F0EBE3", overflow: "hidden" }}>
         {filtered.length === 0 && (
-          <div style={{ padding: "28px 16px", textAlign: "center", color: "#94a3b8", fontSize: 12 }}>
+          <div style={{ padding: "28px 16px", textAlign: "center", color: "#9A8E82", fontSize: 12 }}>
             Aucun devis
           </div>
         )}

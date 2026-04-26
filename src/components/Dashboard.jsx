@@ -11,12 +11,12 @@ export default function Dashboard({ stats, devis, clients, goDevis, setTab, bran
   return (
     <div style={{ padding: 18 }} className="fu">
       <div style={{ marginBottom: 18 }}>
-        <h1 style={{ fontSize: 21, fontWeight: 600, color: "#0f172a", fontFamily: "'Syne', sans-serif", letterSpacing: '-0.3px' }}>
+        <h1 style={{ fontSize: 21, fontWeight: 600, color: "#1A1612", fontFamily: "'Syne', sans-serif", letterSpacing: '-0.3px' }}>
           {brand.firstName?.trim()
             ? "Bonjour, " + brand.firstName.trim()
             : brand.companyName ? "Bonjour, " + brand.companyName.split(" ")[0] : "Tableau de bord"}
         </h1>
-        <p style={{ color: "#94a3b8", fontSize: 12, marginTop: 2 }}>
+        <p style={{ color: "#9A8E82", fontSize: 12, marginTop: 2 }}>
           {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
         </p>
       </div>
@@ -32,35 +32,35 @@ export default function Dashboard({ stats, devis, clients, goDevis, setTab, bran
           { l: TX.accepted,   v: stats.acceptes,        dot: ac       },
           { l: TX.signedCA,   v: fmt(stats.ca),         dot: "#f97316" },
         ].map(({ l, v, dot }) => (
-          <div key={l} style={{ background: "white", borderRadius: 14, padding: 16, border: "1px solid #f1f5f9", boxShadow: "0 1px 4px rgba(0,0,0,.04)" }}>
+          <div key={l} style={{ background: "white", borderRadius: 14, padding: 16, border: "1px solid #F0EBE3", boxShadow: "0 1px 4px rgba(0,0,0,.04)" }}>
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: dot, marginBottom: 10 }}/>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "#0f172a", fontFamily: "'Syne', sans-serif", letterSpacing: '-0.5px' }}>{v}</div>
-            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{l}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#1A1612", fontFamily: "'Syne', sans-serif", letterSpacing: '-0.5px' }}>{v}</div>
+            <div style={{ fontSize: 11, color: "#9A8E82", marginTop: 2 }}>{l}</div>
           </div>
         ))}
       </div>
 
       {/* Devis récents */}
-      <div style={{ background: "white", borderRadius: 14, border: "1px solid #f1f5f9", overflow: "hidden", marginBottom: 14 }}>
-        <div style={{ padding: "12px 16px", borderBottom: "1px solid #f8fafc", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>{TX.recentQuotes}</span>
+      <div style={{ background: "white", borderRadius: 14, border: "1px solid #F0EBE3", overflow: "hidden", marginBottom: 14 }}>
+        <div style={{ padding: "12px 16px", borderBottom: "1px solid #FAF7F2", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontWeight: 600, fontSize: 13, color: "#1A1612" }}>{TX.recentQuotes}</span>
           <button onClick={() => setTab("devis")} style={{ background: "none", border: "none", color: ac, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>{TX.seeAll}</button>
         </div>
         {devis.slice(0, 3).map(d => {
           const cl = clients.find(c => c.id === d.client_id);
           return (
             <div key={d.id} onClick={() => goDevis(d.id)}
-              style={{ padding: "11px 16px", borderBottom: "1px solid #f8fafc", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
+              style={{ padding: "11px 16px", borderBottom: "1px solid #FAF7F2", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
               onMouseOver={e => e.currentTarget.style.background = "#fafafa"}
               onMouseOut={e => e.currentTarget.style.background = "white"}>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{d.objet}</div>
-                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1612" }}>{d.objet}</div>
+                <div style={{ fontSize: 11, color: "#9A8E82", marginTop: 2 }}>
                   {cl?.raison_sociale || `${cl?.prenom || ""} ${cl?.nom || ""}`.trim() || "—"}
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{fmt(d.montant_ht)}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1612" }}>{fmt(d.montant_ht)}</div>
                 <div style={{ marginTop: 4 }}><Badge s={d.statut}/></div>
               </div>
             </div>

@@ -2,19 +2,19 @@ import { useState } from 'react'
 import { useAuth } from '../lib/auth.jsx'
 
 const styles = {
-  wrap:   { minHeight:'100vh', display:'grid', placeItems:'center', padding:24, background:'#f8fafc', fontFamily:'Inter,system-ui,sans-serif' },
+  wrap:   { minHeight:'100vh', display:'grid', placeItems:'center', padding:24, background:'#FAF7F2', fontFamily:'Inter,system-ui,sans-serif' },
   card:   { width:'100%', maxWidth:420, background:'#fff', borderRadius:16, padding:32, boxShadow:'0 8px 24px rgba(15,23,42,.08)' },
-  title:  { margin:0, fontSize:24, fontWeight:600, color:'#0f172a', fontFamily:"'Syne',sans-serif", letterSpacing:'-0.5px' },
-  sub:    { marginTop:4, marginBottom:24, fontSize:14, color:'#64748b' },
-  label:  { display:'block', fontSize:12, fontWeight:600, color:'#334155', marginBottom:6 },
-  input:  { width:'100%', padding:'12px 14px', border:'1px solid #e2e8f0', borderRadius:10, fontSize:14, outline:'none', boxSizing:'border-box' },
-  btn:    { width:'100%', padding:'12px 14px', border:0, borderRadius:10, fontSize:14, fontWeight:600, cursor:'pointer', background:'#0f172a', color:'#fff', marginTop:16 },
+  title:  { margin:0, fontSize:24, fontWeight:600, color:'#1A1612', fontFamily:"'Syne',sans-serif", letterSpacing:'-0.5px' },
+  sub:    { marginTop:4, marginBottom:24, fontSize:14, color:'#6B6358' },
+  label:  { display:'block', fontSize:12, fontWeight:600, color:'#3D3028', marginBottom:6 },
+  input:  { width:'100%', padding:'12px 14px', border:'1px solid #E8E2D8', borderRadius:10, fontSize:14, outline:'none', boxSizing:'border-box' },
+  btn:    { width:'100%', padding:'12px 14px', border:0, borderRadius:10, fontSize:14, fontWeight:600, cursor:'pointer', background:'#1A1612', color:'#fff', marginTop:16 },
   err:    { background:'#fef2f2', color:'#991b1b', padding:10, borderRadius:10, fontSize:13, marginTop:12 },
   ok:     { background:'#ecfdf5', color:'#065f46', padding:10, borderRadius:10, fontSize:13, marginTop:12 },
-  switch: { textAlign:'center', marginTop:20, fontSize:13, color:'#64748b' },
+  switch: { textAlign:'center', marginTop:20, fontSize:13, color:'#6B6358' },
   link:   { color:'#1d4ed8', background:'none', border:0, cursor:'pointer', fontWeight:600, padding:0 },
   forgot: { marginTop:10, textAlign:'right' },
-  forgotLink: { color:'#64748b', background:'none', border:0, cursor:'pointer', fontSize:12, fontWeight:500, padding:0, textDecoration:'underline' },
+  forgotLink: { color:'#6B6358', background:'none', border:0, cursor:'pointer', fontSize:12, fontWeight:500, padding:0, textDecoration:'underline' },
 }
 
 export default function Login({ onSwitchToSignup, onBack }) {
@@ -50,7 +50,7 @@ export default function Login({ onSwitchToSignup, onBack }) {
   return (
     <div style={styles.wrap}>
       <div style={styles.card}>
-        {onBack && <button type="button" onClick={onBack} style={{background:'none',border:'none',color:'#94a3b8',fontSize:13,cursor:'pointer',padding:0,marginBottom:16,display:'flex',alignItems:'center',gap:4}}>← Retour</button>}
+        {onBack && <button type="button" onClick={onBack} style={{background:'none',border:'none',color:'#9A8E82',fontSize:13,cursor:'pointer',padding:0,marginBottom:16,display:'flex',alignItems:'center',gap:4}}>← Retour</button>}
 
         {mode === 'login' ? (
           <>

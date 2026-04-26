@@ -84,8 +84,8 @@ Règles :
     <div style={{ padding: 18 }} className="fu">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 600, color: "#0f172a", fontFamily: "'Syne', sans-serif", letterSpacing: '-0.3px' }}>Contacts</h1>
-          <p style={{ color: "#94a3b8", fontSize: 12, marginTop: 2 }}>{clients.length} contact{clients.length > 1 ? "s" : ""}</p>
+          <h1 style={{ fontSize: 20, fontWeight: 600, color: "#1A1612", fontFamily: "'Syne', sans-serif", letterSpacing: '-0.3px' }}>Contacts</h1>
+          <p style={{ color: "#9A8E82", fontSize: 12, marginTop: 2 }}>{clients.length} contact{clients.length > 1 ? "s" : ""}</p>
         </div>
       </div>
 
@@ -103,7 +103,7 @@ Règles :
           </button>
         )}
         <button onClick={() => setEditing(emptyClient())}
-          style={{ background: "#0f172a", color: "white", border: "none", borderRadius: 14, padding: "12px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          style={{ background: "#1A1612", color: "white", border: "none", borderRadius: 14, padding: "12px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           + Nouveau contact
         </button>
         {importError && (
@@ -115,36 +115,36 @@ Règles :
       <div style={{ marginBottom: 12, position: "relative" }}>
         <input value={query} onChange={e => setQuery(e.target.value)}
           placeholder="Rechercher nom, société, ville, email…"
-          style={{ width: "100%", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 12, padding: "11px 14px 11px 36px", fontSize: 13, color: "#0f172a", outline: "none" }}/>
-        <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 14 }}>🔍</span>
+          style={{ width: "100%", background: "#F0EBE3", border: "1px solid #E8E2D8", borderRadius: 12, padding: "11px 14px 11px 36px", fontSize: 13, color: "#1A1612", outline: "none" }}/>
+        <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#9A8E82", fontSize: 14 }}>🔍</span>
       </div>
 
       {/* Liste */}
-      <div style={{ background: "white", borderRadius: 14, border: "1px solid #f1f5f9", overflow: "hidden" }}>
+      <div style={{ background: "white", borderRadius: 14, border: "1px solid #F0EBE3", overflow: "hidden" }}>
         {filtered.length === 0 && (
-          <div style={{ padding: "28px 16px", textAlign: "center", color: "#94a3b8", fontSize: 12 }}>Aucun contact trouvé</div>
+          <div style={{ padding: "28px 16px", textAlign: "center", color: "#9A8E82", fontSize: 12 }}>Aucun contact trouvé</div>
         )}
         {filtered.map(c => (
-          <div key={c.id} style={{ padding: "13px 16px", borderBottom: "1px solid #f8fafc", display: "flex", alignItems: "center", gap: 12 }}>
+          <div key={c.id} style={{ padding: "13px 16px", borderBottom: "1px solid #FAF7F2", display: "flex", alignItems: "center", gap: 12 }}>
             <div onClick={() => goClient(c.id)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 12, cursor: "pointer", minWidth: 0 }}>
               <div style={{ width: 40, height: 40, borderRadius: 12, background: c.type === "particulier" ? "#eff6ff" : "#fef3c7", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: c.type === "particulier" ? "#1d4ed8" : "#b45309", fontSize: 15, flexShrink: 0 }}>
                 {displayName(c).charAt(0).toUpperCase()}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1612", display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayName(c)}</span>
                   <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 10, flexShrink: 0, background: c.type === "particulier" ? "#dbeafe" : "#fef3c7", color: c.type === "particulier" ? "#1e40af" : "#92400e" }}>
                     {c.type === "particulier" ? "Particulier" : c.type === "artisan" ? "Artisan" : "Entreprise"}
                   </span>
                 </div>
-                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div style={{ fontSize: 11, color: "#9A8E82", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {[c.email, c.telephone, c.ville].filter(Boolean).join(" · ") || "—"}
                 </div>
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <button onClick={() => setEditing(c)} aria-label="Modifier"
-                style={{ background: "#f1f5f9", border: "none", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 14, color: "#475569" }}>✏️</button>
+                style={{ background: "#F0EBE3", border: "none", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 14, color: "#475569" }}>✏️</button>
               <button onClick={() => deleteContact(c.id)} aria-label="Supprimer"
                 style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 14 }}>🗑️</button>
             </div>
