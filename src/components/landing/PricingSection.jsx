@@ -75,7 +75,7 @@ export default function PricingSection() {
       style={{
         background:  '#FAF7F2',
         padding:     '96px 24px',
-        fontFamily:  "'DM Sans', system-ui, sans-serif",
+        fontFamily:  "Inter, system-ui, sans-serif",
       }}
     >
       <style>{`
@@ -91,7 +91,7 @@ export default function PricingSection() {
 
         .ps-card { transition: transform .25s ease, box-shadow .25s ease !important; }
         .ps-card:hover { transform: translateY(-4px) !important; }
-        .ps-card-plain:hover { box-shadow: 0 20px 48px rgba(10,10,10,.09) !important; }
+        .ps-card-plain:hover { box-shadow: 0 20px 48px rgba(26,22,18,.09) !important; }
         .ps-card-feat:hover  { box-shadow: 0 20px 48px rgba(201,123,92,.22) !important; }
 
         .ps-btn-o:hover {
@@ -184,8 +184,8 @@ export default function PricingSection() {
           <h2 style={{
             fontFamily:    "'Syne', sans-serif",
             fontSize:      44,
-            fontWeight:    700,
-            color:         '#0A0A0A',
+            fontWeight:    400,
+            color:         '#1A1612',
             letterSpacing: '-.5px',
             lineHeight:    1.18,
             marginBottom:  14,
@@ -218,7 +218,7 @@ export default function PricingSection() {
           {/* Pill selector */}
           <div style={{
             display:    'inline-flex',
-            background: 'rgba(10,10,10,.055)',
+            background: 'rgba(26,22,18,.055)',
             borderRadius: 12,
             padding:    3,
             position:   'relative',
@@ -247,7 +247,7 @@ export default function PricingSection() {
                   position:   'relative', zIndex: 1,
                   padding:    '8px 24px',
                   border:     'none', background: 'transparent',
-                  color:      isBiannual === val ? '#0A0A0A' : '#6B6358',
+                  color:      isBiannual === val ? '#1A1612' : '#6B6358',
                   fontSize:   13,
                   fontWeight: isBiannual === val ? 600 : 500,
                   cursor:     'pointer',
@@ -296,7 +296,7 @@ export default function PricingSection() {
               border:      '1.5px solid #E4DAD0',
               borderRadius: 24,
               padding:     '32px 28px',
-              boxShadow:   '0 2px 12px rgba(10,10,10,.04)',
+              boxShadow:   '0 2px 12px rgba(26,22,18,.04)',
               display:     'flex', flexDirection: 'column',
             }}
           >
@@ -318,7 +318,7 @@ export default function PricingSection() {
                   fontFamily:    "'Syne', sans-serif",
                   fontSize:      52,
                   fontWeight:    700,
-                  color:         '#0A0A0A',
+                  color:         '#1A1612',
                   letterSpacing: '-2px',
                   lineHeight:    1,
                 }}>
@@ -414,7 +414,7 @@ export default function PricingSection() {
                   fontFamily:    "'Syne', sans-serif",
                   fontSize:      52,
                   fontWeight:    700,
-                  color:         '#0A0A0A',
+                  color:         '#1A1612',
                   letterSpacing: '-2px',
                   lineHeight:    1,
                 }}>
