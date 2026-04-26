@@ -197,7 +197,7 @@ export default function LandingHero({ onSignup }) {
             transition={{ duration: 0.6, ease: [.16,1,.3,1] }}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(201,123,92,.10)', border: '1px solid rgba(201,123,92,.22)', borderRadius: 20, padding: '6px 14px', marginBottom: 28 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#C97B5C', display: 'inline-block', animation: 'lp-badge 2.5s ease infinite' }} />
-            <span style={{ color: '#C97B5C', fontSize: 11, fontWeight: 600, letterSpacing: '.6px' }}>DISPONIBLE — 30 JOURS GRATUITS</span>
+            <span style={{ color: '#C97B5C', fontSize: 11, fontWeight: 600, letterSpacing: '.6px' }}>IA GÉNÉRATIVE · 30 JOURS GRATUITS</span>
           </motion.div>
 
           {/* H1 */}
@@ -205,9 +205,9 @@ export default function LandingHero({ onSignup }) {
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.65, delay: 0.1, ease: [.16,1,.3,1] }}
             style={{ fontFamily: "'Syne', sans-serif", fontSize: mobile ? 40 : 64, fontWeight: 500, lineHeight: 1.08, color: '#1A1612', letterSpacing: '-1.5px', marginBottom: 22 }}>
-            Dictez vos devis.<br />
-            Encaissez vos factures.<br />
-            <span style={{ color: '#C97B5C', fontFamily: "'Playfair Display', Georgia, serif", fontStyle: 'italic', fontWeight: 400, letterSpacing: '0px' }}>Sans y penser.</span>
+            Parlez. L'IA rédige<br />
+            votre devis.<br />
+            <span style={{ color: '#C97B5C', fontFamily: "'Playfair Display', Georgia, serif", fontStyle: 'italic', fontWeight: 400, letterSpacing: '0px' }}>En 90 secondes.</span>
           </motion.h1>
 
           {/* Sous-titre */}
@@ -215,8 +215,8 @@ export default function LandingHero({ onSignup }) {
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.65, delay: 0.2, ease: [.16,1,.3,1] }}
             style={{ fontSize: 17, color: '#6B6358', lineHeight: 1.75, marginBottom: 36, maxWidth: 480 }}>
-            L'assistant commercial qui transforme votre voix en chiffre d'affaires.
-            Pour les artisans, consultants, freelances et dirigeants qui gèrent seuls leur partie commerciale.
+            Décrivez votre chantier en quelques mots — l'IA structure les postes, calcule les prix,
+            applique la bonne TVA et génère un PDF signable. Pour les artisans qui veulent gagner du temps, pas en perdre.
           </motion.p>
 
           {/* CTAs */}

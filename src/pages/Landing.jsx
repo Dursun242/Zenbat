@@ -1,6 +1,7 @@
 import LandingNav      from '../components/landing/LandingNav'
 import LandingHero     from '../components/landing/LandingHero'
 import LandingStats    from '../components/landing/LandingStats'
+import LandingIA       from '../components/landing/LandingIA'
 import LandingMetiers  from '../components/landing/LandingMetiers'
 import LandingRelance  from '../components/landing/LandingRelance'
 import LandingHow      from '../components/landing/LandingHow'
@@ -14,6 +15,7 @@ export default function Landing({ onLogin, onSignup }) {
       <LandingNav     onLogin={onLogin} onSignup={onSignup} />
       <LandingHero    onSignup={onSignup} />
       <LandingStats   />
+      <LandingIA      />
       <LandingMetiers />
       <LandingRelance />
       <LandingHow     />
