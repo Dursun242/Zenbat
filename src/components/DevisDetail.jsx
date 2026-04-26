@@ -16,6 +16,7 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
   const [acomptePct,     setAcomptePct]     = useState(30);
   const [acompteLoading, setAcompteLoading] = useState(false);
   const [clientPicker,   setClientPicker]   = useState(false);
+  const [statutBusy,    setStatutBusy]    = useState(false);
 
   // Ouvre automatiquement le PDF quand on arrive depuis l'Agent IA après save
   useEffect(() => {
@@ -338,12 +339,12 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
             )}
             {d.statut === "en_signature" && (
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => onChange({ ...d, statut: "accepte", signed_at: new Date().toISOString(), signed_by: signerName || signerEmail || "" })}
-                  style={{ flex: 1, background: "#ecfdf5", color: "#065f46", border: "1px solid #a7f3d0", borderRadius: 12, padding: 10, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                <button disabled={statutBusy} onClick={() => { setStatutBusy(true); onChange({ ...d, statut: "accepte", signed_at: new Date().toISOString(), signed_by: signerName || signerEmail || "" }); }}
+                  style={{ flex: 1, background: "#ecfdf5", color: "#065f46", border: "1px solid #a7f3d0", borderRadius: 12, padding: 10, fontSize: 12, fontWeight: 600, cursor: statutBusy ? "not-allowed" : "pointer", opacity: statutBusy ? 0.6 : 1 }}>
                   ✓ Accepté
                 </button>
-                <button onClick={() => onChange({ ...d, statut: "refuse" })}
-                  style={{ flex: 1, background: "#fef2f2", color: "#991b1b", border: "1px solid #fecaca", borderRadius: 12, padding: 10, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                <button disabled={statutBusy} onClick={() => { setStatutBusy(true); onChange({ ...d, statut: "refuse" }); }}
+                  style={{ flex: 1, background: "#fef2f2", color: "#991b1b", border: "1px solid #fecaca", borderRadius: 12, padding: 10, fontSize: 12, fontWeight: 600, cursor: statutBusy ? "not-allowed" : "pointer", opacity: statutBusy ? 0.6 : 1 }}>
                   ✗ Refusé
                 </button>
               </div>

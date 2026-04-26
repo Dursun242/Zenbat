@@ -345,7 +345,13 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   const micSupported = !!SRClass;
 
   useEffect(() => () => {
-    try { recRef.current?.stop(); } catch {}
+    const rec = recRef.current;
+    if (rec) {
+      rec.onresult = null;
+      rec.onend    = null;
+      rec.onerror  = null;
+      try { rec.stop(); } catch {}
+    }
   }, []);
 
   const stopListening = () => {
