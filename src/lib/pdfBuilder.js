@@ -26,8 +26,20 @@ const AMBER_BG = [254, 249, 195];
 // Table column widths (sum = 190mm)
 const CD = 100, CU = 15, CQ = 13, CP = 22, CT = 13, CR = 27;
 
-// Sanitize text for jsPDF (narrow no-break space → regular space)
-const s = (v) => String(v ?? "").replace(/ /g, " ");
+// Sanitize text for jsPDF — remplace les caractères hors Latin-1/WinAnsi
+const s = (v) => String(v ?? '')
+  .replace(/ /g, ' ')   // espace fine insécable
+  .replace(/ /g, ' ')   // espace insécable
+  .replace(/≥/g, '>=')  // ≥
+  .replace(/≤/g, '<=')  // ≤
+  .replace(/—/g, ' - ') // — tiret em
+  .replace(/–/g, ' - ') // – tiret en
+  .replace(/²/g, '2')   // ²
+  .replace(/³/g, '3')   // ³
+  .replace(/→/g, '->')  // →
+  .replace(/•/g, '-')   // •
+  .replace(/[“”]/g, '"') // ""
+  .replace(/[‘’]/g, "'"); // ''
 
 function setFill(pdf, rgb) { pdf.setFillColor(rgb[0], rgb[1], rgb[2]); }
 function setDraw(pdf, rgb, w = 0.2) { pdf.setDrawColor(rgb[0], rgb[1], rgb[2]); pdf.setLineWidth(w); }
