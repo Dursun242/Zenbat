@@ -1,7 +1,7 @@
 // Navigation principale mobile (bottom nav). Masquée en desktop via .app-bottom-nav.
 export default function BottomNav({ items, activeNav, onSelect, plan, daysLeft }) {
   return (
-    <nav className="app-bottom-nav" style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#1A1612", borderTop: "1px solid rgba(255,255,255,.06)", display: "flex", zIndex: 50 }}>
+    <nav className="app-bottom-nav" style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#1A1612", borderTop: "1px solid rgba(255,255,255,.06)", display: "flex", zIndex: 50, paddingBottom: "env(safe-area-inset-bottom)" }}>
       {items.map(({ id, label, icon }) => {
         const active = activeNav === id;
         return (

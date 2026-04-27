@@ -202,7 +202,7 @@ export default function App() {
         </nav>
 
         {/* Contenu principal */}
-        <div className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "64px" }}>
+        <div className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "calc(64px + env(safe-area-inset-bottom))" }}>
           {["devis", "devis_detail", "factures", "factures_detail"].includes(tab) && (
             <SearchBar devis={devis} clients={clients} invoices={invoices} goDevis={goDevis} goClient={id => { setSelC(id); setTab("client_detail"); }} goInvoice={goInvoice}/>
           )}
