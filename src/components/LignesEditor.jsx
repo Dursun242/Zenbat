@@ -1,10 +1,12 @@
+import { useState } from "react";
 import { UNITES, TVA_RATES } from "../lib/constants.js";
 import { fmt, uid } from "../lib/utils.js";
 
 export default function LignesEditor({ lignes, onChange, ac, vatRegime }) {
+  const [confirmRemoveId, setConfirmRemoveId] = useState(null);
   const franchise = vatRegime === "franchise";
   const update = (id, patch) => onChange(lignes.map(l => l.id === id ? { ...l, ...patch } : l));
-  const remove = (id) => { if (confirm("Supprimer cette ligne ?")) onChange(lignes.filter(l => l.id !== id)); };
+  const remove = (id) => { onChange(lignes.filter(l => l.id !== id)); setConfirmRemoveId(null); };
 
   const move = (id, dir) => {
     const i = lignes.findIndex(l => l.id === id);
@@ -55,8 +57,17 @@ export default function LignesEditor({ lignes, onChange, ac, vatRegime }) {
               style={{ background: "none", border: "none", color: idx === 0 ? "#cbd5e1" : "#6B6358", cursor: idx === 0 ? "default" : "pointer", fontSize: 13, padding: "2px 6px" }}>↑</button>
             <button onClick={() => move(l.id, 1)} disabled={idx === lignes.length - 1}
               style={{ background: "none", border: "none", color: idx === lignes.length - 1 ? "#cbd5e1" : "#6B6358", cursor: idx === lignes.length - 1 ? "default" : "pointer", fontSize: 13, padding: "2px 6px" }}>↓</button>
-            <button onClick={() => remove(l.id)}
-              style={{ background: "none", border: "none", color: "#dc2626", cursor: "pointer", fontSize: 15, padding: "2px 6px", fontWeight: 700 }}>×</button>
+            {confirmRemoveId === l.id ? (
+              <>
+                <button onClick={() => setConfirmRemoveId(null)}
+                  style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 4, color: "#6B6358", cursor: "pointer", fontSize: 10, padding: "2px 6px", fontWeight: 600 }}>Annuler</button>
+                <button onClick={() => remove(l.id)}
+                  style={{ background: "#dc2626", border: "none", borderRadius: 4, color: "white", cursor: "pointer", fontSize: 10, padding: "2px 7px", fontWeight: 700 }}>✓</button>
+              </>
+            ) : (
+              <button onClick={() => setConfirmRemoveId(l.id)}
+                style={{ background: "none", border: "none", color: "#dc2626", cursor: "pointer", fontSize: 15, padding: "2px 6px", fontWeight: 700 }}>×</button>
+            )}
           </div>
 
           {l.type_ligne === "lot" ? (
