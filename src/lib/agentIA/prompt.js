@@ -152,6 +152,23 @@ Format strict du JSON : {"objet":"titre court en français","lignes":[
   {"type_ligne":"ouvrage","lot":"nom lot","designation":"description en français","unite":"${units.split(", ")[0]}","quantite":10,"prix_unitaire":25,"tva_rate":20}
 ]}
 
+FORMAT ÉTENDU — DEVIS BTP UNIQUEMENT :
+Pour tout devis de travaux de bâtiment, ajouter dans le JSON racine ces deux champs OBLIGATOIRES en plus de "objet" et "lignes" :
+1. "typology_id" — identifiant de la typologie parmi :
+   "extension_neuve_go" (extension / agrandissement gros œuvre)
+   "renovation_sdb" (rénovation salle de bain / salle d'eau)
+   "isolation_combles" (isolation combles perdus ou aménageables)
+   "ravalement_facade" (ravalement / enduit extérieur façade)
+   "renovation_interieure" (rénovation intérieure complète appartement ou maison)
+   → choisir l'identifiant le plus proche ; laisser absent si aucun ne convient.
+2. "project_params" — objet avec les dimensions chiffrées du projet (celles que l'utilisateur a données ou que tu as estimées).
+   Exemples :
+   • Extension 35 m², périmètre 24 m : {"surface_sol":35,"perimetre":24,"hauteur_etage":2.5}
+   • Rénovation salle de bain 7 m² : {"surface_sol":7}
+   • Isolation combles 80 m² : {"surface":80}
+   • Ravalement façade 120 m² : {"surface":120}
+   • Rénovation appartement 65 m² : {"surface_sol":65}
+
 ${tvaContext}
 ${franchiseBTPRappel}${btpKnowledgeBlock}
 ${pricingBlock}

@@ -1,0 +1,125 @@
+{
+  "pack_id": "conseil_v1",
+  "pack_name": "Conseil — Prestation intellectuelle",
+  "version": "1.0.0",
+  "typologies": [
+    {
+      "typology_id": "audit_si_pme",
+      "label": "Audit SI PME",
+      "keywords": ["audit si", "audit informatique", "audit système", "audit numérique", "audit it"],
+      "main_dimension": { "name": "nb_jours", "unit": "j", "label": "Charge en jours-homme" },
+      "default_params": {},
+      "envelope": { "min_per_unit": 800, "max_per_unit": 1500, "tolerance_pct": 20 },
+      "required_lots": [
+        "cadrage",
+        "collecte",
+        "analyse",
+        "restitution"
+      ],
+      "optional_lots": ["plan_action", "accompagnement_mise_en_oeuvre"],
+      "derived_quantities": [
+        {
+          "target": "jours_total",
+          "formula": "jours_cadrage + jours_collecte + jours_analyse + jours_restitution",
+          "default_inputs": {}
+        }
+      ],
+      "lots": [
+        {
+          "lot_id": "cadrage",
+          "label": "Cadrage / lancement",
+          "match_keywords": ["cadrage", "lancement", "kick-off", "kickoff", "initialisation", "initialisation", "démarrage"],
+          "suggestion": "Ajouter une phase cadrage / lancement de mission"
+        },
+        {
+          "lot_id": "collecte",
+          "label": "Collecte d'informations",
+          "match_keywords": ["collecte", "recueil", "entretien", "interview", "questionnaire", "inventaire", "diagnostic", "état des lieux"],
+          "suggestion": "Ajouter une phase collecte d'informations (entretiens, questionnaires, inventaire)"
+        },
+        {
+          "lot_id": "analyse",
+          "label": "Analyse",
+          "match_keywords": ["analyse", "étude", "etude", "évaluation", "evaluation", "synthèse", "synthese", "rapport"],
+          "suggestion": "Ajouter une phase analyse (traitement des données, synthèse)"
+        },
+        {
+          "lot_id": "restitution",
+          "label": "Restitution / présentation",
+          "match_keywords": ["restitution", "présentation", "presentation", "livrables", "compte-rendu", "rapport final", "recommandations"],
+          "suggestion": "Ajouter une phase restitution / présentation des résultats"
+        }
+      ]
+    },
+    {
+      "typology_id": "mission_conseil",
+      "label": "Mission de conseil générale",
+      "keywords": ["mission de conseil", "consulting", "conseil stratégique", "conseil opérationnel", "mission stratégique", "conseil en organisation"],
+      "main_dimension": { "name": "nb_jours", "unit": "j", "label": "Charge en jours-homme" },
+      "default_params": {},
+      "envelope": { "min_per_unit": 700, "max_per_unit": 1500, "tolerance_pct": 25 },
+      "required_lots": [
+        "cadrage",
+        "realisation",
+        "restitution"
+      ],
+      "optional_lots": ["suivi", "formation"],
+      "derived_quantities": [],
+      "lots": [
+        {
+          "lot_id": "cadrage",
+          "label": "Cadrage",
+          "match_keywords": ["cadrage", "lancement", "démarrage", "initialisation", "kick-off"],
+          "suggestion": "Ajouter une phase cadrage de la mission"
+        },
+        {
+          "lot_id": "realisation",
+          "label": "Réalisation / travaux",
+          "match_keywords": ["réalisation", "realisation", "travaux", "missions", "études", "etudes", "intervention", "production", "livrables"],
+          "suggestion": "Ajouter une phase réalisation (production des livrables principaux)"
+        },
+        {
+          "lot_id": "restitution",
+          "label": "Restitution",
+          "match_keywords": ["restitution", "présentation", "presentation", "rapport", "recommandations", "compte-rendu"],
+          "suggestion": "Ajouter une phase restitution / présentation des conclusions"
+        }
+      ]
+    },
+    {
+      "typology_id": "accompagnement",
+      "label": "Accompagnement / coaching",
+      "keywords": ["accompagnement", "coaching", "mentoring", "formation conseil", "coaching stratégique", "coaching dirigeant"],
+      "main_dimension": { "name": "nb_jours", "unit": "j", "label": "Charge en jours ou séances" },
+      "default_params": {},
+      "envelope": { "min_per_unit": 600, "max_per_unit": 1200, "tolerance_pct": 25 },
+      "required_lots": [
+        "diagnostic",
+        "sessions",
+        "bilan"
+      ],
+      "optional_lots": ["outils", "suivi_interseance"],
+      "derived_quantities": [],
+      "lots": [
+        {
+          "lot_id": "diagnostic",
+          "label": "Diagnostic initial",
+          "match_keywords": ["diagnostic", "bilan initial", "évaluation initiale", "evaluation initiale", "entretien initial", "assessment"],
+          "suggestion": "Ajouter une phase diagnostic / bilan initial"
+        },
+        {
+          "lot_id": "sessions",
+          "label": "Séances d'accompagnement",
+          "match_keywords": ["séance", "seance", "session", "atelier", "workshop", "accompagnement", "coaching"],
+          "suggestion": "Ajouter les séances / sessions d'accompagnement"
+        },
+        {
+          "lot_id": "bilan",
+          "label": "Bilan final",
+          "match_keywords": ["bilan", "bilan final", "clôture", "cloture", "synthèse", "synthese", "rapport final", "plan d'action"],
+          "suggestion": "Ajouter un bilan final / synthèse de l'accompagnement"
+        }
+      ]
+    }
+  ]
+}

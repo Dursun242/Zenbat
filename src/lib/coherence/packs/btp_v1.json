@@ -1,0 +1,275 @@
+{
+  "pack_id": "btp_v1",
+  "pack_name": "BTP — Bâtiment résidentiel",
+  "version": "1.0.0",
+  "typologies": [
+    {
+      "typology_id": "extension_neuve_go",
+      "label": "Extension neuve — gros œuvre seul",
+      "keywords": ["extension", "agrandissement", "gros oeuvre", "gros œuvre"],
+      "main_dimension": { "name": "surface_sol", "unit": "m²", "label": "Surface au sol" },
+      "default_params": { "hauteur_etage": 2.5, "coef_pente": 1.15, "section_semelle": 0.18 },
+      "envelope": { "min_per_unit": 800, "max_per_unit": 1200, "tolerance_pct": 15 },
+      "required_lots": [
+        "terrassement_fondations",
+        "elevation_maconnerie",
+        "charpente",
+        "couverture",
+        "enduits_exterieurs",
+        "evacuations"
+      ],
+      "optional_lots": ["dallage", "plancher_haut", "menuiseries_exterieures"],
+      "derived_quantities": [
+        {
+          "target": "surface_murs_elevation",
+          "formula": "perimetre * hauteur_etage",
+          "default_inputs": { "hauteur_etage": 2.5 }
+        },
+        {
+          "target": "surface_toiture",
+          "formula": "surface_sol * coef_pente",
+          "default_inputs": { "coef_pente": 1.15 }
+        }
+      ],
+      "lots": [
+        {
+          "lot_id": "terrassement_fondations",
+          "label": "Terrassement et fondations",
+          "match_keywords": ["terrassement", "fondation", "fouille", "semelle", "sous-sol"],
+          "suggestion": "Ajouter un lot terrassement + fondations (fouilles, béton de propreté, semelles filantes)",
+          "items": [
+            {
+              "item_id": "fouilles_rigoles",
+              "label": "Fouilles en rigoles",
+              "unit": "m³",
+              "unit_price": { "min": 15, "max": 50, "typical": 30 }
+            },
+            {
+              "item_id": "beton_fondations",
+              "label": "Béton fondations C25/30",
+              "unit": "m³",
+              "unit_price": { "min": 120, "max": 200, "typical": 160 }
+            }
+          ]
+        },
+        {
+          "lot_id": "elevation_maconnerie",
+          "label": "Gros œuvre maçonnerie",
+          "match_keywords": ["maçonnerie", "maconnerie", "parpaing", "agglo", "élévation", "elevation", "mur", "gros oeuvre", "gros œuvre", "béton armé", "beton arme"],
+          "suggestion": "Ajouter un lot maçonnerie / élévation des murs (parpaings, béton armé)",
+          "items": [
+            {
+              "item_id": "elevation_parpaings",
+              "label": "Élévation murs parpaings 20×20×50",
+              "unit": "m²",
+              "quantity_source": "surface_murs_elevation",
+              "unit_price": { "min": 35, "max": 70, "typical": 50 }
+            },
+            {
+              "item_id": "dalle_beton",
+              "label": "Dalle béton armé",
+              "unit": "m²",
+              "unit_price": { "min": 40, "max": 80, "typical": 55 }
+            }
+          ]
+        },
+        {
+          "lot_id": "charpente",
+          "label": "Charpente",
+          "match_keywords": ["charpente", "fermette", "faîtage", "faitage", "ossature bois", "poutre", "faîtière"],
+          "suggestion": "Ajouter un lot charpente bois (fermettes industrielles ou charpente traditionnelle)",
+          "items": [
+            {
+              "item_id": "charpente_fermettes",
+              "label": "Charpente fermettes industrielles",
+              "unit": "m²",
+              "quantity_source": "surface_toiture",
+              "unit_price": { "min": 40, "max": 100, "typical": 65 }
+            }
+          ]
+        },
+        {
+          "lot_id": "couverture",
+          "label": "Couverture toiture",
+          "match_keywords": ["couverture", "toiture", "tuile", "ardoise", "zinc", "bac acier"],
+          "suggestion": "Ajouter un lot couverture / toiture (tuiles, ardoises, zinguerie)",
+          "items": [
+            {
+              "item_id": "couverture_tuiles",
+              "label": "Couverture tuiles terre cuite",
+              "unit": "m²",
+              "quantity_source": "surface_toiture",
+              "unit_price": { "min": 40, "max": 100, "typical": 65 }
+            }
+          ]
+        },
+        {
+          "lot_id": "enduits_exterieurs",
+          "label": "Enduits extérieurs",
+          "match_keywords": ["enduit", "ravalement", "crépi", "crep", "bardage", "monocouche", "bicouche"],
+          "suggestion": "Ajouter un lot enduits extérieurs (monocouche teinté ou bi-couche)"
+        },
+        {
+          "lot_id": "evacuations",
+          "label": "Évacuations et réseaux",
+          "match_keywords": ["évacuation", "evacuation", "réseau", "reseau", "ep ", "eaux pluviales", "descente", "assainissement", "vrd", "canalisation"],
+          "suggestion": "Ajouter un lot évacuations EP/EU et réseaux (descentes EP, regards, branchements)"
+        }
+      ]
+    },
+    {
+      "typology_id": "renovation_sdb",
+      "label": "Rénovation salle de bain",
+      "keywords": ["salle de bain", "salle de bains", "sdb", "salle d'eau", "douche", "baignoire", "sanitaire"],
+      "main_dimension": { "name": "surface_sol", "unit": "m²", "label": "Surface au sol" },
+      "default_params": {},
+      "envelope": { "min_per_unit": 600, "max_per_unit": 1800, "tolerance_pct": 20 },
+      "required_lots": [
+        "demolition_sdb",
+        "plomberie_sanitaire",
+        "carrelage_sdb",
+        "electricite_sdb"
+      ],
+      "optional_lots": ["peinture_sdb", "menuiserie_sdb"],
+      "derived_quantities": [],
+      "lots": [
+        {
+          "lot_id": "demolition_sdb",
+          "label": "Démolition et dépose",
+          "match_keywords": ["démolition", "demolition", "dépose", "depose", "démonter", "demonter", "casser", "enlèvement", "enlevement"],
+          "suggestion": "Ajouter un lot démolition / dépose des équipements et revêtements existants"
+        },
+        {
+          "lot_id": "plomberie_sanitaire",
+          "label": "Plomberie et sanitaire",
+          "match_keywords": ["plomberie", "sanitaire", "douche", "baignoire", "lavabo", "wc", "mitigeur", "robinetterie", "tuyauterie", "pvc", "per ", "multicouche"],
+          "suggestion": "Ajouter un lot plomberie / sanitaire (alimentation eau froide/chaude + évacuations)"
+        },
+        {
+          "lot_id": "carrelage_sdb",
+          "label": "Carrelage sol et murs",
+          "match_keywords": ["carrelage", "faïence", "faience", "sol", "mur", "revêtement", "revetement", "pose"],
+          "suggestion": "Ajouter un lot carrelage sol + murs / faïence"
+        },
+        {
+          "lot_id": "electricite_sdb",
+          "label": "Électricité",
+          "match_keywords": ["électricité", "electricite", "VMC", "vmc", "éclairage", "eclairage", "tableau", "prise"],
+          "suggestion": "Ajouter un lot électricité / VMC (obligatoire en salle de bain)"
+        }
+      ]
+    },
+    {
+      "typology_id": "isolation_combles",
+      "label": "Isolation combles",
+      "keywords": ["isolation combles", "combles perdus", "isolation toiture", "combles aménageables", "isolation thermique combles"],
+      "main_dimension": { "name": "surface", "unit": "m²", "label": "Surface à isoler" },
+      "default_params": {},
+      "envelope": { "min_per_unit": 15, "max_per_unit": 60, "tolerance_pct": 25 },
+      "required_lots": [
+        "preparation_combles",
+        "isolation_thermique"
+      ],
+      "optional_lots": ["trappe_acces", "parefeu"],
+      "derived_quantities": [],
+      "lots": [
+        {
+          "lot_id": "preparation_combles",
+          "label": "Préparation des combles",
+          "match_keywords": ["préparation", "preparation", "nettoyage", "débarras", "debarras", "balisage", "écran", "ecran"],
+          "suggestion": "Ajouter un lot préparation des combles (déblaiement, pose d'écrans si nécessaire)"
+        },
+        {
+          "lot_id": "isolation_thermique",
+          "label": "Isolation thermique",
+          "match_keywords": ["isolation", "isolant", "soufflé", "souffle", "laine", "ouate", "cellulose", "polyuréthane", "polyurethane", "r =", "r=", "résistance thermique"],
+          "suggestion": "Ajouter le lot isolation thermique (ouate soufflée R≥7 ou laine de verre/roche)"
+        }
+      ]
+    },
+    {
+      "typology_id": "ravalement_facade",
+      "label": "Ravalement façade",
+      "keywords": ["ravalement", "façade", "facade", "enduit extérieur", "enduit exterieur", "crépi façade", "crep facade"],
+      "main_dimension": { "name": "surface", "unit": "m²", "label": "Surface de façade" },
+      "default_params": {},
+      "envelope": { "min_per_unit": 30, "max_per_unit": 120, "tolerance_pct": 25 },
+      "required_lots": [
+        "echafaudage",
+        "preparation_support",
+        "ravalement_enduit"
+      ],
+      "optional_lots": ["peinture_fenetres", "traitement_hydrofuge"],
+      "derived_quantities": [],
+      "lots": [
+        {
+          "lot_id": "echafaudage",
+          "label": "Échafaudage",
+          "match_keywords": ["échafaudage", "echafaudage", "nacelle", "monte-charge", "protection"],
+          "suggestion": "Ajouter un lot échafaudage (pose, location, dépose)"
+        },
+        {
+          "lot_id": "preparation_support",
+          "label": "Préparation du support",
+          "match_keywords": ["préparation", "preparation", "grattage", "nettoyage", "traitement", "désherbage", "desherbage", "piquage", "ragréage", "ragreage"],
+          "suggestion": "Ajouter un lot préparation du support (grattage, nettoyage haute-pression, traitement)"
+        },
+        {
+          "lot_id": "ravalement_enduit",
+          "label": "Enduit / crépi de ravalement",
+          "match_keywords": ["enduit", "crépi", "crep", "monocouche", "bicouche", "peinture facade", "peinture façade"],
+          "suggestion": "Ajouter le lot enduit de ravalement ou peinture façade"
+        }
+      ]
+    },
+    {
+      "typology_id": "renovation_interieure",
+      "label": "Rénovation intérieure complète",
+      "keywords": ["rénovation complète", "renovation complete", "rénovation totale", "renovation totale", "rénovation appartement", "renovation appartement", "rénovation maison", "renovation maison"],
+      "main_dimension": { "name": "surface_sol", "unit": "m²", "label": "Surface au sol" },
+      "default_params": {},
+      "envelope": { "min_per_unit": 200, "max_per_unit": 900, "tolerance_pct": 20 },
+      "required_lots": [
+        "demolition",
+        "electricite",
+        "plomberie",
+        "sols",
+        "peinture"
+      ],
+      "optional_lots": ["cloisons", "menuiserie_int", "cuisine"],
+      "derived_quantities": [],
+      "lots": [
+        {
+          "lot_id": "demolition",
+          "label": "Démolition",
+          "match_keywords": ["démolition", "demolition", "dépose", "depose", "cloison", "abattre"],
+          "suggestion": "Ajouter un lot démolition (dépose cloisons, revêtements, équipements)"
+        },
+        {
+          "lot_id": "electricite",
+          "label": "Électricité",
+          "match_keywords": ["électricité", "electricite", "tableau", "câble", "cable", "prise", "éclairage", "eclairage", "domotique"],
+          "suggestion": "Ajouter un lot électricité (tableau, circuits, prises, éclairage)"
+        },
+        {
+          "lot_id": "plomberie",
+          "label": "Plomberie",
+          "match_keywords": ["plomberie", "sanitaire", "tuyauterie", "eau froide", "eau chaude", "évacuation", "evacuation"],
+          "suggestion": "Ajouter un lot plomberie (alimentation + évacuations)"
+        },
+        {
+          "lot_id": "sols",
+          "label": "Revêtements de sol",
+          "match_keywords": ["sol", "parquet", "carrelage", "vinyl", "lino", "revêtement sol", "revetement sol"],
+          "suggestion": "Ajouter un lot revêtements de sol (parquet, carrelage ou vinyl)"
+        },
+        {
+          "lot_id": "peinture",
+          "label": "Peinture / enduits",
+          "match_keywords": ["peinture", "enduit", "toile de verre", "papier peint", "murs", "plafond"],
+          "suggestion": "Ajouter un lot peinture / enduits (murs + plafonds)"
+        }
+      ]
+    }
+  ]
+}

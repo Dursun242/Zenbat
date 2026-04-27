@@ -8,9 +8,83 @@ import { getToken } from "../lib/getToken.js";
 import { SR_LANGS, MIC_LANG_KEY, pickInitialLang } from "../lib/agentIA/speech.js";
 import { buildAgentGreeting, quickStartsFor } from "../lib/agentIA/sectors.js";
 import { buildSystemPrompt } from "../lib/agentIA/prompt.js";
+import { runCoherenceCheck } from "../lib/coherence/engine.js";
+import { buildCorrectionPrompt } from "../lib/coherence/formatIssues.js";
 import { I } from "./ui/icons.jsx";
 import ClientPickerModal from "./ClientPickerModal.jsx";
 import CelebrateModal from "./agent/CelebrateModal.jsx";
+
+// ─── Boucle de cohérence : valide + corrige jusqu'à COHERENCE_MAX_RETRIES fois ──
+const COHERENCE_MAX_RETRIES = 3;
+
+async function runCoherenceLoop(devis, apiBody, authHeaders, msgs, rawResponse, brand) {
+  let currentDevis = devis;
+  let currentRaw   = rawResponse;
+  let iterationCount = 1;
+
+  let result = runCoherenceCheck(currentDevis);
+  if (result.overall_status !== "fail") {
+    return { resolvedLignes: currentDevis.lignes, resolvedObjet: currentDevis.objet, validationResult: { ...result, iteration_count: 1 } };
+  }
+
+  for (let i = 0; i < COHERENCE_MAX_RETRIES; i++) {
+    iterationCount = i + 2;
+    const correctionPrompt = buildCorrectionPrompt(result);
+
+    let correctedRaw = "";
+    try {
+      const correctionMessages = [
+        ...msgs.slice(-18),
+        { role: "assistant", content: currentRaw },
+        { role: "user",      content: correctionPrompt },
+      ];
+      const res = await fetch("/api/claude", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        body:    JSON.stringify({ ...apiBody, messages: correctionMessages, stream: false }),
+      });
+      if (!res.ok) break;
+      const data = await res.json().catch(() => null);
+      correctedRaw = data?.content?.[0]?.text || "";
+    } catch { break; }
+
+    const corrMatch = correctedRaw.match(/<DEVIS>([\s\S]*?)<\/DEVIS>/) || correctedRaw.match(/<DEVIS>([\s\S]+)/);
+    if (!corrMatch) break;
+
+    let correctedParsed;
+    try { correctedParsed = JSON.parse(corrMatch[1].trim()); } catch { break; }
+
+    let correctedLignes = (correctedParsed.lignes || []).map(l => ({ ...l, id: uid() }));
+    if (brand.vatRegime === "franchise") {
+      correctedLignes = correctedLignes.map(l =>
+        l.type_ligne === "ouvrage" ? { ...l, tva_rate: 0 } : l
+      );
+    }
+
+    currentDevis = { ...correctedParsed, lignes: correctedLignes };
+    currentRaw   = correctedRaw;
+    result       = runCoherenceCheck(currentDevis);
+
+    if (result.overall_status !== "fail") {
+      return {
+        resolvedLignes:   currentDevis.lignes,
+        resolvedObjet:    currentDevis.objet,
+        validationResult: { ...result, iteration_count: iterationCount },
+      };
+    }
+  }
+
+  // Après COHERENCE_MAX_RETRIES sans succès : retourne le meilleur état avec avertissement
+  return {
+    resolvedLignes:   currentDevis.lignes,
+    resolvedObjet:    currentDevis.objet,
+    validationResult: {
+      ...result,
+      iteration_count: iterationCount,
+      residual_issues: (result.checks || []).flatMap(c => c.issues || []),
+    },
+  };
+}
 
 export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, plan, trialExpired, onPaywall, setTab, onOpenDevisPDF, brand }) {
   const [msgs,         setMsgs]         = useState(() => [{ role: "assistant", content: buildAgentGreeting(brand) }]);
@@ -220,6 +294,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       const match = raw.match(/<DEVIS>([\s\S]*?)<\/DEVIS>/) || raw.match(/<DEVIS>([\s\S]+)/);
       const txt   = raw.replace(/<DEVIS>[\s\S]*/g, "").trim();
 
+      let residualWarning = "";
       if (match) {
         try {
           const parsed    = JSON.parse(match[1].trim());
@@ -264,12 +339,41 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
             }
           }
 
-          if (parsed.objet) setObjet(parsed.objet);
-          setLignes(finalLignes);
+          // ─── Moteur de cohérence : validation + boucle de correction ────────
+          let resolvedLignes   = finalLignes;
+          let resolvedObjet    = parsed.objet || "";
+          let validationResult = { overall_status: "pass", checks: [], typology_id: null, iteration_count: 1 };
+          try {
+            const coherence = await runCoherenceLoop(
+              { ...parsed, lignes: finalLignes },
+              body, authHeaders, newMsgs, raw, brand,
+            );
+            resolvedLignes   = coherence.resolvedLignes;
+            resolvedObjet    = coherence.resolvedObjet || parsed.objet || "";
+            validationResult = coherence.validationResult;
+          } catch { /* coherence loop failed — on conserve les lignes originales */ }
+
+          // Log de validation (best-effort, table créée par migration 0024)
+          if (validationResult.typology_id) {
+            supabase.from("coherence_validations").insert({
+              typology_id:     validationResult.typology_id,
+              overall_status:  validationResult.overall_status,
+              checks:          validationResult.checks,
+              iteration_count: validationResult.iteration_count ?? 1,
+            }).then(() => {}, () => {});
+          }
+
+          if (resolvedObjet) setObjet(resolvedObjet);
+          setLignes(resolvedLignes);
+
+          // Avertissement résiduel si le moteur n'a pas pu tout corriger en 3 essais
+          if (validationResult.residual_issues?.length > 0) {
+            residualWarning = "\n\n⚠️ Devis vérifié automatiquement : des écarts de marché subsistent. Vous pouvez les ajuster manuellement.";
+          }
 
           // Tout premier devis jamais généré sur ce compte :
           // on déclenche une modale festive si aucun devis n'existe encore en DB.
-          if (devis.length === 0 && finalLignes.some(l => l.type_ligne === "ouvrage")) {
+          if (devis.length === 0 && resolvedLignes.some(l => l.type_ligne === "ouvrage")) {
             const elapsed = celebrateStartRef.current
               ? Math.max(1, Math.round((Date.now() - celebrateStartRef.current) / 1000))
               : 0;
@@ -279,7 +383,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
         } catch { /* JSON mal formé — on ignore */ }
       }
 
-      const finalText = txt || (match ? TX.linesAdded : "Je n'ai pas compris, pouvez-vous reformuler ?");
+      const finalText = (txt || (match ? TX.linesAdded : "Je n'ai pas compris, pouvez-vous reformuler ?")) + residualWarning;
       updateAssistant(finalText);
 
       // Détection best-effort des interactions "négatives" pour analyse admin.
