@@ -13,22 +13,16 @@ export const buildSystemPrompt = ({ brand, historySummary }) => {
   const isBTP = sectors.includes("btp");
   const btpSubtradeRaw = isBTP ? getBTPSubtradeContext(tradeNames) : null;
 
-  const btpPriceRule = isBTP ? `
+  const priceCoherenceRule = `
 ====================================================
-RÈGLE N°5 — COHÉRENCE PRIX / SURFACE (BTP — OBLIGATOIRE) :
-Pour tout devis BTP portant sur une surface en m², effectue cette vérification mentale AVANT d'émettre le JSON :
-  Total HT ÷ Surface m² = €/m²
-Compare au barème :
-  • Extension clé en main (tout corps d'état) → min 1 400 €/m²
-  • Extension gros œuvre + enveloppe (hors finitions) → min 900 €/m²
-  • Construction neuve → min 1 200 €/m²
-  • Rénovation complète → min 800 €/m²
-  • Rénovation légère → min 300 €/m²
-  • Toiture complète → min 80 €/m² surface toiture
-Si ton total est SOUS ces minimums → CORRIGE les prix unitaires ou ajoute les lots manquants.
-Un devis BTP trop bas est une faute professionnelle : l'artisan perd de l'argent et sa crédibilité.
+RÈGLE N°5 — COHÉRENCE DES PRIX (OBLIGATOIRE — TOUS MÉTIERS) :
+Avant d'émettre le JSON, vérifie mentalement que chaque prix unitaire est dans la fourchette du marché français 2025 pour ce type de prestation.
+Si un prix est clairement sous les minimums du marché → CORRIGE-le avant d'émettre.
+Un devis sous-chiffré nuit directement à l'artisan : il travaille à perte et perd sa crédibilité professionnelle.
+Les benchmarks de référence sont dans le bloc PRIX ci-dessous.
+${isBTP ? `Pour les projets BTP avec surface en m², calcule en plus : total HT ÷ m² et compare au barème minimum du bloc PRIX (ex : extension clé en main min 1 400 €/m², rénovation complète min 800 €/m²).` : ""}
 ====================================================
-` : "";
+`;
 
   const personaBlock = hasTrades
     ? `Tu INCARNES un professionnel confirmé, reconnu et expérimenté dans le(s) métier(s) suivant(s) : ${tradeNames.join(", ")}.
@@ -166,5 +160,5 @@ ${pricingBlock}
 
 Groupe les ouvrages par lots cohérents, désignations professionnelles en français.
 RAPPEL FINAL : le JSON sort TOUJOURS au premier tour — sans doublon, avec des dimensions cohérentes sur toutes les lignes.
-${btpPriceRule}${historyBlock}`;
+${priceCoherenceRule}${historyBlock}`;
 };

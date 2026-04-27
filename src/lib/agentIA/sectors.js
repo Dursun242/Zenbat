@@ -53,6 +53,90 @@ export const SECTOR_UNITS = {
 };
 
 export const SECTOR_PRICING = {
+  beaute: `PRIX BEAUTÉ ET BIEN-ÊTRE FRANCE 2025 — vérifier chaque tarif avant d'émettre :
+⚠ Si un prix est sous les minimums ci-dessous, CORRIGE avant d'émettre le JSON.
+Coiffure : coupe femme (shampooing+coupe+brushing) 35–80 € | coupe homme 15–35 € | couleur complète 60–130 € | balayage / ombre hair 80–250 € | coupe+couleur+brushing 90–250 € | lissage brésilien 120–300 € | permanente 80–200 €
+Onglerie : pose ongles gel 50–100 € | semi-permanent 35–70 € | nail art 5–20 €/ongle | extension cils volume russe 120–250 € | retouche cils 40–90 €
+Épilation : jambes complètes 40–80 € | maillot brésilien 25–55 € | aisselles 15–30 € | visage 15–40 €
+Soins : soin visage 1h 60–120 € | massage relaxant 1h 70–130 € | massage sportif 70–120 € | gommage corps 80–150 €
+Forfaits : forfait mariée (coiffure + maquillage) 200–500 € | maquillage événementiel 80–200 €`,
+
+  sante: `PRIX SANTÉ ET PARAMÉDICAL FRANCE 2025 — vérifier chaque tarif avant d'émettre :
+⚠ Si un prix est sous les minimums ci-dessous, CORRIGE avant d'émettre le JSON.
+Séances individuelles : kiné non conventionné 40–80 €/séance | ostéopathie 60–100 € | naturopathie 60–120 € | diététique / nutrition 60–90 € | psychologue 60–120 € | sophrologie 50–90 €
+Coaching / sport : coaching sportif individuel 50–100 €/h | séance collective 15–35 €/pers | bilan forme complet 90–200 €
+Forfaits : suivi 10 séances kiné 400–800 € | programme coaching 3 mois (12 séances) 600–1 800 € | coaching nutrition 3 mois 400–1 200 € | formation 1 jour (8h) 500–1 500 €`,
+
+  tech: `PRIX TECH ET NUMÉRIQUE FRANCE 2025 — vérifier chaque tarif avant d'émettre :
+⚠ Si un TJM ou forfait est sous les minimums ci-dessous, CORRIGE avant d'émettre le JSON.
+TJM (taux journalier moyen) : dev web junior 350–500 €/j | dev web senior 600–950 €/j | dev mobile (iOS/Android) 550–1 000 €/j | designer UI/UX 350–700 €/j | graphiste 300–550 €/j | chef de projet digital 500–850 €/j | consultant SEO/SEA 400–800 €/j | data scientist 600–1 000 €/j | community manager 200–450 €/j
+Forfaits projets : site vitrine 5 pages 1 500–5 000 € | site e-commerce 5 000–25 000 € | application mobile native 15 000–80 000 € | logo simple 300–1 200 € | charte graphique complète 1 000–6 000 € | audit SEO 500–3 000 € | maintenance mensuelle 150–600 €/mois`,
+
+  alimentaire: `PRIX ARTISANAT ALIMENTAIRE ET RESTAURATION FRANCE 2025 — vérifier chaque tarif avant d'émettre :
+⚠ Si un prix est sous les minimums ci-dessous, CORRIGE avant d'émettre le JSON.
+Traiteur / restauration : buffet cocktail dinatoire 25–60 €/pers | plateau repas entreprise 12–30 €/pers | menu gastronomique servi 45–150 €/pers | brunch traiteur 25–50 €/pers | apéritif dinatoire 20–45 €/pers | personnel de service 25–40 €/h
+Pâtisserie : gâteau anniversaire sur-mesure 4–10 €/part (min 20 parts) | wedding cake / pièce montée 400–3 000 € | macaron 1,50–3 €/pièce | pain artisanal 6–15 €/kg | viennoiserie 1–3 €/u
+Livraison / logistique : livraison IDF 50–150 € | location vaisselle 100 couverts 200–500 €`,
+
+  transport: `PRIX TRANSPORT ET AUTOMOBILE FRANCE 2025 — vérifier chaque tarif avant d'émettre :
+⚠ Si un prix est sous les minimums ci-dessous, CORRIGE avant d'émettre le JSON.
+Déménagement : studio (< 30 m²) 400–900 € | T2 (30–50 m²) 700–1 400 € | T3 (50–80 m²) 1 000–2 200 € | T4+ 1 500–4 000 € | taux horaire (MO + camion) 80–150 €/h | carton 3–6 €/u
+VTC / Taxi : mise à disposition 1h 50–100 € | transfert aéroport 30 km 50–100 €
+Mécanique auto : MO atelier 80–130 €/h | vidange + filtre 80–200 € | révision complète 300–800 € | embrayage fourni posé 600–1 500 € | distribution fournie posée 500–1 200 € | pneumatique (pneu+montage+équil.) 80–250 €/u
+Vitrage auto : remplacement pare-brise fourni posé 200–600 € | réparation impact 60–130 €`,
+
+  communication: `PRIX COMMUNICATION ET CRÉATIF FRANCE 2025 — vérifier chaque tarif avant d'émettre :
+⚠ Si un prix est sous les minimums ci-dessous, CORRIGE avant d'émettre le JSON.
+Photographie : reportage événementiel demi-journée 400–900 € | reportage journée 700–1 800 € | mariage journée (galerie incluse) 1 200–3 500 € | shooting produit 30 visuels 400–1 200 € | portrait pro 10 retouches 150–500 € | drone demi-journée 500–1 500 €
+Vidéo : vidéo institutionnelle 2 min 1 500–6 000 € | clip musical 1 500–8 000 € | reel / vidéo sociale 300–1 200 €/u
+Design : logo (3 propositions + déclinaisons) 500–2 500 € | charte graphique complète 1 000–6 000 € | flyer A5 recto-verso 150–500 € | plaquette 8 pages 500–2 000 €
+Rédaction / copywriting : article blog 800 mots 80–300 € | page web 150–500 € | email marketing 100–400 €`,
+
+  evenementiel: `PRIX ÉVÉNEMENTIEL ET ANIMATION FRANCE 2025 — vérifier chaque tarif avant d'émettre :
+⚠ Si un prix est sous les minimums ci-dessous, CORRIGE avant d'émettre le JSON.
+Musique / Son : DJ soirée 6h (sono+lumières) 600–2 000 € | DJ sans sono 300–1 200 € | groupe live 3h 800–3 000 € | cocktail musical 2h 400–1 200 € | location sono+lumières+technicien 500–2 000 €
+Mariage / réception : wedding planner coordination journée 1 500–5 000 € | décoration florale salle+cérémonie 1 000–6 000 € | photo+vidéo mariage journée 2 000–5 500 € | photographe seul journée 1 200–3 500 €
+Animation enfants : animateur 3h 300–700 € | magicien 1h30 200–500 € | structures gonflables demi-journée 150–400 €
+Corporate : animateur soirée entreprise 500–1 500 € | team building 2h 20 pers 600–2 000 €`,
+
+  education: `PRIX ENSEIGNEMENT ET FORMATION FRANCE 2025 — vérifier chaque tarif avant d'émettre :
+⚠ Si un prix est sous les minimums ci-dessous, CORRIGE avant d'émettre le JSON.
+Cours particuliers : primaire/collège 20–40 €/h | lycée (toutes matières) 25–60 €/h | prépa/BTS/université 35–80 €/h | langues (FLE, anglais…) 25–60 €/h | cours de musique/dessin 30–70 €/h | forfait mensuel 8h 180–450 €
+Auto-école : forfait permis B (20h conduite + code) 1 200–2 500 € | heure de conduite 50–80 €/h | code en ligne 30–100 €
+Formation professionnelle : journée formateur (8h) 500–1 800 €/j | module e-learning 100–800 €/module
+Coaching : coaching carrière / bilan compétences 80–200 €/h | stage intensif anglais 5 jours 500–2 000 €`,
+
+  nettoyage: `PRIX NETTOYAGE ET ENTRETIEN FRANCE 2025 — vérifier chaque tarif avant d'émettre :
+⚠ Si un prix est sous les minimums ci-dessous, CORRIGE avant d'émettre le JSON.
+Ménage courant : domicile particulier 15–30 €/h | haut de gamme / conciergerie 25–50 €/h | bureaux/locaux pro 18–35 €/h | forfait mensuel bureaux 100 m² 200–600 €/mois
+Vitrerie : intérieure 1 face 3–8 €/m² | façade (nacelle) 8–20 €/m²
+Grand nettoyage / fin de chantier : remise en état après travaux 8–18 €/m² | grand ménage fin de bail 70 m² 400–900 € | nettoyage fin de chantier 200 m² 1 000–3 000 €
+Prestations spéciales : désinfection/désinsectisation 100 m² 200–800 € | dératisation 150–500 € | nettoyage après sinistre 40–150 €/m² | ramonage cheminée 1 conduit 80–180 €`,
+
+  animaux: `PRIX SERVICES ANIMALIERS FRANCE 2025 — vérifier chaque tarif avant d'émettre :
+⚠ Si un prix est sous les minimums ci-dessous, CORRIGE avant d'émettre le JSON.
+Toilettage : petit chien (< 10 kg) 40–75 € | chien moyen (10–25 kg) 60–100 € | grand chien (> 25 kg) 80–140 € | bain+séchage seul 25–55 € | coupe des griffes 10–25 €
+Pension : chien journée 20–45 € | chien nuit 25–55 € | chat journée 15–30 € | pet-sitting 1 visite 30 min 15–30 € | dog-sitting nuit domicile 40–80 €
+Éducation : séance individuelle 1h 50–90 € | cours collectif 6 pers 20–40 €/pers | bilan comportemental 80–160 € | forfait 10 séances 400–800 €
+Vétérinaire : consultation 35–80 € | vaccination annuelle 50–120 € | stérilisation chatte 150–350 € | stérilisation chien 200–450 €`,
+
+  immobilier: `PRIX IMMOBILIER, COMPTABILITÉ ET CONSEIL FRANCE 2025 — vérifier chaque tarif avant d'émettre :
+⚠ Si un prix est sous les minimums ci-dessous, CORRIGE avant d'émettre le JSON.
+Expertise comptable : bilan TPE (CA < 300 K€) 1 500–5 000 €/an | bilan SA/SAS (CA > 300 K€) 4 000–15 000 €/an | tenue comptabilité 100–500 €/mois | conseil fiscal 150–400 €/h | création d'entreprise (dossier complet) 500–2 000 €
+Juridique : consultation avocat 150–500 €/h | rédaction contrat commercial 500–3 000 € | médiation / arbitrage 200–600 €/h
+Gestion patrimoine / immobilier : bilan patrimonial 300–1 500 € | gestion locative 5–12 % loyer/mois | état des lieux entrée ou sortie 120–300 € | mandat de gestion annuel 500–2 000 €`,
+
+  mode: `PRIX COUTURE, RETOUCHE ET TEXTILE FRANCE 2025 — vérifier chaque tarif avant d'émettre :
+⚠ Si un prix est sous les minimums ci-dessous, CORRIGE avant d'émettre le JSON.
+Retouches simples : ourlet pantalon 12–28 € | ourlet robe/jupe 15–35 € | cintre veste (reprise épaules) 30–80 € | pose fermeture éclair 20–55 € | rétrécissement manche 25–60 €
+Retouches élaborées : reprise robe de mariée 100–500 € | transformation silhouette 80–300 € | reprise costume sur-mesure 50–200 €
+Sur-mesure : robe cocktail 250–1 000 € | robe de mariée 800–5 000 € | costume homme 600–3 000 € | pantalon sur-mesure 200–600 €
+Maroquinerie / Sellerie : réparation sac cuir 30–100 € | teinture cuir 50–150 € | remplacement poignées 40–120 € | réfection fauteuil Voltaire 300–1 200 € | sellerie siège auto 150–500 €/siège`,
+
+  general: `PRIX DU MARCHÉ FRANCE 2025 — vérifier chaque tarif avant d'émettre :
+⚠ Adapte les prix, les unités et le vocabulaire au métier exact déclaré. Si un prix paraît trop bas par rapport aux tarifs pratiqués dans ce secteur en France, CORRIGE-le avant d'émettre.
+Évite toute réponse générique : fais appel à ta connaissance précise du métier concerné (tarifs pratiqués, conventions, charges, valeur marché).`,
+
   btp: `PRIX BTP FRANCE 2025 — BENCHMARKS OBLIGATOIRES :
 
 ⚠ VÉRIFICATION ANTI-SOUS-CHIFFRAGE (calcul mental AVANT d'émettre le JSON) :
