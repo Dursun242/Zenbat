@@ -243,7 +243,7 @@ export default function LandingNav({ onLogin, onSignup }) {
               Se connecter
             </button>
             <button className="ln-cta" onClick={onSignup}>
-              Essai 30 jours gratuit
+              Tester gratuitement
             </button>
           </div>
 
@@ -300,7 +300,7 @@ export default function LandingNav({ onLogin, onSignup }) {
             className="ln-mobile-cta"
             onClick={() => { setMenuOpen(false); onSignup?.() }}
           >
-            Essai 30 jours gratuit
+            Tester gratuitement
           </button>
         </div>
       )}

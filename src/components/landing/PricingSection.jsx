@@ -198,7 +198,7 @@ export default function PricingSection() {
             fontSize: 15, color: '#6B6358',
             maxWidth: 420, margin: '0 auto', lineHeight: 1.7,
           }}>
-            30 jours d'essai gratuit, sans carte bancaire.
+            Essai gratuit, sans carte bancaire.
             Engagez-vous seulement quand vous êtes convaincu.
           </p>
         </div>
@@ -355,7 +355,7 @@ export default function PricingSection() {
                   cursor: 'pointer', transition: 'all .2s', marginBottom: 8,
                 }}
               >
-                Essayer 30 jours gratuit
+                Tester gratuitement
               </button>
               <p style={{ textAlign: 'center', fontSize: 11, color: '#B0A898', margin: 0 }}>
                 Aucune carte bancaire requise
@@ -454,7 +454,7 @@ export default function PricingSection() {
                   boxShadow: '0 4px 14px rgba(201,123,92,.22)',
                 }}
               >
-                Essayer 30 jours gratuit
+                Tester gratuitement
               </button>
               <p style={{ textAlign: 'center', fontSize: 11, color: '#B0A898', margin: 0 }}>
                 Aucune carte bancaire requise

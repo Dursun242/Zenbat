@@ -228,7 +228,7 @@ export default function LandingHero({ onSignup }) {
               whileHover={{ scale: 1.02, backgroundColor: '#A55F44' }}
               onClick={onSignup}
               style={{ padding: '13px 26px', borderRadius: 10, border: 'none', background: '#C97B5C', color: '#fff', fontSize: 15, fontWeight: 600, cursor: 'pointer', transition: 'background .2s' }}>
-              Essayer 30 jours gratuit
+              Tester gratuitement
             </motion.button>
             <a href="#features" style={{ padding: '13px 26px', borderRadius: 10, border: '1.5px solid #E8E2D8', background: 'transparent', color: '#6B6358', fontSize: 15, fontWeight: 500, cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
               Voir une démo

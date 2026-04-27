@@ -105,7 +105,7 @@ export default function LandingFooter({ onSignup }) {
             marginBottom: 0,
           }}
         >
-          30 jours pour tester Zenbat sans engagement, sans CB, sans risque.
+          Testez Zenbat sans engagement, sans CB, sans risque.
         </p>
 
         <button
