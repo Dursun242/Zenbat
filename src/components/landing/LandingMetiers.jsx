@@ -66,8 +66,8 @@ function Card({ card, isMobile }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 32 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
       viewport={{ once: true }}
       transition={{ duration: 0.55, delay, ease: [0.22, 1, 0.36, 1] }}
       whileHover={{ y: -4, boxShadow: "0 16px 48px rgba(26,22,18,0.10)" }}

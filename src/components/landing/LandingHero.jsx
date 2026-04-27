@@ -2,6 +2,16 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mic, CheckCircle2 } from 'lucide-react'
 
+function FrFlag() {
+  return (
+    <svg width="18" height="13" viewBox="0 0 18 13" style={{ borderRadius: 2, flexShrink: 0 }} aria-label="Drapeau français">
+      <rect x="0"  y="0" width="6"  height="13" fill="#002395" />
+      <rect x="6"  y="0" width="6"  height="13" fill="#FFFFFF" />
+      <rect x="12" y="0" width="6"  height="13" fill="#ED2939" />
+    </svg>
+  )
+}
+
 const TYPEWRITER_TEXT = 'Cuisine 25m², carrelage sol et murs, peinture plafond, livraison 15 jours'
 const DEVIS_LINES = [
   { label: 'Carrelage sol et murs', qty: '25 m²', pu: '85 €', total: '2 125 €' },
@@ -194,25 +204,25 @@ export default function LandingHero({ onSignup }) {
           {/* Badges */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 28 }}>
             <motion.div
-              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
               transition={{ duration: 0.6, ease: [.16,1,.3,1] }}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(201,123,92,.10)', border: '1px solid rgba(201,123,92,.22)', borderRadius: 20, padding: '6px 14px' }}>
-              <span style={{ fontSize: 13 }}>🇫🇷</span>
+              <FrFlag />
               <span style={{ color: '#C97B5C', fontSize: 11, fontWeight: 600, letterSpacing: '.6px' }}>1ʳᵉ APP FRANÇAISE · DEVISEUR ASSISTANT IA</span>
             </motion.div>
 
             <motion.div
-              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.08, ease: [.16,1,.3,1] }}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(26,22,18,.05)', border: '1px solid rgba(26,22,18,.10)', borderRadius: 20, padding: '6px 14px' }}>
-              <span style={{ fontSize: 13 }}>🇫🇷</span>
+              <FrFlag />
               <span style={{ color: '#3D3832', fontSize: 11, fontWeight: 600, letterSpacing: '.6px' }}>FACTURATION ÉLECTRONIQUE · CONFORME LÉGISLATION FRANÇAISE</span>
             </motion.div>
           </div>
 
           {/* H1 */}
           <motion.h1
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             transition={{ duration: 0.65, delay: 0.1, ease: [.16,1,.3,1] }}
             style={{ fontFamily: "'Syne', sans-serif", fontSize: mobile ? 40 : 64, fontWeight: 500, lineHeight: 1.08, color: '#1A1612', letterSpacing: '-1.5px', marginBottom: 22 }}>
             Parlez. L'IA rédige<br />
@@ -222,7 +232,7 @@ export default function LandingHero({ onSignup }) {
 
           {/* Sous-titre */}
           <motion.p
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             transition={{ duration: 0.65, delay: 0.2, ease: [.16,1,.3,1] }}
             style={{ fontSize: 17, color: '#6B6358', lineHeight: 1.75, marginBottom: 36, maxWidth: 480 }}>
             Décrivez votre chantier en quelques mots — l'IA structure les postes, calcule les prix,
@@ -231,7 +241,7 @@ export default function LandingHero({ onSignup }) {
 
           {/* CTAs */}
           <motion.div
-            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.28, ease: [.16,1,.3,1] }}
             style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
             <motion.button

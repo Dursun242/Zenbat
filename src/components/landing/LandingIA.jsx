@@ -113,8 +113,8 @@ export default function LandingIA() {
     >
       <style>{`
         @keyframes ia-fadein {
-          from { opacity: 0; transform: translateY(24px); }
-          to   { opacity: 1; transform: translateY(0); }
+          from { opacity: 0; }
+          to   { opacity: 1; }
         }
         .ia-v0 { animation: ia-fadein .65s cubic-bezier(.16,1,.3,1) both; }
         .ia-v1 { animation: ia-fadein .65s .10s cubic-bezier(.16,1,.3,1) both; }

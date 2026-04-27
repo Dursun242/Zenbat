@@ -80,8 +80,8 @@ export default function PricingSection() {
     >
       <style>{`
         @keyframes ps-up {
-          from { opacity: 0; transform: translateY(28px); }
-          to   { opacity: 1; transform: translateY(0);    }
+          from { opacity: 0; }
+          to   { opacity: 1; }
         }
         /* Classes d'apparition avec délais échelonnés */
         .ps-v0 { animation: ps-up .62s cubic-bezier(.16,1,.3,1) both; }
