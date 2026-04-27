@@ -73,19 +73,20 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
 
-      const pdfBytes = Uint8Array.from(atob(data.pdf_base64), c => c.charCodeAt(0));
-      const blob     = new Blob([pdfBytes], { type: "application/pdf" });
-      downloadBlob(blob, `${invoice.numero}-facturx.pdf`);
-
-      // Conformité : la génération Factur-X est l'émission de la facture.
-      // On bascule statut → 'envoyee' ; le trigger Postgres pose locked=true.
+      // Conformité : verrouiller la facture AVANT le téléchargement.
+      // Si on télécharge d'abord et que l'onglet se ferme, la facture reste
+      // modifiable alors qu'elle a déjà été émise (CGI art. 289).
       if (invoice.statut === "brouillon") {
         try {
-          onChange({ ...invoice, statut: "envoyee", locked: true }, false);
+          await onChange({ ...invoice, statut: "envoyee", locked: true }, false);
         } catch (lockErr) {
           console.warn("[facturx/lock]", lockErr);
         }
       }
+
+      const pdfBytes = Uint8Array.from(atob(data.pdf_base64), c => c.charCodeAt(0));
+      const blob     = new Blob([pdfBytes], { type: "application/pdf" });
+      downloadBlob(blob, `${invoice.numero}-facturx.pdf`);
 
       setExportMsg(
         (data.icc_applied

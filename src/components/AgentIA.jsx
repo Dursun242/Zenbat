@@ -183,7 +183,10 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
                 apiError = msg.error?.message || "Erreur Anthropic";
                 throw new Error("api");
               }
-            } catch { /* chunk partiel — on ignore */ }
+            } catch (parseErr) {
+              if (parseErr?.message === "api") throw parseErr;
+              /* chunk partiel JSON — on ignore */
+            }
           }
         }
       }

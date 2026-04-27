@@ -24,6 +24,7 @@ import InvoicesList  from "./components/InvoicesList.jsx";
 import InvoiceDetail from "./components/InvoiceDetail.jsx";
 import AgentIA       from "./components/AgentIA.jsx";
 import AdminPanel    from "./components/AdminPanel.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import Onboarding        from "./pages/Onboarding.jsx";
 import TradesQuickPicker from "./pages/TradesQuickPicker.jsx";
 import AuthScreen        from "./pages/AuthScreen.jsx";
@@ -276,7 +277,11 @@ export default function App() {
               onOpenDevisPDF={(id) => { setAutoOpenPDF(id); goDevis(id); }}
               brand={brand}/>
           )}
-          {tab === "admin" && isAdmin && <AdminPanel onBack={() => setTab("dashboard")}/>}
+          {tab === "admin" && isAdmin && (
+            <ErrorBoundary>
+              <AdminPanel onBack={() => setTab("dashboard")}/>
+            </ErrorBoundary>
+          )}
         </div>
       </div>
 

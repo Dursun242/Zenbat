@@ -34,16 +34,20 @@ export default async function handler(req, res) {
   const brevoKey = process.env.BREVO_API_KEY
   const adminEmail = process.env.ADMIN_EMAIL
   if (brevoKey && adminEmail) {
-    fetch('https://api.brevo.com/v3/smtp/email', {
-      method:  'POST',
-      headers: { 'api-key': brevoKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sender:      { name: 'Zenbat', email: adminEmail },
-        to:          [{ email: adminEmail }],
-        subject:     '📩 Nouvel abonné newsletter Zenbat',
-        htmlContent: `<p>Nouveau compte inscrit à la newsletter :</p><p><strong>${email.toLowerCase().trim()}</strong></p><p>Source : landing page</p>`,
-      }),
-    }).catch(() => {}) // silencieux si Brevo échoue
+    const safeEmail = email.toLowerCase().trim()
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    try {
+      await fetch('https://api.brevo.com/v3/smtp/email', {
+        method:  'POST',
+        headers: { 'api-key': brevoKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sender:      { name: 'Zenbat', email: adminEmail },
+          to:          [{ email: adminEmail }],
+          subject:     'Nouvel abonné newsletter Zenbat',
+          htmlContent: `<p>Nouveau compte inscrit à la newsletter :</p><p><strong>${safeEmail}</strong></p><p>Source : landing page</p>`,
+        }),
+      })
+    } catch { /* silencieux si Brevo échoue */ }
   }
 
   return res.status(200).json({ ok: true })

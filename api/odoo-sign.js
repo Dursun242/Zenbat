@@ -1,3 +1,4 @@
+import { createClient } from "@supabase/supabase-js";
 import { cors } from "./_cors.js";
 
 // Proxy vers Odoo Sign — authentifie, upload le PDF, crée une demande de signature
@@ -50,10 +51,24 @@ async function odooLogin({ base, db, username, password }) {
 }
 
 export default async function handler(req, res) {
-  cors(req, res, { methods: "POST, OPTIONS", auth: false });
+  cors(req, res, { methods: "POST, OPTIONS", auth: true });
 
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  const token = req.headers.authorization?.replace("Bearer ", "");
+  if (!token) return res.status(401).json({ error: "Non authentifié" });
+
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey)
+    return res.status(500).json({ error: "Supabase non configuré" });
+
+  const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
+  if (authErr || !user) return res.status(401).json({ error: "Token invalide" });
 
   const { ODOO_URL, ODOO_DB, ODOO_USERNAME, ODOO_API_KEY } = process.env;
   if (!ODOO_URL || !ODOO_DB || !ODOO_USERNAME || !ODOO_API_KEY) {
