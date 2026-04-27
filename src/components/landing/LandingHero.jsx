@@ -196,8 +196,8 @@ export default function LandingHero({ onSignup }) {
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: [.16,1,.3,1] }}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(201,123,92,.10)', border: '1px solid rgba(201,123,92,.22)', borderRadius: 20, padding: '6px 14px', marginBottom: 28 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#C97B5C', display: 'inline-block', animation: 'lp-badge 2.5s ease infinite' }} />
-            <span style={{ color: '#C97B5C', fontSize: 11, fontWeight: 600, letterSpacing: '.6px' }}>IA GÉNÉRATIVE · 30 JOURS GRATUITS</span>
+            <span style={{ fontSize: 13 }}>🇫🇷</span>
+            <span style={{ color: '#C97B5C', fontSize: 11, fontWeight: 600, letterSpacing: '.6px' }}>1ʳᵉ APP FRANÇAISE · DEVISEUR ASSISTANT IA</span>
           </motion.div>
 
           {/* H1 */}
