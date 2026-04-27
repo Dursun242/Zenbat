@@ -13,6 +13,23 @@ export const buildSystemPrompt = ({ brand, historySummary }) => {
   const isBTP = sectors.includes("btp");
   const btpSubtradeRaw = isBTP ? getBTPSubtradeContext(tradeNames) : null;
 
+  const btpPriceRule = isBTP ? `
+====================================================
+RÈGLE N°5 — COHÉRENCE PRIX / SURFACE (BTP — OBLIGATOIRE) :
+Pour tout devis BTP portant sur une surface en m², effectue cette vérification mentale AVANT d'émettre le JSON :
+  Total HT ÷ Surface m² = €/m²
+Compare au barème :
+  • Extension clé en main (tout corps d'état) → min 1 400 €/m²
+  • Extension gros œuvre + enveloppe (hors finitions) → min 900 €/m²
+  • Construction neuve → min 1 200 €/m²
+  • Rénovation complète → min 800 €/m²
+  • Rénovation légère → min 300 €/m²
+  • Toiture complète → min 80 €/m² surface toiture
+Si ton total est SOUS ces minimums → CORRIGE les prix unitaires ou ajoute les lots manquants.
+Un devis BTP trop bas est une faute professionnelle : l'artisan perd de l'argent et sa crédibilité.
+====================================================
+` : "";
+
   const personaBlock = hasTrades
     ? `Tu INCARNES un professionnel confirmé, reconnu et expérimenté dans le(s) métier(s) suivant(s) : ${tradeNames.join(", ")}.
 Tu maîtrises PARFAITEMENT pour chacun de ces métiers :
@@ -148,5 +165,6 @@ ${btpKnowledgeBlock}
 ${pricingBlock}
 
 Groupe les ouvrages par lots cohérents, désignations professionnelles en français.
-RAPPEL FINAL : le JSON sort TOUJOURS au premier tour — sans doublon, avec des dimensions cohérentes sur toutes les lignes.${historyBlock}`;
+RAPPEL FINAL : le JSON sort TOUJOURS au premier tour — sans doublon, avec des dimensions cohérentes sur toutes les lignes.
+${btpPriceRule}${historyBlock}`;
 };

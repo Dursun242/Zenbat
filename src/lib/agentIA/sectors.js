@@ -53,7 +53,69 @@ export const SECTOR_UNITS = {
 };
 
 export const SECTOR_PRICING = {
-  btp:           "Prix réalistes BTP France 2025. Ex : main-d'œuvre élec 45-65 €/h, pose carrelage 30-50 €/m², isolation combles 20-40 €/m².",
+  btp: `PRIX BTP FRANCE 2025 — BENCHMARKS OBLIGATOIRES :
+
+⚠ VÉRIFICATION ANTI-SOUS-CHIFFRAGE (calcul mental AVANT d'émettre le JSON) :
+Divise ton total HT par la surface du projet. Si le résultat est sous les minimums ci-dessous, AUGMENTE les prix unitaires — un devis trop bas est une erreur professionnelle grave.
+
+FOURCHETTES GLOBALES €/m² HT selon type de chantier :
+• Extension clé en main (fondations + maçonnerie + charpente + couverture + menuiseries + élec + plomberie + carrelage + peinture) : 1 400–2 200 €/m²
+• Extension gros œuvre + enveloppe uniquement (hors finitions intérieures) : 900–1 400 €/m²
+• Construction neuve maison individuelle (hors terrain, hors VRD) : 1 200–2 000 €/m²
+• Surélévation structure bois : 1 800–3 000 €/m²
+• Rénovation complète tout corps d'état : 800–1 500 €/m²
+• Rénovation cosmétique (peinture + sols + sanitaire) : 300–700 €/m²
+• ITE + ravalement : 100–220 €/m² de façade
+• Toiture complète (dépose + repose) : 80–250 €/m² de surface toiture
+• Salle de bain complète (≈ 6 m²) : 5 000–15 000 € HT selon gamme
+
+TARIFS UNITAIRES PAR CORPS D'ÉTAT (MO + mat sauf mention) :
+Gros œuvre / maçonnerie :
+  Terrassement fouilles en rigole : 20–50 €/m³
+  Béton de propreté dosé 150 kg/m³ : 60–110 €/m²
+  Fondations béton armé semelles filantes : 150–320 €/ml | dalle BA : 80–170 €/m²
+  Maçonnerie parpaings 20 cm élévation : 80–160 €/m² mur
+  Brique monomur 37 cm : 110–210 €/m²
+  Chaînages horizontaux HA10 : 25–60 €/ml
+  Appuis de fenêtre préfabriqués : 30–75 €/ml
+  Enduit monocouche extérieur gratté : 25–55 €/m²
+  Remblai compacté : 15–40 €/m³
+
+Charpente :
+  Traditionnelle (sapin traité) fournie posée : 65–140 €/m² toiture
+  Fermettes industrielles : 35–75 €/m²
+  Ossature bois extension : 110–220 €/m²
+
+Couverture :
+  Tuiles mécaniques avec litteau + écran HPV + pose : 45–90 €/m²
+  Ardoise naturelle posée : 90–200 €/m²
+  Zinc joint debout : 110–220 €/m²
+  Zinguerie (faîtage, rives, noues, chéneaux) : 40–100 €/ml
+
+Menuiseries extérieures PVC DV fournie + posée :
+  Fenêtre 100×120 cm : 350–750 €/u
+  Porte-fenêtre 2 vantaux 200×240 cm : 650–1 500 €/u
+  Porte d'entrée : 800–2 800 €/u
+
+Électricité :
+  Main-d'œuvre : 45–75 €/h
+  Installation complète maison neuve : 80–170 €/m² (tableau + réseaux + appareillage)
+
+Plomberie / Chauffage :
+  Main-d'œuvre : 50–85 €/h
+  Réseau cuivre fourni posé : 30–65 €/ml
+  Salle de bain complète équipée (fourniture + pose) : 4 500–12 000 €
+
+Isolation :
+  Combles perdus soufflés R ≥ 7 : 22–50 €/m²
+  Rampants R ≥ 6 : 35–85 €/m²
+  Plancher bas R ≥ 3 : 20–55 €/m²
+
+Carrelage / revêtements : fourniture + pose gamme courante : 45–95 €/m² | ragréage 15–35 €/m²
+
+Peinture intérieure 2 couches (préparation incluse) : 14–32 €/m² mur
+
+⚠ RÈGLE "CLÉ EN MAIN" : Si la demande précise "clé en main", "tout compris" ou "livré prêt à habiter", le devis DOIT inclure TOUS les corps d'état : fondations, maçonnerie, charpente, couverture, menuiseries, isolation, électricité, plomberie/sanitaire, carrelage, peinture. Omettre un corps d'état sur un "clé en main" est une erreur professionnelle qui peut engager la responsabilité de l'artisan.`,
   beaute:        "Tarifs beauté France 2025. Ex : coupe femme 35-80 €, soin visage 60-120 €, pose ongles 40-80 €, épilation 20-60 €.",
   sante:         "Tarifs paramédicaux France 2025. Ex : séance kiné 40-70 €, ostéo 60-90 €, coaching sportif 50-100 €/h, consultation diét. 60-80 €.",
   tech:          "TJM tech France 2025. Ex : dev web junior 350-500 €/j, senior 600-900 €/j, graphiste 300-600 €/j, chef de projet 500-800 €/j.",
