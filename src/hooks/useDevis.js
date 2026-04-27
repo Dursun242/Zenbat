@@ -91,7 +91,8 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
       .catch(err => {
         setLoadingDevis(prev => { const n = new Set(prev); n.delete(id); return n; });
         console.error("[goDevis reload]", err);
-        showErr("Impossible de charger le devis — vérifiez votre connexion");
+        const hasCached = devis.some(x => x.id === id);
+        if (!hasCached) showErr("Impossible de charger le devis — vérifiez votre connexion");
       });
   };
 
