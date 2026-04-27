@@ -83,7 +83,7 @@ export const SECTOR_TVA = {
 
 ⚠ Règle des 30 % : si les fournitures dépassent 30 % du prix total HT, facturer les fournitures à 20 % et la main-d'œuvre au taux réduit applicable. Séparer en lots distincts dans le JSON.
 ⚠ Attestation simplifiée : le client doit remettre une attestation certifiant que le local est un logement à usage d'habitation achevé depuis > 2 ans. Sans attestation signée, applique 20 % par défaut.
-⚠ Autoliquidation sous-traitance (art. 283-2 nonies CGI) : si le client est lui-même un assujetti TVA (entreprise, autre artisan, promoteur) et que tu interviens en tant que sous-traitant, la TVA est autoliquidée par le donneur d'ordre. Dans ce cas : tva_rate = 0 sur TOUTES les lignes ET ajoute la mention "Autoliquidation de la TVA — art. 283-2 nonies CGI. TVA due par le preneur assujetti." dans le champ objet ou dans un lot de type commentaire.
+⚠ Autoliquidation sous-traitance (art. 283-2 nonies CGI) : si l'utilisateur mentionne l'un de ces signaux — "sous-traitant", "sous-traitance", "promoteur", "maître d'œuvre", "entreprise générale", "donneur d'ordre", "constructeur", "maître d'ouvrage délégué", ou si le client est clairement une société du bâtiment (SAS, SARL, EI assujettie à la TVA) — la TVA est autoliquidée par le donneur d'ordre. Dans ce cas : tva_rate = 0 sur TOUTES les lignes ET ajoute la mention "Autoliquidation de la TVA — art. 283-2 nonies CGI. TVA due par le preneur assujetti." dans l'objet du devis ou dans un lot dédié de type commentaire.
 
 Si une même facture mélange plusieurs taux, décomposer impérativement par lots distincts avec tva_rate explicite sur chaque ligne.`,
   alimentaire: `TVA :
@@ -153,6 +153,34 @@ export const BTP_SUBTRADE_KNOWLEDGE = {
     decomposition: "Décomposer : 1) Dépose + évacuation. 2) Ragréage autonivelant si nécessaire (m², épaisseur). 3) Fourniture carrelage (m², format + référence). 4) Colle (C2S1 mural, C2S2 sol déformable). 5) Pose (m²). 6) Joints (époxy ou ciment, teinte). 7) Plinthes/profilés de finition.",
     details: "Préciser : format (30×60, 60×60, 80×80…), type (grès cérame pleine masse, faïence, pierre naturelle), finition (mat, poli, structuré), classe UPEC pour sol. Prévoir 10 % de chutes minimum dans les quantités.",
   },
+  menuiserie: {
+    keywords: ["menuiserie", "menuisier", "fenêtre", "porte", "baie vitrée", "volet", "portail", "parquet"],
+    normes: "DTU 36.1 (menuiseries bois extérieures), DTU 36.5 (fenêtres et portes-fenêtres aluminium/PVC), NF EN 14351 (performances thermiques et acoustiques).",
+    mentions: "Assurance décennale obligatoire pour menuiseries extérieures (étanchéité à l'eau et à l'air). Préciser les performances sur le devis : Uw (W/m²·K) pour le thermique, Rw (dB) pour l'acoustique.",
+    decomposition: "Décomposer : 1) Dépose menuiseries existantes + évacuation. 2) Fourniture (u, préciser dimensions H×L, matériau : bois/PVC/alu, vitrage : double/triple, Uw cible). 3) Pose + calfeutrement + joints périphériques. 4) Quincaillerie et serrurerie. 5) Finitions (habillage tableau, appui de fenêtre).",
+    details: "Matériaux : PVC (entretien facile, Uw ≈ 1,3), aluminium (esthétique, Uw ≈ 1,6), bois (Uw ≈ 1,4). Vitrages : double vitrage 4/16/4 standard, triple vitrage 4/12/4/12/4 pour passif. Préciser ouvrant, oscillo-battant, fixe ou coulissant.",
+  },
+  vitrerie: {
+    keywords: ["vitrerie", "vitrier", "vitrage", "miroir", "double vitrage", "miroiterie"],
+    normes: "DTU 39.1 (vitrerie miroiterie), NF EN 12150 (verre trempé), NF EN 14449 (verre feuilleté). Règlement de sécurité ERP pour vitrages de sécurité.",
+    mentions: "Garantie décennale pour vitrages structurels ou façades vitrées. Préciser la classe de sécurité du vitrage (feuilleté anti-effraction, anti-chute selon hauteur).",
+    decomposition: "Décomposer : 1) Dépose vitrage existant + évacuation. 2) Fourniture vitrage (m² ou u, préciser composition : 4/16Ar/4 VSG, épaisseur, traitement : Low-E, feuilleté, trempé). 3) Pose + masticage ou profilerie. 4) Joints périphériques.",
+    details: "Types de vitrages : simple (U = 5,8), double (U = 1,1–2,8), triple (U = 0,5–0,8). Ug (conductivité vitrage seul), Uw (conductivité fenêtre complète), Sw (facteur solaire). Feuilleté : 33.1 (anti-chute), 44.2 (anti-effraction P2A). Trempé : résistance ×5 au choc.",
+  },
+  sols_souples: {
+    keywords: ["sols souples", "revêtement souple", "lino", "linoléum", "vinyl", "moquette", "sol pvc"],
+    normes: "DTU 53.1 (revêtements de sol plastiques collés), DTU 53.2 (moquettes). Classement UPEC obligatoire pour tout sol (U = usure, P = poinçonnement, E = eau, C = chimie).",
+    mentions: "Garantie biennale (2 ans) sur la pose. Contrôler le taux d'humidité du support avant pose (< 3 % pour béton, < 5 % pour anhydrite).",
+    decomposition: "Décomposer : 1) Dépose + évacuation ancien revêtement. 2) Ragréage autonivelant si nécessaire (m², épaisseur). 3) Fourniture revêtement (m², préciser marque, épaisseur, classement UPEC). 4) Colle (m², type selon support). 5) Pose. 6) Profilés de finition et plinthes.",
+    details: "Classements courants : U2P2E1C0 (chambre), U3P3E1C1 (séjour), U4P3E2C2 (bureau/commerce). LVT/SPC : rigide, pose flottante possible, résistant à l'eau. Vinyl en lé : pose collée obligatoire, lés de 2 ou 4 m de largeur. Épaisseur couche d'usure : 0,2 mm (résidentiel léger) à 0,7 mm (intensif).",
+  },
+  vrd: {
+    keywords: ["vrd", "voirie", "réseau", "terrassement", "assainissement", "enrobé", "bordure", "trottoir", "canalisations"],
+    normes: "DTU 12 (terrassement général). Guides techniques SETRA/Cerema pour voirie. DTU 64.1 (assainissement non collectif). Fascicule 70 (réseaux EU/EP).",
+    mentions: "Déclaration de travaux ou permis de voirie selon collectivité. DT/DICT obligatoire avant tout terrassement (déclaration de travaux à proximité de réseaux). Assurance décennale pour ouvrages hydrauliques et voirie.",
+    decomposition: "Décomposer : 1) Décaissement + évacuation (m³). 2) Sous-couche (m², préciser épaisseur + matériau : GNT 0/31,5, ballast). 3) Revêtement (m², préciser : enrobé ép., béton dosage, pavés dimensions). 4) Bordures/caniveaux (ml, type T2/T3/CS1). 5) Réseaux EU/EP (ml, matériau, diamètre). 6) Regards de visite (u, type). 7) MO.",
+    details: "Enrobé : préciser épaisseur couche de base (BB3 ou GB) + couche de roulement (BBSG 0/10 ou 0/6). Béton voirie : C25/30, dosage 350 kg/m³, armé si > 12 cm. Assainissement : PVC ø 160 (branchement), ø 200 (collecteur). Pentes mini EU 0,5 %, EP 0,3 %.",
+  },
 };
 
 // Retourne le bloc de connaissance technique pour les sous-métiers BTP détectés.
@@ -177,7 +205,7 @@ export const buildSectorContext = (sectors, vatRegime) => {
   const pricing = sectors.map(s => SECTOR_PRICING[s] || SECTOR_PRICING.general).join("\n");
   const vocab = sectors.includes("btp") ? "travaux / ouvrages" : "prestations / services";
   const tvaContext = vatRegime === "franchise"
-    ? `TVA — RÈGLE ABSOLUE : franchise en base (art. 293 B). TOUS les ouvrages ont "tva_rate": 0. Ne propose jamais d'autre taux. Ne mentionne pas la TVA dans le chat.`
+    ? `TVA — RÈGLE ABSOLUE : franchise en base (art. 293 B). TOUS les ouvrages ont "tva_rate": 0. Ne propose jamais d'autre taux. Ne mentionne pas la TVA dans le chat.\n💡 Mention légale document : après le </DEVIS>, rappelle UNE SEULE FOIS que le devis imprimé doit porter la mention obligatoire : "TVA non applicable, art. 293 B du CGI".`
     : (SECTOR_TVA[sectors.find(s => SECTOR_TVA[s])] || SECTOR_TVA.default);
   return { expertDomain, units, pricing, vocab, tvaContext };
 };
