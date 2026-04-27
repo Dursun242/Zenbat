@@ -234,11 +234,19 @@ export async function createIndiceDevis(source) {
 
 export async function createDevis(devis, lignes = []) {
   const { data: { user } } = await supabase.auth.getUser()
-  const { data: d, error } = await supabase
-    .from('devis')
-    .insert({ ...devis, owner_id: user.id })
-    .select()
-    .single()
+  let payload = { ...devis, owner_id: user.id }
+  let d, error
+  // Retry jusqu'à 10× en cas de collision sur le numéro unique (owner_id, numero)
+  for (let attempt = 0; attempt < 10; attempt++) {
+    ;({ data: d, error } = await supabase.from('devis').insert(payload).select().single())
+    if (!error) break
+    if (error.code !== '23505') throw error
+    // Incrémente le numéro et réessaie : DEV-2026-0003 → DEV-2026-0004
+    const match = payload.numero?.match(/^(.*-)(\d+)$/)
+    payload = { ...payload, numero: match
+      ? `${match[1]}${String(Number(match[2]) + 1).padStart(match[2].length, '0')}`
+      : `${payload.numero || 'DEV'}-${attempt + 2}` }
+  }
   if (error) throw error
 
   if (lignes.length) {

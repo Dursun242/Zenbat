@@ -55,6 +55,10 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
     try {
       const { lignes: dl, client, created_at, updated_at, ...fields } = d;
       const saved = await apiCreateDevis(fields, (dl || []).map(({ id, created_at, ...l }) => l));
+      // Synchronise le numéro réel (peut différer si retry sur collision unique)
+      if (saved.numero !== d.numero) {
+        setDevis(prev => prev.map(x => x.id === d.id ? { ...x, numero: saved.numero } : x));
+      }
       if (dl?.length) {
         const fresh = await getDevis(saved.id);
         if (fresh && !fresh.lignes?.length) {
