@@ -66,6 +66,7 @@ function DevisRow({ d, cl, goDevis, onDelete, confirmDelete, setConfirmDelete })
 // Carte dossier pour un groupe de versions
 function DossierCard({ versions, cl, goDevis, onDelete }) {
   const [open, setOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   // Version active = la non-remplacée (dernière lettre)
   const active = versions.find(v => v.statut !== "remplace") || versions[versions.length - 1];
@@ -75,6 +76,13 @@ function DossierCard({ versions, cl, goDevis, onDelete }) {
       if (!a.indice) return -1;
       return b.indice.localeCompare(a.indice);
     });
+
+  const btnCancel  = id => <button key="cancel" onClick={e => { e.stopPropagation(); setConfirmDelete(null); }}
+    style={{ flexShrink: 0, padding: "3px 7px", borderRadius: 6, border: "1px solid #e5e7eb", background: "white", color: "#1A1612", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>Annuler</button>;
+  const btnConfirm = id => <button key="confirm" onClick={e => { e.stopPropagation(); onDelete(id); setConfirmDelete(null); }}
+    style={{ flexShrink: 0, padding: "3px 7px", borderRadius: 6, border: "none", background: "#dc2626", color: "white", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>Supprimer</button>;
+  const btnX       = id => <button key="x" onClick={e => { e.stopPropagation(); setConfirmDelete(id); }}
+    style={{ flexShrink: 0, padding: "3px 7px", borderRadius: 6, border: "none", background: "#fee2e2", color: "#dc2626", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>✕</button>;
 
   return (
     <div style={{ borderBottom: "1px solid #FAF7F2" }}>
@@ -113,24 +121,39 @@ function DossierCard({ versions, cl, goDevis, onDelete }) {
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1A1612" }}>{fmt(active.montant_ht)}</div>
           <div style={{ marginTop: 4 }}><Badge s={active.statut}/></div>
         </div>
+
+        {/* ✕ version active si brouillon */}
+        {active.statut === "brouillon" && onDelete && (
+          confirmDelete === active.id
+            ? <>{btnCancel(active.id)}{btnConfirm(active.id)}</>
+            : btnX(active.id)
+        )}
       </div>
 
       {/* Versions précédentes (expandable) */}
       {open && others.map(v => (
         <div key={v.id}
-          onClick={() => goDevis(v.id)}
           style={{ padding: "9px 16px 9px 44px", display: "flex", alignItems: "center", gap: 8,
-            background: "#FAF7F2", cursor: "pointer", borderTop: "1px solid #F0EBE3" }}
-          onMouseOver={e => e.currentTarget.style.background = "#F0EBE3"}
-          onMouseOut={e  => e.currentTarget.style.background = "#FAF7F2"}>
-          <span style={{ color: "#cbd5e1", fontSize: 11, flexShrink: 0 }}>└</span>
-          <IndiceChip indice={v.indice}/>
-          <span style={{ fontSize: 12, color: "#6B6358", flex: 1,
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {v.numero}
-          </span>
-          <span style={{ fontSize: 12, color: "#9A8E82", flexShrink: 0 }}>{fmt(v.montant_ht)}</span>
-          <Badge s={v.statut}/>
+            background: "#FAF7F2", borderTop: "1px solid #F0EBE3" }}>
+          <div onClick={() => goDevis(v.id)}
+            style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
+            onMouseOver={e => e.currentTarget.style.opacity = "0.7"}
+            onMouseOut={e  => e.currentTarget.style.opacity = "1"}>
+            <span style={{ color: "#cbd5e1", fontSize: 11, flexShrink: 0 }}>└</span>
+            <IndiceChip indice={v.indice}/>
+            <span style={{ fontSize: 12, color: "#6B6358", flex: 1,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {v.numero}
+            </span>
+            <span style={{ fontSize: 12, color: "#9A8E82", flexShrink: 0 }}>{fmt(v.montant_ht)}</span>
+            <Badge s={v.statut}/>
+          </div>
+          {/* ✕ version précédente si brouillon */}
+          {v.statut === "brouillon" && onDelete && (
+            confirmDelete === v.id
+              ? <>{btnCancel(v.id)}{btnConfirm(v.id)}</>
+              : btnX(v.id)
+          )}
         </div>
       ))}
     </div>
