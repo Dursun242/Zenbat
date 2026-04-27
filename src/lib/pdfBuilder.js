@@ -7,8 +7,6 @@ const X = PAD;
 const PAGE_BOTTOM = 283; // leave 14mm footer margin
 
 // RGB color constants — palette chaude Zenbat
-const TERRA    = [201, 123, 92];   // #C97B5C terracotta (accents, header, labels)
-const TERRA_BG = [240, 235, 227];  // #F0EBE3 fond chaud pour lots/totaux
 const WHITE    = [255, 255, 255];
 const BORDER   = [232, 226, 216];  // #E8E2D8 bordure chaude
 const BORDER2  = [210, 202, 190];  // légèrement plus soutenu
@@ -40,6 +38,14 @@ const s = (v) => String(v ?? '')
   .replace(/•/g, '-')   // •
   .replace(/[“”]/g, '"') // ""
   .replace(/[‘’]/g, "'"); // ''
+
+function hexToRgb(hex) {
+  const h = (hex || "#C97B5C").replace("#", "");
+  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+}
+function mixWhite(rgb, t) {
+  return rgb.map(c => Math.round(c * t + 255 * (1 - t)));
+}
 
 function setFill(pdf, rgb) { pdf.setFillColor(rgb[0], rgb[1], rgb[2]); }
 function setDraw(pdf, rgb, w = 0.2) { pdf.setDrawColor(rgb[0], rgb[1], rgb[2]); pdf.setLineWidth(w); }
@@ -104,6 +110,9 @@ async function loadImgAsPng(url) {
 // ─── Main builder ─────────────────────────────────────────────────────────────
 
 export async function buildPdf(d, cl, brand, kind = "devis", { filename = "document.pdf" } = {}) {
+  const TERRA    = hexToRgb(brand.color);
+  const TERRA_BG = mixWhite(TERRA, 0.20);
+
   const isAvoir   = kind === "facture" && !!d?.avoir_of_invoice_id;
   const isAcompte = kind === "facture" && d?.invoice_type === "acompte";
   const docLabel  = isAvoir ? "FACTURE D'AVOIR" : isAcompte ? "FACTURE D'ACOMPTE" : kind === "facture" ? "FACTURE" : "DEVIS";

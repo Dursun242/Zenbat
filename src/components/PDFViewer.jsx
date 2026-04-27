@@ -86,7 +86,11 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
   const ttc = ht + tva
   const fontFamily = brand.fontStyle==="elegant"?"Playfair Display":brand.fontStyle==="tech"?"Space Grotesk":"DM Sans"
   const navy  = "#1A1612"
-  const terra = "#C97B5C"
+  const terra = brand.color || "#C97B5C"
+  const terraBg = (() => {
+    const [r,g,b] = terra.replace("#","").match(/../g).map(h=>parseInt(h,16))
+    return `rgb(${Math.round(r*.2+204)},${Math.round(g*.2+204)},${Math.round(b*.2+204)})`
+  })()
   const baseDate = d.date_emission ? new Date(d.date_emission) : new Date()
   const validUntil = isNaN(baseDate.getTime()) ? new Date() : baseDate
   validUntil.setDate(validUntil.getDate() + (brand.validityDays || 30))
@@ -161,7 +165,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
           {filteredLignes.map((l,i)=>{
             if(l.type_ligne==="lot") return (
               <tr key={l.id}>
-                <td colSpan={6} style={{padding:"6px 8px",fontWeight:700,fontSize:9.5,color:terra,textTransform:"uppercase",letterSpacing:".5px",borderBottom:`1px solid ${terra}44`,background:"#F0EBE3"}}>{l.designation}</td>
+                <td colSpan={6} style={{padding:"6px 8px",fontWeight:700,fontSize:9.5,color:terra,textTransform:"uppercase",letterSpacing:".5px",borderBottom:`1px solid ${terra}44`,background:terraBg}}>{l.designation}</td>
               </tr>
             )
             const total = (l.quantite||0)*(l.prix_unitaire||0)
@@ -189,7 +193,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
                 <td style={{padding:"3px 8px",textAlign:"right"}}>{fmt(row.montant)}</td>
               </tr>
             ))}
-            <tr style={{background:"#F0EBE3",borderTop:`2px solid ${terra}`}}>
+            <tr style={{background:terraBg,borderTop:`2px solid ${terra}`}}>
               <td style={{padding:"6px 8px",fontWeight:800,color:terra,fontSize:10.5}}>TOTAL TTC</td>
               <td style={{padding:"6px 8px",textAlign:"right",fontWeight:800,color:terra,fontSize:11.5}}>{fmt(ttc)}</td>
             </tr>
