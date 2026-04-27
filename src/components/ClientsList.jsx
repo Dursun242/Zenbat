@@ -4,11 +4,25 @@ import { uid, displayName, emptyClient } from "../lib/utils.js";
 import ContactEditor from "./ContactEditor.jsx";
 import { getToken } from "../lib/getToken.js";
 
+const TYPE_STYLE = {
+  particulier: { bg: "#eff6ff", color: "#1e40af", label: "Particulier", avatarBg: "#dbeafe", avatarColor: "#1d4ed8" },
+  artisan:     { bg: "#f0fdf4", color: "#166534", label: "Artisan",     avatarBg: "#bbf7d0", avatarColor: "#15803d" },
+  entreprise:  { bg: "#fef3c7", color: "#92400e", label: "Entreprise",  avatarBg: "#fde68a", avatarColor: "#b45309" },
+};
+
+function initials(c) {
+  const name = displayName(c).trim();
+  const words = name.split(/\s+/).filter(w => /\w/.test(w));
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+  return name.charAt(0).toUpperCase();
+}
+
 export default function ClientsList({ clients, onSave, onDelete, onRestore, goClient, showUndo }) {
   const [query,       setQuery]       = useState("");
   const [editing,     setEditing]     = useState(null);
   const [importing,   setImporting]   = useState(false);
   const [importError, setImportError] = useState("");
+  const [openMenu,    setOpenMenu]    = useState(null);
   const fileRef = useRef(null);
 
   const filtered = clients.filter(c => {
@@ -74,8 +88,7 @@ Règles :
     }
   };
 
-  const saveContact = async (c) => { await onSave(c); setEditing(null); };
-
+  const saveContact  = async (c) => { await onSave(c); setEditing(null); };
   const deleteContact = async (id) => {
     const { victim, idx } = await onDelete(id);
     if (!victim) return;
@@ -86,7 +99,7 @@ Règles :
     <div style={{ padding: 18 }} className="fu">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 600, color: "#1A1612", fontFamily: "'Syne', sans-serif", letterSpacing: '-0.3px' }}>Contacts</h1>
+          <h1 style={{ fontSize: 20, fontWeight: 600, color: "#1A1612", fontFamily: "'Syne', sans-serif", letterSpacing: "-0.3px" }}>Contacts</h1>
           <p style={{ color: "#9A8E82", fontSize: 12, marginTop: 2 }}>{clients.length} contact{clients.length > 1 ? "s" : ""}</p>
         </div>
       </div>
@@ -122,36 +135,70 @@ Règles :
       </div>
 
       {/* Liste */}
-      <div style={{ background: "white", borderRadius: 14, border: "1px solid #F0EBE3", overflow: "hidden" }}>
+      <div style={{ background: "white", borderRadius: 16, border: "1px solid #F0EBE3", overflow: "hidden" }}
+        onClick={() => setOpenMenu(null)}>
         {filtered.length === 0 && (
           <div style={{ padding: "28px 16px", textAlign: "center", color: "#9A8E82", fontSize: 12 }}>Aucun contact trouvé</div>
         )}
-        {filtered.map(c => (
-          <div key={c.id} style={{ padding: "13px 16px", borderBottom: "1px solid #FAF7F2", display: "flex", alignItems: "center", gap: 12 }}>
-            <div onClick={() => goClient(c.id)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 12, cursor: "pointer", minWidth: 0 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 12, background: c.type === "particulier" ? "#eff6ff" : "#fef3c7", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: c.type === "particulier" ? "#1d4ed8" : "#b45309", fontSize: 15, flexShrink: 0 }}>
-                {displayName(c).charAt(0).toUpperCase()}
+        {filtered.map((c, i) => {
+          const ts = TYPE_STYLE[c.type] || TYPE_STYLE.particulier;
+          const contactLine = [c.email, c.telephone].filter(Boolean).join(" · ");
+          const locationLine = [c.code_postal, c.ville].filter(Boolean).join(" ");
+          return (
+            <div key={c.id} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #FAF7F2" : "none", display: "flex", alignItems: "center", gap: 12, padding: "13px 14px 13px 16px", position: "relative" }}>
+
+              {/* Avatar */}
+              <div onClick={() => goClient(c.id)}
+                style={{ width: 46, height: 46, borderRadius: 14, background: ts.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, color: ts.avatarColor, fontSize: 15, flexShrink: 0, cursor: "pointer", letterSpacing: "-0.5px" }}>
+                {initials(c)}
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1612", display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayName(c)}</span>
-                  <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 10, flexShrink: 0, background: c.type === "particulier" ? "#dbeafe" : "#fef3c7", color: c.type === "particulier" ? "#1e40af" : "#92400e" }}>
-                    {c.type === "particulier" ? "Particulier" : c.type === "artisan" ? "Artisan" : "Entreprise"}
+
+              {/* Infos */}
+              <div onClick={() => goClient(c.id)} style={{ flex: 1, minWidth: 0, cursor: "pointer" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 1 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#1A1612", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {displayName(c)}
+                  </span>
+                  <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 10, flexShrink: 0, background: ts.bg, color: ts.color }}>
+                    {ts.label}
                   </span>
                 </div>
-                <div style={{ fontSize: 11, color: "#9A8E82", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {[c.email, c.telephone, c.ville].filter(Boolean).join(" · ") || "—"}
+                {c.activite && (
+                  <div style={{ fontSize: 11, color: "#6B6358", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {c.activite}
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: "#9A8E82", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {contactLine || locationLine || "—"}
+                  {contactLine && locationLine && <span style={{ color: "#C8BFB5" }}> · {locationLine}</span>}
                 </div>
               </div>
+
+              {/* Menu ⋯ */}
+              <div style={{ position: "relative", flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                <button
+                  onClick={() => setOpenMenu(openMenu === c.id ? null : c.id)}
+                  style={{ background: openMenu === c.id ? "#F0EBE3" : "transparent", border: "none", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 18, color: "#9A8E82", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
+                  ···
+                </button>
+                {openMenu === c.id && (
+                  <div style={{ position: "absolute", right: 0, top: 36, background: "white", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,.12)", border: "1px solid #F0EBE3", zIndex: 20, minWidth: 150, overflow: "hidden" }}>
+                    <button onClick={() => { setEditing(c); setOpenMenu(null); }}
+                      style={{ width: "100%", padding: "12px 16px", background: "none", border: "none", textAlign: "left", fontSize: 13, fontWeight: 500, color: "#1A1612", cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+                      ✏️ Modifier
+                    </button>
+                    <div style={{ height: 1, background: "#F0EBE3" }}/>
+                    <button onClick={() => { deleteContact(c.id); setOpenMenu(null); }}
+                      style={{ width: "100%", padding: "12px 16px", background: "none", border: "none", textAlign: "left", fontSize: 13, fontWeight: 500, color: "#dc2626", cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+                      🗑️ Supprimer
+                    </button>
+                  </div>
+                )}
+              </div>
+
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <button onClick={() => setEditing(c)} aria-label="Modifier"
-                style={{ background: "#F0EBE3", border: "none", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 14, color: "#6B6358" }}>✏️</button>
-              <button onClick={() => deleteContact(c.id)} aria-label="Supprimer"
-                style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 14 }}>🗑️</button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {editing && <ContactEditor c={editing} onSave={saveContact} onClose={() => setEditing(null)}/>}
