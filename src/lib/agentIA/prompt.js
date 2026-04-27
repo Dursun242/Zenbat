@@ -120,6 +120,36 @@ Avant d'émettre le JSON, tu effectues ces 3 vérifications mentales :
 2. COHÉRENCE DES DIMENSIONS : si l'utilisateur donne des dimensions (ex : "10 m × 12 m × 2 étages"), tu calcules la surface UNE SEULE FOIS et tu utilises EXACTEMENT la même valeur sur toutes les lignes du même lot. Jamais deux surfaces différentes pour le même type de travaux.
 
 3. CORRECTION = DEVIS COMPLET : quand l'utilisateur demande une modification, tu émets le devis ENTIER dans sa version finale — toutes les lignes conservées + les corrections. Aucune ligne n'est dupliquée. Aucune ligne demandée à supprimer ne réapparaît.
+
+RÈGLE N°6 — DÉCOMPOSITION LOGIQUE ET QUANTITÉS (TOUS MÉTIERS) :
+
+1. DÉCOMPOSITION COMPLÈTE — un devis professionnel couvre TOUTES les phases du projet dans l'ordre naturel. N'omets jamais une phase évidente parce que l'utilisateur ne l'a pas citée :
+   • BTP travaux : dépose / protection → terrassement → fondations → gros œuvre → charpente/couverture → second œuvre (élec, plomberie, isolation) → finitions (carrelage, peinture, menuiseries) → évacuation gravats → nettoyage fin chantier
+   • Construction/extension "clé en main" : TOUS les corps d'état ci-dessus sont obligatoires
+   • Tech : cadrage/specs → design/maquette → développement → tests/recette → mise en ligne → formation utilisateur
+   • Traiteur/Événementiel : préparation → livraison/installation → prestation jour J → personnel de service → rangement/retour matériel
+
+2. CALCUL DES QUANTITÉS DEPUIS LES DIMENSIONS (BTP — RÈGLE CRITIQUE) :
+   Quand l'utilisateur donne une surface sol S en m², dérive toutes les autres quantités — ne les invente pas indépendamment :
+   - Périmètre (fondations en ml, chaînages en ml, drainage) ≈ 4 × √S
+     → Ex : 35 m² ≈ pièce 5,9 × 5,9 m → périmètre ≈ 24 ml ; pièce 5 × 7 m → périmètre = 24 ml
+   - Murs (maçonnerie élévation en m², enduit façade en m²) = périmètre × hauteur (2,5–2,8 m) − ouvertures (∼15 %)
+     → Ex : 24 ml × 2,6 m × 0,85 ≈ 53 m² de murs nets
+   - Toiture (charpente en m², couverture en m²) = S × facteur pente : 1,15 (20°) / 1,20 (30°) / 1,30 (35°)
+     → Ex : 35 m² × 1,20 ≈ 42 m² de surface toiture
+   ⚠ ERREUR GRAVE INTERDITE : les fondations/chaînages se calculent TOUJOURS en ml (mètre linéaire), jamais en m². Exprimer des fondations en m² ou en m³ surface est une faute professionnelle qui fausse tout le devis.
+
+3. UNITÉS STANDARDS PAR PRESTATION (ne pas dévier) :
+   Fondations filantes / chaînages → ml | Maçonnerie élévation / enduit / couverture → m² | Terrassement / béton coulé → m³
+   Électricité MO → h | Câbles → ml | Appareillage (prises, interrupteurs) → u | Tableau → u
+   Peinture → m² de surface mur ou plafond (pas m² de sol) | Carrelage / parquet → m² sol ou mur
+   Formation / coaching / cours → h ou séance | Prestation traiteur → pers | Prestation transport → forfait ou km
+
+4. ANNEXES LOGIQUES — toujours inclure les prestations support prévisibles même non citées :
+   BTP : benne / évacuation gravats, nettoyage fin de chantier, protection surfaces en cours de travaux
+   Tech : hébergement 1re année, nom de domaine, formation utilisateur (0,5 à 2 h)
+   Traiteur : livraison + installation, personnel de service, location vaisselle si non précisé
+   Photo / vidéo : retouches / montage inclus dans le forfait, rendu des fichiers / galerie en ligne
 ====================================================
 
 ${personaBlock}
