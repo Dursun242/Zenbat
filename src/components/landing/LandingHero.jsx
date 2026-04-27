@@ -191,14 +191,24 @@ export default function LandingHero({ onSignup }) {
         {/* Copie gauche */}
         <div style={{ flex: 1, minWidth: 0 }}>
 
-          {/* Badge */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: [.16,1,.3,1] }}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(201,123,92,.10)', border: '1px solid rgba(201,123,92,.22)', borderRadius: 20, padding: '6px 14px', marginBottom: 28 }}>
-            <span style={{ fontSize: 13 }}>🇫🇷</span>
-            <span style={{ color: '#C97B5C', fontSize: 11, fontWeight: 600, letterSpacing: '.6px' }}>1ʳᵉ APP FRANÇAISE · DEVISEUR ASSISTANT IA</span>
-          </motion.div>
+          {/* Badges */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 28 }}>
+            <motion.div
+              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: [.16,1,.3,1] }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(201,123,92,.10)', border: '1px solid rgba(201,123,92,.22)', borderRadius: 20, padding: '6px 14px' }}>
+              <span style={{ fontSize: 13 }}>🇫🇷</span>
+              <span style={{ color: '#C97B5C', fontSize: 11, fontWeight: 600, letterSpacing: '.6px' }}>1ʳᵉ APP FRANÇAISE · DEVISEUR ASSISTANT IA</span>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.08, ease: [.16,1,.3,1] }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(26,22,18,.05)', border: '1px solid rgba(26,22,18,.10)', borderRadius: 20, padding: '6px 14px' }}>
+              <span style={{ fontSize: 13 }}>🇫🇷</span>
+              <span style={{ color: '#3D3832', fontSize: 11, fontWeight: 600, letterSpacing: '.6px' }}>FACTURATION ÉLECTRONIQUE · CONFORME LÉGISLATION FRANÇAISE</span>
+            </motion.div>
+          </div>
 
           {/* H1 */}
           <motion.h1
