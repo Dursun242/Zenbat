@@ -33,10 +33,15 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   const [micError,     setMicError]     = useState(null);
   const [editing,      setEditing]      = useState(null);   // { id, field }
   const [editingObjet, setEditingObjet] = useState(false);
-  const chatRef  = useRef(null);
-  const inputRef = useRef(null);
-  const recRef   = useRef(null);
-  const accumRef = useRef("");
+  const [chatImage,    setChatImage]    = useState(null);   // { mediaType, b64 }
+  const [dragOver,     setDragOver]     = useState(null);   // id of drop target row
+  const chatRef      = useRef(null);
+  const inputRef     = useRef(null);
+  const recRef       = useRef(null);
+  const accumRef     = useRef("");
+  const abortRef     = useRef(null);
+  const dragRef      = useRef(null);
+  const chatImageRef = useRef(null);
 
   const ac         = brand.color || "#22c55e";
   const fontFamily = brand.fontStyle === "elegant" ? "Playfair Display" : brand.fontStyle === "tech" ? "Space Grotesk" : "DM Sans";
@@ -88,13 +93,19 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     // pas une string et on retombe sur la valeur du champ texte.
     const source = typeof overrideText === "string" ? overrideText : input;
     const payload = source.trim();
-    if (!payload || loading) return;
+    if ((!payload && !chatImage) || loading) return;
     if (trialExpired) { onPaywall(); return; }
 
     // Chrono pour la modale festive "X secondes"
     celebrateStartRef.current = Date.now();
 
-    const userMsg = { role: "user", content: payload };
+    const userContent = chatImage
+      ? [
+          { type: "image", source: { type: "base64", media_type: chatImage.mediaType, data: chatImage.b64 } },
+          { type: "text",  text: payload || "Que vois-tu sur cette image ?" },
+        ]
+      : payload;
+    const userMsg = { role: "user", content: userContent };
     const newMsgs = [...msgs, userMsg];
     setMsgs(newMsgs);
 
@@ -109,7 +120,12 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     setListening(false);
     accumRef.current = "";
 
-    setInput(""); setLoading(true);
+    setInput(""); setChatImage(null); setLoading(true);
+
+    // Annule l'éventuelle requête précédente encore en vol
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
 
     let assistantAdded = false;
     const updateAssistant = (visibleText) => {
@@ -147,6 +163,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({ ...body, stream: true }),
+        signal: ctrl.signal,
       });
       if (!res.ok) {
         const detail = await res.json().catch(() => null);
@@ -194,6 +211,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify(body),
+        signal: ctrl.signal,
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -318,6 +336,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       // Incrémente le compteur d'usage IA (best-effort, silencieux)
       supabase.rpc("increment_ai_used").then(() => {}, () => {});
     } catch (e) {
+      if (e?.name === "AbortError") { setLoading(false); return; }
       const detail = apiError || e.message || "unknown";
       console.error("[AgentIA] send failed:", e, apiError);
       // Log côté serveur pour consultation admin (best-effort, silencieux).
@@ -337,6 +356,9 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     }
     setLoading(false);
   };
+
+  // Annule la requête Claude si le composant est démonté pendant le chargement
+  useEffect(() => () => { abortRef.current?.abort(); }, []);
 
   // ── Reconnaissance vocale (Web Speech API) ─────────────────
   const SRClass = typeof window !== "undefined"
@@ -409,6 +431,47 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   const currentLang = SR_LANGS.find(l => l.code === micLang) || SR_LANGS[0];
 
   const deleteLigne = id => setLignes(l => l.filter(x => x.id !== id));
+
+  const moveLigne = (fromId, toId) => {
+    dragRef.current = null;
+    setDragOver(null);
+    if (!fromId || fromId === toId) return;
+    setLignes(prev => {
+      const from = prev.findIndex(l => l.id === fromId);
+      const to   = prev.findIndex(l => l.id === toId);
+      if (from < 0 || to < 0) return prev;
+      const next = [...prev];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+  };
+
+  const compressImage = (file) =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const maxDim = 1024, w = img.naturalWidth, h = img.naturalHeight;
+        const scale = Math.min(1, maxDim / Math.max(w, h));
+        const canvas = document.createElement("canvas");
+        canvas.width  = Math.round(w * scale);
+        canvas.height = Math.round(h * scale);
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        const [, b64] = canvas.toDataURL("image/jpeg", 0.82).split(",");
+        resolve({ mediaType: "image/jpeg", b64 });
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("load")); };
+      img.src = url;
+    });
+
+  const onChatImage = async (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    try { setChatImage(await compressImage(f)); } catch {}
+  };
 
   const updateLigne = (id, field, val) =>
     setLignes(prev => prev.map(l => l.id === id ? { ...l, [field]: val } : l));
@@ -501,6 +564,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead style={{ position: "sticky", top: 0, background: "white", zIndex: 1 }}>
                 <tr style={{ borderBottom: "1px solid #F0EBE3" }}>
+                  <th style={{ width: 18 }}/>
                   <th style={{ textAlign: "left",  padding: "6px 14px", fontSize: 9, fontWeight: 600, color: "#9A8E82", letterSpacing: "1px" }}>DÉSIGNATION</th>
                   <th style={{ textAlign: "right", padding: "6px 8px",  fontSize: 9, fontWeight: 600, color: "#9A8E82", width: 50 }}>QTÉ</th>
                   <th style={{ textAlign: "right", padding: "6px 8px",  fontSize: 9, fontWeight: 600, color: "#9A8E82", width: 65 }}>P.U. HT</th>
@@ -512,14 +576,21 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
                 {visibleLignes.map((l, idx) => {
                   if (l.type_ligne === "lot") return (
                     <tr key={l.id} style={{ animation: "slideIn .25s ease both", animationDelay: `${idx * 0.05}s` }}>
-                      <td colSpan={5} style={{ background: ac + "18", padding: "7px 14px", borderBottom: "1px solid " + ac + "22" }}>
+                      <td colSpan={6} style={{ background: ac + "18", padding: "7px 14px", borderBottom: "1px solid " + ac + "22" }}>
                         <span style={{ fontFamily, fontSize: 10, fontWeight: 700, color: ac, textTransform: "uppercase", letterSpacing: "1px" }}>{l.designation}</span>
                       </td>
                     </tr>
                   );
                   const total = (l.quantite || 0) * (l.prix_unitaire || 0);
                   return (
-                    <tr key={l.id} style={{ borderBottom: "1px solid #FAF7F2", animation: "rowPop .3s cubic-bezier(.34,1.3,.64,1) both", animationDelay: `${idx * 0.06}s` }}>
+                    <tr key={l.id}
+                      draggable={!editing}
+                      onDragStart={() => { dragRef.current = l.id; }}
+                      onDragOver={(e) => { e.preventDefault(); setDragOver(l.id); }}
+                      onDrop={(e) => { e.preventDefault(); moveLigne(dragRef.current, l.id); }}
+                      onDragEnd={() => { dragRef.current = null; setDragOver(null); }}
+                      style={{ borderBottom: "1px solid #FAF7F2", animation: "rowPop .3s cubic-bezier(.34,1.3,.64,1) both", animationDelay: `${idx * 0.06}s`, background: dragOver === l.id ? ac + "14" : "transparent", transition: "background .1s" }}>
+                      <td style={{ padding: "4px 2px 4px 8px", color: "#C8BFB5", fontSize: 13, userSelect: "none", cursor: "grab" }}>⠿</td>
                       <td style={{ padding: "8px 14px" }}>
                         {editing?.id === l.id && editing?.field === "designation"
                           ? <input autoFocus defaultValue={l.designation}
@@ -578,7 +649,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
                 {/* Bouton ajouter une ligne manuelle */}
                 {visibleCount >= lignes.length && lignes.length > 0 && (
                   <tr>
-                    <td colSpan={5} style={{ padding: "4px 14px 8px" }}>
+                    <td colSpan={6} style={{ padding: "4px 14px 8px" }}>
                       <button onClick={addLigne}
                         style={{ background: "none", border: `1px dashed ${ac}44`, borderRadius: 8, padding: "5px 14px", fontSize: 11, color: ac, cursor: "pointer", width: "100%", fontWeight: 600 }}>
                         + Ajouter une ligne
@@ -589,7 +660,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
 
                 {/* Indicateur d'ajout en cours */}
                 {visibleCount < lignes.length && (
-                  <tr><td colSpan={5} style={{ padding: "8px 14px" }}>
+                  <tr><td colSpan={6} style={{ padding: "8px 14px" }}>
                     <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
                       {[0, 1, 2].map(i => (
                         <div key={i} style={{ width: 5, height: 5, borderRadius: "50%", background: ac, animation: `bounce .8s ease ${i * 150}ms infinite` }}/>
@@ -604,13 +675,13 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
               {ht > 0 && visibleCount >= lignes.length && (
                 <tfoot>
                   <tr style={{ borderTop: `2px solid ${ac}` }}>
-                    <td colSpan={3} style={{ padding: "8px 14px", fontSize: 12, fontWeight: 700, color: "#1A1612", fontFamily }}>Total HT</td>
+                    <td colSpan={4} style={{ padding: "8px 14px", fontSize: 12, fontWeight: 700, color: "#1A1612", fontFamily }}>Total HT</td>
                     <td style={{ padding: "8px 14px", textAlign: "right", fontSize: 14, fontWeight: 800, color: ac, fontFamily, animation: "totalCount .4s ease both" }}>{fmt(ht)}</td>
                     <td/>
                   </tr>
                   {tvaRows.map(row => (
                     <tr key={row.rate} style={{ background: "#FAF7F2" }}>
-                      <td colSpan={3} style={{ padding: "4px 14px", fontSize: 11, color: "#6B6358" }}>
+                      <td colSpan={4} style={{ padding: "4px 14px", fontSize: 11, color: "#6B6358" }}>
                         TVA {row.rate.toString().replace(".", ",")}% <span style={{ color: "#cbd5e1", fontSize: 10 }}>(sur {fmt(row.base)})</span>
                       </td>
                       <td style={{ padding: "4px 14px", textAlign: "right", fontSize: 11, color: "#6B6358" }}>{fmt(row.montant)}</td>
@@ -618,7 +689,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
                     </tr>
                   ))}
                   <tr style={{ background: ac }}>
-                    <td colSpan={3} style={{ padding: "8px 14px", fontSize: 13, fontWeight: 800, color: "white", fontFamily }}>Total TTC</td>
+                    <td colSpan={4} style={{ padding: "8px 14px", fontSize: 13, fontWeight: 800, color: "white", fontFamily }}>Total TTC</td>
                     <td style={{ padding: "8px 14px", textAlign: "right", fontSize: 15, fontWeight: 800, color: "white", fontFamily }}>{fmt(ttc)}</td>
                     <td/>
                   </tr>
@@ -669,9 +740,23 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
                 boxShadow: m.role === "assistant" ? "0 1px 4px rgba(0,0,0,.07)" : "none",
                 border: m.role === "assistant" ? "1px solid #F0EBE3" : "none",
               }}>
-                {m.content.split("\n").map((line, j, arr) => (
-                  <span key={j}>{line.replace(/\*([^*]+)\*/g, "$1")}{j < arr.length - 1 && <br/>}</span>
-                ))}
+                {Array.isArray(m.content) ? (
+                  <>
+                    {m.content.filter(p => p.type === "image").map((p, j) => (
+                      <img key={j} src={`data:${p.source.media_type};base64,${p.source.data}`}
+                        style={{ maxWidth: "100%", borderRadius: 8, marginBottom: 4, display: "block" }} alt="" />
+                    ))}
+                    {m.content.filter(p => p.type === "text" && p.text).map((p, j) => (
+                      <span key={j}>{p.text.split("\n").map((line, k, arr) => (
+                        <span key={k}>{line}{k < arr.length - 1 && <br/>}</span>
+                      ))}</span>
+                    ))}
+                  </>
+                ) : (
+                  m.content.split("\n").map((line, j, arr) => (
+                    <span key={j}>{line.replace(/\*([^*]+)\*/g, "$1")}{j < arr.length - 1 && <br/>}</span>
+                  ))
+                )}
               </div>
             </div>
           ))}
@@ -732,15 +817,33 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
             @keyframes micPulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,.55),0 6px 18px rgba(239,68,68,.45)}70%{box-shadow:0 0 0 16px rgba(239,68,68,0),0 6px 18px rgba(239,68,68,.45)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0),0 6px 18px rgba(239,68,68,.45)}}
             @keyframes micWave{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
           `}</style>
+          <input ref={chatImageRef} type="file" accept="image/*" onChange={onChatImage} style={{ display: "none" }}/>
 
-          {/* Champ texte + envoyer */}
-          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: "#FAF7F2", borderRadius: 14, border: `1.5px solid ${listening ? "#ef4444" : (input.trim() ? ac : "#E8E2D8")}`, padding: "8px 10px", transition: "border-color .2s" }}>
+          {/* Aperçu image jointe */}
+          {chatImage && (
+            <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ position: "relative", flexShrink: 0 }}>
+                <img src={`data:${chatImage.mediaType};base64,${chatImage.b64}`}
+                  style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 8, display: "block" }} alt="" />
+                <button onClick={() => setChatImage(null)}
+                  style={{ position: "absolute", top: -4, right: -4, width: 16, height: 16, borderRadius: "50%", background: "#ef4444", border: "none", color: "white", fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>×</button>
+              </div>
+              <span style={{ fontSize: 11, color: "#6B6358" }}>Image jointe — décrivez votre besoin ou envoyez directement</span>
+            </div>
+          )}
+
+          {/* Champ texte + caméra + envoyer */}
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: "#FAF7F2", borderRadius: 14, border: `1.5px solid ${listening ? "#ef4444" : ((input.trim() || chatImage) ? ac : "#E8E2D8")}`, padding: "8px 10px", transition: "border-color .2s" }}>
             <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
               placeholder={listening ? "Écoute en cours…" : TX.inputPlaceholder}
               rows={1} style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 16, color: "#2A231C", resize: "none", fontFamily: "inherit", lineHeight: 1.5, maxHeight: 120, overflowY: "auto" }}/>
-            <button onClick={send} disabled={!input.trim() || loading}
-              style={{ width: 34, height: 34, borderRadius: 10, background: input.trim() && !loading ? ac : "#d1fae5", border: "none", display: "flex", alignItems: "center", justifyContent: "center", color: "white", cursor: "pointer", transition: "background .2s", flexShrink: 0 }}>
+            <button onClick={() => chatImageRef.current?.click()} title="Joindre une photo"
+              style={{ width: 34, height: 34, borderRadius: 10, background: chatImage ? ac + "22" : "#F0EBE3", border: chatImage ? `1px solid ${ac}55` : "none", display: "flex", alignItems: "center", justifyContent: "center", color: chatImage ? ac : "#6B6358", cursor: "pointer", flexShrink: 0, fontSize: 15 }}>
+              📷
+            </button>
+            <button onClick={send} disabled={(!input.trim() && !chatImage) || loading}
+              style={{ width: 34, height: 34, borderRadius: 10, background: (input.trim() || chatImage) && !loading ? ac : "#d1fae5", border: "none", display: "flex", alignItems: "center", justifyContent: "center", color: "white", cursor: "pointer", transition: "background .2s", flexShrink: 0 }}>
               {I.send}
             </button>
           </div>

@@ -52,13 +52,19 @@ export default async function handler(req, res) {
   // Limite de taille pour maîtriser les coûts tokens
   if (system && system.length > MAX_SYSTEM_CHARS)
     return res.status(400).json({ error: `system trop long (max ${MAX_SYSTEM_CHARS} caractères)` });
-  const messagesSize = messages.reduce((s, m) => s + String(m.content || "").length, 0);
+  const messagesSize = messages.reduce((s, m) => {
+    if (Array.isArray(m.content))
+      return s + m.content.filter(p => p.type === "text").reduce((cs, p) => cs + String(p.text || "").length, 0);
+    return s + String(m.content || "").length;
+  }, 0);
   if (messagesSize > MAX_MESSAGES_CHARS)
     return res.status(400).json({ error: `messages trop longs (max ${MAX_MESSAGES_CHARS} caractères)` });
 
   // ── Appel Anthropic ──────────────────────────────────────────────────────────
   const payload = { model, max_tokens, messages };
-  if (system && typeof system === "string") payload.system = system;
+  if (system && typeof system === "string") {
+    payload.system = [{ type: "text", text: system, cache_control: { type: "ephemeral" } }];
+  }
   if (stream === true) payload.stream = true;
   if (typeof temperature === "number") payload.temperature = temperature;
   if (typeof top_p === "number")       payload.top_p = top_p;
@@ -75,6 +81,7 @@ export default async function handler(req, res) {
           "Content-Type":      "application/json",
           "x-api-key":         process.env.ANTHROPIC_KEY,
           "anthropic-version": "2023-06-01",
+          "anthropic-beta":    "prompt-caching-2024-07-31",
         },
         body: JSON.stringify(payload),
         signal: controller.signal,
