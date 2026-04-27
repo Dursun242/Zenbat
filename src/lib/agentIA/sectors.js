@@ -70,10 +70,22 @@ export const SECTOR_PRICING = {
 };
 
 export const SECTOR_TVA = {
-  btp: `TVA : applique le taux correct par ouvrage selon la réglementation française :
-- 5.5% : travaux d'amélioration énergétique (isolation, PAC, fenêtres dans logement >2 ans).
-- 10% : entretien/rénovation/amélioration dans logement d'habitation >2 ans.
-- 20% : neuf, gros œuvre, locaux professionnels, fournitures sans pose.`,
+  btp: `TVA BTP — 3 taux légaux + autoliquidation sous-traitance :
+
+▸ 5,5 % (art. 278-0 bis A CGI) — Amélioration énergétique dans logement d'habitation achevé depuis > 2 ans :
+  Isolation thermique (combles, murs, plancher bas), PAC (air/air, air/eau, géothermique), chaudière biomasse, chauffe-eau thermodynamique, panneaux solaires thermiques, VMC double flux, fenêtres et portes-fenêtres double/triple vitrage, volets isolants. RGE souvent exigé pour accès aux aides clients.
+
+▸ 10 % (art. 279-0 bis CGI) — Rénovation/entretien dans logement d'habitation achevé depuis > 2 ans :
+  Tous les autres travaux : plomberie, électricité, peinture, carrelage, couverture, maçonnerie d'entretien, menuiserie de remplacement (hors critères énergétiques), sanitaire, charpente de réfection. Les fournitures incluses dans la même facture sont aussi à 10 % si elles ne dépassent pas 30 % du prix total HT.
+
+▸ 20 % — Taux normal :
+  Construction neuve, extension, surélévation, locaux à usage professionnel/commercial, logement achevé depuis < 2 ans, fournitures vendues sans pose, modification de structure portante. Maçonnerie de gros œuvre même sur bâtiment existant si elle crée de la surface ou modifie la structure.
+
+⚠ Règle des 30 % : si les fournitures dépassent 30 % du prix total HT, facturer les fournitures à 20 % et la main-d'œuvre au taux réduit applicable. Séparer en lots distincts dans le JSON.
+⚠ Attestation simplifiée : le client doit remettre une attestation certifiant que le local est un logement à usage d'habitation achevé depuis > 2 ans. Sans attestation signée, applique 20 % par défaut.
+⚠ Autoliquidation sous-traitance (art. 283-2 nonies CGI) : si le client est lui-même un assujetti TVA (entreprise, autre artisan, promoteur) et que tu interviens en tant que sous-traitant, la TVA est autoliquidée par le donneur d'ordre. Dans ce cas : tva_rate = 0 sur TOUTES les lignes ET ajoute la mention "Autoliquidation de la TVA — art. 283-2 nonies CGI. TVA due par le preneur assujetti." dans le champ objet ou dans un lot de type commentaire.
+
+Si une même facture mélange plusieurs taux, décomposer impérativement par lots distincts avec tva_rate explicite sur chaque ligne.`,
   alimentaire: `TVA :
 - 5.5% : produits alimentaires de base (pain, épicerie, pâtisserie non luxe).
 - 10% : restauration, plats cuisinés, traiteur.
@@ -81,6 +93,82 @@ export const SECTOR_TVA = {
   sante: `TVA : 20% pour les soins non remboursés (coaching, naturopathie, nutrition). Actes paramédicaux conventionnés : tva_rate 0. En cas de doute, applique 20%.`,
   nettoyage: `TVA : 10% pour les services à la personne à domicile (résidence principale). 20% pour locaux professionnels.`,
   default: `TVA : 20% par défaut pour les prestations de services en France.`,
+};
+
+// Connaissance technique par sous-métier BTP — normes, décomposition, mentions légales.
+export const BTP_SUBTRADE_KNOWLEDGE = {
+  electricite: {
+    keywords: ["électricité", "électricien", "domotique"],
+    normes: "NF C 15-100 (installation électrique BT domestique), NFC 14-100 (branchement réseau).",
+    mentions: "CONSUEL : attestation de conformité obligatoire pour toute installation neuve ou modification substantielle (nouveau tableau, extension de circuit). Sans CONSUEL, le fournisseur d'énergie refuse la mise en service. Mentionner sur le devis si CONSUEL inclus ou en sus.",
+    decomposition: "Décomposer SYSTÉMATIQUEMENT en : 1) Fournitures — câbles (ml + section : 1,5 mm² éclairage, 2,5 mm² prises, 6 mm² cuisinière), tableau (u, nombre de modules, marque : Hager, Schneider, Legrand), prises/interrupteurs (u, gamme). 2) Main-d'œuvre pose (h ou forfait). Ne jamais regrouper MO + fournitures si le détail est possible.",
+    details: "Préciser : marque et gamme appareillage, section câbles, type de tableau, nombre de circuits protégés. Inclure test d'isolement et mesure de terre dans le devis.",
+  },
+  isolation: {
+    keywords: ["isolation", "isolant", "combles", "ite", "iti"],
+    normes: "RE 2020 (bâtiments neufs). Arrêté CEE (Certificats d'Économies d'Énergie) pour travaux en rénovation. Seuils 2025 : combles perdus ≥ R 7, rampants ≥ R 6, murs ≥ R 3,7, plancher bas ≥ R 3.",
+    mentions: "RGE (Reconnu Garant de l'Environnement) : qualification obligatoire pour que le client bénéficie de MaPrimeRénov' et des CEE. Mentionner le numéro de certification RGE sur le devis. Garantie décennale obligatoire.",
+    decomposition: "Indiquer OBLIGATOIREMENT dans la désignation : type d'isolant + matériau + épaisseur + valeur R cible. Ex : « Isolation combles perdus soufflés, ouate de cellulose, R ≥ 7 m²·K/W, ép. 36 cm ».",
+    details: "Matériaux : laine de verre (λ 0,032–0,040), laine de roche, ouate de cellulose soufflée ou en panneau, polyuréthane projeté, laine de bois. ITE avec crépi : séparer lot isolation (5,5 %) et lot ravalement (10 %).",
+  },
+  charpente: {
+    keywords: ["charpente", "charpentier", "ossature bois", "fermette", "faîtage", "combles"],
+    normes: "DTU 31.1 (ossatures bois), DTU 31.3 (charpente traditionnelle), Eurocode 5 (calcul structure bois).",
+    mentions: "Assurance décennale obligatoire : mentionner numéro de police et assureur sur le devis. Note de calcul structure disponible sur demande.",
+    decomposition: "Décomposer : 1) Bois structure (m³ ou ml, section précise et essence). 2) Quincaillerie et assemblages (u). 3) Main-d'œuvre. 4) Traitement fongicide/insecticide si Classe ≥ 2.",
+    details: "Préciser : essence (Douglas C24, sapin S10, épicéa, chêne), section des pièces (ex. « chevrons 63×175 mm », « pannes 80×160 mm », « faîtière 80×200 mm »), classe de service (CS1 = intérieur sec, CS2 = couvert extérieur, CS3 = exposé).",
+  },
+  plomberie: {
+    keywords: ["plomberie", "plombier", "sanitaire", "chauffage", "pac", "pompe à chaleur", "chaudière"],
+    normes: "DTU 60.1 (plomberie sanitaire), DTU 65.11 (chauffage central). NF EN 1717 (protection contre la pollution).",
+    mentions: "Test de pression obligatoire : réseau eau froide/chaude testé à 10 bars pendant 30 min minimum. Préciser sur le devis si inclus.",
+    decomposition: "Décomposer : 1) Tubes + raccords (ml + u, matériau : cuivre, PER, multicouche). 2) Appareils sanitaires (u, marque/gamme). 3) Robinetterie (u, type : mitigeur, thermostatique). 4) Main-d'œuvre. 5) Test d'étanchéité. Pour PAC/chaudière : préciser marque + puissance (kW) + COP.",
+    details: "Matériaux réseau : cuivre soudé, PER réticulé, multicouche alu+PER. Évacuations : PVC, grès pour enterré. PAC : préciser SCOP/COP, régime eau (35/55°C).",
+  },
+  couverture: {
+    keywords: ["couverture", "toiture", "zinguerie", "étanchéité", "ardoise", "tuile", "zinc"],
+    normes: "DTU 40.11 (ardoises naturelles), DTU 40.21 (tuiles terre cuite), DTU 40.29 (tuiles béton), DTU 40.41 (zinc), DTU 43.1 (étanchéité toiture terrasse).",
+    mentions: "Assurance décennale obligatoire pour l'étanchéité toiture : mentionner numéro de police et assureur.",
+    decomposition: "Décomposer : 1) Dépose + évacuation ancienne couverture. 2) Liteaux/contre-liteaux (ml, section). 3) Écran sous-toiture / pare-pluie (m²). 4) Couverture principale (m², matériau + référence + coloris). 5) Zinguerie (ml : faîtage, rives, noues, chéneaux, descentes EP). 6) MO.",
+    details: "Pentes minimales : ardoise naturelle 25°, tuile mécanique 20°, zinc joint debout 3°. Préciser ventilation sous-toiture. Chéneaux : préciser développé (mm) et matériau (zinc, alu, cuivre).",
+  },
+  maconnerie: {
+    keywords: ["maçonnerie", "maçon", "gros œuvre", "béton", "fondation", "dalle", "agglo", "parpaing", "enduit", "façade"],
+    normes: "DTU 20.1 (parois et murs maçonnerie), DTU 20.12 (soubassements), DTU 13.11 (fondations superficielles).",
+    mentions: "Assurance décennale obligatoire pour gros œuvre et structure. Mentionner numéro de police et assureur.",
+    decomposition: "Décomposer : 1) Terrassement/fouilles (m³). 2) Fondations (m³, résistance béton : C20/25, C25/30). 3) Maçonnerie (m² ou m³, type de bloc). 4) Ferraillage (kg ou ml, diamètre HA). 5) Coffrage. 6) Enduits (m², type : monocouche, bi-couche, isolant). 7) MO.",
+    details: "Spécifier : résistance béton (C16/20, C20/25, C25/30), type de blocs (parpaing 20, brique monomur, brique Monomur R37), armatures (HA8, HA10, HA12, treillis soudé), classe d'exposition XC1–XC4.",
+  },
+  peinture: {
+    keywords: ["peinture", "peintre", "ravalement", "papier peint"],
+    normes: "DTU 59.1 (peintures et vernis). Produits classe A+ en émission COV.",
+    mentions: "Garantie biennale (2 ans) sur les travaux de peinture. Pour ravalement façade : garantie décennale sur l'étanchéité.",
+    decomposition: "Décomposer : 1) Préparation support (dépoussiérage, ponçage, ragréage léger, impression). 2) Application (préciser nombre de couches). 3) Fournitures peinture (litrage estimé, marque/gamme). 4) MO.",
+    details: "Préciser : finition (mat, velours, satin, brillant), type de liant (acrylique ou glycéro), teinte (RAL ou NCS si connue), nombre de couches, surface en m². Ravalement : typer enduit (monocouche teinté, enduit minéral, crépi projeté).",
+  },
+  carrelage: {
+    keywords: ["carrelage", "carreleur", "faïence", "revêtement sol", "ragréage", "parquet"],
+    normes: "DTU 52.1 (pose de carrelage et mosaïque). NF EN 14411 (classification carrelages). DTU 51.3 (parquet collé).",
+    mentions: "Garantie biennale (2 ans) sur la pose.",
+    decomposition: "Décomposer : 1) Dépose + évacuation. 2) Ragréage autonivelant si nécessaire (m², épaisseur). 3) Fourniture carrelage (m², format + référence). 4) Colle (C2S1 mural, C2S2 sol déformable). 5) Pose (m²). 6) Joints (époxy ou ciment, teinte). 7) Plinthes/profilés de finition.",
+    details: "Préciser : format (30×60, 60×60, 80×80…), type (grès cérame pleine masse, faïence, pierre naturelle), finition (mat, poli, structuré), classe UPEC pour sol. Prévoir 10 % de chutes minimum dans les quantités.",
+  },
+};
+
+// Retourne le bloc de connaissance technique pour les sous-métiers BTP détectés.
+export const getBTPSubtradeContext = (tradeNames) => {
+  if (!tradeNames || tradeNames.length === 0) return null;
+  const joined = tradeNames.join(" ").toLowerCase();
+  const matched = Object.values(BTP_SUBTRADE_KNOWLEDGE).filter(st =>
+    st.keywords.some(kw => joined.includes(kw))
+  );
+  if (matched.length === 0) return null;
+  return matched.map(st => [
+    `  • Normes : ${st.normes}`,
+    `  • Mentions à inclure : ${st.mentions}`,
+    `  • Décomposition des lignes : ${st.decomposition}`,
+    `  • Spécifications techniques : ${st.details}`,
+  ].join("\n")).join("\n\n");
 };
 
 export const buildSectorContext = (sectors, vatRegime) => {
