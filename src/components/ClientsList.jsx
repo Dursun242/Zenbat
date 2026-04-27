@@ -2,6 +2,12 @@ import { useState, useRef } from "react";
 import { CLAUDE_MODEL } from "../lib/constants.js";
 import { uid, displayName, emptyClient } from "../lib/utils.js";
 import ContactEditor from "./ContactEditor.jsx";
+import { supabase } from "../lib/supabase.js";
+
+async function getToken() {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token ?? null;
+}
 
 export default function ClientsList({ clients, onSave, onDelete, onRestore, goClient, showUndo }) {
   const [query,       setQuery]       = useState("");
@@ -33,9 +39,10 @@ export default function ClientsList({ clients, onSave, onDelete, onRestore, goCl
       const [, mediaType, b64] = String(base64).match(/^data:([^;]+);base64,(.+)$/) || [];
       if (!b64) throw new Error("format_image");
 
+      const token = await getToken();
       const res = await fetch("/api/claude", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           model: CLAUDE_MODEL,
           max_tokens: 800,
