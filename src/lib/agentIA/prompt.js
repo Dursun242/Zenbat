@@ -40,10 +40,16 @@ Demandes mixtes : tu génères TOUTES les lignes d'un coup, sans séparer.`
   // Si le métier n'entre dans aucun secteur pré-câblé, on fait confiance à
   // l'expertise générale de l'IA sur le métier nommé, sans l'enfermer dans
   // les exemples génériques.
-  const pricingBlock = isGenericSector && hasTrades
+  const pricingBlock = (isGenericSector && hasTrades)
     ? `PRIX — RÈGLE ABSOLUE :
 Utilise des tarifs réalistes du marché français 2025 propres au métier "${tradeNames.join(", ")}". Fais appel à ta connaissance spécifique de ce métier (tarifs pratiqués, unités standards, prestations types). Ne propose JAMAIS de prix génériques ou "secteur services" si un prix plus précis propre à ce métier existe.`
-    : pricing;
+    : (btpSubtradeRaw ? "" : pricing);
+
+  // Évite que les taux 5,5/10/20% du btpKnowledgeBlock entrent en conflit
+  // avec la règle franchise absolue (tva_rate = 0 partout).
+  const franchiseBTPRappel = (brand.vatRegime === "franchise" && isBTP && btpSubtradeRaw)
+    ? "\nRAPPEL ABSOLU — PRIORITÉ MAXIMALE SUR TOUT : tu es en FRANCHISE DE TVA. Ignore tous les taux TVA (5,5 %, 10 %, 20 %) mentionnés dans le bloc expertise ci-dessous. tva_rate = 0 sur CHAQUE ligne sans exception.\n"
+    : "";
 
   const btpKnowledgeBlock = btpSubtradeRaw ? `
 EXPERTISE TECHNIQUE BTP — RÈGLES PAR SOUS-MÉTIER :
@@ -90,6 +96,7 @@ Tu t'adresses à l'utilisateur comme un collègue pro qui veut l'aider vite. Jam
 
 PHRASE OPTIONNELLE APRÈS </DEVIS> :
 Si tu veux proposer un ajustement possible, UNE SEULE phrase courte et douce, style « Dites-moi si vous voulez ajuster X » ou « N'hésitez pas à modifier les quantités ». JAMAIS une liste de questions. JAMAIS au tour 2.
+Exception : une courte astuce légale (décennale, CONSUEL, RGE, mention franchise art. 293 B) est autorisée EN PLUS de cette phrase, à tous les tours, quand elle est pertinente.
 
 EXEMPLE DE COMPORTEMENT CORRECT :
 Utilisateur : « un devis pour une rénovation de salle de bain »
@@ -144,7 +151,7 @@ Format strict du JSON : {"objet":"titre court en français","lignes":[
 ]}
 
 ${tvaContext}
-${btpKnowledgeBlock}
+${franchiseBTPRappel}${btpKnowledgeBlock}
 ${pricingBlock}
 
 Groupe les ouvrages par lots cohérents, désignations professionnelles en français.
