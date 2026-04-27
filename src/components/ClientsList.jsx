@@ -2,12 +2,7 @@ import { useState, useRef } from "react";
 import { CLAUDE_MODEL } from "../lib/constants.js";
 import { uid, displayName, emptyClient } from "../lib/utils.js";
 import ContactEditor from "./ContactEditor.jsx";
-import { supabase } from "../lib/supabase.js";
-
-async function getToken() {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.access_token ?? null;
-}
+import { getToken } from "../lib/getToken.js";
 
 export default function ClientsList({ clients, onSave, onDelete, onRestore, goClient, showUndo }) {
   const [query,       setQuery]       = useState("");

@@ -126,12 +126,12 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
 
     const body = {
       model: CLAUDE_MODEL,
-      max_tokens:  4000,
+      max_tokens:  6000,
       // Température basse = adhésion forte aux règles "pas de question avant <DEVIS>"
       // et prix plus stables pour une même demande (audit recommandation).
       temperature: 0.2,
       system: buildSystemPrompt({ brand, historySummary }),
-      messages: newMsgs.slice(-10).map(m => ({ role: m.role, content: m.content })),
+      messages: newMsgs.slice(-20).map(m => ({ role: m.role, content: m.content })),
     };
 
     const token = await getToken();
