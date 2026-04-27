@@ -29,7 +29,7 @@ function CheckIcon() {
 
 export default function PricingSection() {
   const [isTTC, setIsTTC]           = useState(true)
-  const [isBiannual, setIsBiannual] = useState(false)
+  const [isBiannual, setIsBiannual] = useState(true)
   const [priceChanging, setPriceChanging] = useState(false)
   const [visible, setVisible]       = useState(false)
   const ref = useRef(null)
