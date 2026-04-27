@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { STATUT } from "../lib/constants.js";
 import { fmt } from "../lib/utils.js";
 import { I } from "./ui/icons.jsx";
@@ -20,9 +20,8 @@ function IndiceChip({ indice }) {
 
 // Carte pour un devis sans indice (affichage simple, identique à avant)
 function DevisRow({ d, cl, goDevis, onDelete, confirmDelete, setConfirmDelete }) {
-  const popoverRef = useRef(null);
   return (
-    <div style={{ position: "relative" }}>
+    <div>
       <div
         style={{ padding: "13px 16px", borderBottom: "1px solid #FAF7F2", cursor: "pointer",
           display: "flex", justifyContent: "space-between", alignItems: "center" }}
@@ -40,33 +39,26 @@ function DevisRow({ d, cl, goDevis, onDelete, confirmDelete, setConfirmDelete })
           <div style={{ marginTop: 4 }}><Badge s={d.statut}/></div>
         </div>
         {d.statut === "brouillon" && onDelete && (
-          <button onClick={e => { e.stopPropagation(); setConfirmDelete(confirmDelete === d.id ? null : d.id); }}
-            style={{ marginLeft: 8, padding: "4px 8px", borderRadius: 6, border: "none",
-              background: "#fee2e2", color: "#dc2626", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
-            ✕
-          </button>
+          confirmDelete === d.id ? (
+            <>
+              <button onClick={e => { e.stopPropagation(); setConfirmDelete(null); }}
+                style={{ marginLeft: 8, padding: "4px 8px", borderRadius: 6, border: "1px solid #e5e7eb", background: "white", color: "#1A1612", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                Annuler
+              </button>
+              <button onClick={e => { e.stopPropagation(); onDelete(d.id); setConfirmDelete(null); }}
+                style={{ marginLeft: 4, padding: "4px 8px", borderRadius: 6, border: "none", background: "#dc2626", color: "white", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                Supprimer
+              </button>
+            </>
+          ) : (
+            <button onClick={e => { e.stopPropagation(); setConfirmDelete(d.id); }}
+              style={{ marginLeft: 8, padding: "4px 8px", borderRadius: 6, border: "none",
+                background: "#fee2e2", color: "#dc2626", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+              ✕
+            </button>
+          )
         )}
       </div>
-      {confirmDelete === d.id && (
-        <div ref={popoverRef} style={{ position: "absolute", top: "100%", right: 16, marginTop: 4,
-          background: "white", borderRadius: 8, border: "1px solid #e5e7eb",
-          boxShadow: "0 4px 12px rgba(0,0,0,.15)", padding: "10px 12px", zIndex: 100,
-          minWidth: 200, animation: "popIn .2s ease" }}>
-          <div style={{ fontSize: 12, color: "#6B6358", marginBottom: 8 }}>Supprimer ce brouillon ?</div>
-          <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-            <button onClick={() => setConfirmDelete(null)}
-              style={{ padding: "4px 10px", borderRadius: 4, border: "1px solid #E8E2D8",
-                background: "white", color: "#1A1612", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
-              Annuler
-            </button>
-            <button onClick={() => { onDelete(d.id); setConfirmDelete(null); }}
-              style={{ padding: "4px 10px", borderRadius: 4, border: "none",
-                background: "#dc2626", color: "white", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
-              Supprimer
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
