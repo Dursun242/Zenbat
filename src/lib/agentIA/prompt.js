@@ -1,6 +1,6 @@
 import { tradesLabels } from "../trades.js";
 import { formatHistoryPrompt } from "../devisHistory.js";
-import { detectSectors, buildSectorContext } from "./sectors.js";
+import { detectSectors, buildSectorContext, getBTPSubtradeContext } from "./sectors.js";
 
 // Construit le system prompt envoyé à Claude à chaque tour de conversation.
 // Pure function : aucun effet de bord, facile à tester.
@@ -10,6 +10,8 @@ export const buildSystemPrompt = ({ brand, historySummary }) => {
   const { expertDomain, units, pricing, vocab, tvaContext } = buildSectorContext(sectors, brand.vatRegime);
   const hasTrades = tradeNames.length > 0;
   const isGenericSector = sectors.length === 1 && sectors[0] === "general";
+  const isBTP = sectors.includes("btp");
+  const btpSubtradeRaw = isBTP ? getBTPSubtradeContext(tradeNames) : null;
 
   const personaBlock = hasTrades
     ? `Tu INCARNES un professionnel confirmé, reconnu et expérimenté dans le(s) métier(s) suivant(s) : ${tradeNames.join(", ")}.
@@ -42,6 +44,18 @@ Demandes mixtes : tu génères TOUTES les lignes d'un coup, sans séparer.`
     ? `PRIX — RÈGLE ABSOLUE :
 Utilise des tarifs réalistes du marché français 2025 propres au métier "${tradeNames.join(", ")}". Fais appel à ta connaissance spécifique de ce métier (tarifs pratiqués, unités standards, prestations types). Ne propose JAMAIS de prix génériques ou "secteur services" si un prix plus précis propre à ce métier existe.`
     : pricing;
+
+  const btpKnowledgeBlock = btpSubtradeRaw ? `
+EXPERTISE TECHNIQUE BTP — RÈGLES PAR SOUS-MÉTIER :
+Pour chaque devis impliquant les métiers déclarés, tu DOIS systématiquement :
+1. Décomposer les lignes selon les standards du métier (fournitures séparées de la MO quand applicable).
+2. Mentionner les normes et référentiels techniques dans les désignations si pertinent (DTU, NF, RE 2020…).
+3. Ajouter APRÈS le </DEVIS> une ligne courte signalant les mentions légales obligatoires applicables (décennale, CONSUEL, RGE…) sous forme d'astuce bienveillante : « 💡 Pensez à joindre votre attestation décennale / votre numéro CONSUEL / votre certification RGE pour que votre client puisse accéder aux aides. »
+4. Respecter les spécifications techniques ci-dessous dans les désignations (valeur R, section bois, résistance béton…).
+
+Connaissances par sous-métier détecté :
+${btpSubtradeRaw}
+` : "";
 
   const historyBlock = formatHistoryPrompt(historySummary);
 
@@ -130,7 +144,7 @@ Format strict du JSON : {"objet":"titre court en français","lignes":[
 ]}
 
 ${tvaContext}
-
+${btpKnowledgeBlock}
 ${pricingBlock}
 
 Groupe les ouvrages par lots cohérents, désignations professionnelles en français.
