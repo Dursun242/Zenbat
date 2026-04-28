@@ -227,15 +227,8 @@ function buildXML({ invoice, client, brand, sourceInvoice }) {
         <ram:TypeCode>58</ram:TypeCode>
         <ram:PayeePartyCreditorFinancialAccount><ram:IBANID>${esc(iban)}</ram:IBANID></ram:PayeePartyCreditorFinancialAccount>
       </ram:SpecifiedTradeSettlementPaymentMeans>` : ""}${taxBlocks}
-      ${retenue > 0 ? `
-      <ram:SpecifiedTradeAllowanceCharge>
-        <ram:ChargeIndicator><udt:Indicator>false</udt:Indicator></ram:ChargeIndicator>
-        <ram:ActualAmount>${num(retenue)}</ram:ActualAmount>
-        <ram:Reason>Retenue de garantie</ram:Reason>
-        <ram:CategoryTradeTax><ram:TypeCode>VAT</ram:TypeCode><ram:CategoryCode>S</ram:CategoryCode><ram:RateApplicablePercent>0.00</ram:RateApplicablePercent></ram:CategoryTradeTax>
-      </ram:SpecifiedTradeAllowanceCharge>` : ""}
       <ram:SpecifiedTradePaymentTerms>
-        <ram:Description>${termsDesc}</ram:Description>
+        <ram:Description>${termsDesc}${retenue > 0 ? ` — Retenue de garantie ${num(retenue)} EUR déduite du net à payer.` : ""}</ram:Description>
         ${due ? `<ram:DueDateDateTime><udt:DateTimeString format="102">${due}</udt:DateTimeString></ram:DueDateDateTime>` : ""}
       </ram:SpecifiedTradePaymentTerms>
       <ram:SpecifiedTradeSettlementHeaderMonetarySummation>

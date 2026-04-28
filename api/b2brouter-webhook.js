@@ -37,9 +37,11 @@ export default async function handler(req, res) {
 
   const expected = crypto.createHmac("sha256", secret).update(raw).digest("hex");
   const received = String(sig).replace(/^sha256=/, "");
+  if (!/^[0-9a-f]{64}$/i.test(received))
+    return res.status(401).json({ error: "signature invalide" });
   const expectedBuf = Buffer.from(expected, "hex");
   const receivedBuf = Buffer.from(received, "hex");
-  if (expectedBuf.length !== receivedBuf.length || !crypto.timingSafeEqual(expectedBuf, receivedBuf))
+  if (!crypto.timingSafeEqual(expectedBuf, receivedBuf))
     return res.status(401).json({ error: "signature invalide" });
 
   let event;

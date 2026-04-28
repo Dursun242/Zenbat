@@ -296,7 +296,7 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
                   value={invoice.retenue_garantie_pct || 0}
                   onChange={e => {
                     const pct = Number(e.target.value) || 0;
-                    onChange({ ...invoice, retenue_garantie_pct: pct, retenue_garantie_eur: Math.round(ttc * pct) / 100 }, false);
+                    onChange({ ...invoice, retenue_garantie_pct: pct, retenue_garantie_eur: Math.round(ht * pct) / 100 }, false);
                   }}
                   disabled={isLocked}
                   style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "7px 8px", fontSize: 12, background: isLocked ? "#F0EBE3" : "white", cursor: isLocked ? "not-allowed" : "text" }}/>
