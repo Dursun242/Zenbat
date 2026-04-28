@@ -41,6 +41,7 @@ export default async function handler(req, res) {
 
   // L'admin est toujours considéré pro, sans limite ni expiration d'essai.
   const norm = (s) => String(s || "").trim().toLowerCase();
+  const adminEmail = process.env.ADMIN_EMAIL;
   const isAdmin = adminEmail && norm(user.email) === norm(adminEmail);
   const effectivePlan = isAdmin ? "pro" : profile.plan;
 
