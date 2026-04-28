@@ -98,8 +98,17 @@ Unités du secteur : ${units}
   Quantité donnée  → note-la exactement telle quelle.
   Quantité absente → quantite: null + entrée dans "champs_a_completer".
   Prix donné       → note-le exactement tel quel.
-  Prix absent      → utilise les prix de marché ci-dessous comme référence réaliste.
-  Prix inconnu     → prix_unitaire: null + entrée dans "champs_a_completer".
+  Prix absent      → OBLIGATOIRE : utilise les prix de marché ci-dessous, jamais null.
+
+  ⚠ RÈGLE ABSOLUE SUR LES PRIX :
+  prix_unitaire est TOUJOURS un nombre. JAMAIS null, JAMAIS 0 sauf si la prestation est réellement gratuite.
+  Si tu ne connais pas le prix exact → estime d'après les références de marché ci-dessous.
+  Un devis avec des prix à 0 est inutilisable pour l'artisan.
+
+  ⚠ RÈGLE ABSOLUE SUR LES QUANTITÉS :
+  quantite est JAMAIS 0 sauf si c'est une ligne à supprimer.
+  Si la quantité est inconnue → quantite: null (pas 0).
+  Si la quantité est 1 forfait → quantite: 1, unite: "forfait".
 
 PRIX DE MARCHÉ — RÉFÉRENCE FRANCE :
 ${pricing}
@@ -187,26 +196,25 @@ Demande : "rénovation complète salle de bain 6 m²"
     {"type_ligne": "ouvrage", "lot": "DÉMOLITION", "designation": "Dépose carrelage sol et murs, évacuation gravats", "unite": "m²", "quantite": null, "prix_unitaire": 18, "tva_rate": 10},
 
     {"type_ligne": "lot", "designation": "PLOMBERIE"},
-    {"type_ligne": "ouvrage", "lot": "PLOMBERIE", "designation": "Réfection réseau alimentation EF/ECS en tube multicouche ø 16 mm", "unite": "forfait", "quantite": 1, "prix_unitaire": null, "tva_rate": 10},
-    {"type_ligne": "ouvrage", "lot": "PLOMBERIE", "designation": "Réfection évacuations PVC ø 90 et ø 40 mm, raccordement collecteur existant", "unite": "forfait", "quantite": 1, "prix_unitaire": null, "tva_rate": 10},
+    {"type_ligne": "ouvrage", "lot": "PLOMBERIE", "designation": "Réfection réseau alimentation EF/ECS en tube multicouche ø 16 mm", "unite": "forfait", "quantite": 1, "prix_unitaire": 650, "tva_rate": 10},
+    {"type_ligne": "ouvrage", "lot": "PLOMBERIE", "designation": "Réfection évacuations PVC ø 90 et ø 40 mm, raccordement collecteur existant", "unite": "forfait", "quantite": 1, "prix_unitaire": 480, "tva_rate": 10},
 
     {"type_ligne": "lot", "designation": "CARRELAGE"},
     {"type_ligne": "ouvrage", "lot": "CARRELAGE", "designation": "Fourniture et pose carrelage sol antidérapant R11, format 30×60 cm, colle C2S2, joints époxy", "unite": "m²", "quantite": 6, "prix_unitaire": 72, "tva_rate": 10},
     {"type_ligne": "ouvrage", "lot": "CARRELAGE", "designation": "Fourniture et pose faïence murale, format 30×60 cm, colle C1, joints ciment", "unite": "m²", "quantite": null, "prix_unitaire": 58, "tva_rate": 10},
 
     {"type_ligne": "lot", "designation": "SANITAIRES"},
-    {"type_ligne": "ouvrage", "lot": "SANITAIRES", "designation": "Fourniture et pose douche à l'italienne 80×80 cm, receveur extra-plat + paroi vitrée 8 mm", "unite": "ens", "quantite": 1, "prix_unitaire": null, "tva_rate": 10},
-    {"type_ligne": "ouvrage", "lot": "SANITAIRES", "designation": "Fourniture et pose meuble vasque suspendu 80 cm + mitigeur lavabo + siphon bouteille", "unite": "ens", "quantite": 1, "prix_unitaire": null, "tva_rate": 10},
-    {"type_ligne": "ouvrage", "lot": "SANITAIRES", "designation": "Fourniture et pose WC suspendu + bâti-support + plaque de commande", "unite": "ens", "quantite": 1, "prix_unitaire": null, "tva_rate": 10},
+    {"type_ligne": "ouvrage", "lot": "SANITAIRES", "designation": "Fourniture et pose douche à l'italienne 80×80 cm, receveur extra-plat + paroi vitrée 8 mm", "unite": "ens", "quantite": 1, "prix_unitaire": 1200, "tva_rate": 10},
+    {"type_ligne": "ouvrage", "lot": "SANITAIRES", "designation": "Fourniture et pose meuble vasque suspendu 80 cm + mitigeur lavabo + siphon bouteille", "unite": "ens", "quantite": 1, "prix_unitaire": 650, "tva_rate": 10},
+    {"type_ligne": "ouvrage", "lot": "SANITAIRES", "designation": "Fourniture et pose WC suspendu + bâti-support + plaque de commande chromée", "unite": "ens", "quantite": 1, "prix_unitaire": 780, "tva_rate": 10},
 
     {"type_ligne": "lot", "designation": "ÉLECTRICITÉ"},
-    {"type_ligne": "ouvrage", "lot": "ÉLECTRICITÉ", "designation": "Mise aux normes NF C 15-100 zone SdB (volumes 0/1/2), circuit dédié 20A", "unite": "forfait", "quantite": 1, "prix_unitaire": null, "tva_rate": 10},
-    {"type_ligne": "ouvrage", "lot": "ÉLECTRICITÉ", "designation": "Fourniture et pose luminaire plafonnier IP44 + VMC hygroréglable type B", "unite": "ens", "quantite": 1, "prix_unitaire": null, "tva_rate": 10}
+    {"type_ligne": "ouvrage", "lot": "ÉLECTRICITÉ", "designation": "Mise aux normes NF C 15-100 zone SdB (volumes 0/1/2), circuit dédié 20A avec différentiel 30 mA", "unite": "forfait", "quantite": 1, "prix_unitaire": 580, "tva_rate": 10},
+    {"type_ligne": "ouvrage", "lot": "ÉLECTRICITÉ", "designation": "Fourniture et pose luminaire plafonnier IP44 LED + VMC hygroréglable type B", "unite": "ens", "quantite": 1, "prix_unitaire": 320, "tva_rate": 10}
   ],
   "champs_a_completer": [
-    "Surface murale en m² pour la faïence non précisée",
-    "Modèles et gammes sanitaires à choisir avec le client",
-    "Chiffrage plomberie et électricité à affiner après visite"
+    "Surface murale en m² pour la faïence non précisée — à mesurer sur place",
+    "Gamme et modèles sanitaires à choisir avec le client (prix ajustables)"
   ],
   "suggestions": []
 }</DEVIS>
