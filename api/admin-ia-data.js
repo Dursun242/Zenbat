@@ -75,7 +75,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ feedback: enriched2, generatedAt: new Date().toISOString() })
   }
 
-
+  const tableMap = {
     conversations: { table: 'ia_conversations', limit: 500, key: 'conversations' },
     logs:          { table: 'ia_error_logs',    limit: 200, key: 'logs' },
     negatives:     { table: 'ia_negative_logs', limit: 200, key: 'logs' },
