@@ -39,15 +39,20 @@ export default async function handler(req, res) {
 
   if (!profile) return res.status(403).json({ error: "Profil introuvable" });
 
+  // L'admin est toujours considéré pro, sans limite ni expiration d'essai.
+  const norm = (s) => String(s || "").trim().toLowerCase();
+  const isAdmin = adminEmail && norm(user.email) === norm(adminEmail);
+  const effectivePlan = isAdmin ? "pro" : profile.plan;
+
   const TRIAL_DAYS = 30;
   const accountAgeDays = Math.floor(
     (Date.now() - new Date(user.created_at).getTime()) / 86_400_000
   );
-  if (profile.plan === "free" && accountAgeDays >= TRIAL_DAYS) {
+  if (effectivePlan === "free" && accountAgeDays >= TRIAL_DAYS) {
     return res.status(403).json({ error: "Période d'essai expirée" });
   }
 
-  const AI_DAILY_LIMIT = profile.plan === "pro" ? 200 : 40;
+  const AI_DAILY_LIMIT = effectivePlan === "pro" ? 200 : 40;
   const todayStart = new Date();
   todayStart.setUTCHours(0, 0, 0, 0);
   const { count: callsToday } = await admin.from("ia_conversations")
