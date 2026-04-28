@@ -52,7 +52,30 @@ export default async function handler(req, res) {
     return res.status(200).json({ validations: rows || [], generatedAt: new Date().toISOString() })
   }
 
-  const tableMap = {
+  // Feedback 👍/👎 utilisateurs
+  if (type === 'feedback') {
+    const [
+      { data: rows, error: re },
+      { data: profiles, error: pe },
+      { data: authUsers, error: ae },
+    ] = await Promise.all([
+      admin.from('ia_feedback').select('*').order('created_at', { ascending: false }).limit(500),
+      admin.from('profiles').select('id, company_name, full_name, brand_data'),
+      admin.auth.admin.listUsers({ perPage: 1000 }).then(r => ({ data: r.data?.users || [], error: r.error })),
+    ])
+    if (re) return res.status(500).json({ error: re.message })
+    const profById2 = new Map((profiles || []).map(p => [p.id, p]))
+    const authById2 = new Map((authUsers || []).map(u => [u.id, u]))
+    const enriched2 = (rows || []).map(r => {
+      const p = profById2.get(r.user_id)
+      const a = authById2.get(r.user_id)
+      const trades = r.trades || JSON.parse(p?.brand_data || '{}')?.trades || []
+      return { ...r, email: a?.email || null, name: p?.company_name || p?.full_name || a?.email || '—', trades }
+    })
+    return res.status(200).json({ feedback: enriched2, generatedAt: new Date().toISOString() })
+  }
+
+
     conversations: { table: 'ia_conversations', limit: 500, key: 'conversations' },
     logs:          { table: 'ia_error_logs',    limit: 200, key: 'logs' },
     negatives:     { table: 'ia_negative_logs', limit: 200, key: 'logs' },
