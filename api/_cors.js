@@ -4,6 +4,10 @@
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "")
   .split(",").map(s => s.trim()).filter(Boolean);
 
+// Origines autorisées hors production : uniquement le poste de dev local.
+// On évite ainsi qu'une preview Vercel publique accepte n'importe quelle origine.
+const DEV_ORIGIN_RE = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
 /**
  * Applique les headers CORS sur res.
  * @param {string} methods  ex: "POST, OPTIONS" ou "GET, OPTIONS"
@@ -14,7 +18,7 @@ export function cors(req, res, { methods = "POST, OPTIONS", auth = true } = {}) 
   const isProd  = process.env.VERCEL_ENV === "production";
   const allowed = isProd
     ? (ALLOWED_ORIGINS.includes(origin) ? origin : "")
-    : origin;
+    : (ALLOWED_ORIGINS.includes(origin) || DEV_ORIGIN_RE.test(origin) ? origin : "");
   if (allowed) res.setHeader("Access-Control-Allow-Origin", allowed);
   res.setHeader("Vary", "Origin");
   res.setHeader("Access-Control-Allow-Methods", methods);

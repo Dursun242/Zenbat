@@ -49,5 +49,7 @@ export function useBrand(user, setScreen) {
     return () => { cancelled = true; };
   }, [user?.id, setBrand]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => () => clearTimeout(brandSaveTimer.current), []);
+
   return { brand, setBrand };
 }

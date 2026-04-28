@@ -9,11 +9,11 @@ Stack : React + Vite (frontend) · Vercel Serverless Functions (API) · Supabase
 
 ### Vercel : limite 12 fonctions serverless
 Le plan Hobby de Vercel autorise **maximum 12 fichiers** dans `/api/`.
-Fichiers actuels (11) :
+Fichiers actuels (12, quota atteint — `_cors.js` est un helper non déployé) :
 ```
-admin-delete-user.js   admin-ia-data.js   admin-stats.js   admin-user-detail.js
-b2brouter.js   b2brouter-webhook.js   claude.js   delete-my-account.js
-facturx.js   my-data-export.js   odoo-sign.js
+admin-delete-user.js   admin-ia-data.js       admin-stats.js   admin-user-detail.js
+b2brouter.js           b2brouter-webhook.js   claude.js        delete-my-account.js
+facturx.js             my-data-export.js      newsletter.js    odoo-sign.js
 ```
 → Ne jamais créer un nouveau fichier `/api/` sans en supprimer un autre ou fusionner des endpoints.
 
@@ -21,8 +21,8 @@ facturx.js   my-data-export.js   odoo-sign.js
 Les fichiers dans `/supabase/migrations/` ne s'appliquent **pas automatiquement**.
 L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - Prévenir l'utilisateur à chaque nouvelle migration créée.
-- Dernière migration appliquée : `0022_fix_rls_invoices_update.sql`
-- Prochaine migration : préfixer avec `0023_`.
+- Dernière migration appliquée : `0026_ia_feedback.sql`
+- Prochaine migration : préfixer avec `0027_`.
 
 ### position:fixed et animations CSS transform
 Tout composant React qui contient des enfants `position:fixed` (modales, drawers, toasts)
