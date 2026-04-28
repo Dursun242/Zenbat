@@ -156,5 +156,9 @@ export function formatHistoryPrompt(summary) {
     "═══════════════════════════════════════════════════════════",
   )
 
-  return lines.join("\n")
+  const MAX_HISTORY_CHARS = 5_000;
+  const raw = lines.join("\n");
+  if (raw.length <= MAX_HISTORY_CHARS) return raw;
+  const cut = raw.lastIndexOf("\n", MAX_HISTORY_CHARS);
+  return (cut > 0 ? raw.slice(0, cut) : raw.slice(0, MAX_HISTORY_CHARS)) + "\n[…historique tronqué]";
 }

@@ -31,6 +31,36 @@ export default async function handler(req, res) {
   const { data: { user }, error: authErr } = await admin.auth.getUser(token);
   if (authErr || !user) return res.status(401).json({ error: "Token invalide" });
 
+  // ── Plan + rate limit ────────────────────────────────────────────────────────
+  const { data: profile } = await admin.from("profiles")
+    .select("plan")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile) return res.status(403).json({ error: "Profil introuvable" });
+
+  const TRIAL_DAYS = 30;
+  const accountAgeDays = Math.floor(
+    (Date.now() - new Date(user.created_at).getTime()) / 86_400_000
+  );
+  if (profile.plan === "free" && accountAgeDays >= TRIAL_DAYS) {
+    return res.status(403).json({ error: "Période d'essai expirée" });
+  }
+
+  const AI_DAILY_LIMIT = profile.plan === "pro" ? 200 : 20;
+  const todayStart = new Date();
+  todayStart.setUTCHours(0, 0, 0, 0);
+  const { count: callsToday } = await admin.from("ia_conversations")
+    .select("id", { count: "exact", head: true })
+    .eq("owner_id", user.id)
+    .gte("created_at", todayStart.toISOString());
+
+  if ((callsToday || 0) >= AI_DAILY_LIMIT) {
+    return res.status(429).json({
+      error: `Limite journalière atteinte (${AI_DAILY_LIMIT} appels/jour). Réessayez demain.`,
+    });
+  }
+
   // ── Clé Anthropic ────────────────────────────────────────────────────────────
   if (!process.env.ANTHROPIC_KEY)
     return res.status(500).json({ error: "ANTHROPIC_KEY non configurée côté serveur" });
@@ -58,7 +88,8 @@ export default async function handler(req, res) {
 
   // ── Appel Anthropic ──────────────────────────────────────────────────────────
   const payload = { model, max_tokens, messages };
-  if (system && typeof system === "string") payload.system = system;
+  if (system && typeof system === "string")
+    payload.system = [{ type: "text", text: system, cache_control: { type: "ephemeral" } }];
   if (stream === true) payload.stream = true;
   if (typeof temperature === "number") payload.temperature = temperature;
   if (typeof top_p === "number")       payload.top_p = top_p;
@@ -72,9 +103,10 @@ export default async function handler(req, res) {
       upstream = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
-          "Content-Type":      "application/json",
-          "x-api-key":         process.env.ANTHROPIC_KEY,
-          "anthropic-version": "2023-06-01",
+          "Content-Type":        "application/json",
+          "x-api-key":           process.env.ANTHROPIC_KEY,
+          "anthropic-version":   "2023-06-01",
+          "anthropic-beta":      "prompt-caching-2024-07-31",
         },
         body: JSON.stringify(payload),
         signal: controller.signal,
