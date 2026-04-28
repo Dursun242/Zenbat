@@ -153,7 +153,7 @@ Format strict du JSON : {"objet":"titre court en français","lignes":[
 ]}
 
 FORMAT ÉTENDU — DEVIS BTP UNIQUEMENT :
-Pour tout devis de travaux de bâtiment, ajouter dans le JSON racine ces deux champs OBLIGATOIRES en plus de "objet" et "lignes" :
+Pour tout devis de travaux de bâtiment, ajouter dans le JSON racine ces champs OBLIGATOIRES en plus de "objet" et "lignes" :
 1. "typology_id" — identifiant de la typologie parmi :
    "extension_neuve_go" (extension / agrandissement gros œuvre)
    "renovation_sdb" (rénovation salle de bain / salle d'eau)
@@ -168,6 +168,19 @@ Pour tout devis de travaux de bâtiment, ajouter dans le JSON racine ces deux ch
    • Isolation combles 80 m² : {"surface":80}
    • Ravalement façade 120 m² : {"surface":120}
    • Rénovation appartement 65 m² : {"surface_sol":65}
+3. Sur chaque ligne ouvrage dont la quantité est calculée à partir des dimensions du projet (NE PAS mettre sur les lignes forfaitaires), ajouter "quantity_source" :
+   • Murs d'élévation (parpaings, béton armé, agglo) → "quantity_source": "surface_murs_elevation"
+   • Charpente et couverture (surface de toiture) → "quantity_source": "surface_toiture"
+
+FORMAT ÉTENDU — DEVIS CONSEIL / PRESTATION INTELLECTUELLE :
+Pour tout devis de mission conseil, audit SI, accompagnement ou coaching, ajouter dans le JSON racine :
+1. "typology_id" — identifiant parmi :
+   "audit_si_pme" (audit informatique / audit système d'information PME)
+   "mission_conseil" (consulting, conseil stratégique ou opérationnel)
+   "accompagnement" (coaching, mentoring, accompagnement dirigeant)
+   → laisser absent si aucun ne convient.
+2. "project_params" : {"nb_jours": <charge totale de la mission en jours-homme>}
+   Exemple : mission 5 jours → {"nb_jours":5}
 
 ${tvaContext}
 ${franchiseBTPRappel}${btpKnowledgeBlock}

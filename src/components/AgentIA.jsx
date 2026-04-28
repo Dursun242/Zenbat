@@ -36,7 +36,7 @@ async function runCoherenceLoop(devis, apiBody, authHeaders, msgs, rawResponse, 
     let correctedRaw = "";
     try {
       const correctionMessages = [
-        ...msgs.slice(-18),
+        ...msgs.slice(-6),
         { role: "assistant", content: currentRaw },
         { role: "user",      content: correctionPrompt },
       ];

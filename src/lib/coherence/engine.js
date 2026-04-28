@@ -16,11 +16,14 @@ function findTypologyById(id) {
 }
 
 // Détecte automatiquement la typologie en cherchant les keywords du pack
-// dans l'objet + les désignations du devis.
+// dans l'objet + les noms de lots uniquement (pas les désignations d'ouvrages,
+// trop bruyantes et source de faux positifs).
 function detectTypology(devis) {
   const haystack = [
     devis.objet || "",
-    ...(devis.lignes || []).map(l => l.designation || l.lot || ""),
+    ...(devis.lignes || []).map(l =>
+      l.type_ligne === "lot" ? (l.designation || "") : (l.lot || "")
+    ),
   ].join(" ").toLowerCase();
 
   for (const pack of PACKS) {
