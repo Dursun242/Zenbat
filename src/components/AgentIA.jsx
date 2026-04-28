@@ -17,7 +17,7 @@ import CelebrateModal from "./agent/CelebrateModal.jsx";
 import CoherenceSettings from "./CoherenceSettings.jsx";
 
 // ─── Boucle de cohérence : valide + corrige jusqu'à COHERENCE_MAX_RETRIES fois ──
-const COHERENCE_MAX_RETRIES = 3;
+const COHERENCE_MAX_RETRIES = 1;
 
 async function runCoherenceLoop(devis, apiBody, authHeaders, msgs, rawResponse, brand, userSettings = null) {
   let currentDevis = devis;
