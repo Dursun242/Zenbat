@@ -323,8 +323,13 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
         a.href = url; a.download = `${d.numero}.pdf`
         document.body.appendChild(a); a.click(); document.body.removeChild(a)
         setTimeout(() => URL.revokeObjectURL(url), 3000)
-      } catch (e) { alert("Impossible de générer le PDF : " + (e.message || e)) }
-      finally { setGeneratingPdf(false) }
+      } catch (e) {
+        if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
+          window.location.reload()
+        } else {
+          alert("Impossible de générer le PDF : " + (e.message || e))
+        }
+      } finally { setGeneratingPdf(false) }
     }
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -429,7 +434,11 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
                   setTimeout(() => URL.revokeObjectURL(url), 3000)
                 } catch (e) {
                   console.error("[pdf download]", e)
-                  alert("Impossible de générer le PDF : " + (e.message || e))
+                  if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
+                    window.location.reload()
+                  } else {
+                    alert("Impossible de générer le PDF : " + (e.message || e))
+                  }
                 }
                 finally { setGeneratingPdf(false) }
               }}
