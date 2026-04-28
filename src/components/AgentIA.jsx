@@ -342,7 +342,9 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
         await streamResponse();
         if (!raw) throw new Error("stream-empty");
       } catch (streamErr) {
-        // Fallback non-streamé si le SSE casse (proxy, pare-feu, etc.)
+        // Fallback non-streamé uniquement si c'est une erreur réseau/SSE,
+        // PAS si Anthropic a renvoyé une vraie erreur API (4xx/5xx).
+        if (streamErr.message === "api") throw streamErr;
         console.warn("[AgentIA] streaming failed, falling back:", streamErr);
         raw = "";
         await nonStreamResponse();
@@ -505,7 +507,20 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
         ({ error: dbErr }) => { if (dbErr) console.warn("[log insert/db]", dbErr.message); },
         (netErr)           => { console.warn("[log insert/net]", netErr?.message || netErr); },
       );
-      const msg = !navigator.onLine ? TX.errNetwork : e.message === "api" ? TX.errApi : TX.errGeneral;
+      let msg;
+      if (!navigator.onLine) {
+        msg = TX.errNetwork;
+      } else if (apiError?.includes("journalière") || apiError?.includes("429")) {
+        msg = apiError; // affiche le message précis (ex: "Limite journalière atteinte (40 appels/jour)")
+      } else if (apiError?.includes("Période d'essai")) {
+        msg = apiError;
+      } else if (apiError?.includes("28 secondes") || apiError?.includes("504")) {
+        msg = "La demande a pris trop de temps. Réessayez avec une description plus courte.";
+      } else if (apiError?.includes("529") || apiError?.includes("overloaded") || apiError?.includes("Upstream")) {
+        msg = "Les serveurs IA sont surchargés en ce moment. Réessayez dans 30 secondes.";
+      } else {
+        msg = e.message === "api" ? TX.errApi : TX.errGeneral;
+      }
       updateAssistant("❌ " + msg);
     }
     setLoading(false);
