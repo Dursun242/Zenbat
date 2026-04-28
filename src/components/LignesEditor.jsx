@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { UNITES, TVA_RATES } from "../lib/constants.js";
+import { UNITES, UNITE_ALIASES, TVA_RATES } from "../lib/constants.js";
+
+const normalizeUnite = (v) => UNITE_ALIASES[v] || v || "u";
+const UNITES_VALUES = new Set(UNITES.map(u => u.value));
 import { fmt, uid } from "../lib/utils.js";
 
 export default function LignesEditor({ lignes, onChange, ac, vatRegime }) {
@@ -101,9 +104,14 @@ export default function LignesEditor({ lignes, onChange, ac, vatRegime }) {
                 </div>
                 <div>
                   <div style={{ fontSize: 9, color: "#9A8E82", marginBottom: 2 }}>Unité</div>
-                  <select value={l.unite || "u"} onChange={e => update(l.id, { unite: e.target.value })}
-                    style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 4px", fontSize: 12, color: "#1A1612", background: "white", boxSizing: "border-box" }}>
-                    {UNITES.map(u => <option key={u} value={u}>{u}</option>)}
+                  <select
+                    value={normalizeUnite(l.unite)}
+                    onChange={e => update(l.id, { unite: e.target.value })}
+                    style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 4px", fontSize: 11, color: "#1A1612", background: "white", boxSizing: "border-box" }}>
+                    {!UNITES_VALUES.has(normalizeUnite(l.unite)) && (
+                      <option value={normalizeUnite(l.unite)}>{normalizeUnite(l.unite)}</option>
+                    )}
+                    {UNITES.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
                   </select>
                 </div>
                 <div>

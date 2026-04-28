@@ -125,7 +125,7 @@ FORMAT DE SORTIE — bloc <DEVIS></DEVIS>
       "type_ligne": "ouvrage",
       "lot": "NOM DU LOT",
       "designation": "désignation complète et précise",
-      "unite": "m² | ml | m³ | u | ens | h | j | forfait",
+      "unite": "m² | ml | m³ | u | pièce | lot | ens | forfait | kg | g | t | L | cl | min | h | j | sem | mois | session | séance | pers | part | km",
       "quantite": number ou null,
       "prix_unitaire": number ou null,
       "tva_rate": 20

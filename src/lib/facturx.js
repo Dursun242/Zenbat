@@ -22,17 +22,38 @@ const TYPE_CREDIT  = "381";
 // Codes d'unité UN/ECE Rec. 20 acceptés par le schématron Factur-X.
 // On mappe les libellés courants du bâtiment vers les codes officiels.
 const UNIT_CODE_MAP = {
-  m2:    "MTK", "m²":   "MTK", m_2: "MTK",
+  // Surface & dimensions
+  m2:    "MTK", "m²":   "MTK",
   ml:    "MTR", m:      "MTR",
-  u:     "C62", unite:  "C62", "unité": "C62", pc: "H87",
   m3:    "MTQ", "m³":   "MTQ",
-  ft:    "C62",                        // forfait
-  ens:   "C62",                        // ensemble
+  // Quantités
+  u:     "C62", unite:  "C62", "unité": "C62",
+  "pièce": "H87", piece: "H87", pc: "H87",
+  lot:   "C62",
+  ens:   "C62",
+  forfait: "C62",
+  // Masse
+  kg:    "KGM",
+  g:     "GRM",
+  t:     "TNE",
+  // Volume liquide
+  l:     "LTR", "l":   "LTR",
+  cl:    "CLT",
+  // Temps
+  min:   "MIN",
   h:     "HUR", heure:  "HUR",
   j:     "DAY", jour:   "DAY",
-  kg:    "KGM",
-  t:     "TNE",
-  l:     "LTR",
+  sem:   "WEE", semaine: "WEE",
+  mois:  "MON",
+  session: "C62",
+  "séance": "C62",
+  // Personnes
+  pers:  "C62", personne: "C62",
+  part:  "C62",
+  // Distance
+  km:    "KMT",
+  // Divers
+  ft:    "C62",
 };
 
 function mapUnit(u) {

@@ -4,7 +4,7 @@ const PU_ERROR_THRESHOLD = 0.30;
 // Unités quantifiées : seules les lignes avec ces unités sont vérifiées.
 // Les lignes forfaitaires (u, forfait, ens, ou sans unité) sont ignorées
 // pour éviter les faux positifs (un forfait 8 000 € ≠ un PU à 8 000 €/m²).
-const QUANTIFIED_UNITS = new Set(["m²", "m2", "ml", "m", "m³", "m3", "h", "j", "kg", "t"]);
+const QUANTIFIED_UNITS = new Set(["m²", "m2", "ml", "m", "m³", "m3", "h", "j", "min", "sem", "mois", "kg", "g", "t", "L", "cl", "km"]);
 
 function tokenize(str) {
   return (str || "")

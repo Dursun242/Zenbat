@@ -1,6 +1,43 @@
 export const CLAUDE_MODEL = import.meta.env.VITE_CLAUDE_MODEL || "claude-haiku-4-5-20251001";
 
-export const UNITES = ["m2", "ml", "u", "m3", "ft", "ens", "h", "j"];
+// Valeurs canoniques des unités (alignées avec les sorties IA)
+export const UNITES = [
+  // Surface & dimensions (BTP, nettoyage, paysage…)
+  { value: "m²",      label: "m² — surface" },
+  { value: "ml",      label: "ml — mètre linéaire" },
+  { value: "m³",      label: "m³ — volume / cubage" },
+  // Quantités génériques
+  { value: "u",       label: "u — unité / pièce" },
+  { value: "pièce",   label: "pièce" },
+  { value: "lot",     label: "lot" },
+  { value: "ens",     label: "ens — ensemble" },
+  { value: "forfait", label: "forfait" },
+  // Masse (alimentaire, chimie, agriculture…)
+  { value: "kg",      label: "kg — kilogramme" },
+  { value: "g",       label: "g — gramme" },
+  { value: "t",       label: "t — tonne" },
+  // Volume liquide (alimentaire, plomberie…)
+  { value: "L",       label: "L — litre" },
+  { value: "cl",      label: "cl — centilitre" },
+  // Temps (services, tech, santé, formation…)
+  { value: "min",     label: "min — minute" },
+  { value: "h",       label: "h — heure" },
+  { value: "j",       label: "j — jour / homme" },
+  { value: "sem",     label: "sem — semaine" },
+  { value: "mois",    label: "mois" },
+  { value: "session", label: "session" },
+  { value: "séance",  label: "séance" },
+  // Personnes (traiteur, événementiel, formation…)
+  { value: "pers",    label: "pers — personne" },
+  { value: "part",    label: "part — portion" },
+  // Distance & transport
+  { value: "km",      label: "km — kilomètre" },
+  // Divers
+  { value: "ft",      label: "ft — pied (impérial)" },
+];
+
+// Aliases pour rétrocompatibilité avec les anciennes valeurs ASCII stockées en base
+export const UNITE_ALIASES = { m2: "m²", m3: "m³" };
 export const TVA_RATES = [20, 10, 5.5];
 
 // ── Statuts devis ─────────────────────────────────────────
@@ -77,11 +114,11 @@ export const DEMO_CLIENTS = [
 
 const DEMO_LIGNES = [
   { id: "l1", type_ligne: "lot",     designation: "DÉMOLITION",          lot: ""             },
-  { id: "l2", type_ligne: "ouvrage", designation: "Dépose carrelage",    lot: "Démolition",  unite: "m2", quantite: 24, prix_unitaire: 18   },
-  { id: "l3", type_ligne: "ouvrage", designation: "Évacuation gravats",  lot: "Démolition",  unite: "ft", quantite: 1,  prix_unitaire: 320  },
+  { id: "l2", type_ligne: "ouvrage", designation: "Dépose carrelage",    lot: "Démolition",  unite: "m²", quantite: 24, prix_unitaire: 18   },
+  { id: "l3", type_ligne: "ouvrage", designation: "Évacuation gravats",  lot: "Démolition",  unite: "forfait", quantite: 1,  prix_unitaire: 320  },
   { id: "l4", type_ligne: "lot",     designation: "REVÊTEMENTS",         lot: ""             },
-  { id: "l5", type_ligne: "ouvrage", designation: "Carrelage grès cérame", lot: "Revêtements", unite: "m2", quantite: 24, prix_unitaire: 55 },
-  { id: "l6", type_ligne: "ouvrage", designation: "Faïence murale",      lot: "Revêtements", unite: "m2", quantite: 18, prix_unitaire: 48  },
+  { id: "l5", type_ligne: "ouvrage", designation: "Carrelage grès cérame", lot: "Revêtements", unite: "m²", quantite: 24, prix_unitaire: 55 },
+  { id: "l6", type_ligne: "ouvrage", designation: "Faïence murale",      lot: "Revêtements", unite: "m²", quantite: 18, prix_unitaire: 48  },
   { id: "l7", type_ligne: "lot",     designation: "PLOMBERIE",           lot: ""             },
   { id: "l8", type_ligne: "ouvrage", designation: "WC suspendu complet", lot: "Plomberie",   unite: "u",  quantite: 1,  prix_unitaire: 650 },
   { id: "l9", type_ligne: "ouvrage", designation: "Douche italienne",    lot: "Plomberie",   unite: "u",  quantite: 1,  prix_unitaire: 1200 },
