@@ -415,6 +415,18 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
             residualWarning = "\n\n⚠️ Devis vérifié automatiquement : des écarts de marché subsistent. Vous pouvez les ajuster manuellement.";
           }
 
+          // Champs manquants signalés par l'IA (quantités / prix non dictés)
+          const missing = Array.isArray(parsed.champs_a_completer) ? parsed.champs_a_completer.filter(Boolean) : [];
+          if (missing.length > 0) {
+            residualWarning += "\n\n📋 À compléter :\n" + missing.map(m => `• ${m}`).join("\n");
+          }
+
+          // Suggestions (prestations non demandées à envisager)
+          const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions.filter(Boolean) : [];
+          if (suggestions.length > 0) {
+            residualWarning += "\n\n💡 À envisager :\n" + suggestions.map(s => `• ${s}`).join("\n");
+          }
+
           // Tout premier devis jamais généré sur ce compte :
           // on déclenche une modale festive si aucun devis n'existe encore en DB.
           if (devis.length === 0 && resolvedLignes.some(l => l.type_ligne === "ouvrage")) {
@@ -672,7 +684,9 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
                       </td>
                     </tr>
                   );
-                  const total = (l.quantite || 0) * (l.prix_unitaire || 0);
+                  const total = (l.quantite != null && l.prix_unitaire != null)
+                    ? l.quantite * l.prix_unitaire
+                    : null;
                   return (
                     <tr key={l.id} style={{ borderBottom: "1px solid #FAF7F2", animation: "rowPop .3s cubic-bezier(.34,1.3,.64,1) both", animationDelay: `${idx * 0.06}s` }}>
                       <td style={{ padding: "8px 14px" }}>
@@ -707,7 +721,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
                               onBlur={e => { updateLigne(l.id, "quantite", parseFloat(e.target.value) || 0); setEditing(null); }}
                               onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEditing(null); }}
                               style={{ width: 50, textAlign: "right", border: "none", outline: `2px solid ${ac}`, borderRadius: 4, fontSize: 12, fontWeight: 600, color: "#3D3028", background: "#f0fdf4", padding: "2px 4px" }} />
-                          : <span onClick={() => setEditing({ id: l.id, field: "quantite" })} title="Cliquer pour modifier" style={{ cursor: "text" }}>{l.quantite}</span>
+                          : <span onClick={() => setEditing({ id: l.id, field: "quantite" })} title="Cliquer pour modifier" style={{ cursor: "text", color: l.quantite == null ? "#f59e0b" : undefined }}>{l.quantite ?? "—"}</span>
                         }
                       </td>
                       <td style={{ padding: "8px", textAlign: "right", fontSize: 11, color: "#6B6358" }}>
@@ -716,10 +730,10 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
                               onBlur={e => { updateLigne(l.id, "prix_unitaire", parseFloat(e.target.value) || 0); setEditing(null); }}
                               onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEditing(null); }}
                               style={{ width: 65, textAlign: "right", border: "none", outline: `2px solid ${ac}`, borderRadius: 4, fontSize: 11, color: "#6B6358", background: "#f0fdf4", padding: "2px 4px" }} />
-                          : <span onClick={() => setEditing({ id: l.id, field: "prix" })} title="Cliquer pour modifier" style={{ cursor: "text" }}>{fmt(l.prix_unitaire)}</span>
+                          : <span onClick={() => setEditing({ id: l.id, field: "prix" })} title="Cliquer pour modifier" style={{ cursor: "text", color: l.prix_unitaire == null ? "#f59e0b" : undefined }}>{l.prix_unitaire != null ? fmt(l.prix_unitaire) : "—"}</span>
                         }
                       </td>
-                      <td style={{ padding: "8px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: "#1A1612" }}>{fmt(total)}</td>
+                      <td style={{ padding: "8px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: total == null ? "#f59e0b" : "#1A1612" }}>{total != null ? fmt(total) : "—"}</td>
                       <td style={{ padding: "4px" }}>
                         <button onClick={() => deleteLigne(l.id)}
                           style={{ background: "none", border: "none", cursor: "pointer", color: "#E8E2D8", fontSize: 14, lineHeight: 1, padding: "2px 4px" }}
