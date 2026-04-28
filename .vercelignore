@@ -1,0 +1,10 @@
+# Vercel ne doit pas déployer les fichiers de test comme fonctions serverless.
+# Sans cette ligne, chaque api/*.test.js compte comme une fonction et fait
+# sauter le quota 12 fonctions du plan Hobby.
+**/*.test.js
+**/*.test.jsx
+
+# Tests, configs et docs ne sont pas nécessaires en build prod.
+src/test/
+**/*.test.ts
+**/*.test.tsx
