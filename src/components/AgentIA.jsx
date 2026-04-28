@@ -282,7 +282,8 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       });
       if (!res.ok) {
         const detail = await res.json().catch(() => null);
-        apiError = detail?.error || `HTTP ${res.status}`;
+        const errVal = detail?.error;
+        apiError = typeof errVal === "string" ? errVal : (errVal?.message || detail?.message || `HTTP ${res.status}`);
         throw new Error("api");
       }
       if (!res.body) throw new Error("api");
@@ -328,7 +329,8 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        apiError = data?.error || `HTTP ${res.status}`;
+        const errVal2 = data?.error;
+        apiError = typeof errVal2 === "string" ? errVal2 : (errVal2?.message || data?.message || `HTTP ${res.status}`);
         throw new Error("api");
       }
       raw = (data?.content?.[0]?.text || "").toString();
