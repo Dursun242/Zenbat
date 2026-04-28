@@ -47,7 +47,7 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: "Période d'essai expirée" });
   }
 
-  const AI_DAILY_LIMIT = profile.plan === "pro" ? 200 : 20;
+  const AI_DAILY_LIMIT = profile.plan === "pro" ? 200 : 40;
   const todayStart = new Date();
   todayStart.setUTCHours(0, 0, 0, 0);
   const { count: callsToday } = await admin.from("ia_conversations")

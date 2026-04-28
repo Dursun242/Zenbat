@@ -16,6 +16,32 @@ import ClientPickerModal from "./ClientPickerModal.jsx";
 import CelebrateModal from "./agent/CelebrateModal.jsx";
 import CoherenceSettings from "./CoherenceSettings.jsx";
 
+// Extrait le JSON du bloc <DEVIS> même si la balise fermante est absente
+// (cas où Claude émet du texte ou une astuce après le JSON sans </DEVIS>).
+// Avec balise fermante : trivial. Sans : on équilibre les accolades.
+function extractDevisJson(raw) {
+  const withClose = raw.match(/<DEVIS>([\s\S]*?)<\/DEVIS>/);
+  if (withClose) return withClose[1].trim();
+
+  const openIdx = raw.indexOf("<DEVIS>");
+  if (openIdx < 0) return null;
+
+  const after = raw.slice(openIdx + 7).trimStart();
+  if (!after.startsWith("{")) return null;
+
+  let depth = 0, inStr = false, escape = false;
+  for (let i = 0; i < after.length; i++) {
+    const ch = after[i];
+    if (escape)          { escape = false; continue; }
+    if (ch === "\\" && inStr) { escape = true;  continue; }
+    if (ch === '"')      { inStr = !inStr;  continue; }
+    if (inStr)           continue;
+    if (ch === "{")      depth++;
+    else if (ch === "}") { depth--; if (depth === 0) return after.slice(0, i + 1); }
+  }
+  return null;
+}
+
 // ─── Boucle de cohérence : valide + corrige jusqu'à COHERENCE_MAX_RETRIES fois ──
 const COHERENCE_MAX_RETRIES = 1;
 
@@ -50,11 +76,11 @@ async function runCoherenceLoop(devis, apiBody, authHeaders, msgs, rawResponse, 
       correctedRaw = data?.content?.[0]?.text || "";
     } catch { break; }
 
-    const corrMatch = correctedRaw.match(/<DEVIS>([\s\S]*?)<\/DEVIS>/) || correctedRaw.match(/<DEVIS>([\s\S]+)/);
-    if (!corrMatch) break;
+    const corrJsonStr = extractDevisJson(correctedRaw);
+    if (!corrJsonStr) break;
 
     let correctedParsed;
-    try { correctedParsed = JSON.parse(corrMatch[1].trim()); } catch { break; }
+    try { correctedParsed = JSON.parse(corrJsonStr); } catch { break; }
 
     let correctedLignes = (correctedParsed.lignes || []).map(l => ({ ...l, id: uid() }));
     if (brand.vatRegime === "franchise") {
@@ -92,8 +118,12 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   const [msgs,         setMsgs]         = useState(() => [{ role: "assistant", content: buildAgentGreeting(brand) }]);
   const [input,        setInput]        = useState("");
   const [loading,      setLoading]      = useState(false);
-  const [lignes,       setLignes]       = useState([]);
-  const [objet,        setObjet]        = useState("");
+  const [lignes, setLignes] = useState(() => {
+    try { const d = JSON.parse(localStorage.getItem("zenbat_ia_draft") || "{}"); return Array.isArray(d.lignes) ? d.lignes : []; } catch { return []; }
+  });
+  const [objet, setObjet] = useState(() => {
+    try { const d = JSON.parse(localStorage.getItem("zenbat_ia_draft") || "{}"); return typeof d.objet === "string" ? d.objet : ""; } catch { return ""; }
+  });
   const [visibleCount, setVisibleCount] = useState(0);
   const [pickingClient, setPickingClient] = useState(false);
   const [listening,    setListening]    = useState(false);
@@ -139,6 +169,13 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     ta.scrollTop = ta.scrollHeight;
     ta.scrollLeft = ta.scrollWidth;
   }, [input]);
+
+  useEffect(() => {
+    try {
+      if (!lignes.length && !objet) localStorage.removeItem("zenbat_ia_draft");
+      else localStorage.setItem("zenbat_ia_draft", JSON.stringify({ lignes, objet }));
+    } catch {}
+  }, [lignes, objet]);
 
   useEffect(() => {
     if (!lignes.length) return;
@@ -298,13 +335,13 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
         await nonStreamResponse();
       }
 
-      const match = raw.match(/<DEVIS>([\s\S]*?)<\/DEVIS>/) || raw.match(/<DEVIS>([\s\S]+)/);
-      const txt   = raw.replace(/<DEVIS>[\s\S]*/g, "").trim();
+      const devisJsonStr = extractDevisJson(raw);
+      const txt          = raw.replace(/<DEVIS>[\s\S]*/g, "").trim();
 
       let residualWarning = "";
-      if (match) {
+      if (devisJsonStr) {
         try {
-          const parsed    = JSON.parse(match[1].trim());
+          const parsed    = JSON.parse(devisJsonStr);
           const newLignes = (parsed.lignes || []).map(l => ({ ...l, id: uid() }));
 
           // Franchise en base de TVA : force tva_rate = 0 sur toutes les lignes
@@ -390,7 +427,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
         } catch { /* JSON mal formé — on ignore */ }
       }
 
-      const finalText = (txt || (match ? TX.linesAdded : "Je n'ai pas compris, pouvez-vous reformuler ?")) + residualWarning;
+      const finalText = (txt || (devisJsonStr ? TX.linesAdded : "Je n'ai pas compris, pouvez-vous reformuler ?")) + residualWarning;
       updateAssistant(finalText);
 
       // Détection best-effort des interactions "négatives" pour analyse admin.
@@ -399,7 +436,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       // Refus "dur" uniquement (pas les questions polies du flux soft hors-périmètre).
       const refusalRe  = /ne r[ée]alis(ons|e|ent) pas|ne fais(ons|ent)? pas|ne propos(ons|e|ent) pas|ne traitons pas|pas (notre|de) sp[ée]cialit[ée]/i;
       const negUserRe  = /\b(nul|nulle|pourri|pourrie|merdique|d[ée]bile|stupide|inutile|ne sert à rien|marche pas|fonctionne pas|ne comprend[s]? rien|ça bug|bug[ué]|ça beug|arrête de|n'importe quoi|t'es mauvais|mauvaise r[ée]ponse)\b/i;
-      const isRefusal     = !match && refusalRe.test(finalText);
+      const isRefusal     = !devisJsonStr && refusalRe.test(finalText);
       const isUserNegative= negUserRe.test(userMsg.content || "");
       if (isRefusal || isUserNegative) {
         supabase.from("ia_negative_logs").insert({
@@ -418,7 +455,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       supabase.from("ia_conversations").insert({
         user_message: userMsg.content?.slice(0, 2000) || null,
         ai_response:  finalText?.slice(0, 2000) || null,
-        had_devis:    !!match,
+        had_devis:    !!devisJsonStr,
         trade_names:  tradesLabels(brand?.trades || []).slice(0, 3).join(", ") || null,
         model:        CLAUDE_MODEL,
       }).then(
@@ -548,6 +585,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       odoo_sign_url: null,
     });
     setPickingClient(false);
+    try { localStorage.removeItem("zenbat_ia_draft"); } catch {}
     setLignes([]); setObjet("");
     setMsgs([{ role: "assistant", content: TX.quoteSaved }]);
     // Ouvre directement la vue PDF du devis fraîchement enregistré
@@ -748,7 +786,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
         {/* Boutons Enregistrer / Effacer */}
         {lignes.length > 0 && visibleCount >= lignes.length && (
           <div style={{ padding: "10px 14px", borderTop: "1px solid #F0EBE3", display: "flex", gap: 8, flexShrink: 0, animation: "fadeUp .3s ease both" }}>
-            <button onClick={() => { setLignes([]); setObjet(""); }}
+            <button onClick={() => { try { localStorage.removeItem("zenbat_ia_draft"); } catch {} setLignes([]); setObjet(""); }}
               style={{ flex: 1, background: "none", border: "1px solid #E8E2D8", borderRadius: 10, padding: 9, fontSize: 12, color: "#6B6358", cursor: "pointer", fontWeight: 500 }}>
               {TX.clearQuote}
             </button>
