@@ -251,21 +251,20 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
             if (!line.startsWith("data:")) continue;
             const payload = line.slice(5).trim();
             if (!payload || payload === "[DONE]") continue;
-            try {
-              const msg = JSON.parse(payload);
-              if (msg.type === "content_block_delta" && msg.delta?.type === "text_delta") {
-                if (!firstChunkTime) {
-                  firstChunkTime = Date.now() - fetchStartTime;
-                }
-                raw += msg.delta.text || "";
-                const cut     = raw.indexOf("<DEVIS>");
-                const visible = (cut >= 0 ? raw.slice(0, cut) : raw).trim();
-                if (visible) updateAssistant(visible);
-              } else if (msg.type === "error") {
-                apiError = msg.error?.message || "Erreur Anthropic";
-                throw new Error("api");
+            let msg;
+            try { msg = JSON.parse(payload); } catch { continue; }
+            if (msg.type === "content_block_delta" && msg.delta?.type === "text_delta") {
+              if (!firstChunkTime) {
+                firstChunkTime = Date.now() - fetchStartTime;
               }
-            } catch { /* chunk partiel — on ignore */ }
+              raw += msg.delta.text || "";
+              const cut     = raw.indexOf("<DEVIS>");
+              const visible = (cut >= 0 ? raw.slice(0, cut) : raw).trim();
+              if (visible) updateAssistant(visible);
+            } else if (msg.type === "error") {
+              apiError = msg.error?.message || "Erreur Anthropic";
+              throw new Error("api");
+            }
           }
         }
       }
