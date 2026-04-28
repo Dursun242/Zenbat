@@ -118,6 +118,19 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   const [msgs,         setMsgs]         = useState(() => [{ role: "assistant", content: buildAgentGreeting(brand) }]);
   const [input,        setInput]        = useState("");
   const [loading,      setLoading]      = useState(false);
+  const [feedback,     setFeedback]     = useState({});
+
+  const saveFeedback = async (msgIdx, vote, reason = null) => {
+    const prevMsg = msgs[msgIdx - 1];
+    await supabase.from("ia_feedback").insert({
+      vote,
+      reason: reason || null,
+      user_message: prevMsg?.content?.slice(0, 500) || null,
+      lignes_count: lignes.filter(l => l.type_ligne === "ouvrage").length,
+      trades: brand.trades?.length ? brand.trades : null,
+    }).then(() => {}, () => {});
+    setFeedback(prev => ({ ...prev, [msgIdx]: { ...prev[msgIdx], saved: true } }));
+  };
   const [lignes, setLignes] = useState(() => {
     try { const d = JSON.parse(localStorage.getItem("zenbat_ia_draft") || "{}"); return Array.isArray(d.lignes) ? d.lignes : []; } catch { return []; }
   });
@@ -231,14 +244,14 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     setInput(""); setLoading(true);
 
     let assistantAdded = false;
-    const updateAssistant = (visibleText) => {
+    const updateAssistant = (visibleText, hasDevis = false) => {
       setMsgs(prev => {
         if (!assistantAdded) {
           assistantAdded = true;
-          return [...prev, { role: "assistant", content: visibleText }];
+          return [...prev, { role: "assistant", content: visibleText, hasDevis }];
         }
         const next = [...prev];
-        next[next.length - 1] = { role: "assistant", content: visibleText };
+        next[next.length - 1] = { role: "assistant", content: visibleText, hasDevis };
         return next;
       });
     };
@@ -440,7 +453,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       }
 
       const finalText = (txt || (devisJsonStr ? TX.linesAdded : "Je n'ai pas compris, pouvez-vous reformuler ?")) + residualWarning;
-      updateAssistant(finalText);
+      updateAssistant(finalText, !!devisJsonStr);
 
       // Détection best-effort des interactions "négatives" pour analyse admin.
       // - Refus IA : pas de <DEVIS> émis + vocabulaire de refus dans la réponse.
@@ -824,26 +837,80 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
               Mémoire active · {historySummary.total} devis · {historySummary.topOuvrages.length} ouvrages référencés
             </div>
           )}
-          {msgs.map((m, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start", alignItems: "flex-end", gap: 6 }}>
-              {m.role === "assistant" && (
-                <div style={{ width: 24, height: 24, borderRadius: "50%", background: ac + "22", border: `1px solid ${ac}44`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: ac, fontSize: 12 }}>✦</div>
-              )}
-              <div style={{
-                maxWidth: "82%",
-                borderRadius: m.role === "user" ? "16px 16px 3px 16px" : "16px 16px 16px 3px",
-                padding: "9px 13px", fontSize: 12, lineHeight: 1.55,
-                background: m.role === "user" ? "#1A1612" : "white",
-                color: m.role === "user" ? "white" : "#2A231C",
-                boxShadow: m.role === "assistant" ? "0 1px 4px rgba(0,0,0,.07)" : "none",
-                border: m.role === "assistant" ? "1px solid #F0EBE3" : "none",
-              }}>
-                {m.content.split("\n").map((line, j, arr) => (
-                  <span key={j}>{line.replace(/\*([^*]+)\*/g, "$1")}{j < arr.length - 1 && <br/>}</span>
-                ))}
+          {msgs.map((m, i) => {
+            const fb = feedback[i] || {};
+            const REASON_TAGS = ["Trop de questions", "Mauvais métier", "Prix incorrects", "Trop générique", "Hors sujet"];
+            return (
+              <div key={i}>
+                <div style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start", alignItems: "flex-end", gap: 6 }}>
+                  {m.role === "assistant" && (
+                    <div style={{ width: 24, height: 24, borderRadius: "50%", background: ac + "22", border: `1px solid ${ac}44`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: ac, fontSize: 12 }}>✦</div>
+                  )}
+                  <div style={{
+                    maxWidth: "82%",
+                    borderRadius: m.role === "user" ? "16px 16px 3px 16px" : "16px 16px 16px 3px",
+                    padding: "9px 13px", fontSize: 12, lineHeight: 1.55,
+                    background: m.role === "user" ? "#1A1612" : "white",
+                    color: m.role === "user" ? "white" : "#2A231C",
+                    boxShadow: m.role === "assistant" ? "0 1px 4px rgba(0,0,0,.07)" : "none",
+                    border: m.role === "assistant" ? "1px solid #F0EBE3" : "none",
+                  }}>
+                    {m.content.split("\n").map((line, j, arr) => (
+                      <span key={j}>{line.replace(/\*([^*]+)\*/g, "$1")}{j < arr.length - 1 && <br/>}</span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Barre de vote — uniquement sur les messages IA avec devis, hors chargement */}
+                {m.hasDevis && !loading && (
+                  <div style={{ paddingLeft: 30, marginTop: 4 }}>
+                    {fb.saved ? (
+                      <span style={{ fontSize: 11, color: fb.vote === 1 ? "#16a34a" : "#9A8E82" }}>
+                        {fb.vote === 1 ? "✓ Merci !" : "✓ Noté"}
+                      </span>
+                    ) : fb.showReason ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6, maxWidth: 300 }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                          {REASON_TAGS.map(tag => (
+                            <button key={tag}
+                              onClick={() => setFeedback(prev => ({ ...prev, [i]: { ...prev[i], reason: prev[i]?.reason === tag ? "" : tag } }))}
+                              style={{ fontSize: 10, padding: "3px 8px", borderRadius: 20, border: `1px solid ${fb.reason === tag ? ac : "#e5e7eb"}`, background: fb.reason === tag ? ac + "18" : "white", color: fb.reason === tag ? ac : "#6B6358", cursor: "pointer", fontWeight: fb.reason === tag ? 700 : 400 }}>
+                              {tag}
+                            </button>
+                          ))}
+                        </div>
+                        <input
+                          placeholder="Autre raison… (optionnel)"
+                          value={fb.customReason || ""}
+                          onChange={e => setFeedback(prev => ({ ...prev, [i]: { ...prev[i], customReason: e.target.value } }))}
+                          style={{ fontSize: 11, padding: "5px 8px", borderRadius: 8, border: "1px solid #e5e7eb", outline: "none" }}
+                        />
+                        <button
+                          onClick={() => saveFeedback(i, -1, fb.customReason || fb.reason || null)}
+                          style={{ alignSelf: "flex-start", fontSize: 11, padding: "4px 12px", borderRadius: 8, border: "none", background: "#ef4444", color: "white", cursor: "pointer", fontWeight: 600 }}>
+                          Envoyer
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <span style={{ fontSize: 10, color: "#9A8E82" }}>Cette réponse était utile ?</span>
+                        <button
+                          onClick={() => { setFeedback(prev => ({ ...prev, [i]: { vote: 1 } })); saveFeedback(i, 1); }}
+                          style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 8, padding: "2px 8px", fontSize: 13, cursor: "pointer" }}>
+                          👍
+                        </button>
+                        <button
+                          onClick={() => setFeedback(prev => ({ ...prev, [i]: { vote: -1, showReason: true } }))}
+                          style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 8, padding: "2px 8px", fontSize: 13, cursor: "pointer" }}>
+                          👎
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {/* Puces de démarrage rapide — visibles uniquement sur le chat vierge.
               4 exemples typiques du métier, 1 clic = devis généré. Anti-page blanche
