@@ -128,8 +128,7 @@ export default function App() {
         input,textarea,select,button{font-family:inherit}
         input,textarea,select{font-size:max(16px,1em) !important}
         @media (display-mode: standalone){
-          .app-bottom-nav{padding-bottom:min(env(safe-area-inset-bottom), 16px)}
-          .app-content{padding-bottom:calc(64px + min(env(safe-area-inset-bottom), 16px)) !important}
+          .app-content{padding-bottom:64px !important}
         }
         @media (min-width:1024px){
           .app-sidebar{display:flex !important}
@@ -202,7 +201,7 @@ export default function App() {
         </nav>
 
         {/* Contenu principal */}
-        <div className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "calc(64px + min(env(safe-area-inset-bottom), 16px))" }}>
+        <div className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "64px" }}>
           {["devis", "devis_detail", "factures", "factures_detail"].includes(tab) && (
             <SearchBar devis={devis} clients={clients} invoices={invoices} goDevis={goDevis} goClient={id => { setSelC(id); setTab("client_detail"); }} goInvoice={goInvoice}/>
           )}
