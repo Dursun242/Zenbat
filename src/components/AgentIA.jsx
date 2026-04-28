@@ -8,111 +8,14 @@ import { getToken } from "../lib/getToken.js";
 import { SR_LANGS, MIC_LANG_KEY, pickInitialLang } from "../lib/agentIA/speech.js";
 import { buildAgentGreeting, quickStartsFor } from "../lib/agentIA/sectors.js";
 import { buildSystemPrompt } from "../lib/agentIA/prompt.js";
-import { runCoherenceCheck } from "../lib/coherence/engine.js";
-import { buildCorrectionPrompt } from "../lib/coherence/formatIssues.js";
+import { processDevisFromRaw } from "../lib/agentIA/extractDevis.js";
+import { streamClaude, requestClaude, visibleText, ClaudeApiError } from "../lib/agentIA/stream.js";
+import { runCoherenceLoop } from "../lib/agentIA/coherenceLoop.js";
 import { loadUserCoherenceSettings } from "../lib/coherence/userOverrides.js";
 import { I } from "./ui/icons.jsx";
 import ClientPickerModal from "./ClientPickerModal.jsx";
 import CelebrateModal from "./agent/CelebrateModal.jsx";
 import CoherenceSettings from "./CoherenceSettings.jsx";
-
-// Extrait le JSON du bloc <DEVIS> même si la balise fermante est absente
-// (cas où Claude émet du texte ou une astuce après le JSON sans </DEVIS>).
-// Avec balise fermante : trivial. Sans : on équilibre les accolades.
-function extractDevisJson(raw) {
-  const withClose = raw.match(/<DEVIS>([\s\S]*?)<\/DEVIS>/);
-  if (withClose) return withClose[1].trim();
-
-  const openIdx = raw.indexOf("<DEVIS>");
-  if (openIdx < 0) return null;
-
-  const after = raw.slice(openIdx + 7).trimStart();
-  if (!after.startsWith("{")) return null;
-
-  let depth = 0, inStr = false, escape = false;
-  for (let i = 0; i < after.length; i++) {
-    const ch = after[i];
-    if (escape)          { escape = false; continue; }
-    if (ch === "\\" && inStr) { escape = true;  continue; }
-    if (ch === '"')      { inStr = !inStr;  continue; }
-    if (inStr)           continue;
-    if (ch === "{")      depth++;
-    else if (ch === "}") { depth--; if (depth === 0) return after.slice(0, i + 1); }
-  }
-  return null;
-}
-
-// ─── Boucle de cohérence : valide + corrige jusqu'à COHERENCE_MAX_RETRIES fois ──
-const COHERENCE_MAX_RETRIES = 1;
-
-async function runCoherenceLoop(devis, apiBody, authHeaders, msgs, rawResponse, brand, userSettings = null) {
-  let currentDevis = devis;
-  let currentRaw   = rawResponse;
-  let iterationCount = 1;
-
-  let result = runCoherenceCheck(currentDevis, userSettings);
-  if (result.overall_status !== "fail") {
-    return { resolvedLignes: currentDevis.lignes, resolvedObjet: currentDevis.objet, validationResult: { ...result, iteration_count: 1 } };
-  }
-
-  for (let i = 0; i < COHERENCE_MAX_RETRIES; i++) {
-    iterationCount = i + 2;
-    const correctionPrompt = buildCorrectionPrompt(result);
-
-    let correctedRaw = "";
-    try {
-      const correctionMessages = [
-        ...msgs.slice(-6),
-        { role: "assistant", content: currentRaw },
-        { role: "user",      content: correctionPrompt },
-      ];
-      const res = await fetch("/api/claude", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
-        body:    JSON.stringify({ ...apiBody, messages: correctionMessages, stream: false }),
-      });
-      if (!res.ok) break;
-      const data = await res.json().catch(() => null);
-      correctedRaw = data?.content?.[0]?.text || "";
-    } catch { break; }
-
-    const corrJsonStr = extractDevisJson(correctedRaw);
-    if (!corrJsonStr) break;
-
-    let correctedParsed;
-    try { correctedParsed = JSON.parse(corrJsonStr); } catch { break; }
-
-    let correctedLignes = (correctedParsed.lignes || []).map(l => ({ ...l, id: uid() }));
-    if (brand.vatRegime === "franchise") {
-      correctedLignes = correctedLignes.map(l =>
-        l.type_ligne === "ouvrage" ? { ...l, tva_rate: 0 } : l
-      );
-    }
-
-    currentDevis = { ...correctedParsed, lignes: correctedLignes };
-    currentRaw   = correctedRaw;
-    result       = runCoherenceCheck(currentDevis, userSettings);
-
-    if (result.overall_status !== "fail") {
-      return {
-        resolvedLignes:   currentDevis.lignes,
-        resolvedObjet:    currentDevis.objet,
-        validationResult: { ...result, iteration_count: iterationCount },
-      };
-    }
-  }
-
-  // Après COHERENCE_MAX_RETRIES sans succès : retourne le meilleur état avec avertissement
-  return {
-    resolvedLignes:   currentDevis.lignes,
-    resolvedObjet:    currentDevis.objet,
-    validationResult: {
-      ...result,
-      iteration_count: iterationCount,
-      residual_issues: (result.checks || []).flatMap(c => c.issues || []),
-    },
-  };
-}
 
 export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, plan, trialExpired, onPaywall, setTab, onOpenDevisPDF, brand }) {
   const [msgs,         setMsgs]         = useState(() => [{ role: "assistant", content: buildAgentGreeting(brand) }]);
@@ -271,193 +174,103 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
 
     let raw = "";
     let apiError = null;
-    const fetchStartTime = Date.now();
-    let firstChunkTime = null;
-
-    const streamResponse = async () => {
-      const res = await fetch("/api/claude", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify({ ...body, stream: true }),
-      });
-      if (!res.ok) {
-        const detail = await res.json().catch(() => null);
-        const errVal = detail?.error;
-        apiError = typeof errVal === "string" ? errVal : (errVal?.message || detail?.message || `HTTP ${res.status}`);
-        throw new Error("api");
-      }
-      if (!res.body) throw new Error("api");
-      const reader  = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        let sep;
-        while ((sep = buffer.indexOf("\n\n")) !== -1) {
-          const event = buffer.slice(0, sep);
-          buffer = buffer.slice(sep + 2);
-          for (const line of event.split("\n")) {
-            if (!line.startsWith("data:")) continue;
-            const payload = line.slice(5).trim();
-            if (!payload || payload === "[DONE]") continue;
-            let msg;
-            try { msg = JSON.parse(payload); } catch { continue; }
-            if (msg.type === "content_block_delta" && msg.delta?.type === "text_delta") {
-              if (!firstChunkTime) {
-                firstChunkTime = Date.now() - fetchStartTime;
-              }
-              raw += msg.delta.text || "";
-              const cut     = raw.indexOf("<DEVIS>");
-              const visible = (cut >= 0 ? raw.slice(0, cut) : raw).trim();
-              if (visible) updateAssistant(visible);
-            } else if (msg.type === "error") {
-              apiError = msg.error?.message || "Erreur Anthropic";
-              throw new Error("api");
-            }
-          }
-        }
-      }
-    };
-
-    const nonStreamResponse = async () => {
-      const res = await fetch("/api/claude", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        const errVal2 = data?.error;
-        apiError = typeof errVal2 === "string" ? errVal2 : (errVal2?.message || data?.message || `HTTP ${res.status}`);
-        throw new Error("api");
-      }
-      raw = (data?.content?.[0]?.text || "").toString();
-      const cut     = raw.indexOf("<DEVIS>");
-      const visible = (cut >= 0 ? raw.slice(0, cut) : raw).trim();
-      if (visible) updateAssistant(visible);
-    };
 
     try {
       try {
-        await streamResponse();
+        raw = await streamClaude({
+          body,
+          authHeaders,
+          onTextDelta: (_delta, accumulated) => {
+            const visible = visibleText(accumulated);
+            if (visible) updateAssistant(visible);
+          },
+        });
         if (!raw) throw new Error("stream-empty");
       } catch (streamErr) {
         // Fallback non-streamé uniquement si c'est une erreur réseau/SSE,
         // PAS si Anthropic a renvoyé une vraie erreur API (4xx/5xx).
-        if (streamErr.message === "api") throw streamErr;
+        if (streamErr instanceof ClaudeApiError) {
+          apiError = streamErr.message;
+          throw streamErr;
+        }
         console.warn("[AgentIA] streaming failed, falling back:", streamErr);
-        raw = "";
-        await nonStreamResponse();
+        try {
+          raw = await requestClaude({ body, authHeaders });
+          const visible = visibleText(raw);
+          if (visible) updateAssistant(visible);
+        } catch (fallbackErr) {
+          if (fallbackErr instanceof ClaudeApiError) apiError = fallbackErr.message;
+          throw fallbackErr;
+        }
       }
 
-      const devisJsonStr = extractDevisJson(raw);
-      const txt          = raw.replace(/<DEVIS>[\s\S]*/g, "").trim();
+      const processed = processDevisFromRaw(raw, brand);
+      const hasDevis  = !!processed;
+      const txt       = raw.replace(/<DEVIS>[\s\S]*/g, "").trim();
 
       let residualWarning = "";
-      if (devisJsonStr) {
+      if (processed) {
+        const { parsed, lignes: finalLignes } = processed;
+
+        // ─── Moteur de cohérence : validation + boucle de correction ────────
+        let resolvedLignes   = finalLignes;
+        let resolvedObjet    = parsed.objet || "";
+        let validationResult = { overall_status: "pass", checks: [], typology_id: null, iteration_count: 1 };
         try {
-          const parsed    = JSON.parse(devisJsonStr);
-          const newLignes = (parsed.lignes || []).map(l => ({ ...l, id: uid() }));
+          const coherence = await runCoherenceLoop({
+            devis:        { ...parsed, lignes: finalLignes },
+            apiBody:      body,
+            authHeaders,
+            msgs:         newMsgs,
+            rawResponse:  raw,
+            brand,
+            userSettings: userSettingsRef.current,
+          });
+          resolvedLignes   = coherence.resolvedLignes;
+          resolvedObjet    = coherence.resolvedObjet || parsed.objet || "";
+          validationResult = coherence.validationResult;
+        } catch { /* coherence loop failed — on conserve les lignes originales */ }
 
-          // Franchise en base de TVA : force tva_rate = 0 sur toutes les lignes
-          // (remap immuable — jamais de mutation in-place).
-          let finalLignes = brand.vatRegime === "franchise"
-            ? newLignes.map(l => l.type_ligne === "ouvrage" ? { ...l, tva_rate: 0 } : l)
-            : newLignes;
+        // Log de validation (best-effort, table créée par migration 0024)
+        if (validationResult.typology_id) {
+          supabase.from("coherence_validations").insert({
+            typology_id:     validationResult.typology_id,
+            overall_status:  validationResult.overall_status,
+            checks:          validationResult.checks,
+            iteration_count: validationResult.iteration_count ?? 1,
+          }).then(() => {}, () => {});
+        }
 
-          // Filet de sécurité : si l'IA déclare un montant cible et que la somme
-          // des lignes ouvrage n'y correspond pas, on rescale les prix unitaires.
-          const target = Number(parsed.target_total_ht);
-          if (target > 0) {
-            const sum = finalLignes
-              .filter(l => l.type_ligne === "ouvrage")
-              .reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0);
-            if (sum > 0 && Math.abs(sum - target) / target > 0.005) {
-              const ratio = target / sum;
-              // 1ère passe : rescale proportionnel sur chaque ligne ouvrage
-              finalLignes = finalLignes.map(l => l.type_ligne === "ouvrage"
-                ? { ...l, prix_unitaire: Math.round((Number(l.prix_unitaire) || 0) * ratio * 100) / 100 }
-                : l);
-              // 2ème passe : absorbe la dérive d'arrondi sur la dernière ligne ouvrage
-              const rescaled = finalLignes
-                .filter(l => l.type_ligne === "ouvrage")
-                .reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0);
-              const drift = target - rescaled;
-              if (Math.abs(drift) > 0.009) {
-                let fixed = false;
-                finalLignes = [...finalLignes].reverse().map(l => {
-                  if (!fixed && l.type_ligne === "ouvrage") {
-                    fixed = true;
-                    const q  = Number(l.quantite) || 1;
-                    const pu = (Number(l.prix_unitaire) || 0) + drift / q;
-                    return { ...l, prix_unitaire: Math.round(pu * 100) / 100 };
-                  }
-                  return l;
-                }).reverse();
-              }
-            }
-          }
+        if (resolvedObjet) setObjet(resolvedObjet);
+        setLignes(resolvedLignes);
 
-          // ─── Moteur de cohérence : validation + boucle de correction ────────
-          let resolvedLignes   = finalLignes;
-          let resolvedObjet    = parsed.objet || "";
-          let validationResult = { overall_status: "pass", checks: [], typology_id: null, iteration_count: 1 };
-          try {
-            const coherence = await runCoherenceLoop(
-              { ...parsed, lignes: finalLignes },
-              body, authHeaders, newMsgs, raw, brand, userSettingsRef.current,
-            );
-            resolvedLignes   = coherence.resolvedLignes;
-            resolvedObjet    = coherence.resolvedObjet || parsed.objet || "";
-            validationResult = coherence.validationResult;
-          } catch { /* coherence loop failed — on conserve les lignes originales */ }
+        if (validationResult.residual_issues?.length > 0) {
+          residualWarning = "\n\n⚠️ Devis vérifié automatiquement : des écarts de marché subsistent. Vous pouvez les ajuster manuellement.";
+        }
 
-          // Log de validation (best-effort, table créée par migration 0024)
-          if (validationResult.typology_id) {
-            supabase.from("coherence_validations").insert({
-              typology_id:     validationResult.typology_id,
-              overall_status:  validationResult.overall_status,
-              checks:          validationResult.checks,
-              iteration_count: validationResult.iteration_count ?? 1,
-            }).then(() => {}, () => {});
-          }
+        const missing = Array.isArray(parsed.champs_a_completer) ? parsed.champs_a_completer.filter(Boolean) : [];
+        if (missing.length > 0) {
+          residualWarning += "\n\n📋 À compléter :\n" + missing.map(m => `• ${m}`).join("\n");
+        }
 
-          if (resolvedObjet) setObjet(resolvedObjet);
-          setLignes(resolvedLignes);
+        const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions.filter(Boolean) : [];
+        if (suggestions.length > 0) {
+          residualWarning += "\n\n💡 À envisager :\n" + suggestions.map(s => `• ${s}`).join("\n");
+        }
 
-          // Avertissement résiduel si le moteur n'a pas pu tout corriger en 3 essais
-          if (validationResult.residual_issues?.length > 0) {
-            residualWarning = "\n\n⚠️ Devis vérifié automatiquement : des écarts de marché subsistent. Vous pouvez les ajuster manuellement.";
-          }
-
-          // Champs manquants signalés par l'IA (quantités / prix non dictés)
-          const missing = Array.isArray(parsed.champs_a_completer) ? parsed.champs_a_completer.filter(Boolean) : [];
-          if (missing.length > 0) {
-            residualWarning += "\n\n📋 À compléter :\n" + missing.map(m => `• ${m}`).join("\n");
-          }
-
-          // Suggestions (prestations non demandées à envisager)
-          const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions.filter(Boolean) : [];
-          if (suggestions.length > 0) {
-            residualWarning += "\n\n💡 À envisager :\n" + suggestions.map(s => `• ${s}`).join("\n");
-          }
-
-          // Tout premier devis jamais généré sur ce compte :
-          // on déclenche une modale festive si aucun devis n'existe encore en DB.
-          if (devis.length === 0 && resolvedLignes.some(l => l.type_ligne === "ouvrage")) {
-            const elapsed = celebrateStartRef.current
-              ? Math.max(1, Math.round((Date.now() - celebrateStartRef.current) / 1000))
-              : 0;
-            celebrateSecondsRef.current = elapsed;
-            setCelebrate(true);
-          }
-        } catch { /* JSON mal formé — on ignore */ }
+        // Tout premier devis jamais généré sur ce compte :
+        // on déclenche une modale festive si aucun devis n'existe encore en DB.
+        if (devis.length === 0 && resolvedLignes.some(l => l.type_ligne === "ouvrage")) {
+          const elapsed = celebrateStartRef.current
+            ? Math.max(1, Math.round((Date.now() - celebrateStartRef.current) / 1000))
+            : 0;
+          celebrateSecondsRef.current = elapsed;
+          setCelebrate(true);
+        }
       }
 
-      const finalText = (txt || (devisJsonStr ? TX.linesAdded : "Je n'ai pas compris, pouvez-vous reformuler ?")) + residualWarning;
-      updateAssistant(finalText, !!devisJsonStr);
+      const finalText = (txt || (hasDevis ? TX.linesAdded : "Je n'ai pas compris, pouvez-vous reformuler ?")) + residualWarning;
+      updateAssistant(finalText, hasDevis);
 
       // Détection best-effort des interactions "négatives" pour analyse admin.
       // - Refus IA : pas de <DEVIS> émis + vocabulaire de refus dans la réponse.
@@ -465,7 +278,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       // Refus "dur" uniquement (pas les questions polies du flux soft hors-périmètre).
       const refusalRe  = /ne r[ée]alis(ons|e|ent) pas|ne fais(ons|ent)? pas|ne propos(ons|e|ent) pas|ne traitons pas|pas (notre|de) sp[ée]cialit[ée]/i;
       const negUserRe  = /\b(nul|nulle|pourri|pourrie|merdique|d[ée]bile|stupide|inutile|ne sert à rien|marche pas|fonctionne pas|ne comprend[s]? rien|ça bug|bug[ué]|ça beug|arrête de|n'importe quoi|t'es mauvais|mauvaise r[ée]ponse)\b/i;
-      const isRefusal     = !devisJsonStr && refusalRe.test(finalText);
+      const isRefusal     = !hasDevis && refusalRe.test(finalText);
       const isUserNegative= negUserRe.test(userMsg.content || "");
       if (isRefusal || isUserNegative) {
         supabase.from("ia_negative_logs").insert({
@@ -484,7 +297,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       supabase.from("ia_conversations").insert({
         user_message: userMsg.content?.slice(0, 2000) || null,
         ai_response:  finalText?.slice(0, 2000) || null,
-        had_devis:    !!devisJsonStr,
+        had_devis:    hasDevis,
         trade_names:  tradesLabels(brand?.trades || []).slice(0, 3).join(", ") || null,
         model:        CLAUDE_MODEL,
       }).then(
@@ -521,7 +334,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       } else if (apiError?.includes("529") || apiError?.includes("overloaded") || apiError?.includes("Upstream")) {
         msg = "Les serveurs IA sont surchargés en ce moment. Réessayez dans 30 secondes.";
       } else {
-        msg = e.message === "api" ? TX.errApi : TX.errGeneral;
+        msg = e instanceof ClaudeApiError ? TX.errApi : TX.errGeneral;
       }
       updateAssistant("❌ " + msg);
     }
