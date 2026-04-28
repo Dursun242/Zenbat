@@ -33,25 +33,49 @@ function detectTypology(devis) {
   return null;
 }
 
-// Point d'entrée principal : prend un devis (format Zenbat) et retourne un
-// rapport de validation avec overall_status "pass" | "warn" | "fail".
-// Si aucune typologie n'est reconnue, retourne pass immédiatement.
-export function runCoherenceCheck(devis) {
+// Applique les surcharges utilisateur sur une typologie (fourchettes custom).
+function applyUserOverrides(typology, override) {
+  if (!override) return typology;
+  return {
+    ...typology,
+    envelope: override.envelope
+      ? { ...typology.envelope, ...override.envelope }
+      : typology.envelope,
+  };
+}
+
+// Point d'entrée principal : prend un devis (format Zenbat) + paramètres utilisateur
+// optionnels et retourne un rapport de validation overall_status "pass" | "warn" | "fail".
+// Si aucune typologie n'est reconnue, ou si l'utilisateur a désactivé la vérification,
+// retourne pass immédiatement.
+export function runCoherenceCheck(devis, userSettings = null) {
+  if (userSettings?.global_disabled) {
+    return { overall_status: "pass", checks: [], typology_id: null };
+  }
+
   let found = devis.typology_id ? findTypologyById(devis.typology_id) : null;
   if (!found) found = detectTypology(devis);
   if (!found) return { overall_status: "pass", checks: [], typology_id: null };
 
   const { typology } = found;
+
+  // Vérification désactivée pour cette typologie spécifique
+  const override = userSettings?.typology_overrides?.[typology.typology_id];
+  if (override?.disabled) {
+    return { overall_status: "pass", checks: [], typology_id: typology.typology_id };
+  }
+
+  const effectiveTypology = applyUserOverrides(typology, override);
   const projectParams = {
-    ...(typology.default_params || {}),
+    ...(effectiveTypology.default_params || {}),
     ...(devis.project_params  || {}),
   };
 
   const checks = [
-    checkCompleteness(devis, typology),
-    checkQuantities(devis, typology, projectParams),
-    checkUnitPrices(devis, typology),
-    checkEnvelope(devis, typology, projectParams),
+    checkCompleteness(devis, effectiveTypology),
+    checkQuantities(devis, effectiveTypology, projectParams),
+    checkUnitPrices(devis, effectiveTypology),
+    checkEnvelope(devis, effectiveTypology, projectParams),
   ];
 
   const hasError = checks.some(c => c.status === "fail");
@@ -62,4 +86,18 @@ export function runCoherenceCheck(devis) {
     checks,
     typology_id: typology.typology_id,
   };
+}
+
+// Expose la liste des typologies de tous les packs pour l'UI de configuration.
+export function getAllTypologies() {
+  return PACKS.flatMap(pack =>
+    pack.typologies.map(t => ({
+      pack_id:      pack.pack_id,
+      pack_name:    pack.pack_name,
+      typology_id:  t.typology_id,
+      label:        t.label,
+      main_dimension: t.main_dimension,
+      envelope:     t.envelope,
+    }))
+  );
 }

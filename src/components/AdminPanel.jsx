@@ -8,6 +8,7 @@ import AdminErrorLogs    from "./admin/AdminErrorLogs.jsx"
 import AdminNegativeLogs from "./admin/AdminNegativeLogs.jsx"
 import AdminConversations from "./admin/AdminConversations.jsx"
 import AdminNewsletter    from "./admin/AdminNewsletter.jsx"
+import AdminCoherenceStats from "./admin/AdminCoherenceStats.jsx"
 import DeleteUserModal    from "./admin/DeleteUserModal.jsx"
 import UserDetailDrawer  from "./admin/UserDetailDrawer.jsx"
 
@@ -25,6 +26,8 @@ export default function AdminPanel({ onBack }) {
   const [convsLoading,     setConvsLoading]     = useState(false)
   const [newsletter,       setNewsletter]       = useState(null)
   const [newsletterLoading,setNewsletterLoading]= useState(false)
+  const [coherence,        setCoherence]        = useState(null)
+  const [coherenceLoading, setCoherenceLoading] = useState(false)
   const [openConvUser, setOpenConvUser] = useState(null)
   const [convSearch,   setConvSearch]   = useState("")
   const [userSearch,   setUserSearch]   = useState("")
@@ -39,7 +42,7 @@ export default function AdminPanel({ onBack }) {
   const [detailError,  setDetailError]  = useState(null)
   const [detailTab,    setDetailTab]    = useState("overview")
 
-  useEffect(() => { if (session) { load(); loadLogs(); loadNegs(); loadConvs(); loadNewsletter() } }, [session?.access_token])
+  useEffect(() => { if (session) { load(); loadLogs(); loadNegs(); loadConvs(); loadNewsletter(); loadCoherence() } }, [session?.access_token])
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -91,6 +94,16 @@ export default function AdminPanel({ onBack }) {
       const data = await res.json()
       if (res.ok) setNewsletter(data.subscribers || [])
     } catch {} finally { setNewsletterLoading(false) }
+  }
+
+  const loadCoherence = async () => {
+    setCoherenceLoading(true)
+    try {
+      const token = await getToken()
+      const res  = await fetch("/api/admin-ia-data?type=coherence", { headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json()
+      if (res.ok) setCoherence(data)
+    } catch {} finally { setCoherenceLoading(false) }
   }
 
   const openDelete = (u) => { setDeleteTarget(u); setConfirmInput(""); setDeleteError(null) }
@@ -188,6 +201,10 @@ export default function AdminPanel({ onBack }) {
           <AdminNewsletter
             subscribers={newsletter}  loading={newsletterLoading}
             onRefresh={loadNewsletter}
+          />
+          <AdminCoherenceStats
+            data={coherence}  loading={coherenceLoading}
+            onRefresh={loadCoherence}
           />
           <div style={{ textAlign: "center", fontSize: 10, color: "#cbd5e1" }}>
             Données du {fmtD(stats.generatedAt)} à {new Date(stats.generatedAt).toLocaleTimeString("fr-FR")}

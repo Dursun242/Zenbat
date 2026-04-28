@@ -10,19 +10,21 @@ import { buildAgentGreeting, quickStartsFor } from "../lib/agentIA/sectors.js";
 import { buildSystemPrompt } from "../lib/agentIA/prompt.js";
 import { runCoherenceCheck } from "../lib/coherence/engine.js";
 import { buildCorrectionPrompt } from "../lib/coherence/formatIssues.js";
+import { loadUserCoherenceSettings } from "../lib/coherence/userOverrides.js";
 import { I } from "./ui/icons.jsx";
 import ClientPickerModal from "./ClientPickerModal.jsx";
 import CelebrateModal from "./agent/CelebrateModal.jsx";
+import CoherenceSettings from "./CoherenceSettings.jsx";
 
 // ─── Boucle de cohérence : valide + corrige jusqu'à COHERENCE_MAX_RETRIES fois ──
 const COHERENCE_MAX_RETRIES = 3;
 
-async function runCoherenceLoop(devis, apiBody, authHeaders, msgs, rawResponse, brand) {
+async function runCoherenceLoop(devis, apiBody, authHeaders, msgs, rawResponse, brand, userSettings = null) {
   let currentDevis = devis;
   let currentRaw   = rawResponse;
   let iterationCount = 1;
 
-  let result = runCoherenceCheck(currentDevis);
+  let result = runCoherenceCheck(currentDevis, userSettings);
   if (result.overall_status !== "fail") {
     return { resolvedLignes: currentDevis.lignes, resolvedObjet: currentDevis.objet, validationResult: { ...result, iteration_count: 1 } };
   }
@@ -63,7 +65,7 @@ async function runCoherenceLoop(devis, apiBody, authHeaders, msgs, rawResponse, 
 
     currentDevis = { ...correctedParsed, lignes: correctedLignes };
     currentRaw   = correctedRaw;
-    result       = runCoherenceCheck(currentDevis);
+    result       = runCoherenceCheck(currentDevis, userSettings);
 
     if (result.overall_status !== "fail") {
       return {
@@ -107,6 +109,8 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   const [micError,     setMicError]     = useState(null);
   const [editing,      setEditing]      = useState(null);   // { id, field }
   const [editingObjet, setEditingObjet] = useState(false);
+  const [coherenceSettingsOpen, setCoherenceSettingsOpen] = useState(false);
+  const userSettingsRef = useRef(null);
   const chatRef  = useRef(null);
   const inputRef = useRef(null);
   const recRef   = useRef(null);
@@ -117,6 +121,10 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
 
   // Résume l'historique pour contextualiser l'IA (recalculé quand devis change)
   const historySummary = useMemo(() => buildDevisHistorySummary(devis), [devis]);
+
+  useEffect(() => {
+    loadUserCoherenceSettings().then(s => { userSettingsRef.current = s; });
+  }, []);
 
   useEffect(() => {
     chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
@@ -346,7 +354,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
           try {
             const coherence = await runCoherenceLoop(
               { ...parsed, lignes: finalLignes },
-              body, authHeaders, newMsgs, raw, brand,
+              body, authHeaders, newMsgs, raw, brand, userSettingsRef.current,
             );
             resolvedLignes   = coherence.resolvedLignes;
             resolvedObjet    = coherence.resolvedObjet || parsed.objet || "";
@@ -570,11 +578,17 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
               : <span style={{ fontFamily, fontWeight: 800, fontSize: 15, color: "white" }}>{brand.companyName || "Votre entreprise"}</span>
             }
           </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontFamily, color: "rgba(255,255,255,.6)", fontSize: 9, letterSpacing: "1.5px", fontWeight: 600 }}>{TX.quoteInProgress.toUpperCase()}</div>
-            <div style={{ fontFamily, color: "white", fontWeight: 800, fontSize: 18, marginTop: 2, animation: "totalCount .3s ease both" }}>
-              {fmt(ht)} <span style={{ fontSize: 10, fontWeight: 400, color: "rgba(255,255,255,.7)", marginLeft: 4 }}>HT</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontFamily, color: "rgba(255,255,255,.6)", fontSize: 9, letterSpacing: "1.5px", fontWeight: 600 }}>{TX.quoteInProgress.toUpperCase()}</div>
+              <div style={{ fontFamily, color: "white", fontWeight: 800, fontSize: 18, marginTop: 2, animation: "totalCount .3s ease both" }}>
+                {fmt(ht)} <span style={{ fontSize: 10, fontWeight: 400, color: "rgba(255,255,255,.7)", marginLeft: 4 }}>HT</span>
+              </div>
             </div>
+            <button onClick={() => setCoherenceSettingsOpen(true)} title="Paramètres de vérification"
+              style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: 8, padding: 6, cursor: "pointer", color: "white", lineHeight: 0, flexShrink: 0 }}>
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </button>
           </div>
         </div>
 
@@ -932,6 +946,13 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
           ac={ac}
           onClose={() => setCelebrate(false)}
           onSave={() => { setCelebrate(false); setPickingClient(true); }}
+        />
+      )}
+
+      {coherenceSettingsOpen && (
+        <CoherenceSettings
+          onClose={() => setCoherenceSettingsOpen(false)}
+          onSave={s => { userSettingsRef.current = s; }}
         />
       )}
     </div>

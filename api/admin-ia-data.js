@@ -41,13 +41,24 @@ export default async function handler(req, res) {
     return res.status(200).json({ subscribers: rows || [], generatedAt: new Date().toISOString() })
   }
 
+  // Statistiques moteur de cohérence (table créée par migration 0024)
+  if (type === 'coherence') {
+    const { data: rows, error: re } = await admin
+      .from('coherence_validations')
+      .select('id, typology_id, overall_status, iteration_count, created_at')
+      .order('created_at', { ascending: false })
+      .limit(500)
+    if (re) return res.status(500).json({ error: re.message })
+    return res.status(200).json({ validations: rows || [], generatedAt: new Date().toISOString() })
+  }
+
   const tableMap = {
     conversations: { table: 'ia_conversations', limit: 500, key: 'conversations' },
     logs:          { table: 'ia_error_logs',    limit: 200, key: 'logs' },
     negatives:     { table: 'ia_negative_logs', limit: 200, key: 'logs' },
   }
   const cfg = tableMap[type]
-  if (!cfg) return res.status(400).json({ error: "Paramètre 'type' invalide (conversations | logs | negatives | newsletter)" })
+  if (!cfg) return res.status(400).json({ error: "Paramètre 'type' invalide (conversations | logs | negatives | newsletter | coherence)" })
 
   const [
     { data: rows,     error: re },
