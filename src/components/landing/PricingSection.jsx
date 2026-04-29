@@ -28,6 +28,13 @@ function CheckIcon() {
 }
 
 export default function PricingSection({ onSignup }) {
+  // Permet aussi un achat direct : on mémorise le plan choisi et l'inscription
+  // déclenchera automatiquement Stripe Checkout côté App.
+  function handleBuyNow(plan) {
+    try { localStorage.setItem('pending_checkout_plan', plan) } catch {}
+    onSignup?.()
+  }
+
   const [isTTC, setIsTTC]           = useState(true)
   const [isBiannual, setIsBiannual] = useState(true)
   const [priceChanging, setPriceChanging] = useState(false)
@@ -358,9 +365,20 @@ export default function PricingSection({ onSignup }) {
               >
                 Tester gratuitement
               </button>
-              <p style={{ textAlign: 'center', fontSize: 11, color: '#B0A898', margin: 0 }}>
+              <p style={{ textAlign: 'center', fontSize: 11, color: '#B0A898', margin: '0 0 10px' }}>
                 Aucune carte bancaire requise
               </p>
+              <button
+                onClick={() => handleBuyNow('monthly')}
+                style={{
+                  display: 'block', margin: '0 auto', padding: 0,
+                  background: 'transparent', border: 'none',
+                  color: '#6B6358', fontSize: 12, fontWeight: 500,
+                  textDecoration: 'underline', cursor: 'pointer',
+                }}
+              >
+                Déjà décidé ? S'abonner directement →
+              </button>
             </div>
           </div>
 
@@ -458,9 +476,20 @@ export default function PricingSection({ onSignup }) {
               >
                 Tester gratuitement
               </button>
-              <p style={{ textAlign: 'center', fontSize: 11, color: '#B0A898', margin: 0 }}>
+              <p style={{ textAlign: 'center', fontSize: 11, color: '#B0A898', margin: '0 0 10px' }}>
                 Aucune carte bancaire requise
               </p>
+              <button
+                onClick={() => handleBuyNow('biannual')}
+                style={{
+                  display: 'block', margin: '0 auto', padding: 0,
+                  background: 'transparent', border: 'none',
+                  color: '#6B6358', fontSize: 12, fontWeight: 500,
+                  textDecoration: 'underline', cursor: 'pointer',
+                }}
+              >
+                Déjà décidé ? S'abonner directement →
+              </button>
             </div>
           </div>
         </div>

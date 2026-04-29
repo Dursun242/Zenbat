@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "./lib/auth.jsx";
+import { supabase } from "./lib/supabase.js";
 import { TRIAL_DAYS } from "./lib/appShell.js";
 
 import { useSaveState } from "./hooks/useSaveState.js";
@@ -72,6 +73,30 @@ export default function App() {
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
+
+  // Si l'utilisateur a cliqué « S'abonner directement » sur la landing,
+  // on déclenche Stripe Checkout dès qu'il est authentifié.
+  useEffect(() => {
+    if (!user) return;
+    let plan;
+    try { plan = localStorage.getItem('pending_checkout_plan') } catch {}
+    if (plan !== 'monthly' && plan !== 'biannual') return;
+    try { localStorage.removeItem('pending_checkout_plan') } catch {}
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (!token) return;
+        const res  = await fetch('/api/stripe-checkout', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body:    JSON.stringify({ plan }),
+        });
+        const data = await res.json();
+        if (res.ok && data?.url) window.location.href = data.url;
+      } catch {}
+    })();
+  }, [user]);
 
   const handleSignOut = () => {
     if (!window.confirm("Se déconnecter ?")) return;
