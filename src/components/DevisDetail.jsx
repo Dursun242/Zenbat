@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fmt } from "../lib/utils.js";
+import { getToken } from "../lib/getToken.js";
 import { I } from "./ui/icons.jsx";
 import Badge from "./ui/Badge.jsx";
 import LignesEditor from "./LignesEditor.jsx";
@@ -58,9 +59,13 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
       const { base64 } = await renderDataToPdf(d, cl, brand, "devis", { filename: `${d.numero}.pdf` });
       addLog("✓ PDF généré");
       addLog("Envoi vers Odoo Sign…");
+      const token = await getToken();
       const res = await fetch("/api/odoo-sign", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           pdf_base64:   base64,
           filename:     `${d.numero}.pdf`,
