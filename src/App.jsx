@@ -46,6 +46,13 @@ export default function App() {
   const [plan,      setPlan]      = useState("free");   // "free" | "pro"
   const [billingType, setBillingType] = useState(null); // "monthly" | "biannual" — défini à l'abonnement
   const [showPwa,setShowPwa]= useState(false);
+  // Étape intermédiaire payée déclenchée depuis la landing (« S'abonner directement »).
+  // Reste true tant qu'on attend l'URL Stripe Checkout — bloque l'affichage des autres écrans.
+  const [checkoutPending, setCheckoutPending] = useState(() => {
+    try { return ['monthly','biannual'].includes(localStorage.getItem('pending_checkout_plan')) }
+    catch { return false }
+  });
+  const [checkoutError, setCheckoutError] = useState(null);
   const deferredPrompt = useRef(null);
 
   const { user, signOut } = useAuth();
@@ -75,28 +82,35 @@ export default function App() {
   }, []);
 
   // Si l'utilisateur a cliqué « S'abonner directement » sur la landing,
-  // on déclenche Stripe Checkout dès qu'il est authentifié.
+  // on déclenche Stripe Checkout dès qu'il est authentifié — étape payée
+  // intercalée entre la création du compte et le picker des métiers.
   useEffect(() => {
-    if (!user) return;
-    let plan;
-    try { plan = localStorage.getItem('pending_checkout_plan') } catch {}
-    if (plan !== 'monthly' && plan !== 'biannual') return;
-    try { localStorage.removeItem('pending_checkout_plan') } catch {}
+    if (!user || !checkoutPending) return;
+    let pendingPlan;
+    try { pendingPlan = localStorage.getItem('pending_checkout_plan') } catch {}
+    if (pendingPlan !== 'monthly' && pendingPlan !== 'biannual') {
+      setCheckoutPending(false);
+      return;
+    }
     (async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         const token = session?.access_token;
-        if (!token) return;
+        if (!token) throw new Error("Vous devez être connecté.");
         const res  = await fetch('/api/stripe-checkout', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body:    JSON.stringify({ plan }),
+          body:    JSON.stringify({ plan: pendingPlan }),
         });
-        const data = await res.json();
-        if (res.ok && data?.url) window.location.href = data.url;
-      } catch {}
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.url) throw new Error(data?.error || `Erreur ${res.status}`);
+        try { localStorage.removeItem('pending_checkout_plan') } catch {}
+        window.location.href = data.url;
+      } catch (e) {
+        setCheckoutError(e?.message || 'Redirection vers le paiement impossible');
+      }
     })();
-  }, [user]);
+  }, [user, checkoutPending]);
 
   const handleSignOut = () => {
     if (!window.confirm("Se déconnecter ?")) return;
@@ -116,6 +130,37 @@ export default function App() {
   };
 
   const activeNav = NAV.find(n => tab.startsWith(n.id))?.id || "dashboard";
+
+  // ── Étape intermédiaire : redirection vers Stripe Checkout ──
+  // Bloque tout autre écran (notamment le picker des métiers) tant qu'on
+  // n'a pas redirigé l'utilisateur vers le paiement.
+  if (checkoutPending) {
+    return (
+      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#FAF7F2", fontFamily: "Inter, system-ui, sans-serif", padding: 24 }}>
+        <div style={{ textAlign: "center", maxWidth: 360 }}>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 28, fontWeight: 800, marginBottom: 16, letterSpacing: "-0.5px" }}>
+            <span style={{ color: "#22c55e" }}>Zen</span><span style={{ color: "#1A1612" }}>bat</span>
+          </div>
+          {!checkoutError ? (
+            <>
+              <div style={{ fontSize: 16, color: "#1A1612", fontWeight: 600, marginBottom: 8 }}>Redirection vers le paiement…</div>
+              <div style={{ fontSize: 13, color: "#6B6358", lineHeight: 1.6 }}>Vous allez être redirigé vers Stripe pour finaliser votre abonnement.</div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 15, color: "#991b1b", fontWeight: 600, marginBottom: 8 }}>Le paiement n'a pas pu démarrer</div>
+              <div style={{ fontSize: 13, color: "#6B6358", lineHeight: 1.6, marginBottom: 16 }}>{checkoutError}</div>
+              <button
+                onClick={() => { setCheckoutError(null); setCheckoutPending(false); try { localStorage.removeItem('pending_checkout_plan') } catch {} }}
+                style={{ background: "#1A1612", color: "#fff", border: "none", borderRadius: 10, padding: "10px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                Continuer en essai gratuit
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   // ── Écrans hors dashboard ──────────────────────────────────
   if (screen === "auth") return <AuthScreen onEnter={(co, isSignup) => {
