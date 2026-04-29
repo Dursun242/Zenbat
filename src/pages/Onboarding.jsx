@@ -42,7 +42,7 @@ export default function Onboarding({ brand, setBrand, onDone }) {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.access_token) throw new Error("Vous devez être connecté.")
-      const res = await fetch("/api/my-data-export", {
+      const res = await fetch("/api/account", {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
       if (!res.ok) {
@@ -69,7 +69,7 @@ export default function Onboarding({ brand, setBrand, onDone }) {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.access_token) throw new Error("Session expirée — reconnectez-vous.")
-      const res = await fetch("/api/delete-my-account", {
+      const res = await fetch("/api/account", {
         method:  "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
         body:    JSON.stringify({ confirmEmail: deleteConfirm }),
