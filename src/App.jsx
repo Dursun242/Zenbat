@@ -164,7 +164,7 @@ export default function App() {
           <SaveIndicator state={saveState}/>
           {plan === "pro"
             ? <span style={{ background: "rgba(34,197,94,.15)", color: "#4ade80", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, border: "1px solid rgba(34,197,94,.25)" }}>PRO</span>
-            : <span style={{ background: daysLeft <= 7 ? "rgba(249,115,22,.15)" : "#2A231C", color: daysLeft <= 7 ? "#fb923c" : "#9A8E82", fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 20, border: daysLeft <= 7 ? "1px solid rgba(249,115,22,.25)" : "none" }}>Essai · {daysLeft}j</span>
+            : <button onClick={() => setScreen("paywall")} style={{ background: daysLeft <= 7 ? "rgba(249,115,22,.15)" : "#2A231C", color: daysLeft <= 7 ? "#fb923c" : "#9A8E82", fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 20, border: daysLeft <= 7 ? "1px solid rgba(249,115,22,.25)" : "none", cursor: "pointer" }}>Essai · {daysLeft}j</button>
           }
         </div>
       </header>
