@@ -58,6 +58,18 @@ export default async function handler(req, res) {
     const { data: profile } = await admin.from('profiles').select('stripe_customer_id, company_name, full_name').eq('id', user.id).maybeSingle()
     let customerId = profile?.stripe_customer_id || null
 
+    // Vérifie que le customer stocké existe toujours côté Stripe.
+    // Il peut être obsolète si la clé API a changé (rotation, test → live, autre compte).
+    if (customerId) {
+      try {
+        const existing = await stripe.customers.retrieve(customerId)
+        if (existing?.deleted) customerId = null
+      } catch (err) {
+        if (err?.code === 'resource_missing') customerId = null
+        else throw err
+      }
+    }
+
     if (!customerId) {
       const customer = await stripe.customers.create({
         email:    user.email,
