@@ -1,4 +1,10 @@
 import { useState } from "react";
+import { supabase } from "../lib/supabase.js";
+
+async function getToken() {
+  const { data: { session } } = await supabase.auth.getSession()
+  return session?.access_token ?? null
+}
 
 const CHECK = <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>;
 
@@ -16,9 +22,9 @@ const PLANS = {
     label:      "Mensuel",
     price:      19,
     priceLabel: "19€",
-    unit:       "/mois HT",
+    unit:       "/mois TTC",
     billed:     "Résiliable à tout moment",
-    cta:        "S'abonner — 19 € HT / mois",
+    cta:        "S'abonner — 19 € TTC / mois",
     badge:      null,
     saving:     null,
   },
@@ -27,18 +33,39 @@ const PLANS = {
     label:      "6 mois",
     price:      9.5,
     priceLabel: "9,50€",
-    unit:       "/mois HT",
-    billed:     "Soit 57 € HT facturés en une fois",
-    cta:        "S'abonner — 57 € HT pour 6 mois",
+    unit:       "/mois TTC",
+    billed:     "Soit 57 € TTC facturés en une fois",
+    cta:        "S'abonner — 57 € TTC pour 6 mois",
     badge:      "-50%",
     saving:     57,
   },
 };
 
-export default function PaywallScreen({ daysLeft = 0, onBack, onSubscribe }) {
-  const [billing, setBilling] = useState("biannual");
+export default function PaywallScreen({ daysLeft = 0, onBack }) {
+  const [billing,  setBilling]  = useState("biannual");
+  const [loading,  setLoading]  = useState(false);
+  const [ctaError, setCtaError] = useState(null);
   const expired = daysLeft <= 0;
   const plan    = PLANS[billing];
+
+  const handleSubscribe = async () => {
+    setLoading(true); setCtaError(null)
+    try {
+      const token = await getToken()
+      if (!token) throw new Error("Vous devez être connecté.")
+      const res  = await fetch("/api/stripe-checkout", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body:    JSON.stringify({ plan: billing }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `Erreur ${res.status}`)
+      window.location.href = data.url
+    } catch (e) {
+      setCtaError(e.message || "Erreur inattendue")
+      setLoading(false)
+    }
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: "#1A1612", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "Inter, system-ui, sans-serif" }}>
@@ -109,7 +136,7 @@ export default function PaywallScreen({ daysLeft = 0, onBack, onSubscribe }) {
             <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "8px 12px", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 16 }}>🎉</span>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#15803d" }}>Vous économisez {plan.saving} € HT</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#15803d" }}>Vous économisez {plan.saving} € TTC</div>
                 <div style={{ fontSize: 11, color: "#16a34a" }}>{plan.billed}</div>
               </div>
             </div>
@@ -129,10 +156,13 @@ export default function PaywallScreen({ daysLeft = 0, onBack, onSubscribe }) {
           ))}
 
           {/* CTA */}
-          <button onClick={() => onSubscribe(billing)}
-            style={{ width: "100%", background: "#22c55e", color: "white", border: "none", borderRadius: 12, padding: 14, fontSize: 14, fontWeight: 700, marginTop: 16, cursor: "pointer" }}>
-            {plan.cta}
+          <button onClick={handleSubscribe} disabled={loading}
+            style={{ width: "100%", background: loading ? "#86efac" : "#22c55e", color: "white", border: "none", borderRadius: 12, padding: 14, fontSize: 14, fontWeight: 700, marginTop: 16, cursor: loading ? "default" : "pointer", transition: "background .15s" }}>
+            {loading ? "Redirection…" : plan.cta}
           </button>
+          {ctaError && (
+            <p style={{ textAlign: "center", fontSize: 11, color: "#ef4444", marginTop: 8 }}>{ctaError}</p>
+          )}
 
           {/* Garantie */}
           <p style={{ textAlign: "center", fontSize: 11, color: "#9A8E82", marginTop: 10 }}>
