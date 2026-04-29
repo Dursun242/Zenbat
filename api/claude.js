@@ -7,7 +7,7 @@ const ALLOWED_MODELS = [
   "claude-sonnet-4-5",
 ];
 
-const MAX_SYSTEM_CHARS  = 20_000;
+const MAX_SYSTEM_CHARS  = 40_000;
 const MAX_MESSAGES_CHARS = 40_000;
 
 export default async function handler(req, res) {

@@ -242,13 +242,29 @@ describe("claude endpoint — validation des paramètres", () => {
   it("renvoie 400 si system dépasse la taille max", async () => {
     setupAuthed();
     const res = makeRes();
-    const huge = "x".repeat(20_001);
+    const huge = "x".repeat(40_001);
     await handler(
       makeReq({ headers: { authorization: "Bearer t" }, body: { model: "claude-haiku-4-5-20251001", max_tokens: 100, messages: [{ role: "user", content: "x" }], system: huge } }),
       res,
     );
     expect(res.statusCode).toBe(400);
     expect(res.body.error).toMatch(/system trop long/);
+  });
+
+  it("accepte un system de 30 000 caractères (BTP multi-métiers + historique)", async () => {
+    setupAuthed();
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ content: [{ text: "ok" }] }),
+    });
+    const res = makeRes();
+    const big = "x".repeat(30_000);
+    await handler(
+      makeReq({ headers: { authorization: "Bearer t" }, body: { model: "claude-haiku-4-5-20251001", max_tokens: 100, messages: [{ role: "user", content: "x" }], system: big } }),
+      res,
+    );
+    expect(res.statusCode).toBe(200);
   });
 });
 
