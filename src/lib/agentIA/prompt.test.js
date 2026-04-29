@@ -90,12 +90,20 @@ describe("buildSystemPrompt", () => {
     expect(result).toContain("suggestions");
   });
 
-  it("inclut la règle anti-débordement : corps d'état nommé = TYPE 2 strict", () => {
+  it("inclut la règle anti-débordement : prestation nommée = TYPE 2 strict, tous secteurs", () => {
     const result = buildSystemPrompt({ brand: {}, historySummary: null });
-    // La règle qui empêche le bug "rénovation appart' en ÉLECTRICITÉ → tous lots"
+    // La règle générique qui empêche le débordement de périmètre
     expect(result).toContain("CAS CRITIQUE");
-    expect(result).toContain("rénovation électrique");
-    expect(result).toMatch(/UNIQUEMENT lots électriques/);
     expect(result).toMatch(/JAMAIS TYPE 3/);
+    expect(result).toMatch(/qualifier précis.*l'emporte TOUJOURS/);
+    // Couvre plusieurs secteurs (pas que BTP)
+    expect(result).toContain("rénovation électrique");
+    expect(result).toContain("coupe + couleur");
+    expect(result).toContain("création logo");
+    expect(result).toContain("buffet cocktail");
+    expect(result).toContain("reportage photo");
+    expect(result).toContain("retouche pantalon");
+    // Heuristique de tie-break : en cas de doute, TYPE 2
+    expect(result).toMatch(/HÉSITES.*TYPE 2/);
   });
 });
