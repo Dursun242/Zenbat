@@ -11,6 +11,10 @@
   "functions": {
     "api/*.js": {
       "maxDuration": 30
+    },
+    "api/facturx.js": {
+      "maxDuration": 30,
+      "includeFiles": "public/fonts/DejaVu*.ttf"
     }
   }
 }
