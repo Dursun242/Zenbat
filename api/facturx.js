@@ -16,8 +16,12 @@ import { createClient } from "@supabase/supabase-js";
 import { PDFDocument, AFRelationship, PDFName, PDFRawStream, PDFRef } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { cors } from "./_cors.js"
+
+// __dirname équivalent ESM — pointe vers le dossier api/ à la fois en local et sur Vercel
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const XML_FILENAME    = "factur-x.xml";
 // Profil EN 16931 (norme européenne, obligatoire PPF/PDP à partir de 09/2026).
@@ -327,7 +331,8 @@ async function loadSRGBProfile() {
 let _fontCache = null;
 async function loadEmbeddingFonts() {
   if (_fontCache) return _fontCache;
-  const base = join(process.cwd(), "public", "fonts");
+  // Fonts co-localisées dans api/fonts/ — accessibles via __dirname sur Vercel et en local
+  const base = join(__dirname, "fonts");
   const [regular, bold] = await Promise.all([
     readFile(join(base, "DejaVuSans.ttf")),
     readFile(join(base, "DejaVuSans-Bold.ttf")),
