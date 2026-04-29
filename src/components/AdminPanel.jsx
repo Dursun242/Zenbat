@@ -63,7 +63,7 @@ export default function AdminPanel({ onBack }) {
     setLogsLoading(true)
     try {
       const token = await getToken()
-      const res  = await fetch("/api/admin-ia-data?type=logs", { headers: { Authorization: `Bearer ${token}` } })
+      const res  = await fetch("/api/admin-stats?type=logs", { headers: { Authorization: `Bearer ${token}` } })
       const data = await res.json()
       if (res.ok) setIaLogs(data.logs || [])
     } catch {} finally { setLogsLoading(false) }
@@ -73,7 +73,7 @@ export default function AdminPanel({ onBack }) {
     setNegsLoading(true)
     try {
       const token = await getToken()
-      const res  = await fetch("/api/admin-ia-data?type=negatives", { headers: { Authorization: `Bearer ${token}` } })
+      const res  = await fetch("/api/admin-stats?type=negatives", { headers: { Authorization: `Bearer ${token}` } })
       const data = await res.json()
       if (res.ok) setIaNegs(data.logs || [])
     } catch {} finally { setNegsLoading(false) }
@@ -83,7 +83,7 @@ export default function AdminPanel({ onBack }) {
     setConvsLoading(true)
     try {
       const token = await getToken()
-      const res  = await fetch("/api/admin-ia-data?type=conversations", { headers: { Authorization: `Bearer ${token}` } })
+      const res  = await fetch("/api/admin-stats?type=conversations", { headers: { Authorization: `Bearer ${token}` } })
       const data = await res.json()
       if (res.ok) setIaConvs(data.conversations || [])
     } catch {} finally { setConvsLoading(false) }
@@ -93,7 +93,7 @@ export default function AdminPanel({ onBack }) {
     setNewsletterLoading(true)
     try {
       const token = await getToken()
-      const res  = await fetch("/api/admin-ia-data?type=newsletter", { headers: { Authorization: `Bearer ${token}` } })
+      const res  = await fetch("/api/admin-stats?type=newsletter", { headers: { Authorization: `Bearer ${token}` } })
       const data = await res.json()
       if (res.ok) setNewsletter(data.subscribers || [])
     } catch {} finally { setNewsletterLoading(false) }
@@ -103,7 +103,7 @@ export default function AdminPanel({ onBack }) {
     setCoherenceLoading(true)
     try {
       const token = await getToken()
-      const res  = await fetch("/api/admin-ia-data?type=coherence", { headers: { Authorization: `Bearer ${token}` } })
+      const res  = await fetch("/api/admin-stats?type=coherence", { headers: { Authorization: `Bearer ${token}` } })
       const data = await res.json()
       if (res.ok) setCoherence(data)
     } catch {} finally { setCoherenceLoading(false) }
@@ -113,7 +113,7 @@ export default function AdminPanel({ onBack }) {
     setFeedbackLoading(true)
     try {
       const token = await getToken()
-      const res  = await fetch("/api/admin-ia-data?type=feedback", { headers: { Authorization: `Bearer ${token}` } })
+      const res  = await fetch("/api/admin-stats?type=feedback", { headers: { Authorization: `Bearer ${token}` } })
       const data = await res.json()
       if (res.ok) setFeedback(data.feedback || [])
     } catch {} finally { setFeedbackLoading(false) }

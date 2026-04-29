@@ -1,3 +1,12 @@
+// Stats tableau de bord admin + données IA — routage par ?type= :
+//   (aucun type)              → dashboard stats global
+//   ?type=conversations       → logs ia_conversations
+//   ?type=logs                → logs ia_error_logs
+//   ?type=negatives           → logs ia_negative_logs
+//   ?type=newsletter          → abonnés newsletter
+//   ?type=coherence           → validations cohérence
+//   ?type=feedback            → feedbacks 👍/👎
+
 import { createClient } from '@supabase/supabase-js'
 import { cors } from "./_cors.js"
 
@@ -26,6 +35,82 @@ export default async function handler(req, res) {
   const norm = (s) => String(s || '').trim().toLowerCase()
   if (!adminEmail || norm(user.email) !== norm(adminEmail))
     return res.status(403).json({ error: "Accès réservé à l'administrateur" })
+
+  // ── Données IA : routage par ?type= ─────────────────────────────────
+  const type = (req.query.type || '').toString().trim()
+
+  if (type === 'newsletter') {
+    const { data: rows, error: re } = await admin
+      .from('newsletter_subscribers')
+      .select('id, email, source, created_at')
+      .order('created_at', { ascending: false })
+      .limit(1000)
+    if (re) return res.status(500).json({ error: re.message })
+    return res.status(200).json({ subscribers: rows || [], generatedAt: new Date().toISOString() })
+  }
+
+  if (type === 'coherence') {
+    const { data: rows, error: re } = await admin
+      .from('coherence_validations')
+      .select('id, typology_id, overall_status, iteration_count, created_at')
+      .order('created_at', { ascending: false })
+      .limit(500)
+    if (re) return res.status(500).json({ error: re.message })
+    return res.status(200).json({ validations: rows || [], generatedAt: new Date().toISOString() })
+  }
+
+  if (type === 'feedback') {
+    const [
+      { data: rows,     error: re },
+      { data: profiles, error: pe },
+      { data: authUsers, error: ae },
+    ] = await Promise.all([
+      admin.from('ia_feedback').select('*').order('created_at', { ascending: false }).limit(500),
+      admin.from('profiles').select('id, company_name, full_name, brand_data'),
+      admin.auth.admin.listUsers({ perPage: 1000 }).then(r => ({ data: r.data?.users || [], error: r.error })),
+    ])
+    if (re) return res.status(500).json({ error: re.message })
+    const profById2 = new Map((profiles || []).map(p => [p.id, p]))
+    const authById2 = new Map((authUsers || []).map(u => [u.id, u]))
+    const enriched2 = (rows || []).map(r => {
+      const p = profById2.get(r.user_id)
+      const a = authById2.get(r.user_id)
+      const trades = r.trades || JSON.parse(p?.brand_data || '{}')?.trades || []
+      return { ...r, email: a?.email || null, name: p?.company_name || p?.full_name || a?.email || '—', trades }
+    })
+    return res.status(200).json({ feedback: enriched2, generatedAt: new Date().toISOString() })
+  }
+
+  if (type === 'conversations' || type === 'logs' || type === 'negatives') {
+    const tableMap = {
+      conversations: { table: 'ia_conversations', limit: 500, key: 'conversations' },
+      logs:          { table: 'ia_error_logs',    limit: 200, key: 'logs' },
+      negatives:     { table: 'ia_negative_logs', limit: 200, key: 'logs' },
+    }
+    const cfg = tableMap[type]
+    const [
+      { data: rows,      error: re },
+      { data: profiles,  error: pe },
+      { data: authUsers, error: ae },
+    ] = await Promise.all([
+      admin.from(cfg.table).select('*').order('created_at', { ascending: false }).limit(cfg.limit),
+      admin.from('profiles').select('id, company_name, full_name'),
+      admin.auth.admin.listUsers({ perPage: 1000 }).then(r => ({ data: r.data?.users || [], error: r.error })),
+    ])
+    if (re) return res.status(500).json({ error: re.message })
+    if (pe) return res.status(500).json({ error: pe.message })
+    if (ae) return res.status(500).json({ error: ae.message })
+    const profById = new Map((profiles || []).map(p => [p.id, p]))
+    const authById = new Map((authUsers || []).map(u => [u.id, u]))
+    const enriched = (rows || []).map(r => {
+      const p = profById.get(r.owner_id)
+      const a = authById.get(r.owner_id)
+      return { ...r, email: a?.email || null, name: p?.company_name || p?.full_name || a?.email || '—' }
+    })
+    return res.status(200).json({ [cfg.key]: enriched, generatedAt: new Date().toISOString() })
+  }
+
+  if (type) return res.status(400).json({ error: "Paramètre 'type' invalide (conversations | logs | negatives | newsletter | coherence | feedback)" })
 
   // ── Récupération des données ─────────────────────────────────────────
   const [
