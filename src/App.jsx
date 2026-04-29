@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "./lib/auth.jsx";
 import { supabase } from "./lib/supabase.js";
+import { getMyProfile } from "./lib/api.js";
 import { TRIAL_DAYS } from "./lib/appShell.js";
 
 import { useSaveState } from "./hooks/useSaveState.js";
@@ -30,6 +31,7 @@ import TradesQuickPicker from "./pages/TradesQuickPicker.jsx";
 import AuthScreen        from "./pages/AuthScreen.jsx";
 import PaywallScreen     from "./pages/PaywallScreen.jsx";
 import PWAInstallScreen  from "./pages/PWAInstallScreen.jsx";
+import SubscriptionScreen from "./pages/SubscriptionScreen.jsx";
 
 const NAV = [
   { id: "dashboard", label: "Accueil",  icon: I.trend },
@@ -85,6 +87,17 @@ export default function App() {
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
+
+  // Charge le plan d'abonnement depuis Supabase au login pour que les clients
+  // ayant déjà payé n'atterrissent pas sur le paywall ou le bandeau « essai ».
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    getMyProfile()
+      .then(p => { if (!cancelled && (p?.plan === "pro" || p?.plan === "free")) setPlan(p.plan); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   // Si l'utilisateur a cliqué « S'abonner directement » sur la landing,
   // on déclenche Stripe Checkout dès qu'il est authentifié — étape payée
@@ -186,6 +199,7 @@ export default function App() {
   if (screen === "onboarding")  return <Onboarding brand={brand} setBrand={setBrand} onDone={() => setScreen(showPwa ? "pwa_install" : "app")}/>;
   if (screen === "pwa_install") return <PWAInstallScreen deferredPrompt={deferredPrompt.current} onDone={() => { setShowPwa(false); setScreen("app"); }}/>;
   if (screen === "paywall")     return <PaywallScreen daysLeft={daysLeft} onBack={() => setScreen("app")} onSubscribe={(type) => { setPlan("pro"); setBillingType(type); setScreen("app"); }}/>;
+  if (screen === "subscription") return <SubscriptionScreen isAdmin={isAdmin} daysLeft={daysLeft} plan={effectivePlan} onBack={() => setScreen("app")}/>;
 
   return (
     <div style={{ fontFamily: "Inter, system-ui, sans-serif", height: "100dvh", display: "flex", flexDirection: "column", background: "#FAF7F2", overflow: "hidden" }}>
@@ -238,7 +252,8 @@ export default function App() {
           )}
           <SaveIndicator state={saveState}/>
           {effectivePlan === "pro"
-            ? <span style={{ background: "rgba(34,197,94,.15)", color: "#4ade80", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, border: "1px solid rgba(34,197,94,.25)" }}>PRO</span>
+            ? <button onClick={() => setScreen("subscription")} title="Gérer mon abonnement"
+                style={{ background: "rgba(34,197,94,.15)", color: "#4ade80", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, border: "1px solid rgba(34,197,94,.25)", cursor: "pointer" }}>PRO</button>
             : <button onClick={() => setScreen("paywall")} style={{ background: daysLeft <= 7 ? "rgba(249,115,22,.15)" : "#2A231C", color: daysLeft <= 7 ? "#fb923c" : "#9A8E82", fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 20, border: daysLeft <= 7 ? "1px solid rgba(249,115,22,.25)" : "none", cursor: "pointer" }}>Essai · {daysLeft}j</button>
           }
         </div>

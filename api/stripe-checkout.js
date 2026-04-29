@@ -45,15 +45,66 @@ export default async function handler(req, res) {
     if (!supabaseUrl || !serviceKey) return res.status(500).json({ error: 'Config Supabase manquante' })
     if (!stripeKey) return res.status(500).json({ error: 'STRIPE_SECRET_KEY non configurée' })
 
-    const { plan } = req.body || {}
-    const cfg = PLAN_CONFIG[plan]
-    if (!cfg) return res.status(400).json({ error: "Plan invalide (monthly | biannual)" })
-
+    const action = (req.body && req.body.action) || 'checkout'
     const admin  = createClient(supabaseUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
     const stripe = new Stripe(stripeKey)
 
     const { data: { user }, error: authErr } = await admin.auth.getUser(token)
     if (authErr || !user) return res.status(401).json({ error: 'Token invalide' })
+
+    // ── action = 'info' : renvoie les détails d'abonnement Stripe ──────
+    if (action === 'info') {
+      const { data: profile } = await admin.from('profiles')
+        .select('plan, stripe_customer_id, stripe_subscription_id')
+        .eq('id', user.id).maybeSingle()
+
+      const subId = profile?.stripe_subscription_id
+      if (!subId) return res.status(200).json({ plan: profile?.plan || 'free', subscription: null })
+
+      try {
+        const sub = await stripe.subscriptions.retrieve(subId)
+        const item = sub.items?.data?.[0]
+        return res.status(200).json({
+          plan: profile?.plan || 'pro',
+          subscription: {
+            id:                  sub.id,
+            status:              sub.status,
+            cancelAtPeriodEnd:   sub.cancel_at_period_end,
+            currentPeriodEnd:    sub.current_period_end,
+            currentPeriodStart:  sub.current_period_start,
+            interval:            item?.price?.recurring?.interval || null,
+            intervalCount:       item?.price?.recurring?.interval_count || null,
+            unitAmount:          item?.price?.unit_amount || null,
+            currency:            item?.price?.currency || 'eur',
+            planLabel:           sub.metadata?.plan || null,
+          },
+        })
+      } catch (err) {
+        if (err?.code === 'resource_missing') return res.status(200).json({ plan: profile?.plan || 'free', subscription: null })
+        throw err
+      }
+    }
+
+    // ── action = 'portal' : redirige vers Stripe Customer Portal ───────
+    if (action === 'portal') {
+      const { data: profile } = await admin.from('profiles')
+        .select('stripe_customer_id').eq('id', user.id).maybeSingle()
+      const customerId = profile?.stripe_customer_id
+      if (!customerId) return res.status(400).json({ error: "Aucun abonnement Stripe — passez d'abord par la souscription." })
+
+      const base = appUrl(req)
+      const portal = await stripe.billingPortal.sessions.create({
+        customer:   customerId,
+        return_url: `${base}/app?stripe=portal_return`,
+      })
+      return res.status(200).json({ url: portal.url })
+    }
+
+    // ── action = 'checkout' (par défaut) : crée une session Checkout ───
+
+    const { plan } = req.body || {}
+    const cfg = PLAN_CONFIG[plan]
+    if (!cfg) return res.status(400).json({ error: "Plan invalide (monthly | biannual)" })
 
     const { data: profile } = await admin.from('profiles').select('stripe_customer_id, company_name, full_name').eq('id', user.id).maybeSingle()
     let customerId = profile?.stripe_customer_id || null
