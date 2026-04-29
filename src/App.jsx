@@ -74,6 +74,11 @@ export default function App() {
   const isAdmin = !!user?.email && !!import.meta.env.VITE_ADMIN_EMAIL &&
     user.email.trim().toLowerCase() === import.meta.env.VITE_ADMIN_EMAIL.trim().toLowerCase();
 
+  // L'admin est toujours en plan Pro côté UI (cohérent avec api/claude.js qui
+  // applique déjà ce traitement côté serveur). Évite le paywall et le bandeau
+  // « essai gratuit » sur le compte admin.
+  const effectivePlan = isAdmin ? "pro" : plan;
+
   // Capture beforeinstallprompt for Android PWA
   useEffect(() => {
     const handler = e => { e.preventDefault(); deferredPrompt.current = e; };
@@ -120,7 +125,7 @@ export default function App() {
 
   const trialStart   = user?.created_at ? new Date(user.created_at).getTime() : null;
   const daysLeft     = trialStart !== null ? Math.max(0, TRIAL_DAYS - Math.floor((Date.now() - trialStart) / 86400000)) : TRIAL_DAYS;
-  const trialExpired = plan === "free" && daysLeft === 0;
+  const trialExpired = effectivePlan === "free" && daysLeft === 0;
 
   const stats = {
     clients:  clients.length,
@@ -232,7 +237,7 @@ export default function App() {
             </button>
           )}
           <SaveIndicator state={saveState}/>
-          {plan === "pro"
+          {effectivePlan === "pro"
             ? <span style={{ background: "rgba(34,197,94,.15)", color: "#4ade80", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, border: "1px solid rgba(34,197,94,.25)" }}>PRO</span>
             : <button onClick={() => setScreen("paywall")} style={{ background: daysLeft <= 7 ? "rgba(249,115,22,.15)" : "#2A231C", color: daysLeft <= 7 ? "#fb923c" : "#9A8E82", fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 20, border: daysLeft <= 7 ? "1px solid rgba(249,115,22,.25)" : "none", cursor: "pointer" }}>Essai · {daysLeft}j</button>
           }
@@ -240,7 +245,7 @@ export default function App() {
       </header>
 
       {/* Bandeau trial expiring */}
-      {plan === "free" && daysLeft <= 7 && (
+      {effectivePlan === "free" && daysLeft <= 7 && (
         <button onClick={() => setScreen("paywall")}
           style={{ flexShrink: 0, width: "100%", background: daysLeft === 0 ? "#fef2f2" : "#fff7ed", borderBottom: `1px solid ${daysLeft === 0 ? "#fecaca" : "#fed7aa"}`, padding: "8px 14px", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer", border: "none", color: daysLeft === 0 ? "#991b1b" : "#9a3412", fontSize: 11, fontWeight: 600 }}>
           {daysLeft === 0 ? "⛔ Période d'essai terminée — passer en Pro" : `⏳ Plus que ${daysLeft} jour${daysLeft > 1 ? "s" : ""} d'essai — découvrir Pro`}
@@ -260,7 +265,7 @@ export default function App() {
                 style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", background: active ? "rgba(34,197,94,.1)" : "transparent", border: "none", borderLeft: `3px solid ${active ? "#22c55e" : "transparent"}`, color: active ? "#22c55e" : "#6B6358", cursor: "pointer", width: "100%", textAlign: "left", fontSize: 14, fontWeight: active ? 600 : 400, transition: "all .15s", position: "relative" }}>
                 {icon}
                 <span>{label}</span>
-                {id === "agent" && plan === "free" && daysLeft <= 7 && (
+                {id === "agent" && effectivePlan === "free" && daysLeft <= 7 && (
                   <span style={{ marginLeft: "auto", background: daysLeft === 0 ? "#ef4444" : "#f97316", color: "white", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 10 }}>
                     {daysLeft === 0 ? "!" : `${daysLeft}j`}
                   </span>
@@ -338,7 +343,7 @@ export default function App() {
               onCreateDevis={onCreateDevis}
               clients={clients}
               onSaveClient={onSaveClient}
-              plan={plan}
+              plan={effectivePlan}
               trialExpired={trialExpired}
               onPaywall={() => setScreen("paywall")}
               setTab={setTab}
@@ -350,7 +355,7 @@ export default function App() {
       </div>
 
       <Toast toast={toast} onDismiss={dismissToast}/>
-      <BottomNav items={NAV} activeNav={activeNav} onSelect={setTab} plan={plan} daysLeft={daysLeft}/>
+      <BottomNav items={NAV} activeNav={activeNav} onSelect={setTab} plan={effectivePlan} daysLeft={daysLeft}/>
     </div>
   );
 }
