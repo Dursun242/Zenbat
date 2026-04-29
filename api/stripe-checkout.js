@@ -8,15 +8,15 @@ import { cors } from './_cors.js'
 
 const PLAN_CONFIG = {
   monthly: {
-    productId:     'prod_UQOVWM1dF9ZGKs',
-    unitAmount:    1900,   // 19,00 € HT en centimes
+    productName:  'Zenbat Pro — Mensuel',
+    unitAmount:    1900,   // 19,00 € TTC en centimes
     interval:      'month',
     intervalCount: 1,
     biannual:      false,
   },
   biannual: {
-    productId:     'prod_UQOWyWNR0hPe0M',
-    unitAmount:    5700,   // 57,00 € HT en centimes
+    productName:  'Zenbat Pro — 6 mois',
+    unitAmount:    5700,   // 57,00 € TTC en centimes
     interval:      'month',
     intervalCount: 6,
     biannual:      true,   // cancel_at_period_end activé via webhook
@@ -76,10 +76,10 @@ export default async function handler(req, res) {
       payment_method_types: ['card'],
       line_items: [{
         price_data: {
-          currency:   'eur',
-          product:    cfg.productId,
+          currency:    'eur',
+          product_data: { name: cfg.productName, metadata: { plan } },
           unit_amount: cfg.unitAmount,
-          recurring:  { interval: cfg.interval, interval_count: cfg.intervalCount },
+          recurring:   { interval: cfg.interval, interval_count: cfg.intervalCount },
         },
         quantity: 1,
       }],
