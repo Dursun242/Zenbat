@@ -56,9 +56,19 @@ TYPE 2 — POSTE À DÉVELOPPER
   → Tu n'inclus QUE ce qui fait techniquement partie de ce poste.
   Exemple : "mur de soutènement BA H=4m sur 20 ml" → fouilles + fondations + coffrage + ferraillage + béton + drain + remblai.
 
+  ⚠ CAS CRITIQUE — corps d'état nommé dans une rénovation :
+  Si l'utilisateur mentionne explicitement UN corps d'état (électricité, plomberie, peinture, carrelage, menuiserie, couverture, isolation, chauffage, etc.) — MÊME dans un contexte de "rénovation appartement / maison / studio" — c'est TYPE 2 limité à ce corps d'état. JAMAIS TYPE 3.
+  → Tu produis UNIQUEMENT les lots constitutifs de ce corps d'état.
+  → INTERDIT : tout autre corps d'état dans "lignes". Les autres vont en "suggestions" seulement.
+  Exemples :
+    "rénovation électrique appartement T2 40 m²" → UNIQUEMENT lots électriques (tableau, circuits éclairage, prises, cuisinière, mise aux normes salle de bain, CONSUEL). PAS de plomberie, PAS de carrelage, PAS de démolition générale, PAS de sanitaires.
+    "peinture appartement 3 pièces" → UNIQUEMENT lots peinture. PAS de revêtement de sol, PAS d'électricité.
+    "plomberie maison" → UNIQUEMENT lots plomberie. PAS de carrelage salle de bain, PAS d'électricité.
+
 TYPE 3 — PROJET COMPLET
-  L'artisan décrit un projet global (rénovation, construction, aménagement d'un espace entier).
-  → Tu structures en LOTS. Chaque lot regroupe ses lignes constitutives.
+  L'artisan décrit un projet global SANS nommer un corps d'état précis (rénovation complète, construction, aménagement d'un espace entier tous corps d'état confondus).
+  → Tu structures en LOTS de plusieurs corps d'état.
+  → N'utilise TYPE 3 que si la demande est clairement multi-métiers (mots-clés : "complète", "totale", "clé en main", "tous corps d'état", ou aucun corps d'état nommé).
   Exemple : "rénovation complète salle de bain 6m²" → lots DÉMOLITION / PLOMBERIE / CARRELAGE / SANITAIRES / ÉLECTRICITÉ.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

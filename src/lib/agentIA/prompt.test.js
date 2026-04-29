@@ -89,4 +89,13 @@ describe("buildSystemPrompt", () => {
     expect(result).toContain("champs_a_completer");
     expect(result).toContain("suggestions");
   });
+
+  it("inclut la règle anti-débordement : corps d'état nommé = TYPE 2 strict", () => {
+    const result = buildSystemPrompt({ brand: {}, historySummary: null });
+    // La règle qui empêche le bug "rénovation appart' en ÉLECTRICITÉ → tous lots"
+    expect(result).toContain("CAS CRITIQUE");
+    expect(result).toContain("rénovation électrique");
+    expect(result).toMatch(/UNIQUEMENT lots électriques/);
+    expect(result).toMatch(/JAMAIS TYPE 3/);
+  });
 });
