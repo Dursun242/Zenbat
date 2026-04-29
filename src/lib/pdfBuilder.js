@@ -7,8 +7,8 @@ const X = PAD;
 const PAGE_BOTTOM = 283; // leave 14mm footer margin
 
 // RGB color constants — palette chaude Zenbat
-const TERRA    = [201, 123, 92];   // #C97B5C terracotta (accents, header, labels)
-const TERRA_BG = [240, 235, 227];  // #F0EBE3 fond chaud pour lots/totaux
+const TERRA    = [201, 123, 92];   // #C97B5C terracotta (fallback brand color)
+const TERRA_BG = [240, 235, 227];  // #F0EBE3 fond chaud par défaut
 const WHITE    = [255, 255, 255];
 const BORDER   = [232, 226, 216];  // #E8E2D8 bordure chaude
 const BORDER2  = [210, 202, 190];  // légèrement plus soutenu
@@ -22,6 +22,39 @@ const GREEN    = [22, 163, 74];
 const GREEN_DK = [22, 101, 52];
 const AMBER    = [146, 64, 14];
 const AMBER_BG = [254, 249, 195];
+
+// Convertit "#RRGGBB" ou "#RGB" en [r,g,b]. Retourne null si invalide.
+export function hexToRgb(hex) {
+  let s = String(hex || "").trim().replace(/^#/, "");
+  if (s.length === 3) s = s.split("").map(c => c + c).join("");
+  if (s.length !== 6) return null;
+  const n = parseInt(s, 16);
+  if (Number.isNaN(n)) return null;
+  return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
+}
+
+// Mélange deux couleurs RGB. weight = part de la première (0..1).
+export function mixRgb(a, b, weight) {
+  return [
+    Math.round(a[0] * weight + b[0] * (1 - weight)),
+    Math.round(a[1] * weight + b[1] * (1 - weight)),
+    Math.round(a[2] * weight + b[2] * (1 - weight)),
+  ];
+}
+
+// Luminance relative WCAG pour choisir un texte lisible sur un fond donné.
+function luminance([r, g, b]) {
+  const v = [r, g, b].map(c => {
+    c /= 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+}
+
+// Texte blanc si le fond est foncé, encre sombre sinon (>0.55 ≈ couleur claire).
+export function pickTextColor(bg) {
+  return luminance(bg) > 0.55 ? DARK : WHITE;
+}
 
 // Table column widths (sum = 190mm)
 const CD = 100, CU = 15, CQ = 13, CP = 22, CT = 13, CR = 27;
@@ -108,6 +141,14 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
   const isAcompte = kind === "facture" && d?.invoice_type === "acompte";
   const docLabel  = isAvoir ? "FACTURE D'AVOIR" : isAcompte ? "FACTURE D'ACOMPTE" : kind === "facture" ? "FACTURE" : "DEVIS";
 
+  // Couleur d'accent dérivée du profil utilisateur (brand.color), avec
+  // fallback TERRA si invalide. Le fond d'accent est un mix 15% accent + 85%
+  // blanc — réplique le contraste original TERRA / TERRA_BG. Le texte sur
+  // l'accent saturé suit la luminance pour rester lisible.
+  const accent    = hexToRgb(brand?.color) || TERRA;
+  const accentBg  = mixRgb(accent, WHITE, 0.15);
+  const accentTxt = pickTextColor(accent);
+
   // Compute totals (mirrors PDFViewer.jsx)
   const lignes = d.lignes || [];
   const filteredLignes = lignes.filter((l, i) => {
@@ -165,16 +206,16 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
       if (dh > MAX_H) { dh = MAX_H; dw = dh * aspect; }
       pdf.addImage(img.dataUrl, "PNG", X, y, dw, dh, undefined, "FAST");
     } else {
-      txt(pdf, brand.companyName || "Votre Entreprise", X, y + 5, { size: 13, bold: true, color: TERRA });
+      txt(pdf, brand.companyName || "Votre Entreprise", X, y + 5, { size: 13, bold: true, color: accent });
     }
   } else {
-    txt(pdf, brand.companyName || "Votre Entreprise", X, y + 5, { size: 13, bold: true, color: TERRA });
+    txt(pdf, brand.companyName || "Votre Entreprise", X, y + 5, { size: 13, bold: true, color: accent });
   }
 
   // Doc info (right-aligned)
   const rx = X + CW;
   txt(pdf, docLabel, rx, y + 4,  { size: 7.5, bold: true, color: MUTED, align: "right" });
-  txt(pdf, s(d.numero), rx, y + 10, { size: 14, bold: true, color: TERRA, align: "right" });
+  txt(pdf, s(d.numero), rx, y + 10, { size: 14, bold: true, color: accent, align: "right" });
   txt(pdf, `Émis le ${fmtD(d.date_emission)}`, rx, y + 16, { size: 7.5, color: LIGHT, align: "right" });
   if (kind === "facture") {
     if (d.date_echeance)
@@ -184,7 +225,7 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
   }
 
   y += 23;
-  hline(pdf, X, X + CW, y, TERRA, 0.5);
+  hline(pdf, X, X + CW, y, accent, 0.5);
   y += 5;
 
   // ── Info grid (Entreprise | Client) ───────────────────────────────────────
@@ -228,13 +269,13 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
 
   // ── Table title ───────────────────────────────────────────────────────────
   y = need(pdf, y, 10);
-  txt(pdf, "DÉTAIL DES PRESTATIONS", X, y + 4, { size: 8, bold: true, color: TERRA });
+  txt(pdf, "DÉTAIL DES PRESTATIONS", X, y + 4, { size: 8, bold: true, color: accent });
   y += 8;
 
   // Table header row
   const drawTableHeader = (atY) => {
-    box(pdf, X, atY, CW, 8, TERRA);
-    pdf.setFontSize(8); pdf.setFont("helvetica", "bold"); setTxt(pdf, WHITE);
+    box(pdf, X, atY, CW, 8, accent);
+    pdf.setFontSize(8); pdf.setFont("helvetica", "bold"); setTxt(pdf, accentTxt);
     let cx = X;
     pdf.text("Description",  cx + 3,                        atY + 4.5);
     pdf.text("Unité",        cx + CD + CU / 2,              atY + 4.5, { align: "center" });
@@ -252,9 +293,9 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
     if (l.type_ligne === "lot") {
       y = need(pdf, y, 7);
       if (y === PAD) y = drawTableHeader(y); // repeat header after page break
-      box(pdf, X, y, CW, 6, TERRA_BG);
+      box(pdf, X, y, CW, 6, accentBg);
       hline(pdf, X, X + CW, y + 6, BORDER);
-      txt(pdf, (l.designation || "").toUpperCase(), X + 3, y + 4, { size: 8, bold: true, color: TERRA });
+      txt(pdf, (l.designation || "").toUpperCase(), X + 3, y + 4, { size: 8, bold: true, color: accent });
       y += 6;
     } else if (l.type_ligne === "ouvrage") {
       pdf.setFontSize(8.5);
@@ -302,10 +343,10 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
     y += TRH;
   });
 
-  hline(pdf, TX, TX + TW, y, TERRA, 0.5);
-  box(pdf, TX, y, TW, TRH + 2, TERRA_BG);
-  txt(pdf, "TOTAL TTC", TX + 3, y + 5, { size: 9, bold: true, color: TERRA });
-  txt(pdf, fmt(ttc),    TX + TW - 2, y + 5, { size: 10, bold: true, color: TERRA, align: "right" });
+  hline(pdf, TX, TX + TW, y, accent, 0.5);
+  box(pdf, TX, y, TW, TRH + 2, accentBg);
+  txt(pdf, "TOTAL TTC", TX + 3, y + 5, { size: 9, bold: true, color: accent });
+  txt(pdf, fmt(ttc),    TX + TW - 2, y + 5, { size: 10, bold: true, color: accent, align: "right" });
   y += TRH + 2;
 
   if (kind === "facture" && Number(d.retenue_garantie_eur) > 0) {
@@ -329,7 +370,7 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
     const obsLines = wrap(pdf, obs, CW, 8.5);
     const obsH     = obsLines.length * 4.5 + 8;
     y = need(pdf, y, obsH);
-    txt(pdf, "OBSERVATIONS", X, y + 3, { size: 7, bold: true, color: TERRA });
+    txt(pdf, "OBSERVATIONS", X, y + 3, { size: 7, bold: true, color: accent });
     y += 7;
     pdf.setFont("helvetica", "normal"); setTxt(pdf, MID);
     pdf.text(obsLines, X, y);
@@ -349,7 +390,7 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
       const termLines = wrap(pdf, brand.paymentTerms, colW - 6, 8.5);
       const bh        = Math.max(22, termLines.length * 4.5 + 12);
       box(pdf, bx, y, colW, bh, BG_LIGHT, BORDER);
-      txt(pdf, "CONDITIONS", bx + 3, y + 4, { size: 7, bold: true, color: TERRA });
+      txt(pdf, "CONDITIONS", bx + 3, y + 4, { size: 7, bold: true, color: accent });
       pdf.setFont("helvetica", "normal"); setTxt(pdf, MID); pdf.setFontSize(8.5);
       pdf.text(termLines, bx + 3, y + 10);
       bx += colW + 5;
@@ -357,7 +398,7 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
     if (hasBank) {
       const bkW = hasBoth ? colW : CW;
       box(pdf, bx, y, bkW, 24, BG_LIGHT, BORDER);
-      txt(pdf, "COORDONNÉES BANCAIRES", bx + 3, y + 4, { size: 7, bold: true, color: TERRA });
+      txt(pdf, "COORDONNÉES BANCAIRES", bx + 3, y + 4, { size: 7, bold: true, color: accent });
       let by = y + 10;
       if (brand.rib)  { txt(pdf, brand.rib,              bx + 3, by, { size: 8,   color: MID });   by += 4.5; }
       if (brand.iban) { txt(pdf, `IBAN : ${brand.iban}`, bx + 3, by, { size: 7.5, color: LIGHT }); by += 4;   }

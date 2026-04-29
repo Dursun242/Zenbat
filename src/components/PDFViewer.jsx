@@ -86,7 +86,8 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
   const ttc = ht + tva
   const fontFamily = brand.fontStyle==="elegant"?"Playfair Display":brand.fontStyle==="tech"?"Space Grotesk":"DM Sans"
   const navy  = "#1A1612"
-  const terra = "#C97B5C"
+  // Couleur d'accent du profil utilisateur, fallback terracotta historique.
+  const terra = brand?.color || "#C97B5C"
   const baseDate = d.date_emission ? new Date(d.date_emission) : new Date()
   const validUntil = isNaN(baseDate.getTime()) ? new Date() : baseDate
   validUntil.setDate(validUntil.getDate() + (brand.validityDays || 30))
