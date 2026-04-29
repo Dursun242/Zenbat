@@ -83,7 +83,7 @@ export default function Landing({ onLogin, onSignup }) {
       <LandingMetiers />
       <LandingRelance />
       <LandingHow     />
-      <PricingSection />
+      <PricingSection onSignup={onSignup} />
       <LandingFAQ        />
       <LandingNewsletter />
       <LandingFooter     onSignup={onSignup} />

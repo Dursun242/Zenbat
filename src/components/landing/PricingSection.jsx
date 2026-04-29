@@ -27,7 +27,7 @@ function CheckIcon() {
   )
 }
 
-export default function PricingSection() {
+export default function PricingSection({ onSignup }) {
   const [isTTC, setIsTTC]           = useState(true)
   const [isBiannual, setIsBiannual] = useState(true)
   const [priceChanging, setPriceChanging] = useState(false)
@@ -348,6 +348,7 @@ export default function PricingSection() {
             <div>
               <button
                 className="ps-btn-o"
+                onClick={onSignup}
                 style={{
                   width: '100%', padding: '13px 0', borderRadius: 12,
                   border: '1.5px solid #C97B5C', background: 'transparent',
@@ -446,6 +447,7 @@ export default function PricingSection() {
             <div style={{ position: 'relative' }}>
               <button
                 className="ps-btn-f"
+                onClick={onSignup}
                 style={{
                   width: '100%', padding: '13px 0', borderRadius: 12,
                   border: 'none', background: '#C97B5C', color: '#fff',
