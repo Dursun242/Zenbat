@@ -97,8 +97,6 @@ export default function AdminAgentBenchmark() {
     setProgress({ done: 0, total });
     cancelRef.current = false;
 
-    const token = await getToken();
-    const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
     const out = new Array(total);
     let nextIndex = 0, doneCount = 0;
     let lastStart = 0;
@@ -118,6 +116,11 @@ export default function AdminAgentBenchmark() {
         const t0 = lastStart;
         let row;
         try {
+          // Re-récupère le token à chaque appel : le run dure ~11 min et
+          // Supabase rafraîchit silencieusement les sessions, donc un token
+          // capturé au début devient invalide en cours de route.
+          const token = await getToken();
+          const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
           const system = buildSystemPrompt({ brand: item.brand, historySummary: null });
           const text = await requestClaude({
             body: {
