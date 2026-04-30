@@ -10,6 +10,7 @@ import AdminConversations from "./admin/AdminConversations.jsx"
 import AdminNewsletter    from "./admin/AdminNewsletter.jsx"
 import AdminCoherenceStats from "./admin/AdminCoherenceStats.jsx"
 import AdminFeedback       from "./admin/AdminFeedback.jsx"
+import AdminAgentBenchmark from "./admin/AdminAgentBenchmark.jsx"
 import DeleteUserModal    from "./admin/DeleteUserModal.jsx"
 import UserDetailDrawer  from "./admin/UserDetailDrawer.jsx"
 
@@ -223,6 +224,7 @@ export default function AdminPanel({ onBack }) {
             data={feedback}  loading={feedbackLoading}
             onRefresh={loadFeedback}
           />
+          <AdminAgentBenchmark />
           <div style={{ textAlign: "center", fontSize: 10, color: "#cbd5e1" }}>
             Données du {fmtD(stats.generatedAt)} à {new Date(stats.generatedAt).toLocaleTimeString("fr-FR")}
           </div>

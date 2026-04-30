@@ -10,7 +10,6 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:agent": "node scripts/test-agent.mjs",
     "generate-pwa-assets": "pwa-assets-generator --preset minimal2023 public/icon.svg"
   },
   "dependencies": {

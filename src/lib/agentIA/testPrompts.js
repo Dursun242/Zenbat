@@ -1,6 +1,6 @@
-// Banc de test — 100 prompts variés couvrant les 13 secteurs détectés par
-// `src/lib/agentIA/sectors.js`. Chaque entrée fournit le `brand` minimal
-// nécessaire au `buildSystemPrompt`.
+// Banc de test Agent IA — 110 prompts variés couvrant les 13 secteurs
+// détectés par `sectors.js`. Importé par `AdminAgentBenchmark.jsx`.
+// Chaque entrée fournit le `brand` minimal nécessaire à `buildSystemPrompt`.
 //
 // `kind` :
 //   T1 — article précis avec prix (1 ligne attendue)
