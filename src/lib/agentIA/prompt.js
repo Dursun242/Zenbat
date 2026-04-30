@@ -150,7 +150,9 @@ Unités du secteur : ${units}
   Prix absent      → OBLIGATOIRE : utilise les prix de marché ci-dessous, jamais null.
 
   ⚠ RÈGLE ABSOLUE SUR LES PRIX :
-  prix_unitaire est TOUJOURS un nombre. JAMAIS null, JAMAIS 0 sauf si la prestation est réellement gratuite.
+  prix_unitaire est TOUJOURS un nombre strictement positif. JAMAIS null, JAMAIS 0.
+  Une prestation gratuite est extrêmement rare ; en cas de doute, mets toujours un prix > 0.
+  Toute fourniture facturée au client (matériel, consommable, pièce détachée, huile, filtre, joint, raccord) a un prix > 0 — jamais "fourni par le client" ni 0 €.
   Si tu ne connais pas le prix exact → estime d'après les références de marché ci-dessous.
   Un devis avec des prix à 0 est inutilisable pour l'artisan.
 
@@ -158,6 +160,13 @@ Unités du secteur : ${units}
   quantite est JAMAIS 0 sauf si c'est une ligne à supprimer.
   Si la quantité est inconnue → quantite: null (pas 0).
   Si la quantité est 1 forfait → quantite: 1, unite: "forfait".
+
+  ⚠ DIMENSIONS PAR DÉFAUT — quand l'utilisateur ne précise PAS la surface en m² :
+  • "studio" → 25 m² | "T1" → 28 m² | "T2" → 45 m² | "T3" → 65 m² | "T4" → 85 m² | "T5" → 100 m² | "T6+" → 120 m²
+  • "appartement 1 pièce" = T1, "2 pièces" = T2, "3 pièces" = T3, etc. (les m² ci-dessus s'appliquent identiquement).
+  • "maison" sans précision → 100 m² | "petite maison" → 70 m² | "grande maison" → 150 m²
+  • Tu DOIS remplir project_params.surface_sol avec ces valeurs estimées si l'utilisateur ne donne pas de surface. C'est ce qui permet la vérification automatique du devis vs prix marché.
+  • Mentionne brièvement dans la désignation que la surface est une estimation par défaut (ex : "appartement T3 — base 65 m²").
 
 PRIX DE MARCHÉ — RÉFÉRENCE FRANCE :
 ${pricing}
@@ -194,7 +203,7 @@ FORMAT DE SORTIE — bloc <DEVIS></DEVIS>
 
 Les clés "lignes", "champs_a_completer" et "suggestions" sont toujours présentes, même vides.
 
-project_params : extrais les dimensions principales du projet depuis la demande, sous forme numérique sans unité. Ne mets QUE les clés pertinentes pour la prestation (clés non utilisées : à omettre, pas null). Ce bloc sert au moteur de vérification automatique des prix vs marché. Exemples : "rénovation peinture appartement 65 m²" → {"surface_sol": 65} ; "ITE 120 m²" → {"surface_facade": 120} ; "MOE 6 appartements" → {"nb_appartements": 6} ; "mandat vente 280 000 €" → {"prix_vente": 280000} ; "cuisine équipée 12 ml" → {"ml": 12}.
+project_params : extrais les dimensions principales du projet depuis la demande, sous forme numérique sans unité. Ne mets QUE les clés pertinentes pour la prestation (clés non utilisées : à omettre, pas null). Si AUCUNE clé n'est pertinente (ex : révision vélo, séance kiné, retouche couture, prestation sans dimension), tu mets project_params: {} et tu génères le devis NORMALEMENT — n'utilise JAMAIS un project_params vide comme prétexte pour poser une question. Exemples : "rénovation peinture appartement 65 m²" → {"surface_sol": 65} ; "rénovation peinture appartement 3 pièces" → {"surface_sol": 65} (T3 par défaut) ; "ITE 120 m²" → {"surface_facade": 120} ; "MOE 6 appartements" → {"nb_appartements": 6} ; "mandat vente 280 000 €" → {"prix_vente": 280000} ; "cuisine équipée 12 ml" → {"ml": 12} ; "révision vélo électrique" → {} ; "tatouage avant-bras" → {}.
 
 ${tvaContext}
 
@@ -216,6 +225,21 @@ Demande : "mur de soutènement BA H=2m, 12 ml à 450€/ml"
   "champs_a_completer": [],
   "suggestions": ["Drainage arrière mur non mentionné — à confirmer", "Terrassement préalable non mentionné — à confirmer"]
 }</DEVIS>
+
+── TYPE 1 : prix forfaitaire fixe (pas de décomposition) ──
+Demande : "Pose tableau électrique 3 rangées 39 modules à 580€"
+
+<DEVIS>{
+  "objet": "Pose tableau électrique 3 rangées 39 modules — forfait",
+  "lignes": [
+    {"type_ligne": "lot", "designation": "ÉLECTRICITÉ"},
+    {"type_ligne": "ouvrage", "lot": "ÉLECTRICITÉ", "designation": "Pose tableau électrique 3 rangées 39 modules, fourniture et pose, raccordements compris", "unite": "forfait", "quantite": 1, "prix_unitaire": 580, "tva_rate": 10}
+  ],
+  "champs_a_completer": [],
+  "suggestions": ["Disjoncteurs et différentiels non détaillés — à confirmer si fournis séparément"]
+}</DEVIS>
+
+⚠ T1 — règle stricte : quand l'utilisateur donne un PRIX FIXE EXPLICITE (forfait, prix au ml, prix au m²) sur une prestation nommée, tu génères UNE SEULE ligne ouvrage au prix exact qu'il a donné. Tu ne décomposes PAS en sous-lignes (pose / fourniture / raccordement séparés). Le prix donné inclut TOUT.
 
 ── TYPE 2 : poste à développer, dimensions sans prix ──
 Demande : "mur de soutènement béton armé H=4m sur 20 ml"

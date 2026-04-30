@@ -87,18 +87,23 @@ describe("runCoherenceLoop", () => {
     expect(out.resolvedLignes[0].tva_rate).toBe(0);
   });
 
-  it("retourne residual_issues si le retry échoue toujours", async () => {
+  it("retourne residual_issues si tous les retries échouent", async () => {
     runCoherenceCheck
       .mockReturnValueOnce({ overall_status: "fail", checks: [{ issues: [{ code: "A" }] }] })
-      .mockReturnValueOnce({ overall_status: "fail", checks: [{ issues: [{ code: "B" }] }] });
+      .mockReturnValueOnce({ overall_status: "fail", checks: [{ issues: [{ code: "B" }] }] })
+      .mockReturnValueOnce({ overall_status: "fail", checks: [{ issues: [{ code: "C" }] }] });
 
-    requestClaude.mockResolvedValueOnce(
-      '<DEVIS>{"lignes":[{"type_ligne":"ouvrage","quantite":1,"prix_unitaire":50,"tva_rate":20}]}</DEVIS>'
-    );
+    requestClaude
+      .mockResolvedValueOnce(
+        '<DEVIS>{"lignes":[{"type_ligne":"ouvrage","quantite":1,"prix_unitaire":50,"tva_rate":20}]}</DEVIS>'
+      )
+      .mockResolvedValueOnce(
+        '<DEVIS>{"lignes":[{"type_ligne":"ouvrage","quantite":1,"prix_unitaire":75,"tva_rate":20}]}</DEVIS>'
+      );
 
     const out = await runCoherenceLoop({ ...baseArgs, devis: baseDevis });
-    expect(out.validationResult.residual_issues).toEqual([{ code: "B" }]);
-    expect(out.validationResult.iteration_count).toBe(2);
+    expect(out.validationResult.residual_issues).toEqual([{ code: "C" }]);
+    expect(out.validationResult.iteration_count).toBe(3);
   });
 
   it("interrompt la boucle proprement sur erreur API et renvoie l'état initial", async () => {

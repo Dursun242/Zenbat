@@ -4,7 +4,10 @@ import { extractDevisJson, applyVatRegime } from "./extractDevis.js";
 import { requestClaude, ClaudeApiError } from "./stream.js";
 import { uid } from "../utils.js";
 
-const COHERENCE_MAX_RETRIES = 1;
+// 2 retries — quand l'IA est très loin du marché (ex : 975 € pour une rénovation
+// plomberie 90 m² qui devrait être ~10 k), une seule passe ne suffit pas pour
+// quintupler le total. La 2e passe pousse réellement l'IA dans la fourchette.
+const COHERENCE_MAX_RETRIES = 2;
 
 // Valide le devis avec le moteur de cohérence puis, en cas d'échec, demande
 // une correction à Claude (jusqu'à COHERENCE_MAX_RETRIES). Retourne toujours
