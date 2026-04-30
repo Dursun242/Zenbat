@@ -6,7 +6,11 @@ import { extractDevisJson } from "../../lib/agentIA/extractDevis.js";
 import { requestClaude, ClaudeApiError } from "../../lib/agentIA/stream.js";
 import { PROMPTS } from "../../lib/agentIA/testPrompts.js";
 
-const CONCURRENCY = 3;
+// Une requête à la fois + 6 s minimum entre 2 départs : le tier free Anthropic
+// plafonne à 50k input tokens/min et 10k output tokens/min, donc 3 requêtes
+// parallèles saturent immédiatement et 90 % des prompts retombent en rate limit.
+const CONCURRENCY = 1;
+const MIN_INTERVAL_MS = 6000;
 const REFUSAL_RE = /ne r[ée]alis(ons|e|ent) pas|ne fais(ons|ent)? pas|ne propos(ons|e|ent) pas|ne traitons pas|pas (notre|de) sp[ée]cialit[ée]/i;
 
 function analyseResponse(rawText) {
@@ -45,7 +49,8 @@ function downloadCsv(rows) {
   const csv = [header.join(",")]
     .concat(rows.map(r => header.map(h => escape(r[h])).join(",")))
     .join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  // BOM UTF-8 pour qu'Excel ouvre bien les accents et l'€.
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
   a.href = url;
@@ -96,13 +101,21 @@ export default function AdminAgentBenchmark() {
     const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
     const out = new Array(total);
     let nextIndex = 0, doneCount = 0;
+    let lastStart = 0;
 
     const worker = async () => {
       while (!cancelRef.current) {
         const i = nextIndex++;
         if (i >= total) return;
         const item = PROMPTS[i];
-        const t0 = Date.now();
+
+        // Throttle : on garde au moins MIN_INTERVAL_MS entre 2 départs
+        // pour rester sous les caps tokens/min de l'org Anthropic.
+        const wait = Math.max(0, lastStart + MIN_INTERVAL_MS - Date.now());
+        if (wait > 0) await new Promise(r => setTimeout(r, wait));
+        if (cancelRef.current) return;
+        lastStart = Date.now();
+        const t0 = lastStart;
         let row;
         try {
           const system = buildSystemPrompt({ brand: item.brand, historySummary: null });
@@ -178,7 +191,7 @@ export default function AdminAgentBenchmark() {
         <div style={{ fontSize: 11, color: "#6B6358", marginBottom: 10, lineHeight: 1.5 }}>
           Envoie {total} requêtes à <code>/api/claude</code> avec le même <code>system</code> que l'agent en prod.
           Mesure : taux de devis générés, refus IA, questions avant <code>&lt;DEVIS&gt;</code>, lignes à prix nul.
-          Compte ~3 min et ~110 appels sur ton quota IA quotidien (200/jour pour le compte admin).
+          Compte ~{Math.ceil((total * MIN_INTERVAL_MS) / 60000)} min (1 appel toutes les {MIN_INTERVAL_MS / 1000} s pour rester sous le rate limit Anthropic).
         </div>
 
         {error && (
