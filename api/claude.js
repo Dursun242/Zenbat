@@ -101,8 +101,11 @@ export default async function handler(req, res) {
   if (typeof top_p === "number")       payload.top_p = top_p;
 
   try {
+    // 55 s — sous le maxDuration Vercel de 60 s, marge de 5 s pour transmettre
+    // la réponse au client. Les T3 multi-lots (rénovation totale, extension)
+    // peuvent légitimement prendre 30-50 s à générer.
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 28000);
+    const timeout = setTimeout(() => controller.abort(), 55000);
 
     let upstream;
     try {
@@ -157,7 +160,7 @@ export default async function handler(req, res) {
 
   } catch (err) {
     if (err?.name === "AbortError")
-      return res.status(504).json({ error: "Délai dépassé — Claude API n'a pas répondu en 28 secondes" });
+      return res.status(504).json({ error: "Délai dépassé — Claude API n'a pas répondu en 55 secondes" });
     return res.status(502).json({ error: "Upstream Anthropic unreachable" });
   }
 }

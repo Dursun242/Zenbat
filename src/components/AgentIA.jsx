@@ -329,7 +329,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
         msg = apiError; // affiche le message précis (ex: "Limite journalière atteinte (40 appels/jour)")
       } else if (apiError?.includes("Période d'essai")) {
         msg = apiError;
-      } else if (apiError?.includes("28 secondes") || apiError?.includes("504")) {
+      } else if (apiError?.includes("55 secondes") || apiError?.includes("504")) {
         msg = "La demande a pris trop de temps. Réessayez avec une description plus courte.";
       } else if (apiError?.includes("529") || apiError?.includes("overloaded") || apiError?.includes("Upstream")) {
         msg = "Les serveurs IA sont surchargés en ce moment. Réessayez dans 30 secondes.";
