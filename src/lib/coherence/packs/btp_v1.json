@@ -81,7 +81,7 @@
       "keywords": ["moe rénovation immeuble", "moe renovation immeuble", "maîtrise d'œuvre immeuble", "maitrise d'oeuvre immeuble", "honoraires moe immeuble"],
       "main_dimension": { "name": "nb_appartements", "unit": "appt", "label": "Nombre d'appartements" },
       "default_params": {},
-      "envelope": { "min_per_unit": 7000, "max_per_unit": 18000, "tolerance_pct": 25 },
+      "envelope": { "min_per_unit": 3333, "max_per_unit": 5833, "tolerance_pct": 5 },
       "required_lots": [],
       "optional_lots": [],
       "derived_quantities": [],

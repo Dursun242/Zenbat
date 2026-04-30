@@ -112,6 +112,32 @@ describe("Typologies de rénovation mono-corps d'état (BTP v1.1)", () => {
     expect(result.overall_status).toBe("fail");
   });
 
+  it("moe_immeuble : 99 200 € pour 6 appts (16 533 €/appt) → fail (sur-évalué)", () => {
+    const devis = {
+      objet: "MOE rénovation immeuble 6 appartements",
+      project_params: { nb_appartements: 6 },
+      lignes: [
+        { type_ligne: "ouvrage", designation: "Mission MOE", quantite: 1, prix_unitaire: 99200, tva_rate: 20 },
+      ],
+    };
+    const result = runCoherenceCheck(devis);
+    expect(result.typology_id).toBe("moe_immeuble");
+    expect(result.overall_status).toBe("fail");
+  });
+
+  it("moe_immeuble : 25 800 € pour 6 appts (4 300 €/appt) → pass (médian de 20-35 k)", () => {
+    const devis = {
+      objet: "MOE rénovation immeuble 6 appartements",
+      project_params: { nb_appartements: 6 },
+      lignes: [
+        { type_ligne: "ouvrage", designation: "Mission MOE", quantite: 1, prix_unitaire: 25800, tva_rate: 20 },
+      ],
+    };
+    const result = runCoherenceCheck(devis);
+    expect(result.typology_id).toBe("moe_immeuble");
+    expect(result.overall_status).toBe("pass");
+  });
+
   it("demolition_cloisons : 880 € pour 40 m² (22 €/m²) → fail (sous-évalué)", () => {
     const devis = {
       objet: "Démolition cloisons intérieures 40 m²",

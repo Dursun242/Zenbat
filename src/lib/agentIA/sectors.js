@@ -70,7 +70,7 @@ export const SECTOR_PRICING = {
 • Salle de bain rénovation complète clé en main : 1 200-2 500 €/m² (démolition + plomberie + carrelage + sanitaires + élec). 6 m² = 8 000-15 000 €.
 • Cuisine rénovation clé en main : 1 000-1 800 €/m² (démol + plomberie + élec + cuisine équipée). 14 m² = 14 000-25 000 €.
 • Construction maison neuve : 1 000-1 500 €/m² hors fondations / hors VRD / hors terrain.
-• Maîtrise d'œuvre / MOE : 8-12 % du montant HT des travaux. Pour 6 appartements à rénover (~600 k€-1 M€ de travaux) : 50 000-100 000 € d'honoraires MOE.
+• Maîtrise d'œuvre / MOE rénovation : 3 500-5 500 €/appartement, soit ~20-35 k€ pour un immeuble de 6 appts. Pour une maison particulière : 4 000-12 000 € selon ampleur.
 • Bureau d'études structure : 1 500-4 500 € selon complexité (ouverture mur porteur 1 500-2 500 €).
 • Permis de construire dossier seul (sans architecte) : 1 500-3 000 €. Avec architecte : 6 000-12 000 €.
 • Chauffage : PAC air/eau 11 kW posée 12 000-18 000 €, chaudière condensation gaz 4 500-8 000 €, plancher chauffant 80-130 €/m².
