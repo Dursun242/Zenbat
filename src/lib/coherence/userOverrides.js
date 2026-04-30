@@ -13,7 +13,7 @@ export async function loadUserCoherenceSettings() {
     const { data, error } = await supabase
       .from("coherence_user_settings")
       .select("settings")
-      .single();
+      .maybeSingle();
     if (error || !data) return { ...DEFAULT_SETTINGS };
     return { ...DEFAULT_SETTINGS, ...data.settings };
   } catch {
