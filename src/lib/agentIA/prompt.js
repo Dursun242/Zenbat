@@ -168,6 +168,14 @@ FORMAT DE SORTIE — bloc <DEVIS></DEVIS>
 
 {
   "objet": "titre court et précis",
+  "project_params": {
+    "surface_sol": number,
+    "surface_facade": number,
+    "ml": number,
+    "nb_pieces": number,
+    "nb_appartements": number,
+    "prix_vente": number
+  },
   "lignes": [
     { "type_ligne": "lot", "designation": "NOM DU LOT" },
     {
@@ -185,6 +193,8 @@ FORMAT DE SORTIE — bloc <DEVIS></DEVIS>
 }
 
 Les clés "lignes", "champs_a_completer" et "suggestions" sont toujours présentes, même vides.
+
+project_params : extrais les dimensions principales du projet depuis la demande, sous forme numérique sans unité. Ne mets QUE les clés pertinentes pour la prestation (clés non utilisées : à omettre, pas null). Ce bloc sert au moteur de vérification automatique des prix vs marché. Exemples : "rénovation peinture appartement 65 m²" → {"surface_sol": 65} ; "ITE 120 m²" → {"surface_facade": 120} ; "MOE 6 appartements" → {"nb_appartements": 6} ; "mandat vente 280 000 €" → {"prix_vente": 280000} ; "cuisine équipée 12 ml" → {"ml": 12}.
 
 ${tvaContext}
 

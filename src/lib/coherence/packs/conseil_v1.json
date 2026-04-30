@@ -1,8 +1,20 @@
 {
   "pack_id": "conseil_v1",
   "pack_name": "Conseil — Prestation intellectuelle",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "typologies": [
+    {
+      "typology_id": "mandat_vente_immo",
+      "label": "Mandat de vente immobilier — honoraires agence",
+      "keywords": ["mandat exclusif vente", "mandat exclusif de vente", "mandat de vente", "mandat simple vente", "honoraires agence immobilier", "honoraires agence immobilière", "commission agence immobilier"],
+      "main_dimension": { "name": "prix_vente", "unit": "€", "label": "Prix de vente du bien" },
+      "default_params": {},
+      "envelope": { "min_per_unit": 0.04, "max_per_unit": 0.08, "tolerance_pct": 10 },
+      "required_lots": [],
+      "optional_lots": [],
+      "derived_quantities": [],
+      "lots": []
+    },
     {
       "typology_id": "audit_si_pme",
       "label": "Audit SI PME",

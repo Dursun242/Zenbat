@@ -1,8 +1,92 @@
 {
   "pack_id": "btp_v1",
   "pack_name": "BTP — Bâtiment résidentiel",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "typologies": [
+    {
+      "typology_id": "renovation_plomberie_partielle",
+      "label": "Rénovation plomberie (mono-corps d'état)",
+      "keywords": ["rénovation plomberie", "renovation plomberie", "remplacement complet plomberie", "réfection plomberie", "refection plomberie", "plomberie maison", "plomberie appartement"],
+      "main_dimension": { "name": "surface_sol", "unit": "m²", "label": "Surface habitable" },
+      "default_params": {},
+      "envelope": { "min_per_unit": 70, "max_per_unit": 150, "tolerance_pct": 20 },
+      "required_lots": [],
+      "optional_lots": [],
+      "derived_quantities": [],
+      "lots": []
+    },
+    {
+      "typology_id": "renovation_electrique_partielle",
+      "label": "Rénovation électrique (mono-corps d'état)",
+      "keywords": ["rénovation électrique", "renovation electrique", "rénovation elec", "renovation elec", "mise aux normes électrique", "mise aux normes electrique", "refonte tableau électrique"],
+      "main_dimension": { "name": "surface_sol", "unit": "m²", "label": "Surface habitable" },
+      "default_params": {},
+      "envelope": { "min_per_unit": 100, "max_per_unit": 170, "tolerance_pct": 10 },
+      "required_lots": [],
+      "optional_lots": [],
+      "derived_quantities": [],
+      "lots": []
+    },
+    {
+      "typology_id": "renovation_peinture_interieure",
+      "label": "Peinture intérieure (mono-corps d'état)",
+      "keywords": ["rénovation peinture", "renovation peinture", "peinture intérieure appartement", "peinture interieure appartement", "peinture appartement", "peinture intérieure maison", "peinture interieure maison", "peinture maison"],
+      "main_dimension": { "name": "surface_sol", "unit": "m²", "label": "Surface habitable" },
+      "default_params": {},
+      "envelope": { "min_per_unit": 22, "max_per_unit": 55, "tolerance_pct": 25 },
+      "required_lots": [],
+      "optional_lots": [],
+      "derived_quantities": [],
+      "lots": []
+    },
+    {
+      "typology_id": "demolition_cloisons",
+      "label": "Démolition cloisons intérieures",
+      "keywords": ["démolition cloisons", "demolition cloisons", "dépose cloisons", "depose cloisons", "abattre cloisons"],
+      "main_dimension": { "name": "surface_sol", "unit": "m²", "label": "Surface de cloisons" },
+      "default_params": {},
+      "envelope": { "min_per_unit": 30, "max_per_unit": 90, "tolerance_pct": 25 },
+      "required_lots": [],
+      "optional_lots": [],
+      "derived_quantities": [],
+      "lots": []
+    },
+    {
+      "typology_id": "ite_facade",
+      "label": "ITE — Isolation thermique extérieure",
+      "keywords": ["ite ", "isolation thermique extérieure", "isolation thermique exterieure", "isolation par l'extérieur", "isolation par l'exterieur", "isolation extérieure"],
+      "main_dimension": { "name": "surface_facade", "unit": "m²", "label": "Surface de façade" },
+      "default_params": {},
+      "envelope": { "min_per_unit": 110, "max_per_unit": 220, "tolerance_pct": 20 },
+      "required_lots": [],
+      "optional_lots": [],
+      "derived_quantities": [],
+      "lots": []
+    },
+    {
+      "typology_id": "cuisine_cle_en_main",
+      "label": "Rénovation cuisine clé en main",
+      "keywords": ["rénovation complète cuisine", "renovation complete cuisine", "rénovation cuisine clé en main", "renovation cuisine cle en main", "cuisine clé en main", "cuisine cle en main", "rénovation cuisine"],
+      "main_dimension": { "name": "surface_sol", "unit": "m²", "label": "Surface cuisine" },
+      "default_params": {},
+      "envelope": { "min_per_unit": 900, "max_per_unit": 1900, "tolerance_pct": 20 },
+      "required_lots": [],
+      "optional_lots": [],
+      "derived_quantities": [],
+      "lots": []
+    },
+    {
+      "typology_id": "moe_immeuble",
+      "label": "Maîtrise d'œuvre — rénovation immeuble",
+      "keywords": ["moe rénovation immeuble", "moe renovation immeuble", "maîtrise d'œuvre immeuble", "maitrise d'oeuvre immeuble", "honoraires moe immeuble"],
+      "main_dimension": { "name": "nb_appartements", "unit": "appt", "label": "Nombre d'appartements" },
+      "default_params": {},
+      "envelope": { "min_per_unit": 7000, "max_per_unit": 18000, "tolerance_pct": 25 },
+      "required_lots": [],
+      "optional_lots": [],
+      "derived_quantities": [],
+      "lots": []
+    },
     {
       "typology_id": "extension_neuve_go",
       "label": "Extension neuve — gros œuvre seul",
