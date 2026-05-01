@@ -64,6 +64,7 @@ type EventKind =
   | "app_log_error"
   | "payment_success"
   | "subscription_canceled"
+  | "account_deleted"
   | "pdf_generated"
   | "raw";
 
@@ -155,6 +156,15 @@ function formatEvent(kind: EventKind, payload: Record<string, unknown>): string 
         "⚠️ <b>Abonnement annulé</b>",
         p.email ? `User : ${escapeHtml(p.email)}` : "",
       ].filter(Boolean).join("\n");
+
+    case "account_deleted": {
+      const by = p.by === "admin" ? "par l'admin" : "(libre-service RGPD)";
+      return [
+        `🗑 <b>Compte supprimé</b> ${by}`,
+        p.email ? `User : ${escapeHtml(p.email)}` : "",
+        p.plan  ? `Plan : ${escapeHtml(p.plan)}`   : "",
+      ].filter(Boolean).join("\n");
+    }
 
     case "pdf_generated": {
       const k = p.kind === "facture" ? "Facture" : "Devis";
