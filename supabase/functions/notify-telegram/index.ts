@@ -1,15 +1,19 @@
-// Relais Telegram — point d'entrée unique pour toutes les notifications admin.
+// Relais Telegram **sortant** — point d'entrée pour toutes les notifications admin.
 // Reçoit un événement et le pousse à Telegram (sendMessage ou sendDocument).
 // Aucune persistance, aucun stockage : tout transite en mémoire.
 //
 // Sources qui appellent cette fonction :
 //   • DB Webhooks Supabase (profiles, activity_log, ia_error_logs, ia_negative_logs, app_logs)
 //   • Front Zenbat (helper src/lib/telegramNotify.js — envoi PDF)
-//   • Vercel API stripe-webhook.js (paiements)
+//   • Vercel API stripe.js (paiements, abonnements annulés)
 //
 // Auth : verify_jwt activé par défaut côté Supabase. Les DB Webhooks envoient
 // le service_role key dans Authorization, le front envoie le JWT user, et
 // les API server-to-server utilisent le service_role key.
+//
+// Pour le flux **entrant** (commandes admin / support relay), voir la fonction
+// dédiée `telegram-bot` (à créer) — séparée pour conserver `verify_jwt:true` ici
+// alors que le webhook Telegram entrant doit être public (auth via secret token).
 //
 // Variables d'env requises (Project Settings → Edge Functions secrets) :
 //   TELEGRAM_BOT_TOKEN — token du bot @BotFather

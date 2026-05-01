@@ -30,7 +30,8 @@ Les fichiers dans `/supabase/migrations/` ne s'appliquent **pas automatiquement*
 L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - Prévenir l'utilisateur à chaque nouvelle migration créée.
 - Dernière migration appliquée : `0029_profile_signup_email.sql`
-- Prochaine migration : préfixer avec `0030_`.
+- Migration en attente d'application : `0030_support_tickets.sql` (créée, à coller dans le SQL Editor avant le déploiement du bot Telegram support).
+- Prochaine migration : préfixer avec `0031_`.
 
 ### position:fixed et animations CSS transform
 Tout composant React qui contient des enfants `position:fixed` (modales, drawers, toasts)
@@ -96,12 +97,33 @@ Les endpoints admin vérifient en plus que `caller.email === ADMIN_EMAIL`.
 | `odoo-sign.js` | Proxy Odoo Sign (signature électronique) |
 | `stripe.js` | Stripe checkout/portal/info (POST authentifié) + webhook (détection par header `stripe-signature`) |
 
-**Notifications Telegram** : déléguées à une Supabase Edge Function `notify-telegram` (pas un endpoint Vercel — n'occupe pas de slot). Les endpoints Vercel l'appellent en fire-and-forget pour les événements importants (paiement réussi, suppression d'abonnement, etc.).
+### Architecture Telegram
+
+Le bot Telegram est volontairement éclaté en **deux fonctions Edge** distinctes pour des raisons d'authentification :
+
+| Fonction | Sens | Auth | Rôle |
+|----------|------|------|------|
+| `supabase/functions/notify-telegram/` | sortant | `verify_jwt: true` | Reçoit des événements (DB webhooks, API Vercel, front) et les pousse en HTML formaté vers le chat admin (`TELEGRAM_CHAT_ID`). Existe déjà. |
+| `supabase/functions/telegram-bot/`    | entrant | `verify_jwt: false` + `TELEGRAM_WEBHOOK_SECRET` (header `X-Telegram-Bot-Api-Secret-Token`) | Reçoit le webhook Telegram (commandes admin `/stats`, `/user`, `/reply`, et messages de support relayés). À créer. |
+
+Pourquoi deux fonctions :
+- `notify-telegram` est appelée par des sources authentifiées Supabase (DB triggers, service_role keys) → JWT obligatoire pour la sécurité.
+- Le webhook Telegram entrant est public (Telegram ne sait pas envoyer de JWT Supabase) → on doit désactiver `verify_jwt` et valider à la place le secret token Telegram.
+- Mélanger les deux = devoir baisser `verify_jwt` partout, ce qui exposerait les notifications.
+
+Ces fonctions Edge n'occupent **pas** de slot Vercel (limite 12) — les Edge Functions Supabase sont gratuites et illimitées.
+
+Variables d'env Edge Functions (Supabase Dashboard → Project Settings → Edge Functions) :
+- `TELEGRAM_BOT_TOKEN` (token @BotFather)
+- `TELEGRAM_CHAT_ID` (chat_id admin via @userinfobot)
+- `TELEGRAM_WEBHOOK_SECRET` (à venir — secret aléatoire passé à `setWebhook`)
+- `TELEGRAM_ADMIN_CHAT_ID` (à venir — alias plus explicite si besoin de filtrer commandes admin)
 
 ### Base de données (Supabase)
 Tables principales : `profiles`, `clients`, `devis`, `lignes_devis`, `invoices`, `lignes_invoices`
-Tables IA : `ia_conversations`, `ia_error_logs`, `ia_negative_logs`
-Autres : `b2b_accounts`, `activity_log`, `cgu_acceptances`
+Tables IA : `ia_conversations`, `ia_error_logs`, `ia_negative_logs`, `ia_feedback`
+Tables support : `support_tickets`, `support_messages` (migration `0030`)
+Autres : `b2b_accounts`, `activity_log`, `cgu_acceptances`, `newsletter_subscribers`, `app_logs`
 
 RLS activé sur toutes les tables — les endpoints admin contournent via `SUPABASE_SERVICE_ROLE_KEY`.
 
