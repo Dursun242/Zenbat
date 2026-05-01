@@ -9,7 +9,7 @@ vi.mock("@supabase/supabase-js", () => ({
   createClient: () => ({ from: fromMock }),
 }));
 
-import handler from "./b2brouter-webhook.js";
+import handler from "./b2brouter.js";
 
 function makeRes() {
   const res = {
@@ -21,12 +21,14 @@ function makeRes() {
   return res;
 }
 
-// req factice : implémente Symbol.asyncIterator pour que `for await (const c of req)` fonctionne
-function makeReq({ method = "POST", headers = {}, raw = "" } = {}) {
+// req factice : implémente Symbol.asyncIterator pour que `for await (const c of req)` fonctionne.
+// `url` inclut le marqueur ?route=webhook reproduit par la rewrite Vercel pour cibler le flux webhook.
+function makeReq({ method = "POST", headers = {}, raw = "", url = "/api/b2brouter?route=webhook" } = {}) {
   const buf = Buffer.from(raw, "utf8");
   return {
     method,
     headers,
+    url,
     [Symbol.asyncIterator]: async function* () { yield buf; },
   };
 }

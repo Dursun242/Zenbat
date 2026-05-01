@@ -1,16 +1,30 @@
-// Proxy vers B2Brouter eDocExchange — création compte artisan, envoi facture, suivi.
-// Variables d'environnement Vercel :
-//   B2B_API_KEY     clé API B2Brouter (staging ou prod)
-//   B2B_API_URL     défaut: https://api-staging.b2brouter.net
-//   B2B_API_VERSION défaut: 2026-03-02
+// Endpoint B2Brouter unifié — proxy eDocExchange + webhook entrant.
+// Routage interne :
+//   - Header `x-b2b-signature` ou `x-b2brouter-signature` présent → webhook (HMAC + maj statut facture)
+//   - Sinon → POST authentifié { action, payload } : ensure_account | send_invoice | get_invoice_status | list_received
 //
-// Le client doit envoyer un Authorization: Bearer <supabase_access_token>
-// pour que l'utilisateur soit authentifié via Supabase.
+// Variables d'env :
+//   B2B_API_KEY, B2B_API_URL, B2B_API_VERSION  (proxy)
+//   B2B_WEBHOOK_SECRET                          (validation HMAC)
+//
+// URL externe préservée via vercel.json :
+//   /api/b2brouter-webhook → /api/b2brouter
 
 import { createClient } from "@supabase/supabase-js";
-import { cors } from "./_cors.js"
+import crypto from "node:crypto";
+import { cors } from "./_cors.js";
+
+// Le webhook a besoin du body brut pour valider la signature HMAC.
+// Pour les actions authentifiées on parse manuellement le JSON.
+export const config = { api: { bodyParser: false } };
 
 const B2B_TIMEOUT_MS = 10000;
+
+async function readRawBody(req) {
+  const chunks = [];
+  for await (const c of req) chunks.push(c);
+  return Buffer.concat(chunks).toString("utf8");
+}
 
 async function b2b(method, path, body) {
   const base    = (process.env.B2B_API_URL || "https://api-staging.b2brouter.net").replace(/\/$/, "");
@@ -23,9 +37,9 @@ async function b2b(method, path, body) {
   const res = await fetch(`${base}${path}`, {
     method,
     headers: {
-      "Content-Type":    "application/json",
-      "Accept":          "application/json",
-      "X-B2B-API-Key":   apiKey,
+      "Content-Type":      "application/json",
+      "Accept":            "application/json",
+      "X-B2B-API-Key":     apiKey,
       "X-B2B-API-Version": version,
     },
     body: body ? JSON.stringify(body) : undefined,
@@ -46,7 +60,67 @@ async function b2b(method, path, body) {
   return data;
 }
 
-export default async function handler(req, res) {
+function mapStatus(b2bStatus) {
+  const s = String(b2bStatus || "").toLowerCase();
+  if (/(sent|dispatched|transmitted)/.test(s)) return "envoyee";
+  if (/(delivered|received)/.test(s))          return "recue";
+  if (/(paid|settled)/.test(s))                return "payee";
+  if (/(rejected|failed|error)/.test(s))       return "rejetee";
+  if (/(cancel)/.test(s))                      return "annulee";
+  return null;
+}
+
+// ─── Webhook B2Brouter ───────────────────────────────────────────────
+async function handleWebhook(req, res, raw) {
+  const secret = process.env.B2B_WEBHOOK_SECRET;
+  if (!secret) return res.status(500).json({ error: "B2B_WEBHOOK_SECRET non configuré" });
+
+  const sig = req.headers["x-b2b-signature"] || req.headers["x-b2brouter-signature"];
+  if (!sig) return res.status(401).json({ error: "signature manquante" });
+
+  const expected = crypto.createHmac("sha256", secret).update(raw).digest("hex");
+  const received = String(sig).replace(/^sha256=/, "");
+  if (!/^[0-9a-f]{64}$/i.test(received))
+    return res.status(401).json({ error: "signature invalide" });
+  const expectedBuf = Buffer.from(expected, "hex");
+  const receivedBuf = Buffer.from(received, "hex");
+  if (!crypto.timingSafeEqual(expectedBuf, receivedBuf))
+    return res.status(401).json({ error: "signature invalide" });
+
+  let event;
+  try { event = JSON.parse(raw); } catch { return res.status(400).json({ error: "JSON invalide" }); }
+
+  const b2bId     = event?.invoice_id || event?.id || event?.data?.id;
+  const b2bStatus = event?.status || event?.data?.status || event?.type;
+  if (!b2bId) return res.status(400).json({ error: "invoice_id manquant dans l'event" });
+
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey)
+    return res.status(500).json({ error: "Supabase non configuré" });
+
+  const admin = createClient(supabaseUrl, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  const patch = {
+    b2brouter_status:     String(b2bStatus || "").slice(0, 60),
+    b2brouter_last_event: new Date().toISOString(),
+  };
+  const mapped = mapStatus(b2bStatus);
+  if (mapped) patch.statut = mapped;
+
+  const { error } = await admin
+    .from("invoices")
+    .update(patch)
+    .eq("b2brouter_invoice_id", b2bId);
+
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json({ ok: true });
+}
+
+// ─── Actions authentifiées (proxy B2Brouter) ─────────────────────────
+async function handleAction(req, res, raw) {
   cors(req, res, { methods: "POST, OPTIONS" });
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -65,14 +139,16 @@ export default async function handler(req, res) {
   const { data: { user }, error: authErr } = await admin.auth.getUser(token);
   if (authErr || !user) return res.status(401).json({ error: "Token invalide" });
 
-  const { action, payload = {} } = req.body || {};
+  let body = {};
+  if (raw && raw.length) {
+    try { body = JSON.parse(raw); } catch { return res.status(400).json({ error: "JSON invalide" }); }
+  }
+  const { action, payload = {} } = body;
   if (!action) return res.status(400).json({ error: "action requise" });
 
   try {
     switch (action) {
-      // ─── Création / récupération du compte B2Brouter de l'artisan ───
       case "ensure_account": {
-        // 1. Déjà existant en DB ?
         const { data: existing } = await admin
           .from("b2b_accounts")
           .select("*")
@@ -80,7 +156,6 @@ export default async function handler(req, res) {
           .maybeSingle();
         if (existing) return res.status(200).json({ account: existing, created: false });
 
-        // 2. Crée le compte côté B2Brouter
         const { siren, name, email, address, city, postal_code } = payload;
         if (!siren || !name) return res.status(400).json({ error: "siren et name requis" });
 
@@ -94,7 +169,6 @@ export default async function handler(req, res) {
         const accountId = created?.id || created?.account_id || created?.uuid;
         if (!accountId) throw new Error("Réponse B2Brouter sans id de compte");
 
-        // 3. Stocke en DB
         const { data: row, error: insertErr } = await admin
           .from("b2b_accounts")
           .insert({
@@ -109,12 +183,10 @@ export default async function handler(req, res) {
         return res.status(200).json({ account: row, created: true });
       }
 
-      // ─── Envoi d'une facture à B2Brouter ───
       case "send_invoice": {
         const { invoice_id } = payload;
         if (!invoice_id) return res.status(400).json({ error: "invoice_id requis" });
 
-        // Compte artisan
         const { data: account } = await admin
           .from("b2b_accounts")
           .select("b2brouter_account_id")
@@ -122,7 +194,6 @@ export default async function handler(req, res) {
           .maybeSingle();
         if (!account) return res.status(400).json({ error: "Compte B2Brouter non initialisé" });
 
-        // Charge la facture + lignes + client
         const { data: inv, error: invErr } = await admin
           .from("invoices")
           .select("*")
@@ -142,12 +213,10 @@ export default async function handler(req, res) {
           ? await admin.from("clients").select("*").eq("id", inv.client_id).maybeSingle()
           : { data: null };
 
-        // Construit le payload B2Brouter
         const b2bPayload = buildInvoicePayload({ inv, lignes, client, account });
         const response   = await b2b("POST", "/invoices", b2bPayload);
         const b2bId      = response?.id || response?.invoice_id || response?.uuid;
 
-        // Verrouille et met à jour la facture
         await admin.from("invoices")
           .update({
             b2brouter_invoice_id: b2bId,
@@ -161,7 +230,6 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, b2brouter_id: b2bId, response });
       }
 
-      // ─── Statut d'une facture ───
       case "get_invoice_status": {
         const { b2brouter_id } = payload;
         if (!b2brouter_id) return res.status(400).json({ error: "b2brouter_id requis" });
@@ -169,7 +237,6 @@ export default async function handler(req, res) {
         return res.status(200).json({ data });
       }
 
-      // ─── Factures reçues (fournisseurs de l'artisan) ───
       case "list_received": {
         const { data: account } = await admin
           .from("b2b_accounts")
@@ -190,6 +257,31 @@ export default async function handler(req, res) {
       detail: err.detail || null,
     });
   }
+}
+
+function isWebhookRequest(req) {
+  // Le webhook arrive via la rewrite Vercel `/api/b2brouter-webhook` → `/api/b2brouter?route=webhook`,
+  // ou directement avec un header de signature B2Brouter.
+  if (req.url) {
+    const idx = req.url.indexOf("?");
+    if (idx >= 0) {
+      const params = new URLSearchParams(req.url.slice(idx + 1));
+      if (params.get("route") === "webhook") return true;
+    }
+  }
+  return !!(req.headers["x-b2b-signature"] || req.headers["x-b2brouter-signature"]);
+}
+
+export default async function handler(req, res) {
+  if (isWebhookRequest(req)) {
+    if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+    const raw = await readRawBody(req);
+    return handleWebhook(req, res, raw);
+  }
+
+  if (req.method === "OPTIONS") return handleAction(req, res, "");
+  const raw = await readRawBody(req);
+  return handleAction(req, res, raw);
 }
 
 function buildInvoicePayload({ inv, lignes, client, account }) {

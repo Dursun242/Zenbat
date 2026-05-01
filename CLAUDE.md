@@ -9,20 +9,28 @@ Stack : React + Vite (frontend) · Vercel Serverless Functions (API) · Supabase
 
 ### Vercel : limite 12 fonctions serverless
 Le plan Hobby de Vercel autorise **maximum 12 fichiers** dans `/api/`.
-Fichiers actuels (12, quota atteint — `_cors.js` est un helper non déployé) :
+Fichiers actuels (10/12 — `_cors.js` est un helper non déployé, `*.test.js` ignorés, `fonts/` est un dossier d'assets) :
 ```
-admin-delete-user.js   admin-ia-data.js       admin-stats.js   admin-user-detail.js
-b2brouter.js           b2brouter-webhook.js   claude.js        delete-my-account.js
-facturx.js             my-data-export.js      newsletter.js    odoo-sign.js
+account.js             admin-delete-user.js   admin-stats.js     admin-user-detail.js
+b2brouter.js           claude.js              facturx.js         newsletter.js
+odoo-sign.js           stripe.js
 ```
 → Ne jamais créer un nouveau fichier `/api/` sans en supprimer un autre ou fusionner des endpoints.
+
+**Convention de fusion** : quand on doit fusionner des endpoints, on regroupe par domaine (Stripe, B2Brouter…) dans un seul fichier qui route en interne :
+- soit par méthode HTTP (`account.js` : GET = export, POST = suppression)
+- soit par paramètre de requête (`admin-stats.js` : `?type=conversations|logs|...`)
+- soit par champ `action` dans le body (`b2brouter.js`, `stripe.js`)
+- soit par présence d'un header de signature (`stripe.js` détecte le webhook via `stripe-signature`, `b2brouter.js` via `x-b2b-signature`)
+
+Les anciennes URL externes (Stripe Dashboard, B2Brouter webhook) sont préservées via `vercel.json` rewrites.
 
 ### Migrations Supabase : application manuelle
 Les fichiers dans `/supabase/migrations/` ne s'appliquent **pas automatiquement**.
 L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - Prévenir l'utilisateur à chaque nouvelle migration créée.
-- Dernière migration appliquée : `0026_ia_feedback.sql`
-- Prochaine migration : préfixer avec `0027_`.
+- Dernière migration appliquée : `0029_profile_signup_email.sql`
+- Prochaine migration : préfixer avec `0030_`.
 
 ### position:fixed et animations CSS transform
 Tout composant React qui contient des enfants `position:fixed` (modales, drawers, toasts)
@@ -77,17 +85,18 @@ Les endpoints admin vérifient en plus que `caller.email === ADMIN_EMAIL`.
 
 | Fichier | Rôle |
 |---------|------|
-| `claude.js` | Proxy Claude API avec timeout 28s + AbortController |
-| `admin-stats.js` | Stats globales + liste utilisateurs |
-| `admin-user-detail.js` | Données complètes d'un utilisateur (profil, devis, factures, clients, IA) |
+| `account.js` | RGPD libre-service — `GET` = export portabilité, `POST` = suppression compte |
 | `admin-delete-user.js` | Suppression compte par l'admin |
-| `admin-ia-data.js` | Logs IA (conversations, erreurs, négatifs) — paramètre `?type=` |
+| `admin-stats.js` | Stats globales + logs IA (conversations, erreurs, négatifs, feedback, newsletter, cohérence) — paramètre `?type=` |
+| `admin-user-detail.js` | Données complètes d'un utilisateur (profil, devis, factures, clients, IA) |
+| `b2brouter.js` | Proxy B2Brouter eDocExchange + webhook entrant (détection par header `x-b2b-signature`) |
+| `claude.js` | Proxy Claude API avec timeout 28s + AbortController |
 | `facturx.js` | Génération PDF Factur-X (XML CII embarqué) |
-| `delete-my-account.js` | Suppression compte en libre-service (RGPD) |
-| `my-data-export.js` | Export RGPD (portabilité des données) |
-| `b2brouter.js` | Proxy B2Brouter eDocExchange (facture électronique) |
-| `b2brouter-webhook.js` | Webhook B2Brouter → mise à jour statuts factures |
+| `newsletter.js` | Inscription newsletter |
 | `odoo-sign.js` | Proxy Odoo Sign (signature électronique) |
+| `stripe.js` | Stripe checkout/portal/info (POST authentifié) + webhook (détection par header `stripe-signature`) |
+
+**Notifications Telegram** : déléguées à une Supabase Edge Function `notify-telegram` (pas un endpoint Vercel — n'occupe pas de slot). Les endpoints Vercel l'appellent en fire-and-forget pour les événements importants (paiement réussi, suppression d'abonnement, etc.).
 
 ### Base de données (Supabase)
 Tables principales : `profiles`, `clients`, `devis`, `lignes_devis`, `invoices`, `lignes_invoices`
@@ -111,6 +120,8 @@ RLS activé sur toutes les tables — les endpoints admin contournent via `SUPAB
 | `B2B_API_KEY` | Clé B2Brouter |
 | `B2B_API_URL` | URL B2Brouter (défaut: staging) |
 | `B2B_WEBHOOK_SECRET` | Secret HMAC webhook B2Brouter |
+| `STRIPE_SECRET_KEY` | Clé secrète Stripe (checkout / portal / abonnements) |
+| `STRIPE_WEBHOOK_SECRET` | Secret de signature webhook Stripe |
 | `ODOO_URL` / `ODOO_DB` / `ODOO_USERNAME` / `ODOO_API_KEY` | Odoo Sign |
 
 ---
