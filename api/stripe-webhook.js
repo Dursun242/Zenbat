@@ -19,6 +19,22 @@ async function getRawBody(req) {
   })
 }
 
+// Notification Telegram fire-and-forget. Auth via service_role key.
+async function notifyTelegram(kind, payload) {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return
+  try {
+    await fetch(`${url}/functions/v1/notify-telegram`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ kind, payload }),
+    })
+  } catch (err) {
+    console.error('[stripe-webhook] notifyTelegram failed:', err.message)
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
@@ -75,6 +91,12 @@ export default async function handler(req, res) {
     }
 
     console.log(`[stripe-webhook] checkout.completed → user ${profile.id} plan=pro (${plan})`)
+
+    await notifyTelegram('payment_success', {
+      email:  session.customer_details?.email || session.customer_email || null,
+      plan,
+      amount: typeof session.amount_total === 'number' ? session.amount_total / 100 : null,
+    })
   }
 
   if (event.type === 'customer.subscription.deleted') {
@@ -93,6 +115,9 @@ export default async function handler(req, res) {
         stripe_subscription_id: null,
       }).eq('id', profile.id)
       console.log(`[stripe-webhook] subscription.deleted → user ${profile.id} plan=free`)
+
+      const { data: { user } = {} } = await admin.auth.admin.getUserById(profile.id)
+      await notifyTelegram('subscription_canceled', { email: user?.email || null })
     }
   }
 
