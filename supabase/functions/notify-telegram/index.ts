@@ -83,26 +83,39 @@ function formatEvent(kind: EventKind, payload: Record<string, unknown>): string 
       const nd = (p.new_data as Record<string, unknown>) ?? {};
       const od = (p.old_data as Record<string, unknown>) ?? {};
 
+      // Calcule un TTC approximatif pour devis (montant_ht stocké, pas le TTC).
+      // Pour invoices, montant_ttc est stocké directement (cf 0005).
+      const devisTtc = (() => {
+        const ht = Number(nd.montant_ht ?? 0);
+        const tx = Number(nd.tva_rate ?? 20);
+        if (!Number.isFinite(ht) || ht <= 0) return 0;
+        return ht * (1 + tx / 100);
+      })();
+      const invoiceTtc = Number(nd.montant_ttc ?? 0);
+
       if (t === "devis" && action === "insert") {
         return `🆕 Nouveau devis <b>${escapeHtml(nd.numero)}</b>` +
-          (nd.total_ttc ? ` — ${fmtAmount(nd.total_ttc)}` : "");
+          (devisTtc > 0 ? ` — ${fmtAmount(devisTtc)}` : "");
       }
       if (t === "devis" && action === "update" && nd.statut !== od.statut) {
         return `📄 Devis <b>${escapeHtml(nd.numero)}</b> : ` +
-          `${escapeHtml(od.statut)} → <b>${escapeHtml(nd.statut)}</b>`;
+          `${escapeHtml(od.statut)} → <b>${escapeHtml(nd.statut)}</b>` +
+          (devisTtc > 0 ? ` (${fmtAmount(devisTtc)})` : "");
       }
       if (t === "invoices" && action === "insert") {
         return `🧾 Nouvelle facture <b>${escapeHtml(nd.numero)}</b>` +
-          (nd.total_ttc ? ` — ${fmtAmount(nd.total_ttc)}` : "");
+          (invoiceTtc > 0 ? ` — ${fmtAmount(invoiceTtc)}` : "");
       }
       if (t === "invoices" && action === "update" && nd.statut !== od.statut) {
         return `🧾 Facture <b>${escapeHtml(nd.numero)}</b> : ` +
-          `${escapeHtml(od.statut)} → <b>${escapeHtml(nd.statut)}</b>`;
+          `${escapeHtml(od.statut)} → <b>${escapeHtml(nd.statut)}</b>` +
+          (invoiceTtc > 0 ? ` (${fmtAmount(invoiceTtc)})` : "");
       }
-      // Inscription via trigger sur profiles (cf migration 0028)
+      // Inscription via trigger sur profiles (cf migrations 0028 + 0029)
       if (t === "profiles" && action === "insert") {
-        return `🆕 <b>Nouvelle inscription</b>\n` +
-          escapeHtml(clip(nd.email ?? nd.id, 80));
+        const who = nd.email ?? nd.full_name ?? nd.id;
+        const company = nd.company_name ? `\nEntreprise : ${escapeHtml(clip(nd.company_name, 60))}` : "";
+        return `🆕 <b>Nouvelle inscription</b>\n${escapeHtml(clip(who, 80))}${company}`;
       }
       return "";
     }
