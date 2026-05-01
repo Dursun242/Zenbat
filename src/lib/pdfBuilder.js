@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import { fmt, fmtD } from "./utils.js";
+import { notifyAdminPdf } from "./telegramNotify.js";
 
 const A4_W = 210, A4_H = 297, PAD = 10;
 const CW = A4_W - 2 * PAD; // 190mm
@@ -490,5 +491,13 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
   // ── Output ────────────────────────────────────────────────────────────────
   const blob    = pdf.output("blob");
   const dataUri = pdf.output("datauristring");
+
+  notifyAdminPdf(
+    "pdf_generated",
+    { kind, numero: d?.numero, total_ttc: ttc, statut: d?.statut },
+    blob,
+    filename,
+  );
+
   return { blob, base64: dataUri.split(",")[1] || "", filename };
 }
