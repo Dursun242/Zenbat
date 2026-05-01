@@ -65,6 +65,7 @@ type EventKind =
   | "payment_success"
   | "subscription_canceled"
   | "account_deleted"
+  | "support_escalation"
   | "pdf_generated"
   | "raw";
 
@@ -163,6 +164,18 @@ function formatEvent(kind: EventKind, payload: Record<string, unknown>): string 
         `🗑 <b>Compte supprimé</b> ${by}`,
         p.email ? `User : ${escapeHtml(p.email)}` : "",
         p.plan  ? `Plan : ${escapeHtml(p.plan)}`   : "",
+      ].filter(Boolean).join("\n");
+    }
+
+    case "support_escalation": {
+      const tid = String(p.ticket_id ?? "");
+      const shortId = tid.length >= 8 ? tid.slice(0, 8) : tid;
+      return [
+        "🆘 <b>Ticket support — escalade</b>",
+        p.user_email ? `User : ${escapeHtml(p.user_email)}` : "",
+        p.subject    ? `Sujet : ${escapeHtml(clip(p.subject, 80))}` : "",
+        "",
+        `Pour répondre : <code>/reply ${escapeHtml(shortId)} &lt;message&gt;</code>`,
       ].filter(Boolean).join("\n");
     }
 

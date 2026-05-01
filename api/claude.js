@@ -72,7 +72,29 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "ANTHROPIC_KEY non configurée côté serveur" });
 
   // ── Validation des paramètres ────────────────────────────────────────────────
-  const { model, max_tokens, messages, system, stream, temperature, top_p } = req.body || {};
+  const { model, max_tokens, messages, system, stream, temperature, top_p, support_ticket_id } = req.body || {};
+
+  // Si support_ticket_id est fourni, on est dans le flux SupportChat :
+  // Claude joue le rôle de support et sa réponse sera persistée dans support_messages.
+  // On valide ici l'appartenance du ticket à l'utilisateur (RLS bypass via service_role).
+  let supportTicket = null;
+  if (support_ticket_id) {
+    if (typeof support_ticket_id !== "string")
+      return res.status(400).json({ error: "support_ticket_id invalide" });
+    const { data, error: ticketErr } = await admin.from("support_tickets")
+      .select("id, status")
+      .eq("id", support_ticket_id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (ticketErr || !data)
+      return res.status(403).json({ error: "Ticket support introuvable ou non autorisé" });
+    if (data.status === "resolved")
+      return res.status(400).json({ error: "Ticket clos — créez-en un nouveau" });
+    supportTicket = data;
+    // Force le mode non-streamé pour pouvoir capturer la réponse complète et l'insérer en DB.
+    if (stream === true)
+      return res.status(400).json({ error: "Le streaming n'est pas supporté pour le support" });
+  }
 
   if (!model || typeof model !== "string" || !ALLOWED_MODELS.includes(model))
     return res.status(400).json({ error: "Paramètre 'model' manquant ou non autorisé" });
@@ -156,6 +178,22 @@ export default async function handler(req, res) {
 
     // ── Non-streaming ────────────────────────────────────────────────────────
     const upstreamData = await upstream.json();
+
+    // Persistance support : si on est dans un ticket, on insère la réponse Claude
+    // dans support_messages (role='claude'). L'utilisateur a déjà inséré son propre
+    // message côté client via RLS avant l'appel.
+    if (supportTicket && upstream.ok) {
+      const claudeText = upstreamData?.content?.[0]?.text || "";
+      if (claudeText.trim()) {
+        const { error: insertErr } = await admin.from("support_messages").insert({
+          ticket_id: supportTicket.id,
+          role:      "claude",
+          content:   claudeText.slice(0, 8000),
+        });
+        if (insertErr) console.error("[claude/support] insert claude msg:", insertErr.message);
+      }
+    }
+
     return res.status(upstream.status).json(upstreamData);
 
   } catch (err) {
