@@ -180,7 +180,9 @@ export default function AdminPanel({ onBack }) {
       return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.fullName || "").toLowerCase().includes(q)
     })
     .sort((a, b) => {
-      if (sortBy === "joined" || sortBy === "lastSignIn") return new Date(b[sortBy] || 0) - new Date(a[sortBy] || 0)
+      if (["joined", "lastSignIn", "lastDevis"].includes(sortBy)) return new Date(b[sortBy] || 0) - new Date(a[sortBy] || 0)
+      if (sortBy === "name") return (a.fullName || a.name || "").localeCompare(b.fullName || b.name || "", "fr")
+      if (sortBy === "accepte") return (b.byStatut?.accepte || 0) - (a.byStatut?.accepte || 0)
       return (b[sortBy] || 0) - (a[sortBy] || 0)
     })
 
