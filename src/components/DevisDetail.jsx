@@ -16,7 +16,8 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
   const [acompteModal,   setAcompteModal]   = useState(false);
   const [acomptePct,     setAcomptePct]     = useState(30);
   const [acompteLoading, setAcompteLoading] = useState(false);
-  const [clientPicker,   setClientPicker]   = useState(false);
+  const [clientPicker,      setClientPicker]      = useState(false);
+  const [pickerRequireEmail, setPickerRequireEmail] = useState(false);
   const [statutBusy,    setStatutBusy]    = useState(false);
 
   // Ouvre automatiquement le PDF quand on arrive depuis l'Agent IA après save
@@ -49,7 +50,8 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
   const sendOdoo = async () => {
     if (sending) return;
     if (!signerEmail) {
-      alert("Le contact de ce devis n'a pas d'email — impossible d'envoyer la signature.");
+      setPickerRequireEmail(true);
+      setClientPicker(true);
       return;
     }
     setSending(true); setLog([]); setShowLog(true);
@@ -194,7 +196,8 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
           clients={clients}
           current={cl}
           onSelect={c => onChange({ ...d, client_id: c?.id ?? null })}
-          onClose={() => setClientPicker(false)}/>
+          onClose={() => { setClientPicker(false); setPickerRequireEmail(false); }}
+          requireEmail={pickerRequireEmail}/>
       )}
       <div className="detail-shell" style={{ minHeight: "100%", background: "#FAF7F2", display: "flex", flexDirection: "column" }}>
         <div className="detail-row" style={{ flex: 1, display: "flex" }}>
@@ -283,10 +286,16 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
           )}
 
           {/* Client */}
-          <button onClick={() => !isRemplace && setClientPicker(true)} disabled={isRemplace}
+          {["brouillon","envoye"].includes(d.statut) && !isRemplace && !signerEmail && (
+            <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 8, padding: "6px 10px", marginBottom: 6, fontSize: 11, color: "#c2410c", display: "flex", alignItems: "center", gap: 6 }}>
+              <span>⚠️</span>
+              <span>Pour envoyer en signature électronique, ce client doit avoir une adresse email.</span>
+            </div>
+          )}
+          <button onClick={() => { if (!isRemplace) { setPickerRequireEmail(false); setClientPicker(true); } }} disabled={isRemplace}
             style={{ width: "100%", display: "flex", alignItems: "center", gap: 8,
               background: isRemplace ? "#F0EBE3" : "#FAF7F2",
-              border: "1px solid #E8E2D8", borderRadius: 10, padding: "7px 10px", marginBottom: 8,
+              border: `1px solid ${["brouillon","envoye"].includes(d.statut) && !isRemplace && !signerEmail ? "#fed7aa" : "#E8E2D8"}`, borderRadius: 10, padding: "7px 10px", marginBottom: 8,
               cursor: isRemplace ? "not-allowed" : "pointer", textAlign: "left" }}>
             <span style={{ fontSize: 16 }}>👤</span>
             <div style={{ flex: 1, minWidth: 0 }}>
