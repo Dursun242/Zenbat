@@ -287,15 +287,19 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
 
           {/* Client */}
           {["brouillon","envoye"].includes(d.statut) && !isRemplace && !signerEmail && (
-            <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 8, padding: "6px 10px", marginBottom: 6, fontSize: 11, color: "#c2410c", display: "flex", alignItems: "center", gap: 6 }}>
-              <span>⚠️</span>
-              <span>Pour envoyer en signature électronique, ce client doit avoir une adresse email.</span>
+            <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10,
+              padding: "10px 12px", marginBottom: 8, display: "flex", alignItems: "flex-start", gap: 8 }}>
+              <span style={{ fontSize: 16, lineHeight: "1.3", flexShrink: 0 }}>✉️</span>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#92400e", marginBottom: 2 }}>Email requis pour la signature</div>
+                <div style={{ fontSize: 11, color: "#b45309", lineHeight: "1.4" }}>Sélectionnez un client avec une adresse email pour envoyer ce devis en signature électronique.</div>
+              </div>
             </div>
           )}
           <button onClick={() => { if (!isRemplace) { setPickerRequireEmail(false); setClientPicker(true); } }} disabled={isRemplace}
             style={{ width: "100%", display: "flex", alignItems: "center", gap: 8,
               background: isRemplace ? "#F0EBE3" : "#FAF7F2",
-              border: `1px solid ${["brouillon","envoye"].includes(d.statut) && !isRemplace && !signerEmail ? "#fed7aa" : "#E8E2D8"}`, borderRadius: 10, padding: "7px 10px", marginBottom: 8,
+              border: "1px solid #E8E2D8", borderRadius: 10, padding: "7px 10px", marginBottom: 8,
               cursor: isRemplace ? "not-allowed" : "pointer", textAlign: "left" }}>
             <span style={{ fontSize: 16 }}>👤</span>
             <div style={{ flex: 1, minWidth: 0 }}>

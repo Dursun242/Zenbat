@@ -43,9 +43,12 @@ export default function ClientPickerModal({ clients = [], current, onSelect, onC
         {/* Liste */}
         <div style={{ overflowY: "auto", flex: 1 }}>
           {requireEmail && (
-            <div style={{ padding: "8px 18px", background: "#fff7ed", borderBottom: "1px solid #fed7aa", fontSize: 12, color: "#c2410c", display: "flex", alignItems: "center", gap: 6 }}>
-              <span>⚠️</span>
-              <span>La signature électronique requiert un client avec une adresse email.</span>
+            <div style={{ margin: "10px 14px 4px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10, padding: "10px 12px", display: "flex", alignItems: "flex-start", gap: 8 }}>
+              <span style={{ fontSize: 15, lineHeight: "1.3", flexShrink: 0 }}>✉️</span>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#92400e", marginBottom: 2 }}>Email requis</div>
+                <div style={{ fontSize: 11, color: "#b45309", lineHeight: "1.4" }}>Choisissez un client avec une adresse email pour la signature électronique.</div>
+              </div>
             </div>
           )}
           {/* Option "sans client" */}
@@ -79,7 +82,7 @@ export default function ClientPickerModal({ clients = [], current, onSelect, onC
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1612", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</div>
                   {sub && <div style={{ fontSize: 11, color: "#9A8E82", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</div>}
-                  {noEmail && <div style={{ fontSize: 11, color: "#c2410c", fontWeight: 600 }}>Aucun email — signature impossible</div>}
+                  {noEmail && <span style={{ display: "inline-block", fontSize: 10, fontWeight: 600, color: "#c2410c", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 20, padding: "1px 7px", marginTop: 3 }}>sans email</span>}
                 </div>
                 {isCurrent && <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 700, flexShrink: 0 }}>✓ actuel</span>}
               </button>
