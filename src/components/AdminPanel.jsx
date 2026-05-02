@@ -37,6 +37,7 @@ export default function AdminPanel({ onBack }) {
   const [userSearch,   setUserSearch]   = useState("")
   const [sortBy,       setSortBy]       = useState("joined")
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteMode,   setDeleteMode]   = useState("delete") // 'delete' | 'reset_data'
   const [confirmInput, setConfirmInput] = useState("")
   const [deleting,     setDeleting]     = useState(false)
   const [deleteError,  setDeleteError]  = useState(null)
@@ -120,7 +121,8 @@ export default function AdminPanel({ onBack }) {
     } catch {} finally { setFeedbackLoading(false) }
   }
 
-  const openDelete = (u) => { setDeleteTarget(u); setConfirmInput(""); setDeleteError(null) }
+  const openDelete = (u) => { setDeleteMode("delete"); setDeleteTarget(u); setConfirmInput(""); setDeleteError(null) }
+  const openReset  = (u) => { setDeleteMode("reset_data"); setDeleteTarget(u); setConfirmInput(""); setDeleteError(null) }
 
   const openDetail = async (u) => {
     setDetailUser(u); setDetailData(null); setDetailError(null)
@@ -149,13 +151,21 @@ export default function AdminPanel({ onBack }) {
       const res  = await fetch("/api/admin-delete-user", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ userId: deleteTarget.id, confirmEmail: confirmInput }),
+        body: JSON.stringify({ userId: deleteTarget.id, confirmEmail: confirmInput, mode: deleteMode }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || "Erreur serveur")
-      setStats(s => s ? { ...s, usersDetail: s.usersDetail.filter(u => u.id !== deleteTarget.id) } : s)
+      if (deleteMode === "delete") {
+        setStats(s => s ? { ...s, usersDetail: s.usersDetail.filter(u => u.id !== deleteTarget.id) } : s)
+      }
       setDeleteTarget(null); setConfirmInput("")
       load()
+      // Si on était en train de regarder le détail de ce user, on le rafraîchit
+      // pour voir 0 devis / 0 factures après reset.
+      if (detailUser && detailUser.id === deleteTarget.id) {
+        if (deleteMode === "delete") closeDetail()
+        else openDetail(detailUser)
+      }
     } catch (e) {
       setDeleteError(e.message)
     } finally {
@@ -237,13 +247,15 @@ export default function AdminPanel({ onBack }) {
           error={detailError}  tab={detailTab}         onTabChange={setDetailTab}
           onClose={closeDetail}
           onRequestDelete={() => { closeDetail(); openDelete(detailUser); }}
+          onRequestReset={() => { openReset(detailUser); }}
           currentUserId={currentUser?.id}
         />
       )}
 
       {deleteTarget && (
         <DeleteUserModal
-          target={deleteTarget}  confirmInput={confirmInput}  setConfirmInput={setConfirmInput}
+          target={deleteTarget}  mode={deleteMode}
+          confirmInput={confirmInput}  setConfirmInput={setConfirmInput}
           deleting={deleting}    error={deleteError}          onClose={closeDelete}
           onConfirm={confirmDelete}
         />
