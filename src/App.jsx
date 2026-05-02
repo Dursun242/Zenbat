@@ -50,6 +50,7 @@ export default function App() {
   const [plan,      setPlan]      = useState("free");   // "free" | "pro"
   const [billingType, setBillingType] = useState(null); // "monthly" | "biannual" — défini à l'abonnement
   const [showPwa,setShowPwa]= useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
   // Étape intermédiaire payée déclenchée depuis la landing (« S'abonner directement »).
   // Reste true tant qu'on attend l'URL Stripe Checkout — bloque l'affichage des autres écrans.
   const [checkoutPending, setCheckoutPending] = useState(() => {
@@ -246,6 +247,7 @@ export default function App() {
             onOpenProfile={() => setScreen("onboarding")}
             onOpenSubscription={() => setScreen("subscription")}
             onOpenPaywall={() => setScreen("paywall")}
+            onOpenSupport={tab !== "agent" && tab !== "admin" ? () => setSupportOpen(true) : null}
             onSignOut={handleSignOut}
           />
         </div>
@@ -362,9 +364,7 @@ export default function App() {
       </div>
 
       <Toast toast={toast} onDismiss={dismissToast}/>
-      {tab !== "agent" && tab !== "admin" && (
-        <SupportChat accent={brand?.color || "#22c55e"}/>
-      )}
+      <SupportChat accent={brand?.color || "#22c55e"} open={supportOpen} onClose={() => setSupportOpen(false)}/>
       <BottomNav items={NAV} activeNav={activeNav} onSelect={setTab} plan={effectivePlan} daysLeft={daysLeft}/>
     </div>
   );

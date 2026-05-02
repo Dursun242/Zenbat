@@ -17,6 +17,7 @@ export default function HeaderMenu({
   onOpenProfile,
   onOpenSubscription,
   onOpenPaywall,
+  onOpenSupport,
   onSignOut,
 }) {
   const [open, setOpen] = useState(false);
@@ -125,6 +126,15 @@ export default function HeaderMenu({
               <span style={{ color: "#6B6358", display: "inline-flex" }}>{I.paint}</span>
               Mon profil
             </button>
+
+            {onOpenSupport && (
+              <button role="menuitem" onClick={() => { close(); onOpenSupport(); }} style={itemBase}
+                onMouseEnter={e => e.currentTarget.style.background = "#FAF7F2"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                <span style={{ color: "#22c55e", display: "inline-flex" }}>{I.chat}</span>
+                Support
+              </button>
+            )}
 
             {isAdmin && (
               <button role="menuitem" onClick={() => { close(); onOpenAdmin(); }} style={itemBase}

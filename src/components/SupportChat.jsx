@@ -21,9 +21,8 @@ import { SUPPORT_SYSTEM_PROMPT } from "../lib/supportPrompts.js";
 
 const MAX_INPUT_CHARS = 2000;
 
-export default function SupportChat({ accent = "#22c55e" }) {
+export default function SupportChat({ accent = "#22c55e", open, onClose }) {
   const { user } = useAuth();
-  const [open,     setOpen]     = useState(false);
   const [ticket,   setTicket]   = useState(null);
   const [messages, setMessages] = useState([]);
   const [input,    setInput]    = useState("");
@@ -195,41 +194,20 @@ export default function SupportChat({ accent = "#22c55e" }) {
     }
   }, [ticket, user?.email]);
 
-  if (!user) return null;
+  if (!user || !open) return null;
 
-  // ── FAB (toujours rendu) ────────────────────────────────────────────
   return (
-    <>
-      {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          aria-label="Ouvrir le chat de support"
-          style={{
-            position: "fixed", right: 16, bottom: 88, zIndex: 50,
-            width: 52, height: 52, borderRadius: "50%",
-            background: accent, color: "white", border: "none",
-            boxShadow: "0 6px 20px rgba(0,0,0,.18)",
-            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-          }}
-        >
-          <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/>
-          </svg>
-        </button>
-      )}
-
-      {open && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Support Zenbat"
-          style={{
-            position: "fixed", inset: 0, zIndex: 60,
-            background: "rgba(0,0,0,.4)",
-            display: "flex", alignItems: "flex-end", justifyContent: "center",
-          }}
-          onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
-        >
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Support Zenbat"
+      style={{
+        position: "fixed", inset: 0, zIndex: 60,
+        background: "rgba(0,0,0,.4)",
+        display: "flex", alignItems: "flex-end", justifyContent: "center",
+      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
+    >
           <div
             style={{
               width: "100%", maxWidth: 480, height: "85%", maxHeight: 720,
@@ -253,7 +231,7 @@ export default function SupportChat({ accent = "#22c55e" }) {
                 </div>
               </div>
               <button
-                onClick={() => setOpen(false)}
+                onClick={() => onClose?.()}
                 aria-label="Fermer"
                 style={{
                   background: "rgba(255,255,255,.18)", border: "none", color: "white",
@@ -358,10 +336,8 @@ export default function SupportChat({ accent = "#22c55e" }) {
                 Envoyer
               </button>
             </div>
-          </div>
-        </div>
-      )}
-    </>
+      </div>
+    </div>
   );
 }
 
