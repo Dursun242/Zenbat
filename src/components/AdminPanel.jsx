@@ -209,6 +209,12 @@ export default function AdminPanel({ onBack }) {
       {stats && (
         <div style={{ padding: 16 }}>
           <AdminKPIs stats={stats} />
+          <AdminConversations
+            iaConvs={iaConvs}      loading={convsLoading}
+            convSearch={convSearch} setConvSearch={setConvSearch}
+            openConvUser={openConvUser} setOpenConvUser={setOpenConvUser}
+            onRefresh={loadConvs}
+          />
           <AdminUsersTable
             users={filteredUsers}
             userSearch={userSearch}    setUserSearch={setUserSearch}
@@ -218,12 +224,6 @@ export default function AdminPanel({ onBack }) {
           />
           <AdminErrorLogs    iaLogs={iaLogs}  loading={logsLoading}  onRefresh={loadLogs} />
           <AdminNegativeLogs iaNegs={iaNegs}  loading={negsLoading}  negFilter={negFilter} setNegFilter={setNegFilter} onRefresh={loadNegs} />
-          <AdminConversations
-            iaConvs={iaConvs}      loading={convsLoading}
-            convSearch={convSearch} setConvSearch={setConvSearch}
-            openConvUser={openConvUser} setOpenConvUser={setOpenConvUser}
-            onRefresh={loadConvs}
-          />
           <AdminNewsletter
             subscribers={newsletter}  loading={newsletterLoading}
             onRefresh={loadNewsletter}
