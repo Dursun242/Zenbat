@@ -9,20 +9,29 @@ Stack : React + Vite (frontend) · Vercel Serverless Functions (API) · Supabase
 
 ### Vercel : limite 12 fonctions serverless
 Le plan Hobby de Vercel autorise **maximum 12 fichiers** dans `/api/`.
-Fichiers actuels (12, quota atteint — `_cors.js` est un helper non déployé) :
+Fichiers actuels (10/12 — `_cors.js` est un helper non déployé, `*.test.js` ignorés, `fonts/` est un dossier d'assets) :
 ```
-admin-delete-user.js   admin-ia-data.js       admin-stats.js   admin-user-detail.js
-b2brouter.js           b2brouter-webhook.js   claude.js        delete-my-account.js
-facturx.js             my-data-export.js      newsletter.js    odoo-sign.js
+account.js             admin-delete-user.js   admin-stats.js     admin-user-detail.js
+b2brouter.js           claude.js              facturx.js         newsletter.js
+odoo-sign.js           stripe.js
 ```
 → Ne jamais créer un nouveau fichier `/api/` sans en supprimer un autre ou fusionner des endpoints.
+
+**Convention de fusion** : quand on doit fusionner des endpoints, on regroupe par domaine (Stripe, B2Brouter…) dans un seul fichier qui route en interne :
+- soit par méthode HTTP (`account.js` : GET = export, POST = suppression)
+- soit par paramètre de requête (`admin-stats.js` : `?type=conversations|logs|...`)
+- soit par champ `action` dans le body (`b2brouter.js`, `stripe.js`)
+- soit par présence d'un header de signature (`stripe.js` détecte le webhook via `stripe-signature`, `b2brouter.js` via `x-b2b-signature`)
+
+Les anciennes URL externes (Stripe Dashboard, B2Brouter webhook) sont préservées via `vercel.json` rewrites.
 
 ### Migrations Supabase : application manuelle
 Les fichiers dans `/supabase/migrations/` ne s'appliquent **pas automatiquement**.
 L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - Prévenir l'utilisateur à chaque nouvelle migration créée.
-- Dernière migration appliquée : `0026_ia_feedback.sql`
-- Prochaine migration : préfixer avec `0027_`.
+- Dernière migration appliquée : `0029_profile_signup_email.sql`
+- Migration en attente d'application : `0030_support_tickets.sql` (créée, à coller dans le SQL Editor avant le déploiement du bot Telegram support).
+- Prochaine migration : préfixer avec `0031_`.
 
 ### position:fixed et animations CSS transform
 Tout composant React qui contient des enfants `position:fixed` (modales, drawers, toasts)
@@ -77,22 +86,44 @@ Les endpoints admin vérifient en plus que `caller.email === ADMIN_EMAIL`.
 
 | Fichier | Rôle |
 |---------|------|
-| `claude.js` | Proxy Claude API avec timeout 28s + AbortController |
-| `admin-stats.js` | Stats globales + liste utilisateurs |
-| `admin-user-detail.js` | Données complètes d'un utilisateur (profil, devis, factures, clients, IA) |
+| `account.js` | RGPD libre-service — `GET` = export portabilité, `POST` = suppression compte |
 | `admin-delete-user.js` | Suppression compte par l'admin |
-| `admin-ia-data.js` | Logs IA (conversations, erreurs, négatifs) — paramètre `?type=` |
+| `admin-stats.js` | Stats globales + logs IA (conversations, erreurs, négatifs, feedback, newsletter, cohérence) — paramètre `?type=` |
+| `admin-user-detail.js` | Données complètes d'un utilisateur (profil, devis, factures, clients, IA) |
+| `b2brouter.js` | Proxy B2Brouter eDocExchange + webhook entrant (détection par header `x-b2b-signature`) |
+| `claude.js` | Proxy Claude API avec timeout 28s + AbortController |
 | `facturx.js` | Génération PDF Factur-X (XML CII embarqué) |
-| `delete-my-account.js` | Suppression compte en libre-service (RGPD) |
-| `my-data-export.js` | Export RGPD (portabilité des données) |
-| `b2brouter.js` | Proxy B2Brouter eDocExchange (facture électronique) |
-| `b2brouter-webhook.js` | Webhook B2Brouter → mise à jour statuts factures |
+| `newsletter.js` | Inscription newsletter |
 | `odoo-sign.js` | Proxy Odoo Sign (signature électronique) |
+| `stripe.js` | Stripe checkout/portal/info (POST authentifié) + webhook (détection par header `stripe-signature`) |
+
+### Architecture Telegram
+
+Le bot Telegram est volontairement éclaté en **deux fonctions Edge** distinctes pour des raisons d'authentification :
+
+| Fonction | Sens | Auth | Rôle |
+|----------|------|------|------|
+| `supabase/functions/notify-telegram/` | sortant | `verify_jwt: true` | Reçoit des événements (DB webhooks, API Vercel, front) et les pousse en HTML formaté vers le chat admin (`TELEGRAM_CHAT_ID`). |
+| `supabase/functions/telegram-bot/`    | entrant | `verify_jwt: false` + `TELEGRAM_WEBHOOK_SECRET` (header `X-Telegram-Bot-Api-Secret-Token`) | Reçoit le webhook Telegram et exécute les commandes admin : `/stats`, `/user`, `/tickets`, `/reply`. Validation à deux étages (secret + chat_id whitelisté). |
+
+Pourquoi deux fonctions :
+- `notify-telegram` est appelée par des sources authentifiées Supabase (DB triggers, service_role keys) → JWT obligatoire pour la sécurité.
+- Le webhook Telegram entrant est public (Telegram ne sait pas envoyer de JWT Supabase) → on doit désactiver `verify_jwt` et valider à la place le secret token Telegram.
+- Mélanger les deux = devoir baisser `verify_jwt` partout, ce qui exposerait les notifications.
+
+Ces fonctions Edge n'occupent **pas** de slot Vercel (limite 12) — les Edge Functions Supabase sont gratuites et illimitées.
+
+Variables d'env Edge Functions (Supabase Dashboard → Project Settings → Edge Functions) :
+- `TELEGRAM_BOT_TOKEN` (token @BotFather)
+- `TELEGRAM_CHAT_ID` (chat_id admin via @userinfobot)
+- `TELEGRAM_WEBHOOK_SECRET` (à venir — secret aléatoire passé à `setWebhook`)
+- `TELEGRAM_ADMIN_CHAT_ID` (à venir — alias plus explicite si besoin de filtrer commandes admin)
 
 ### Base de données (Supabase)
 Tables principales : `profiles`, `clients`, `devis`, `lignes_devis`, `invoices`, `lignes_invoices`
-Tables IA : `ia_conversations`, `ia_error_logs`, `ia_negative_logs`
-Autres : `b2b_accounts`, `activity_log`, `cgu_acceptances`
+Tables IA : `ia_conversations`, `ia_error_logs`, `ia_negative_logs`, `ia_feedback`
+Tables support : `support_tickets`, `support_messages` (migration `0030`)
+Autres : `b2b_accounts`, `activity_log`, `cgu_acceptances`, `newsletter_subscribers`, `app_logs`
 
 RLS activé sur toutes les tables — les endpoints admin contournent via `SUPABASE_SERVICE_ROLE_KEY`.
 
@@ -111,6 +142,8 @@ RLS activé sur toutes les tables — les endpoints admin contournent via `SUPAB
 | `B2B_API_KEY` | Clé B2Brouter |
 | `B2B_API_URL` | URL B2Brouter (défaut: staging) |
 | `B2B_WEBHOOK_SECRET` | Secret HMAC webhook B2Brouter |
+| `STRIPE_SECRET_KEY` | Clé secrète Stripe (checkout / portal / abonnements) |
+| `STRIPE_WEBHOOK_SECRET` | Secret de signature webhook Stripe |
 | `ODOO_URL` / `ODOO_DB` / `ODOO_USERNAME` / `ODOO_API_KEY` | Odoo Sign |
 
 ---

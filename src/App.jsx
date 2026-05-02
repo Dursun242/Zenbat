@@ -26,6 +26,7 @@ import InvoicesList  from "./components/InvoicesList.jsx";
 import InvoiceDetail from "./components/InvoiceDetail.jsx";
 import AgentIA       from "./components/AgentIA.jsx";
 import AdminPanel    from "./components/AdminPanel.jsx";
+import SupportChat   from "./components/SupportChat.jsx";
 import Onboarding        from "./pages/Onboarding.jsx";
 import TradesQuickPicker from "./pages/TradesQuickPicker.jsx";
 import AuthScreen        from "./pages/AuthScreen.jsx";
@@ -370,6 +371,9 @@ export default function App() {
       </div>
 
       <Toast toast={toast} onDismiss={dismissToast}/>
+      {tab !== "agent" && tab !== "admin" && (
+        <SupportChat accent={brand?.color || "#22c55e"}/>
+      )}
       <BottomNav items={NAV} activeNav={activeNav} onSelect={setTab} plan={effectivePlan} daysLeft={daysLeft}/>
     </div>
   );

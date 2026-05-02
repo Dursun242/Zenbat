@@ -5,6 +5,22 @@
 import { createClient } from '@supabase/supabase-js'
 import { cors } from "./_cors.js"
 
+// Notification Telegram fire-and-forget. Auth via service_role key.
+async function notifyTelegram(kind, payload) {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return
+  try {
+    await fetch(`${url}/functions/v1/notify-telegram`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ kind, payload }),
+    })
+  } catch (err) {
+    console.error('[account] notifyTelegram failed:', err.message)
+  }
+}
+
 export default async function handler(req, res) {
   cors(req, res, { methods: "GET, POST, OPTIONS" })
   if (req.method === 'OPTIONS') return res.status(204).end()
@@ -122,6 +138,9 @@ export default async function handler(req, res) {
       console.warn('[account/delete] storage cleanup:', e?.message)
     }
 
+    // Récupère le plan avant suppression pour la notif
+    const { data: planRow } = await admin.from('profiles').select('plan').eq('id', user.id).maybeSingle()
+
     const { error: delErr } = await admin.auth.admin.deleteUser(user.id)
     if (delErr) {
       console.error('[account/delete] deleteUser failed:', delErr)
@@ -130,6 +149,12 @@ export default async function handler(req, res) {
         code:  delErr.code || delErr.status || null,
       })
     }
+
+    await notifyTelegram('account_deleted', {
+      email: user.email || null,
+      plan:  planRow?.plan || null,
+      by:    'self',
+    })
 
     return res.status(200).json({ ok: true, deleted_at: new Date().toISOString() })
   } catch (err) {

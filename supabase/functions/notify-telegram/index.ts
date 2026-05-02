@@ -1,15 +1,19 @@
-// Relais Telegram — point d'entrée unique pour toutes les notifications admin.
+// Relais Telegram **sortant** — point d'entrée pour toutes les notifications admin.
 // Reçoit un événement et le pousse à Telegram (sendMessage ou sendDocument).
 // Aucune persistance, aucun stockage : tout transite en mémoire.
 //
 // Sources qui appellent cette fonction :
 //   • DB Webhooks Supabase (profiles, activity_log, ia_error_logs, ia_negative_logs, app_logs)
 //   • Front Zenbat (helper src/lib/telegramNotify.js — envoi PDF)
-//   • Vercel API stripe-webhook.js (paiements)
+//   • Vercel API stripe.js (paiements, abonnements annulés)
 //
 // Auth : verify_jwt activé par défaut côté Supabase. Les DB Webhooks envoient
 // le service_role key dans Authorization, le front envoie le JWT user, et
 // les API server-to-server utilisent le service_role key.
+//
+// Pour le flux **entrant** (commandes admin / support relay), voir la fonction
+// dédiée `telegram-bot` (à créer) — séparée pour conserver `verify_jwt:true` ici
+// alors que le webhook Telegram entrant doit être public (auth via secret token).
 //
 // Variables d'env requises (Project Settings → Edge Functions secrets) :
 //   TELEGRAM_BOT_TOKEN — token du bot @BotFather
@@ -60,6 +64,8 @@ type EventKind =
   | "app_log_error"
   | "payment_success"
   | "subscription_canceled"
+  | "account_deleted"
+  | "support_escalation"
   | "pdf_generated"
   | "raw";
 
@@ -151,6 +157,27 @@ function formatEvent(kind: EventKind, payload: Record<string, unknown>): string 
         "⚠️ <b>Abonnement annulé</b>",
         p.email ? `User : ${escapeHtml(p.email)}` : "",
       ].filter(Boolean).join("\n");
+
+    case "account_deleted": {
+      const by = p.by === "admin" ? "par l'admin" : "(libre-service RGPD)";
+      return [
+        `🗑 <b>Compte supprimé</b> ${by}`,
+        p.email ? `User : ${escapeHtml(p.email)}` : "",
+        p.plan  ? `Plan : ${escapeHtml(p.plan)}`   : "",
+      ].filter(Boolean).join("\n");
+    }
+
+    case "support_escalation": {
+      const tid = String(p.ticket_id ?? "");
+      const shortId = tid.length >= 8 ? tid.slice(0, 8) : tid;
+      return [
+        "🆘 <b>Ticket support — escalade</b>",
+        p.user_email ? `User : ${escapeHtml(p.user_email)}` : "",
+        p.subject    ? `Sujet : ${escapeHtml(clip(p.subject, 80))}` : "",
+        "",
+        `Pour répondre : <code>/reply ${escapeHtml(shortId)} &lt;message&gt;</code>`,
+      ].filter(Boolean).join("\n");
+    }
 
     case "pdf_generated": {
       const k = p.kind === "facture" ? "Facture" : "Devis";

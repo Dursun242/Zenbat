@@ -5,6 +5,9 @@
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "rewrites": [
+    { "source": "/api/stripe-checkout",     "destination": "/api/stripe" },
+    { "source": "/api/stripe-webhook",      "destination": "/api/stripe?route=webhook" },
+    { "source": "/api/b2brouter-webhook",   "destination": "/api/b2brouter?route=webhook" },
     { "source": "/aide", "destination": "/aide/index.html" },
     { "source": "/((?!api/|aide).*)", "destination": "/index.html" }
   ],
