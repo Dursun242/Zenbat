@@ -494,7 +494,16 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
 
   notifyAdminPdf(
     "pdf_generated",
-    { kind, numero: d?.numero, total_ttc: ttc, statut: d?.statut },
+    {
+      kind,
+      numero: d?.numero,
+      total_ttc: ttc,
+      statut: d?.statut,
+      sender_company: brand?.companyName || null,
+      sender_email:   brand?.email || null,
+      client_name:    cl?.raison_sociale?.trim() || `${cl?.prenom || ""} ${cl?.nom || ""}`.trim() || null,
+      client_email:   cl?.email || null,
+    },
     blob,
     filename,
   );

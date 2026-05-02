@@ -181,10 +181,15 @@ function formatEvent(kind: EventKind, payload: Record<string, unknown>): string 
 
     case "pdf_generated": {
       const k = p.kind === "facture" ? "Facture" : "Devis";
+      const sender = p.sender_company || p.sender_email || p.user_email || null;
+      const client = p.client_name || p.client_email || null;
+      const head = sender && client
+        ? `📎 <b>${escapeHtml(clip(sender, 60))}</b> a envoyé ${k.toLowerCase()} <b>${escapeHtml(p.numero ?? "—")}</b> à <b>${escapeHtml(clip(client, 60))}</b>`
+        : `📎 ${k} <b>${escapeHtml(p.numero ?? "—")}</b>`;
       return [
-        `📎 ${k} <b>${escapeHtml(p.numero ?? "—")}</b>`,
-        p.user_email ? `User : ${escapeHtml(p.user_email)}` : "",
-        p.total_ttc  ? `Montant : ${fmtAmount(p.total_ttc)}` : "",
+        head,
+        p.client_email && p.client_email !== client ? `Email : ${escapeHtml(p.client_email)}` : "",
+        p.total_ttc    ? `Montant : ${fmtAmount(p.total_ttc)}` : "",
       ].filter(Boolean).join("\n");
     }
 
