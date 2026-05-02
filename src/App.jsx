@@ -17,6 +17,7 @@ import Toast         from "./components/app/Toast.jsx";
 import BottomNav     from "./components/app/BottomNav.jsx";
 import SearchBar     from "./components/app/SearchBar.jsx";
 import SaveIndicator from "./components/app/SaveIndicator.jsx";
+import HeaderMenu    from "./components/app/HeaderMenu.jsx";
 import Dashboard     from "./components/Dashboard.jsx";
 import ClientsList   from "./components/ClientsList.jsx";
 import ClientDetail  from "./components/ClientDetail.jsx";
@@ -235,28 +236,18 @@ export default function App() {
       <header style={{ background: "#1A1612", padding: "calc(10px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 10px calc(18px + env(safe-area-inset-left))", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
         <Logo size={24} white/>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {isAdmin && (
-            <button onClick={() => setTab("admin")} title="Panel Admin"
-              style={{ background: "#2A231C", border: "1px solid #3D3028", borderRadius: 8, padding: "5px 10px", display: "flex", alignItems: "center", gap: 5, color: "#f59e0b", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
-              ⚙ Admin
-            </button>
-          )}
-          <button onClick={() => setScreen("onboarding")}
-            style={{ background: "#2A231C", border: "1px solid #3D3028", borderRadius: 8, padding: "5px 10px", display: "flex", alignItems: "center", gap: 5, color: "#9A8E82", fontSize: 11, fontWeight: 500, cursor: "pointer" }}>
-            {I.paint} Mon profil
-          </button>
-          {user && (
-            <button onClick={handleSignOut} title="Se déconnecter"
-              style={{ background: "#2A231C", border: "1px solid #3D3028", borderRadius: 8, padding: "5px 8px", display: "flex", alignItems: "center", color: "#ef4444", cursor: "pointer" }}>
-              {I.logout}
-            </button>
-          )}
           <SaveIndicator state={saveState}/>
-          {effectivePlan === "pro"
-            ? <button onClick={() => setScreen("subscription")} title="Gérer mon abonnement"
-                style={{ background: "rgba(34,197,94,.15)", color: "#4ade80", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, border: "1px solid rgba(34,197,94,.25)", cursor: "pointer" }}>PRO</button>
-            : <button onClick={() => setScreen("paywall")} style={{ background: daysLeft <= 7 ? "rgba(249,115,22,.15)" : "#2A231C", color: daysLeft <= 7 ? "#fb923c" : "#9A8E82", fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 20, border: daysLeft <= 7 ? "1px solid rgba(249,115,22,.25)" : "none", cursor: "pointer" }}>Essai · {daysLeft}j</button>
-          }
+          <HeaderMenu
+            isAdmin={isAdmin}
+            user={user}
+            effectivePlan={effectivePlan}
+            daysLeft={daysLeft}
+            onOpenAdmin={() => setTab("admin")}
+            onOpenProfile={() => setScreen("onboarding")}
+            onOpenSubscription={() => setScreen("subscription")}
+            onOpenPaywall={() => setScreen("paywall")}
+            onSignOut={handleSignOut}
+          />
         </div>
       </header>
 
