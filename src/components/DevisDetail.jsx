@@ -234,9 +234,11 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
                 </button>
               )}
               {["brouillon","envoye"].includes(d.statut) && !isRemplace && (
-                <button onClick={() => onChange({ ...d, statut: "en_signature" })}
-                  style={{ background: "#faf5ff", color: "#6b21a8", border: "1px solid #e9d5ff", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-                  🖊 Signature
+                <button onClick={sendOdoo} disabled={sending}
+                  style={{ background: "#faf5ff", color: "#6b21a8", border: "1px solid #e9d5ff", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: sending ? "default" : "pointer", whiteSpace: "nowrap", opacity: sending ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}>
+                  {sending
+                    ? <><span style={{display:"inline-block",width:10,height:10,border:"2px solid #6b21a8",borderTopColor:"transparent",borderRadius:"50%",animation:"spin 1s linear infinite"}}/> Envoi…</>
+                    : <>🖊 Signature Odoo</>}
                 </button>
               )}
             </div>
