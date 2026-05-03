@@ -26,7 +26,7 @@ const fmtEur  = n => new Intl.NumberFormat('fr-FR', { style: 'currency', currenc
 
 async function sendEmail({ to, subject, html, cc }) {
   const gmailUser = process.env.GMAIL_USER
-  const gmailPass = process.env.GMAIL_APP_PASSWORD
+  const gmailPass = process.env.GMAIL_APP_PASSWORD || process.env.GMAIL_APP_PASWORD
 
   if (gmailUser && gmailPass) {
     const { createTransport } = await import('nodemailer')
