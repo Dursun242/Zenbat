@@ -54,7 +54,7 @@ export default function DevisClientActions({ devis, client, onChange }) {
       const res   = await fetch('/api/devis-public', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ action: 'send', token: devis.public_token, devis_id: devis.id }),
+        body: JSON.stringify({ action: 'send', devis_id: devis.id }),
       })
       const data = await res.json()
       if (!res.ok) { setSendErr(data.error); return }

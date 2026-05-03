@@ -217,10 +217,9 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const body = req.body || {}
-  const { action, token } = body
-  if (!token) return res.status(400).json({ error: 'token manquant' })
+  const { action } = body
 
-  // ── send : artisan envoie le devis (auth requise) ──────────────────────
+  // ── send : artisan envoie le devis (auth requise, pas besoin de public_token côté client) ──
   if (action === 'send') {
     const auth = await authenticate(req, res)
     if (!auth) return
@@ -234,16 +233,28 @@ export default async function handler(req, res) {
       .eq('id', devis_id).eq('owner_id', user.id).maybeSingle()
     if (!devis) return res.status(404).json({ error: 'Devis introuvable' })
 
+    // Génère un public_token si absent (devis créé avant migration)
+    let publicToken = devis.public_token
+    if (!publicToken) {
+      const { randomUUID } = await import('crypto')
+      publicToken = randomUUID()
+      await admin.from('devis').update({ public_token: publicToken }).eq('id', devis.id)
+    }
+
     const { data: client } = await admin.from('clients')
       .select('raison_sociale, nom, prenom, email').eq('id', devis.client_id).maybeSingle()
     if (!client?.email) return res.status(400).json({ error: "Le client n'a pas d'email renseigné" })
+
+    if (!process.env.RESEND_API_KEY) {
+      return res.status(503).json({ error: 'RESEND_API_KEY non configurée — ajoutez-la dans Vercel Settings → Environment Variables' })
+    }
 
     const { data: profile } = await admin.from('profiles')
       .select('company_name, brand_data').eq('id', user.id).maybeSingle()
     const brand = (() => { try { return JSON.parse(profile?.brand_data || '{}') } catch { return {} } })()
     const company    = profile?.company_name || brand.companyName || ''
     const clientName = (`${client.prenom || ''} ${client.nom || ''}`).trim() || client.raison_sociale || ''
-    const publicUrl  = `${process.env.VITE_PUBLIC_URL || 'https://app.zenbat.fr'}/d/${devis.public_token}`
+    const publicUrl  = `${process.env.VITE_PUBLIC_URL || 'https://app.zenbat.fr'}/d/${publicToken}`
 
     try {
       await sendEmail({
@@ -258,8 +269,11 @@ export default async function handler(req, res) {
     await admin.from('devis').update({ statut: 'envoye', sent_to_client_at: new Date().toISOString() }).eq('id', devis.id)
     await admin.from('devis_audit_log').insert({ devis_id: devis.id, event: 'sent', from_party: 'artisan', meta: { to: client.email } })
 
-    return res.status(200).json({ ok: true, publicUrl, token: devis.public_token })
+    return res.status(200).json({ ok: true, publicUrl, token: publicToken })
   }
+
+  const { token } = body
+  if (!token) return res.status(400).json({ error: 'token manquant' })
 
   // ── artisan_respond : réponse à une négociation (auth requise) ─────────
   if (action === 'artisan_respond') {
