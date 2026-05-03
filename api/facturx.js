@@ -12,13 +12,13 @@
 // mais centralise la logique pour qu'on puisse facilement ajouter des
 // polices embarquées, compression, signature, etc. plus tard.
 
-import { createClient } from "@supabase/supabase-js";
 import { PDFDocument, AFRelationship, PDFName, PDFRawStream, PDFRef } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import { readFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cors } from "./_cors.js"
+import { authenticate } from "./_withAuth.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -401,20 +401,9 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   // Authentification
-  const token = req.headers.authorization?.replace("Bearer ", "");
-  if (!token) return res.status(401).json({ error: "Non authentifié" });
-
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceKey)
-    return res.status(500).json({ error: "Configuration serveur manquante" });
-
-  const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-
-  const { data: { user }, error: authErr } = await admin.auth.getUser(token);
-  if (authErr || !user) return res.status(401).json({ error: "Token invalide" });
+  const auth = await authenticate(req, res);
+  if (!auth) return;
+  const { user, admin } = auth;
 
   const { pdf_base64, invoice, client, brand, sourceInvoice } = req.body || {};
   if (!pdf_base64 || !invoice) return res.status(400).json({ error: "pdf_base64 et invoice requis" });

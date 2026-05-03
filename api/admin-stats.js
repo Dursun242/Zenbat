@@ -7,34 +7,17 @@
 //   ?type=coherence           → validations cohérence
 //   ?type=feedback            → feedbacks 👍/👎
 
-import { createClient } from '@supabase/supabase-js'
 import { cors } from "./_cors.js"
+import { authenticate } from "./_withAuth.js"
 
 export default async function handler(req, res) {
   cors(req, res, { methods: "GET, OPTIONS" })
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Non authentifié' })
-
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const adminEmail  = process.env.ADMIN_EMAIL
-
-  if (!supabaseUrl || !serviceKey)
-    return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY non configurée' })
-
-  const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
-
-  // Vérification identité
-  const { data: { user }, error: authErr } = await admin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Token invalide' })
-  const norm = (s) => String(s || '').trim().toLowerCase()
-  if (!adminEmail || norm(user.email) !== norm(adminEmail))
-    return res.status(403).json({ error: "Accès réservé à l'administrateur" })
+  const auth = await authenticate(req, res, { adminOnly: true })
+  if (!auth) return
+  const { admin } = auth
 
   // ── Données IA : routage par ?type= ─────────────────────────────────
   const type = (req.query.type || '').toString().trim()

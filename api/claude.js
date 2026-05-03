@@ -1,5 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
 import { cors } from "./_cors.js";
+import { authenticate } from "./_withAuth.js";
 
 const ALLOWED_MODELS = [
   "claude-haiku-4-5-20251001",
@@ -22,19 +22,9 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   // ── Auth Supabase ───────────────────────────────────────────────────────────
-  const token = req.headers.authorization?.replace("Bearer ", "");
-  if (!token) return res.status(401).json({ error: "Non authentifié" });
-
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceKey)
-    return res.status(500).json({ error: "Supabase non configuré" });
-
-  const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-  const { data: { user }, error: authErr } = await admin.auth.getUser(token);
-  if (authErr || !user) return res.status(401).json({ error: "Token invalide" });
+  const auth = await authenticate(req, res);
+  if (!auth) return;
+  const { user, admin } = auth;
 
   // ── Plan + rate limit ────────────────────────────────────────────────────────
   const { data: profile } = await admin.from("profiles")
