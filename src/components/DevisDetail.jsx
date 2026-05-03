@@ -320,6 +320,9 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
         </div>
 
         <div style={{ padding: 18 }}>
+          {/* Suivi client — envoi, négociation, audit */}
+          <DevisClientActions devis={d} client={cl} onChange={onChange} />
+
           {/* Bouton PDF */}
           <button className="detail-pdf-btn" onClick={() => setShowPDF(true)}
             style={{ width: "100%", background: `linear-gradient(135deg,${ac}ee,${ac})`, color: "white", border: "none", borderRadius: 16, padding: 16, fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, cursor: "pointer", boxShadow: `0 6px 20px ${ac}44`, marginBottom: 12 }}>
@@ -377,9 +380,6 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
               </div>
             )}
           </div>
-
-          {/* Suivi client — envoi, négociation, audit */}
-          <DevisClientActions devis={d} client={cl} onChange={onChange} />
 
           {/* Log Odoo Sign */}
           {showLog && log.length > 0 && (
