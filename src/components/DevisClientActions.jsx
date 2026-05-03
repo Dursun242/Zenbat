@@ -158,37 +158,27 @@ export default function DevisClientActions({ devis, client, onChange }) {
 
       {/* ── Bouton d'envoi ── */}
       {!cloture && (
-        <div style={{ background: 'white', borderRadius: 14, padding: 14, border: '1px solid #E8E2D8', marginBottom: 10 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#9A8E82', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
-            Suivi client
-          </div>
-
-          {client?.email ? (
-            <div style={{ fontSize: 12, color: '#6B6358', marginBottom: 10 }}>
-              ✉ {client.email}
-            </div>
-          ) : (
-            <div style={{ fontSize: 12, color: '#f97316', marginBottom: 10 }}>
-              ⚠ Aucun email renseigné pour ce client
-            </div>
-          )}
-
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ background: 'white', borderRadius: 12, padding: '10px 12px', border: '1px solid #E8E2D8', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#9A8E82', textTransform: 'uppercase', letterSpacing: '0.5px', flexShrink: 0 }}>Suivi</span>
+            {client?.email
+              ? <span style={{ fontSize: 12, color: '#6B6358', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>✉ {client.email}</span>
+              : <span style={{ fontSize: 12, color: '#f97316' }}>⚠ Pas d'email</span>
+            }
             {canSend && (
               <button onClick={send} disabled={sending}
-                style={{ padding: '8px 14px', borderRadius: 10, border: 'none', background: '#1d4ed8', color: 'white', fontWeight: 700, fontSize: 12, cursor: 'pointer', opacity: sending ? 0.7 : 1 }}>
-                {sending ? 'Envoi…' : isSent ? '✉ Renvoyer au client' : '✉ Envoyer au client'}
+                style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: '#1d4ed8', color: 'white', fontWeight: 700, fontSize: 11, cursor: 'pointer', opacity: sending ? 0.7 : 1, flexShrink: 0 }}>
+                {sending ? 'Envoi…' : isSent ? '✉ Renvoyer' : '✉ Envoyer'}
               </button>
             )}
             {(isSent || devis.public_token) && (
               <button onClick={copyLink}
-                style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid #E8E2D8', background: 'white', color: copied ? '#22c55e' : '#6B6358', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
-                {copied ? '✓ Lien copié !' : '🔗 Copier le lien'}
+                style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #E8E2D8', background: 'white', color: copied ? '#22c55e' : '#6B6358', fontWeight: 600, fontSize: 11, cursor: 'pointer', flexShrink: 0 }}>
+                {copied ? '✓ Copié' : '🔗 Lien'}
               </button>
             )}
           </div>
-
-          {sendErr && <div style={{ fontSize: 12, color: '#ef4444', marginTop: 8 }}>{sendErr}</div>}
+          {sendErr && <div style={{ fontSize: 11, color: '#ef4444', marginTop: 6 }}>{sendErr}</div>}
         </div>
       )}
 
