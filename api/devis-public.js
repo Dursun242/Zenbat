@@ -252,7 +252,7 @@ export default async function handler(req, res) {
         html: emailDevis({ clientName, company, brand, devis, fmtEurFn: fmtEur, publicUrl }),
       })
     } catch (e) {
-      return res.status(502).json({ error: 'Impossible d'envoyer l'email : ' + e.message })
+      return res.status(502).json({ error: `Impossible d'envoyer l'email : ${e.message}` })
     }
 
     await admin.from('devis').update({ statut: 'envoye', sent_to_client_at: new Date().toISOString() }).eq('id', devis.id)

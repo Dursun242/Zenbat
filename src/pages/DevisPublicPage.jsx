@@ -19,7 +19,7 @@ const AUDIT_LABELS = {
   accepted:         { icon: '✅', label: 'Accepté' },
   refused:          { icon: '✗', label: 'Refusé' },
   negotiation_sent: { icon: '↩', label: 'Proposition du client' },
-  artisan_responded:{ icon: '↪', label: 'Réponse de l'artisan' },
+  artisan_responded:{ icon: '↪', label: "Réponse de l'artisan" },
 }
 
 // ── Composants utilitaires ─────────────────────────────────────────────────
