@@ -24,9 +24,10 @@ const hashStr = s => createHash('sha256').update(String(s)).digest('hex')
 const genOtp  = () => Math.floor(100000 + Math.random() * 900000).toString()
 const fmtEur  = n => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n || 0)
 
-async function sendEmail({ to, subject, html, cc }) {
+async function sendEmail({ to, subject, html, cc, fromName }) {
   const gmailUser = process.env.GMAIL_USER
   const gmailPass = process.env.GMAIL_APP_PASSWORD || process.env.GMAIL_APP_PASWORD
+  const displayName = fromName || 'Consulter votre devis'
 
   if (gmailUser && gmailPass) {
     const { createTransport } = await import('nodemailer')
@@ -35,7 +36,7 @@ async function sendEmail({ to, subject, html, cc }) {
       auth: { user: gmailUser, pass: gmailPass },
     })
     await transporter.sendMail({
-      from: `Zenbat <${gmailUser}>`,
+      from: `${displayName} <${gmailUser}>`,
       to, subject, html,
       ...(cc ? { cc: Array.isArray(cc) ? cc.join(',') : cc } : {}),
     })
@@ -44,7 +45,7 @@ async function sendEmail({ to, subject, html, cc }) {
 
   const key = process.env.RESEND_API_KEY
   if (!key) throw new Error('Aucun service email configuré (GMAIL_USER+GMAIL_APP_PASSWORD ou RESEND_API_KEY)')
-  const payload = { from: process.env.RESEND_FROM || 'Zenbat <onboarding@resend.dev>', to, subject, html }
+  const payload = { from: process.env.RESEND_FROM || `${displayName} <onboarding@resend.dev>`, to, subject, html }
   if (cc) payload.cc = Array.isArray(cc) ? cc : [cc]
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -86,10 +87,7 @@ function emailDevis({ clientName, company, brand, devis, fmtEurFn, publicUrl }) 
   return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f5;font-family:Inter,system-ui,sans-serif">
 <div style="max-width:560px;margin:32px auto;background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
   <div style="background:#1A1612;padding:28px 32px;text-align:center">
-    <div style="font-size:26px;font-weight:800;letter-spacing:-1px;margin-bottom:${company ? '8' : '0'}px">
-      <span style="color:${accentColor}">Zen</span><span style="color:white">bat</span>
-    </div>
-    ${company ? `<div style="color:white;font-size:15px;font-weight:700">${company}</div>` : ''}
+    ${company ? `<div style="font-size:22px;font-weight:800;letter-spacing:-0.5px;color:${accentColor}">${company}</div>` : `<div style="font-size:22px;font-weight:800;letter-spacing:-1px"><span style="color:${accentColor}">Zen</span><span style="color:white">bat</span></div>`}
   </div>
   <div style="padding:32px">
     <h2 style="margin:0 0 8px;font-size:20px;color:#1A1612">Bonjour${clientName ? ' ' + clientName : ''},</h2>
@@ -283,6 +281,7 @@ export default async function handler(req, res) {
       await sendEmail({
         to: client.email,
         cc: artisanEmail || undefined,
+        fromName: company || 'Consulter votre devis',
         subject: `Consulter votre devis${devis.objet ? ' — ' + devis.objet : ' ' + devis.numero}${company ? ' · ' + company : ''}`,
         html: emailDevis({ clientName, company, brand, devis, fmtEurFn: fmtEur, publicUrl }),
       })
