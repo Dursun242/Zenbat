@@ -11,7 +11,6 @@ import AdminNewsletter    from "./admin/AdminNewsletter.jsx"
 import AdminCoherenceStats from "./admin/AdminCoherenceStats.jsx"
 import AdminFeedback       from "./admin/AdminFeedback.jsx"
 import AdminAgentBenchmark from "./admin/AdminAgentBenchmark.jsx"
-import AdminTokenStats    from "./admin/AdminTokenStats.jsx"
 import DeleteUserModal    from "./admin/DeleteUserModal.jsx"
 import UserDetailDrawer  from "./admin/UserDetailDrawer.jsx"
 
@@ -33,8 +32,6 @@ export default function AdminPanel({ onBack }) {
   const [coherenceLoading, setCoherenceLoading] = useState(false)
   const [feedback,         setFeedback]         = useState(null)
   const [feedbackLoading,  setFeedbackLoading]  = useState(false)
-  const [tokenStats,       setTokenStats]       = useState(null)
-  const [tokenLoading,     setTokenLoading]     = useState(false)
   const [openConvUser, setOpenConvUser] = useState(null)
   const [convSearch,   setConvSearch]   = useState("")
   const [userSearch,   setUserSearch]   = useState("")
@@ -50,7 +47,7 @@ export default function AdminPanel({ onBack }) {
   const [detailError,  setDetailError]  = useState(null)
   const [detailTab,    setDetailTab]    = useState("overview")
 
-  useEffect(() => { if (session) { load(); loadLogs(); loadNegs(); loadConvs(); loadNewsletter(); loadCoherence(); loadFeedback(); loadTokens() } }, [session?.access_token])
+  useEffect(() => { if (session) { load(); loadLogs(); loadNegs(); loadConvs(); loadNewsletter(); loadCoherence(); loadFeedback() } }, [session?.access_token])
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -122,16 +119,6 @@ export default function AdminPanel({ onBack }) {
       const data = await res.json()
       if (res.ok) setFeedback(data.feedback || [])
     } catch {} finally { setFeedbackLoading(false) }
-  }
-
-  const loadTokens = async () => {
-    setTokenLoading(true)
-    try {
-      const token = await getToken()
-      const res  = await fetch("/api/admin-stats?type=tokens", { headers: { Authorization: `Bearer ${token}` } })
-      const data = await res.json()
-      if (res.ok) setTokenStats(data)
-    } catch {} finally { setTokenLoading(false) }
   }
 
   const openDelete = (u) => { setDeleteMode("delete"); setDeleteTarget(u); setConfirmInput(""); setDeleteError(null) }
@@ -222,10 +209,6 @@ export default function AdminPanel({ onBack }) {
       {stats && (
         <div style={{ padding: 16 }}>
           <AdminKPIs stats={stats} />
-          <AdminTokenStats
-            data={tokenStats}  loading={tokenLoading}
-            onRefresh={loadTokens}
-          />
           <AdminConversations
             iaConvs={iaConvs}      loading={convsLoading}
             convSearch={convSearch} setConvSearch={setConvSearch}
