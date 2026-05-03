@@ -48,6 +48,12 @@ export function AuthProvider({ children }) {
     return res
   }, [])
 
+  const resendConfirmation = useCallback(async () => {
+    const email = session?.user?.email
+    if (!email) return { error: { message: "Email introuvable" } }
+    return supabase.auth.resend({ type: 'signup', email })
+  }, [session])
+
   const value = {
     session,
     user: session?.user ?? null,
@@ -58,6 +64,7 @@ export function AuthProvider({ children }) {
     signOut,
     resetPasswordForEmail,
     updatePassword,
+    resendConfirmation,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

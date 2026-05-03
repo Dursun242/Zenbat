@@ -21,6 +21,8 @@
 
 const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN") ?? "";
 const TELEGRAM_CHAT_ID   = Deno.env.get("TELEGRAM_CHAT_ID")   ?? "";
+const SUPABASE_URL       = Deno.env.get("SUPABASE_URL")       ?? "";
+const SERVICE_ROLE_KEY   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 const TG_API = (method: string) =>
   `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${method}`;
@@ -48,6 +50,41 @@ function fmtAmount(n: unknown): string {
   }) + " €";
 }
 
+// ─── Résolution identité utilisateur ─────────────────────────────────────
+// Les events DB Webhook (activity_log, ia_*) portent owner_id mais pas
+// l'email. On le récupère via REST + admin GoTrue. Best-effort : un échec
+// ne bloque pas la notif (on tombe juste sur le format générique).
+
+type Owner = { email: string | null; company: string | null; full_name: string | null };
+
+async function resolveOwner(ownerId: string | null | undefined): Promise<Owner | null> {
+  if (!ownerId || !SUPABASE_URL || !SERVICE_ROLE_KEY) return null;
+  try {
+    const headers = { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` };
+    const [authR, profR] = await Promise.all([
+      fetch(`${SUPABASE_URL}/auth/v1/admin/users/${ownerId}`, { headers }),
+      fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${ownerId}&select=company_name,full_name`, { headers }),
+    ]);
+    const email = authR.ok ? ((await authR.json())?.email ?? null) : null;
+    const profileArr = profR.ok ? await profR.json() : [];
+    const company   = profileArr?.[0]?.company_name ?? null;
+    const full_name = profileArr?.[0]?.full_name ?? null;
+    return { email, company, full_name };
+  } catch (err) {
+    console.warn("[notify-telegram] resolveOwner:", err);
+    return null;
+  }
+}
+
+function ownerLine(owner: Owner | null): string {
+  if (!owner) return "";
+  const label = owner.company || owner.full_name || owner.email;
+  if (!label) return "";
+  const parts = [label];
+  if (owner.email && owner.email !== label) parts.push(owner.email);
+  return `\n👤 ${escapeHtml(clip(parts.join(" · "), 100))}`;
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -69,7 +106,7 @@ type EventKind =
   | "pdf_generated"
   | "raw";
 
-function formatEvent(kind: EventKind, payload: Record<string, unknown>): string {
+async function formatEvent(kind: EventKind, payload: Record<string, unknown>): Promise<string> {
   const p = payload || {};
 
   switch (kind) {
@@ -88,6 +125,8 @@ function formatEvent(kind: EventKind, payload: Record<string, unknown>): string 
       const action = String(p.action ?? "");
       const nd = (p.new_data as Record<string, unknown>) ?? {};
       const od = (p.old_data as Record<string, unknown>) ?? {};
+      const owner = await resolveOwner(String(p.owner_id ?? nd.owner_id ?? ""));
+      const oLine = ownerLine(owner);
 
       // Calcule un TTC approximatif pour devis (montant_ht stocké, pas le TTC).
       // Pour invoices, montant_ttc est stocké directement (cf 0005).
@@ -101,21 +140,21 @@ function formatEvent(kind: EventKind, payload: Record<string, unknown>): string 
 
       if (t === "devis" && action === "insert") {
         return `🆕 Nouveau devis <b>${escapeHtml(nd.numero)}</b>` +
-          (devisTtc > 0 ? ` — ${fmtAmount(devisTtc)}` : "");
+          (devisTtc > 0 ? ` — ${fmtAmount(devisTtc)}` : "") + oLine;
       }
       if (t === "devis" && action === "update" && nd.statut !== od.statut) {
         return `📄 Devis <b>${escapeHtml(nd.numero)}</b> : ` +
           `${escapeHtml(od.statut)} → <b>${escapeHtml(nd.statut)}</b>` +
-          (devisTtc > 0 ? ` (${fmtAmount(devisTtc)})` : "");
+          (devisTtc > 0 ? ` (${fmtAmount(devisTtc)})` : "") + oLine;
       }
       if (t === "invoices" && action === "insert") {
         return `🧾 Nouvelle facture <b>${escapeHtml(nd.numero)}</b>` +
-          (invoiceTtc > 0 ? ` — ${fmtAmount(invoiceTtc)}` : "");
+          (invoiceTtc > 0 ? ` — ${fmtAmount(invoiceTtc)}` : "") + oLine;
       }
       if (t === "invoices" && action === "update" && nd.statut !== od.statut) {
         return `🧾 Facture <b>${escapeHtml(nd.numero)}</b> : ` +
           `${escapeHtml(od.statut)} → <b>${escapeHtml(nd.statut)}</b>` +
-          (invoiceTtc > 0 ? ` (${fmtAmount(invoiceTtc)})` : "");
+          (invoiceTtc > 0 ? ` (${fmtAmount(invoiceTtc)})` : "") + oLine;
       }
       // Inscription via trigger sur profiles (cf migrations 0028 + 0029)
       if (t === "profiles" && action === "insert") {
@@ -126,17 +165,21 @@ function formatEvent(kind: EventKind, payload: Record<string, unknown>): string 
       return "";
     }
 
-    case "ia_error":
+    case "ia_error": {
+      const owner = await resolveOwner(String(p.owner_id ?? ""));
       return [
         "🔥 <b>Erreur IA</b>",
         escapeHtml(clip(p.error_message ?? p.message ?? p.error, 400)),
-      ].join("\n");
+      ].join("\n") + ownerLine(owner);
+    }
 
-    case "ia_negative":
+    case "ia_negative": {
+      const owner = await resolveOwner(String(p.owner_id ?? ""));
       return [
         "👎 <b>Feedback IA négatif</b>",
         escapeHtml(clip(p.feedback ?? p.comment ?? p.reason, 400)),
-      ].join("\n");
+      ].join("\n") + ownerLine(owner);
+    }
 
     case "app_log_error":
       return [
@@ -286,7 +329,7 @@ Deno.serve(async (req: Request) => {
       } catch { /* payload invalide → on continue avec {} */ }
 
       const file = fd.get("pdf");
-      const caption = formatEvent(kind, payload) || "📎 PDF";
+      const caption = (await formatEvent(kind, payload)) || "📎 PDF";
 
       let ok = false;
       if (file instanceof File) {
@@ -306,7 +349,7 @@ Deno.serve(async (req: Request) => {
     // 2a. Supabase DB Webhook
     const webhook = fromSupabaseWebhook(body);
     if (webhook) {
-      const text = formatEvent(webhook.kind, webhook.payload);
+      const text = await formatEvent(webhook.kind, webhook.payload);
       const ok = await sendText(text);
       return new Response(
         JSON.stringify({ ok }),
@@ -317,7 +360,7 @@ Deno.serve(async (req: Request) => {
     // 2b. Appel direct : { kind, payload }
     const kind    = String(body.kind ?? "raw") as EventKind;
     const payload = (body.payload as Record<string, unknown>) ?? {};
-    const text = formatEvent(kind, payload);
+    const text = await formatEvent(kind, payload);
     const ok = await sendText(text);
     return new Response(
       JSON.stringify({ ok }),

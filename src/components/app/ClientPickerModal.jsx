@@ -4,7 +4,7 @@ function clientLabel(c) {
   return c?.raison_sociale || `${c?.prenom || ""} ${c?.nom || ""}`.trim() || "—";
 }
 
-export default function ClientPickerModal({ clients = [], current, onSelect, onClose }) {
+export default function ClientPickerModal({ clients = [], current, onSelect, onClose, requireEmail = false }) {
   const [q, setQ] = useState("");
   const inputRef  = useRef(null);
 
@@ -42,6 +42,15 @@ export default function ClientPickerModal({ clients = [], current, onSelect, onC
 
         {/* Liste */}
         <div style={{ overflowY: "auto", flex: 1 }}>
+          {requireEmail && (
+            <div style={{ margin: "10px 14px 4px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10, padding: "10px 12px", display: "flex", alignItems: "flex-start", gap: 8 }}>
+              <span style={{ fontSize: 15, lineHeight: "1.3", flexShrink: 0 }}>✉️</span>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#92400e", marginBottom: 2 }}>Email requis</div>
+                <div style={{ fontSize: 11, color: "#b45309", lineHeight: "1.4" }}>Choisissez un client avec une adresse email pour la signature électronique.</div>
+              </div>
+            </div>
+          )}
           {/* Option "sans client" */}
           <button
             onClick={() => { onSelect(null); onClose(); }}
@@ -57,13 +66,14 @@ export default function ClientPickerModal({ clients = [], current, onSelect, onC
           )}
 
           {filtered.map(c => {
-            const isCurrent = c.id === current?.id;
-            const label     = clientLabel(c);
-            const sub       = c.email || c.telephone || c.ville || "";
+            const isCurrent  = c.id === current?.id;
+            const label      = clientLabel(c);
+            const sub        = c.email || c.telephone || c.ville || "";
+            const noEmail    = requireEmail && !c.email;
             return (
               <button key={c.id}
                 onClick={() => { onSelect(c); onClose(); }}
-                style={{ width: "100%", padding: "11px 18px", background: isCurrent ? "#f0fdf4" : "none", border: "none", borderBottom: "1px solid #FAF7F2", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
+                style={{ width: "100%", padding: "11px 18px", background: isCurrent ? "#f0fdf4" : "none", border: "none", borderBottom: "1px solid #FAF7F2", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 10, opacity: noEmail ? 0.65 : 1 }}
                 onMouseOver={e => { if (!isCurrent) e.currentTarget.style.background = "#FAF7F2"; }}
                 onMouseOut={e  => { if (!isCurrent) e.currentTarget.style.background = "none"; }}>
                 <span style={{ width: 32, height: 32, borderRadius: 10, background: isCurrent ? "#dcfce7" : "#F0EBE3", color: isCurrent ? "#16a34a" : "#6B6358", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
@@ -72,6 +82,7 @@ export default function ClientPickerModal({ clients = [], current, onSelect, onC
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1612", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</div>
                   {sub && <div style={{ fontSize: 11, color: "#9A8E82", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</div>}
+                  {noEmail && <span style={{ display: "inline-block", fontSize: 10, fontWeight: 600, color: "#c2410c", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 20, padding: "1px 7px", marginTop: 3 }}>sans email</span>}
                 </div>
                 {isCurrent && <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 700, flexShrink: 0 }}>✓ actuel</span>}
               </button>

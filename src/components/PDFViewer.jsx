@@ -313,6 +313,19 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
     </>
   )
 
+  const watermarkOverlay = d.statut === "brouillon" ? (
+    <div style={{
+      position: "absolute", inset: 0, display: "flex", alignItems: "center",
+      justifyContent: "center", pointerEvents: "none", zIndex: 10, overflow: "hidden",
+    }}>
+      <div style={{
+        fontSize: 80, fontWeight: 900, color: terra, opacity: 0.07,
+        transform: "rotate(-38deg)", letterSpacing: "10px", whiteSpace: "nowrap",
+        userSelect: "none", fontFamily: "sans-serif",
+      }}>BROUILLON</div>
+    </div>
+  ) : null
+
   if (inline) {
     const download = async () => {
       setGeneratingPdf(true)
@@ -362,6 +375,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
         <div ref={wrapRef} style={{ background: "#dde1e7", padding: "20px 14px", overflowY: "auto", flex: 1, boxSizing: "border-box" }}>
           <div style={{ position: "relative", width: `calc(210mm * ${fitScale})`, height: pageH ? `${pageH}px` : "auto", margin: "0 auto" }}>
             <div ref={pageRef} className="pdf-page" style={{ background: "white", width: "210mm", minHeight: "297mm", boxShadow: "0 4px 24px rgba(0,0,0,.22)", padding: "10mm", fontFamily, color: "#1a1a1a", fontSize: 11, lineHeight: 1.5, boxSizing: "border-box", transform: `scale(${fitScale})`, transformOrigin: "top left", position: "absolute", top: 0, left: 0 }}>
+              {watermarkOverlay}
               {pageBody}
             </div>
           </div>
@@ -449,13 +463,14 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
               {generatingPdf ? "⏳" : "⬇"}
             </button>
           )}
-          <button onClick={onClose} style={{background:"#2A231C",color:"#9A8E82",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer"}}>{Ix.x}</button>
+          <button onClick={onClose} aria-label="Fermer" style={{background:"#2A231C",color:"#9A8E82",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer"}}>{Ix.x}</button>
         </div>
       </div>
 
       <div className="pdf-scroll" ref={wrapRef} style={{flex:1,overflow:"auto",padding:"16px 16px calc(20px + env(safe-area-inset-bottom))",background:"#2A231C"}}>
         <div className="pdf-page-wrap" style={{width:`calc(210mm * ${scale})`,height:pageH?`${pageH}px`:"auto",margin:"0 auto",position:"relative"}}>
           <div ref={pageRef} className="pdf-page" style={{background:"white",width:"210mm",minHeight:"297mm",boxShadow:"0 20px 60px rgba(0,0,0,.5)",padding:"10mm",fontFamily,color:"#1a1a1a",fontSize:11,lineHeight:1.5,boxSizing:"border-box",transform:`scale(${scale})`,transformOrigin:"top left",position:"absolute",top:0,left:0}}>
+            {watermarkOverlay}
             {pageBody}
           </div>
         </div>

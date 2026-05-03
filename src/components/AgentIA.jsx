@@ -579,6 +579,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
                       <td style={{ padding: "8px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: total == null ? "#f59e0b" : "#1A1612" }}>{total != null ? fmt(total) : "—"}</td>
                       <td style={{ padding: "4px" }}>
                         <button onClick={() => deleteLigne(l.id)}
+                          aria-label="Supprimer la ligne"
                           style={{ background: "none", border: "none", cursor: "pointer", color: "#E8E2D8", fontSize: 14, lineHeight: 1, padding: "2px 4px" }}
                           onMouseOver={e => e.target.style.color = "#ef4444"}
                           onMouseOut={e => e.target.style.color = "#E8E2D8"}>×</button>
@@ -806,6 +807,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
               placeholder={listening ? "Écoute en cours…" : TX.inputPlaceholder}
               rows={1} style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 16, color: "#2A231C", resize: "none", fontFamily: "inherit", lineHeight: 1.5, maxHeight: 120, overflowY: "auto" }}/>
             <button onClick={send} disabled={!input.trim() || loading}
+              aria-label="Envoyer le message"
               style={{ width: 34, height: 34, borderRadius: 10, background: input.trim() && !loading ? ac : "#d1fae5", border: "none", display: "flex", alignItems: "center", justifyContent: "center", color: "white", cursor: "pointer", transition: "background .2s", flexShrink: 0 }}>
               {I.send}
             </button>
@@ -828,6 +830,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
             <button
               onClick={toggleMic}
               disabled={!micSupported}
+              aria-label={micSupported ? (listening ? "Arrêter la dictée" : "Démarrer la dictée vocale") : "Dictée vocale non supportée"}
               title={micSupported ? (listening ? "Appuyez pour arrêter" : "Appuyez pour parler") : "Non supporté par ce navigateur"}
               style={{
                 width: 44, height: 44, borderRadius: "50%",

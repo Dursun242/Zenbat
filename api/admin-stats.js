@@ -6,35 +6,26 @@
 //   ?type=newsletter          → abonnés newsletter
 //   ?type=coherence           → validations cohérence
 //   ?type=feedback            → feedbacks 👍/👎
+//   ?type=tokens              → tokens consommés + coûts par modèle
 
-import { createClient } from '@supabase/supabase-js'
+// Prix USD par million de tokens (Anthropic, mai 2026)
+const MODEL_PRICING = {
+  "claude-haiku-4-5-20251001": { input: 0.80, output: 4.00 },
+  "claude-sonnet-4-6":         { input: 3.00, output: 15.00 },
+  "claude-sonnet-4-5":         { input: 3.00, output: 15.00 },
+}
+
 import { cors } from "./_cors.js"
+import { authenticate } from "./_withAuth.js"
 
 export default async function handler(req, res) {
   cors(req, res, { methods: "GET, OPTIONS" })
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Non authentifié' })
-
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const adminEmail  = process.env.ADMIN_EMAIL
-
-  if (!supabaseUrl || !serviceKey)
-    return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY non configurée' })
-
-  const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
-
-  // Vérification identité
-  const { data: { user }, error: authErr } = await admin.auth.getUser(token)
-  if (authErr || !user) return res.status(401).json({ error: 'Token invalide' })
-  const norm = (s) => String(s || '').trim().toLowerCase()
-  if (!adminEmail || norm(user.email) !== norm(adminEmail))
-    return res.status(403).json({ error: "Accès réservé à l'administrateur" })
+  const auth = await authenticate(req, res, { adminOnly: true })
+  if (!auth) return
+  const { admin } = auth
 
   // ── Données IA : routage par ?type= ─────────────────────────────────
   const type = (req.query.type || '').toString().trim()
@@ -81,6 +72,102 @@ export default async function handler(req, res) {
     return res.status(200).json({ feedback: enriched2, generatedAt: new Date().toISOString() })
   }
 
+  if (type === 'tokens') {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString()
+    const startMonth    = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
+
+    const [
+      { data: allLogs,    error: le },
+      { data: recent,     error: re },
+      { data: profiles,   error: pro },
+      { data: authUsers,  error: ae },
+    ] = await Promise.all([
+      admin.from('claude_api_logs').select('model, input_tokens, output_tokens, created_at, user_id').eq('status_code', 200),
+      admin.from('claude_api_logs').select('model, input_tokens, output_tokens, created_at, user_id').eq('status_code', 200).gte('created_at', thirtyDaysAgo),
+      admin.from('profiles').select('id, company_name, full_name'),
+      admin.auth.admin.listUsers({ perPage: 1000 }).then(r => ({ data: r.data?.users || [], error: r.error })),
+    ])
+    if (le) return res.status(500).json({ error: le.message })
+
+    const calcCost = (model, inputTk, outputTk) => {
+      const p = MODEL_PRICING[model] || { input: 3.00, output: 15.00 }
+      return (inputTk / 1_000_000) * p.input + (outputTk / 1_000_000) * p.output
+    }
+
+    // ── Totaux globaux ──────────────────────────────────────────────────
+    let totalInput = 0, totalOutput = 0, totalCost = 0
+    let monthInput = 0, monthOutput = 0, monthCost = 0
+    const byModel = {}
+    for (const r of allLogs || []) {
+      const inp = r.input_tokens  || 0
+      const out = r.output_tokens || 0
+      const cost = calcCost(r.model, inp, out)
+      totalInput  += inp; totalOutput += out; totalCost += cost
+      const m = r.model || 'unknown'
+      if (!byModel[m]) byModel[m] = { input: 0, output: 0, cost: 0, calls: 0 }
+      byModel[m].input  += inp
+      byModel[m].output += out
+      byModel[m].cost   += cost
+      byModel[m].calls  += 1
+    }
+    for (const r of allLogs || []) {
+      if (r.created_at >= startMonth) {
+        monthInput  += r.input_tokens  || 0
+        monthOutput += r.output_tokens || 0
+        monthCost   += calcCost(r.model, r.input_tokens || 0, r.output_tokens || 0)
+      }
+    }
+
+    // ── Tendance journalière (30 derniers jours) ────────────────────────
+    const daily = {}
+    for (const r of recent || []) {
+      const day = r.created_at.slice(0, 10)
+      if (!daily[day]) daily[day] = { input: 0, output: 0, cost: 0, calls: 0 }
+      const inp = r.input_tokens  || 0
+      const out = r.output_tokens || 0
+      daily[day].input  += inp
+      daily[day].output += out
+      daily[day].cost   += calcCost(r.model, inp, out)
+      daily[day].calls  += 1
+    }
+    const dailyTrend = Object.entries(daily)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, v]) => ({ date, ...v }))
+
+    // ── Top utilisateurs ────────────────────────────────────────────────
+    const profById  = new Map((profiles  || []).map(p => [p.id, p]))
+    const authById  = new Map((authUsers || []).map(u => [u.id, u]))
+    const perUser = {}
+    for (const r of allLogs || []) {
+      if (!r.user_id) continue
+      const inp  = r.input_tokens  || 0
+      const out  = r.output_tokens || 0
+      const cost = calcCost(r.model, inp, out)
+      if (!perUser[r.user_id]) perUser[r.user_id] = { input: 0, output: 0, cost: 0, calls: 0 }
+      perUser[r.user_id].input  += inp
+      perUser[r.user_id].output += out
+      perUser[r.user_id].cost   += cost
+      perUser[r.user_id].calls  += 1
+    }
+    const topUsers = Object.entries(perUser)
+      .map(([id, v]) => {
+        const p = profById.get(id)
+        const a = authById.get(id)
+        return { id, name: p?.company_name || p?.full_name || a?.email || '—', email: a?.email || '—', ...v }
+      })
+      .sort((a, b) => b.cost - a.cost)
+      .slice(0, 20)
+
+    return res.status(200).json({
+      total:  { input: totalInput, output: totalOutput, cost: totalCost, calls: (allLogs || []).length },
+      month:  { input: monthInput, output: monthOutput, cost: monthCost },
+      byModel: Object.entries(byModel).map(([model, v]) => ({ model, ...v })).sort((a, b) => b.cost - a.cost),
+      dailyTrend,
+      topUsers,
+      generatedAt: new Date().toISOString(),
+    })
+  }
+
   if (type === 'conversations' || type === 'logs' || type === 'negatives') {
     const tableMap = {
       conversations: { table: 'ia_conversations', limit: 500, key: 'conversations' },
@@ -110,7 +197,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ [cfg.key]: enriched, generatedAt: new Date().toISOString() })
   }
 
-  if (type) return res.status(400).json({ error: "Paramètre 'type' invalide (conversations | logs | negatives | newsletter | coherence | feedback)" })
+  if (type) return res.status(400).json({ error: "Paramètre 'type' invalide (conversations | logs | negatives | newsletter | coherence | feedback | tokens)" })
 
   // ── Récupération des données ─────────────────────────────────────────
   const [

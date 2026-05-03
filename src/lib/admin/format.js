@@ -24,8 +24,12 @@ export const SL = { brouillon: "Brou.", envoye: "Env.", en_signature: "Sig.", ac
 
 export const SORT_OPTS = [
   { v: "joined",      l: "Inscription" },
-  { v: "lastSignIn",  l: "Connexion" },
-  { v: "caTotal",     l: "CA" },
-  { v: "devisTotal",  l: "Devis" },
-  { v: "ai_used",     l: "IA" },
+  { v: "lastSignIn",  l: "Dernière connexion" },
+  { v: "lastDevis",   l: "Dernier devis" },
+  { v: "caTotal",     l: "CA signé" },
+  { v: "devisTotal",  l: "Nb devis" },
+  { v: "accepte",     l: "Devis acceptés" },
+  { v: "txConv",      l: "Taux conv." },
+  { v: "ai_used",     l: "Usage IA" },
+  { v: "name",        l: "Nom A→Z" },
 ];

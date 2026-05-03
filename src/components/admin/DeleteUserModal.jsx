@@ -1,23 +1,36 @@
 import { fmtEur } from "../../lib/admin/format.js";
 
-// Modale de confirmation de suppression de compte (panel admin).
-// La confirmation exige la saisie exacte de l'email du compte ciblé.
+// Modale de confirmation pour les actions destructives admin sur un compte :
+//   mode = 'delete'     → suppression complète du compte (cascade RGPD)
+//   mode = 'reset_data' → suppression des devis + factures, compte conservé
+// Confirmation par saisie exacte de l'email cible dans les deux cas.
 export default function DeleteUserModal({
-  target, confirmInput, setConfirmInput, deleting, error, onClose, onConfirm,
+  target, mode = "delete",
+  confirmInput, setConfirmInput, deleting, error, onClose, onConfirm,
 }) {
+  const isReset = mode === "reset_data";
   const canConfirm = !deleting && confirmInput.trim().toLowerCase() === (target.email || "").toLowerCase();
+
+  const accent = isReset
+    ? { bg: "#fef3c7", iconStroke: "#d97706", btn: "#d97706", btnDisabled: "#fcd34d" }
+    : { bg: "#fef2f2", iconStroke: "#dc2626", btn: "#dc2626", btnDisabled: "#fca5a5" };
+
   return (
     <div onClick={onClose}
       style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 100, animation: "fadeUp .15s ease both" }}>
       <div onClick={e => e.stopPropagation()}
         style={{ background: "white", borderRadius: 16, maxWidth: 420, width: "100%", padding: 22, boxShadow: "0 24px 48px rgba(0,0,0,.3)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-          <div style={{ width: 42, height: 42, borderRadius: 12, background: "#fef2f2", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <svg width="22" height="22" fill="none" stroke="#dc2626" strokeWidth="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div style={{ width: 42, height: 42, borderRadius: 12, background: accent.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <svg width="22" height="22" fill="none" stroke={accent.iconStroke} strokeWidth="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#1A1612" }}>Supprimer ce compte ?</div>
-            <div style={{ fontSize: 11, color: "#6B6358", marginTop: 2 }}>Cette action est <strong style={{ color: "#dc2626" }}>irréversible</strong>.</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#1A1612" }}>
+              {isReset ? "Réinitialiser les données ?" : "Supprimer ce compte ?"}
+            </div>
+            <div style={{ fontSize: 11, color: "#6B6358", marginTop: 2 }}>
+              Cette action est <strong style={{ color: accent.btn }}>irréversible</strong>.
+            </div>
           </div>
         </div>
 
@@ -32,7 +45,9 @@ export default function DeleteUserModal({
         </div>
 
         <div style={{ fontSize: 11, color: "#6B6358", lineHeight: 1.5, marginBottom: 12 }}>
-          Seront supprimés : compte utilisateur, profil, clients, devis, lignes et PDF associés.
+          {isReset
+            ? "Seront supprimés : tous les devis, toutes les factures, les lignes associées et les PDF stockés. Le compte, le profil et les clients sont conservés."
+            : "Seront supprimés : compte utilisateur, profil, clients, devis, lignes et PDF associés."}
         </div>
 
         <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#3D3028", marginBottom: 6 }}>
@@ -56,8 +71,10 @@ export default function DeleteUserModal({
             Annuler
           </button>
           <button onClick={onConfirm} disabled={!canConfirm}
-            style={{ flex: 2, background: !canConfirm ? "#fca5a5" : "#dc2626", color: "white", border: "none", borderRadius: 10, padding: "10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-            {deleting ? "Suppression…" : "Supprimer définitivement"}
+            style={{ flex: 2, background: !canConfirm ? accent.btnDisabled : accent.btn, color: "white", border: "none", borderRadius: 10, padding: "10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+            {deleting
+              ? (isReset ? "Réinitialisation…" : "Suppression…")
+              : (isReset ? "Réinitialiser les données" : "Supprimer définitivement")}
           </button>
         </div>
       </div>

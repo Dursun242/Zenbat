@@ -242,7 +242,7 @@ describe("claude endpoint — validation des paramètres", () => {
   it("renvoie 400 si system dépasse la taille max", async () => {
     setupAuthed();
     const res = makeRes();
-    const huge = "x".repeat(40_001);
+    const huge = "x".repeat(80_001);
     await handler(
       makeReq({ headers: { authorization: "Bearer t" }, body: { model: "claude-haiku-4-5-20251001", max_tokens: 100, messages: [{ role: "user", content: "x" }], system: huge } }),
       res,
