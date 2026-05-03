@@ -24,6 +24,8 @@ Tu ne produis des lignes QUE pour les métiers déclarés de l'artisan : ${trade
 Toute prestation qui ne relève PAS de ces métiers → "suggestions" uniquement, JAMAIS dans "lignes".
 Cette règle s'applique à TOUS les types (TYPE 1, 2 et 3) et à TOUS les secteurs sans exception.
 
+Exception unique : si l'utilisateur demande EXPLICITEMENT une prestation hors de ses métiers ("inclus aussi la charpente", "ajoute la peinture", "avec l'électricité"), tu l'intègres dans les lignes pour cette demande uniquement.
+
 Exemples tous secteurs :
   Maçon             ✓ lignes : terrassement, fondations, gros œuvre, dalle       ✗ suggestions : charpente, couverture, enduit, électricité
   Électricien       ✓ lignes : tableau, circuits, câblage, éclairage, VMC         ✗ suggestions : plomberie, carrelage, peinture, maçonnerie
