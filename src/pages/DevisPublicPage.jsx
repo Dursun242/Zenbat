@@ -264,12 +264,36 @@ function NegotiateMode({ lignes, token, sessionId, onDone, onCancel }) {
 export default function DevisPublicPage({ token }) {
   const [data,      setData]      = useState(null)
   const [sessionId, setSessionId] = useState(null)
-  const [phase,     setPhase]     = useState('loading') // loading|verify|view|accepted|refused|done
-  const [mode,      setMode]      = useState(null)      // null|accept|refuse|negotiate
+  const [phase,     setPhase]     = useState('loading')
+  const [mode,      setMode]      = useState(null)
   const [clientName, setClientName] = useState('')
   const [refuseReason, setRefuseReason] = useState('')
-  const [busy,  setBusy]  = useState(false)
-  const [err,   setErr]   = useState(null)
+  const [busy,      setBusy]      = useState(false)
+  const [err,       setErr]       = useState(null)
+  const [pdfLoading, setPdfLoading] = useState(false)
+
+  const openPdf = async () => {
+    if (pdfLoading || !data) return
+    setPdfLoading(true)
+    try {
+      const { renderDataToPdf } = await import('../lib/pdf.js')
+      const d  = { ...data, lignes: data.lignes || [] }
+      const cl = { raison_sociale: data.client?.name, email: data.client?.email }
+      const brand = {
+        companyName: data.artisan?.company,
+        email:       data.artisan?.email,
+        phone:       data.artisan?.phone,
+        address:     data.artisan?.address,
+      }
+      const { blob } = await renderDataToPdf(d, cl, brand, 'devis', { filename: `${data.numero}.pdf` })
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setPdfLoading(false)
+    }
+  }
 
   const load = useCallback(async (sid) => {
     const id = sid || sessionId
@@ -410,6 +434,12 @@ export default function DevisPublicPage({ token }) {
             </div>
           )}
         </div>
+
+        {/* Bouton PDF */}
+        <button onClick={openPdf} disabled={pdfLoading}
+          style={{ width: '100%', background: '#1A1612', color: 'white', border: 'none', borderRadius: 14, padding: '14px 20px', fontSize: 14, fontWeight: 700, cursor: pdfLoading ? 'default' : 'pointer', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, opacity: pdfLoading ? 0.7 : 1 }}>
+          {pdfLoading ? 'Génération…' : '📄 Voir le PDF du devis'}
+        </button>
 
         {/* Lignes du devis */}
         {lots.map(lot => (
