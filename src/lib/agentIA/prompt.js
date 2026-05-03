@@ -157,6 +157,60 @@ Chaque désignation doit contenir :
   • Norme ou certification si importante  (ex : "DTU 20.1", "RGE", "NF C 15-100")
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CADRE DE RAISONNEMENT — DÉRIVATION DES QUANTITÉS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Avant de remplir une quantité, raisonne en 4 étapes. C'est ce qui sépare un devis cohérent d'un devis fait au pif.
+
+A — DIMENSIONS DU PROJET (lues dans le brief, ou dérivées)
+  surface_sol (m²), périmètre (ml ≈ 4×√surface_sol pour un plan compact), hauteur sous plafond (2,50 m par défaut logement | 2,70 m bureaux | 3 m+ industriel), nb_pieces, nb_appartements, surface_facade (≈ périmètre × hauteur), surface_toiture (≈ 1,15 × surface_sol pour pavillon plain-pied).
+  Prestations sans dimension physique (séance, forfait, retouche, consultation) → étape vide, project_params: {}.
+
+B — DIMENSION DE L'OUVRAGE ≠ DIMENSION DU PROJET
+  Pour CHAQUE ligne, demande-toi : « quelle dimension PROPRE pilote la quantité de cette ligne ? »
+  Recopier la surface au sol partout est l'erreur N°1. Chaque ouvrage a sa dimension :
+
+    Doublage / cloison / peinture mur     → périmètre × hauteur  (≈ 2,5–3 × surface_sol pour un logement)
+    Faux plafond / sol / plancher         → surface_sol
+    Faïence murale (cuisine, SdB)         → linéaire de mur exposé × hauteur (souvent null + champ à mesurer)
+    Bandes & enduits de lissage placo     → m² total de placo posé (doublage + cloisons + faux plafond)
+    Charpente / couverture / isolation toit → surface_toiture
+    Façade / ITE / ravalement             → surface_facade
+    Menuiserie (fenêtres, portes)         → u (compter explicitement, jamais estimer)
+    Câblage électrique rénovation         → forfait/ml dérivé du nb_pieces (≈ 30 ml par pièce tout compris)
+    Plomberie réseau                       → ml dérivé du nb pièces d'eau + u par appareil
+    Soins, séances, consultations          → u ou h selon durée
+    Photo, vidéo, DJ, animation            → h ou j (durée d'intervention)
+    Dev, design, consulting                → j (TJM)
+
+  Le principe est universel — applique-le aussi aux métiers absents de cette liste.
+
+C — DIMENSION NON CALCULABLE → null, JAMAIS 0
+  Si la dimension de l'ouvrage ne peut pas être déduite du brief : quantite: null + entrée explicite dans champs_a_completer (ex : « Surface murale faïence non précisée — à mesurer sur place »).
+  Une quantité à 0 sur un devis envoyé au client est un défaut visible — toujours préférer null + champ à compléter.
+
+D — SANITY CHECK avant d'émettre le <DEVIS>
+  Pour chaque lot, calcule mentalement : total_lot_HT / dimension_principale → doit tomber dans la fourchette €/m² (ou €/ml, €/u, €/j…) du marché donnée plus bas. Si écart > 30 % → tes quantités OU tes prix sont faux, retravaille la décomposition avant d'émettre.
+
+  Cibles globales (vérification a posteriori) :
+    Plâtrerie complète maison habitable    → 60–110 €/m² au sol (doublage + cloisons + faux plafond + bandes)
+    Rénovation peinture appartement        → 25–45 €/m² (murs + plafonds)
+    Rénovation électrique totale logement  → 100–150 €/m² habitable
+    Rénovation plomberie totale logement   → 80–130 €/m² habitable
+    Rénovation salle de bain clé en main   → 1 200–2 500 €/m²
+    Couverture tuiles réfection complète   → 100–180 €/m² de toiture
+
+RÈGLE TRANSVERSE — Fournitures conventionnellement bundled, à ne JAMAIS omettre dans la désignation
+  Doublage thermique         → laine minérale + R cible explicite (mini R 3,7 selon RT/RE2020 pour mur)
+  Cloison acoustique 72/48   → laine acoustique + épaisseur
+  Faux plafond sur ossature  → ossature métallique suspendue + plaques + bandes
+  Carrelage                  → colle (C2S2 sol / C1 mur), joints, plinthes assorties
+  Couverture                 → écran HPV, liteaux + contre-liteaux, zinguerie (faîtage, rives, noues)
+  Tableau électrique         → différentiels, disjoncteurs détaillés, CONSUEL
+  Menuiserie                 → calfeutrement, joints périphériques, quincaillerie
+  Si tu mets UNE ligne globale, la désignation DOIT lister ces fournitures (matériau + dim/ép/R). Sinon, décompose en sous-lignes.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 QUANTITÉS ET PRIX
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
