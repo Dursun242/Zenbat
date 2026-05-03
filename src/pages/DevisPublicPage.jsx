@@ -298,6 +298,8 @@ export default function DevisPublicPage({ token }) {
         email:       data.artisan?.email,
         phone:       data.artisan?.phone,
         address:     data.artisan?.address,
+        color:       data.artisan?.color,
+        logo:        data.artisan?.logo,
       }
       const { blob } = await renderDataToPdf(d, cl, brand, 'devis', { filename: `${data.numero}.pdf` })
       window.open(URL.createObjectURL(blob), '_blank')
