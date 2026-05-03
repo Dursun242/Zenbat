@@ -435,50 +435,11 @@ export default function DevisPublicPage({ token }) {
           )}
         </div>
 
-        {/* Bouton PDF */}
+        {/* Bouton PDF — action principale */}
         <button onClick={openPdf} disabled={pdfLoading}
-          style={{ width: '100%', background: '#1A1612', color: 'white', border: 'none', borderRadius: 14, padding: '14px 20px', fontSize: 14, fontWeight: 700, cursor: pdfLoading ? 'default' : 'pointer', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, opacity: pdfLoading ? 0.7 : 1 }}>
+          style={{ width: '100%', background: '#1A1612', color: 'white', border: 'none', borderRadius: 14, padding: '16px 20px', fontSize: 15, fontWeight: 700, cursor: pdfLoading ? 'default' : 'pointer', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, opacity: pdfLoading ? 0.7 : 1 }}>
           {pdfLoading ? 'Génération…' : '📄 Voir le PDF du devis'}
         </button>
-
-        {/* Lignes du devis */}
-        {lots.map(lot => (
-          <div key={lot} style={{ background: 'white', borderRadius: 16, padding: 16, marginBottom: 10, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
-            {lots.length > 1 && <div style={{ fontSize: 10, fontWeight: 700, color: '#9A8E82', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: 10 }}>{lot}</div>}
-            {ouvrages.filter(l => (l.lot || 'Divers') === lot).map(l => (
-              <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, padding: '8px 0', borderBottom: '1px solid #F5F0E8' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1612' }}>{l.designation}</div>
-                  {l.description && <div style={{ fontSize: 12, color: '#6B6358', marginTop: 2 }}>{l.description}</div>}
-                  <div style={{ fontSize: 11, color: '#9A8E82', marginTop: 2 }}>{l.quantite} {l.unite} × {fmtEur(l.prix_unitaire)}</div>
-                </div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#1A1612', flexShrink: 0 }}>
-                  {fmtEur((l.quantite || 0) * (l.prix_unitaire || 0))}
-                </div>
-              </div>
-            ))}
-            {/* Lignes texte du lot */}
-            {lignes.filter(l => l.type_ligne === 'texte' && (l.lot || 'Divers') === lot).map(l => (
-              <div key={l.id} style={{ fontSize: 12, color: '#6B6358', fontStyle: 'italic', padding: '6px 0' }}>{l.designation}</div>
-            ))}
-          </div>
-        ))}
-
-        {/* Totaux */}
-        <div style={{ background: 'white', borderRadius: 16, padding: 16, marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontSize: 13, color: '#6B6358' }}>Total HT</span>
-            <span style={{ fontWeight: 700 }}>{fmtEur(totalHT)}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-            <span style={{ fontSize: 13, color: '#6B6358' }}>TVA {tvaRate}%</span>
-            <span style={{ fontWeight: 700 }}>{fmtEur(totalTTC - totalHT)}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #1A1612', paddingTop: 10 }}>
-            <span style={{ fontWeight: 800, fontSize: 15 }}>Total TTC</span>
-            <span style={{ fontWeight: 800, fontSize: 18 }}>{fmtEur(totalTTC)}</span>
-          </div>
-        </div>
 
         {/* Documents annexes */}
         {data.docs?.length > 0 && (
