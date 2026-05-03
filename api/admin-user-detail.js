@@ -5,8 +5,8 @@
 // Auth : bearer token de l'admin (ADMIN_EMAIL). Paramètre : userId (query
 // string ou body). Charge en parallèle via service_role key.
 
-import { createClient } from '@supabase/supabase-js'
 import { cors } from "./_cors.js"
+import { authenticate } from "./_withAuth.js"
 
 // Exécute une requête Supabase en tolérant l'absence de table (ex: migration
 // 0012 non appliquée sur l'env courant). Renvoie { data: [], error } au lieu
@@ -27,25 +27,9 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '')
-    if (!token) return res.status(401).json({ error: 'Non authentifié' })
-
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-    const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
-    const adminEmail  = process.env.ADMIN_EMAIL
-    if (!supabaseUrl || !serviceKey)
-      return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY non configurée' })
-
-    const admin = createClient(supabaseUrl, serviceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    })
-
-    // Vérifie l'identité de l'appelant + droit admin
-    const { data: { user: caller }, error: authErr } = await admin.auth.getUser(token)
-    if (authErr || !caller) return res.status(401).json({ error: 'Token invalide' })
-    const norm = (s) => String(s || '').trim().toLowerCase()
-    if (!adminEmail || norm(caller.email) !== norm(adminEmail))
-      return res.status(403).json({ error: "Accès réservé à l'administrateur" })
+    const auth = await authenticate(req, res, { adminOnly: true })
+    if (!auth) return
+    const { admin } = auth
 
     const userId = (req.query.userId || req.query.id || '').toString().trim()
     if (!userId) return res.status(400).json({ error: 'userId manquant' })
