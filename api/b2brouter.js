@@ -18,7 +18,9 @@ import { cors } from "./_cors.js";
 // Pour les actions authentifiées on parse manuellement le JSON.
 export const config = { api: { bodyParser: false } };
 
-const B2B_TIMEOUT_MS = 10000;
+const B2B_TIMEOUT_MS    = 10000;
+const B2B_RETRY_DELAY_MS = 1000;
+const B2B_MAX_ATTEMPTS   = 2;
 
 async function readRawBody(req) {
   const chunks = [];
@@ -32,32 +34,49 @@ async function b2b(method, path, body) {
   const version = process.env.B2B_API_VERSION || "2026-03-02";
   if (!apiKey) throw new Error("B2B_API_KEY non configurée");
 
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), B2B_TIMEOUT_MS);
-  const res = await fetch(`${base}${path}`, {
-    method,
-    headers: {
-      "Content-Type":      "application/json",
-      "Accept":            "application/json",
-      "X-B2B-API-Key":     apiKey,
-      "X-B2B-API-Version": version,
-    },
-    body: body ? JSON.stringify(body) : undefined,
-    signal: ctrl.signal,
-  }).finally(() => clearTimeout(t));
+  let lastErr;
+  for (let attempt = 1; attempt <= B2B_MAX_ATTEMPTS; attempt++) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), B2B_TIMEOUT_MS);
+    let res;
+    try {
+      res = await fetch(`${base}${path}`, {
+        method,
+        headers: {
+          "Content-Type":      "application/json",
+          "Accept":            "application/json",
+          "X-B2B-API-Key":     apiKey,
+          "X-B2B-API-Version": version,
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: ctrl.signal,
+      });
+      clearTimeout(t);
+    } catch (err) {
+      clearTimeout(t);
+      if (attempt === B2B_MAX_ATTEMPTS) throw err;
+      lastErr = err;
+      await new Promise(r => setTimeout(r, B2B_RETRY_DELAY_MS));
+      continue;
+    }
 
-  const text = await res.text();
-  let data = null;
-  try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
+    const text = await res.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
 
-  if (!res.ok) {
-    const err = data?.error || data?.message || `B2Brouter HTTP ${res.status}`;
-    const e = new Error(err);
+    if (res.ok) return data;
+
+    const msg = data?.error || data?.message || `B2Brouter HTTP ${res.status}`;
+    const e = new Error(msg);
     e.status = res.status;
     e.detail = data;
-    throw e;
+    // Ne pas réessayer sur les erreurs client (4xx)
+    if (res.status >= 400 && res.status < 500) throw e;
+    if (attempt === B2B_MAX_ATTEMPTS) throw e;
+    lastErr = e;
+    await new Promise(r => setTimeout(r, B2B_RETRY_DELAY_MS));
   }
-  return data;
+  throw lastErr;
 }
 
 function mapStatus(b2bStatus) {

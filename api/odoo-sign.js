@@ -10,11 +10,28 @@ import { cors } from "./_cors.js";
 //   ODOO_API_KEY   ex: <API key générée dans Odoo → Préférences → Compte>
 
 const ODOO_CALL_TIMEOUT_MS = 10000;
+const ODOO_RETRY_DELAY_MS  = 1000;
+const ODOO_MAX_ATTEMPTS    = 2;
 
-function odooFetch(url, init) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), ODOO_CALL_TIMEOUT_MS);
-  return fetch(url, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(t));
+async function odooFetch(url, init) {
+  let lastErr;
+  for (let attempt = 1; attempt <= ODOO_MAX_ATTEMPTS; attempt++) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), ODOO_CALL_TIMEOUT_MS);
+    try {
+      const res = await fetch(url, { ...init, signal: ctrl.signal });
+      clearTimeout(t);
+      // Ne pas réessayer sur les erreurs client (4xx) ni si c'est le dernier essai
+      if (res.ok || res.status < 500 || attempt === ODOO_MAX_ATTEMPTS) return res;
+      lastErr = new Error(`Odoo HTTP ${res.status}`);
+    } catch (err) {
+      clearTimeout(t);
+      if (attempt === ODOO_MAX_ATTEMPTS) throw err;
+      lastErr = err;
+    }
+    await new Promise(r => setTimeout(r, ODOO_RETRY_DELAY_MS));
+  }
+  throw lastErr;
 }
 
 async function odooCall({ base, db, uid, password, model, method, args=[], kwargs={} }) {
