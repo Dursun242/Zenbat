@@ -24,13 +24,33 @@ const hashStr = s => createHash('sha256').update(String(s)).digest('hex')
 const genOtp  = () => Math.floor(100000 + Math.random() * 900000).toString()
 const fmtEur  = n => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n || 0)
 
-async function sendEmail({ to, subject, html }) {
+async function sendEmail({ to, subject, html, cc, fromName }) {
+  const gmailUser = process.env.GMAIL_USER
+  const gmailPass = process.env.GMAIL_APP_PASSWORD || process.env.GMAIL_APP_PASWORD
+  const displayName = fromName || 'Consulter votre devis'
+
+  if (gmailUser && gmailPass) {
+    const { createTransport } = await import('nodemailer')
+    const transporter = createTransport({
+      host: 'smtp.gmail.com', port: 587, secure: false,
+      auth: { user: gmailUser, pass: gmailPass },
+    })
+    await transporter.sendMail({
+      from: `${displayName} <${gmailUser}>`,
+      to, subject, html,
+      ...(cc ? { cc: Array.isArray(cc) ? cc.join(',') : cc } : {}),
+    })
+    return
+  }
+
   const key = process.env.RESEND_API_KEY
-  if (!key) { console.warn('[devis-public] RESEND_API_KEY non configurée'); return }
+  if (!key) throw new Error('Aucun service email configuré (GMAIL_USER+GMAIL_APP_PASSWORD ou RESEND_API_KEY)')
+  const payload = { from: process.env.RESEND_FROM || `${displayName} <onboarding@resend.dev>`, to, subject, html }
+  if (cc) payload.cc = Array.isArray(cc) ? cc : [cc]
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: 'Zenbat <devis@zenbat.fr>', to, subject, html }),
+    body: JSON.stringify(payload),
   })
   if (!res.ok) {
     const e = await res.json().catch(() => ({}))
@@ -63,11 +83,15 @@ async function verifySession(admin, publicToken, sessionId) {
 
 // ── Templates email ────────────────────────────────────────────────────────
 function emailDevis({ clientName, company, brand, devis, fmtEurFn, publicUrl }) {
+  const accentColor = brand?.color || '#22c55e'
+  const logo = brand?.logo || null
+  const headerContent = logo
+    ? `<img src="${logo}" alt="${company || ''}" style="max-height:64px;max-width:220px;object-fit:contain;display:block;margin:0 auto${company ? ';margin-bottom:10px' : ''}">${company ? `<div style="color:white;font-size:13px;font-weight:600;opacity:0.85">${company}</div>` : ''}`
+    : `<div style="font-size:22px;font-weight:800;letter-spacing:-0.5px;color:white">${company || 'Votre devis'}</div>`
   return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f5;font-family:Inter,system-ui,sans-serif">
 <div style="max-width:560px;margin:32px auto;background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
-  <div style="background:#1A1612;padding:28px 32px;text-align:center">
-    <div style="font-size:26px;font-weight:800;letter-spacing:-1px"><span style="color:#22c55e">Zen</span><span style="color:white">bat</span></div>
-    ${company ? `<div style="color:#9A8E82;font-size:13px;margin-top:6px">${company}</div>` : ''}
+  <div style="background:${accentColor};padding:28px 32px;text-align:center">
+    ${headerContent}
   </div>
   <div style="padding:32px">
     <h2 style="margin:0 0 8px;font-size:20px;color:#1A1612">Bonjour${clientName ? ' ' + clientName : ''},</h2>
@@ -86,8 +110,8 @@ function emailDevis({ clientName, company, brand, devis, fmtEurFn, publicUrl }) 
         <span style="font-weight:800;font-size:16px;color:#1A1612">${fmtEurFn(devis.montant_ht)}</span>
       </div>
     </div>
-    <a href="${publicUrl}" style="display:block;background:#22c55e;color:white;text-decoration:none;text-align:center;padding:14px 20px;border-radius:12px;font-weight:700;font-size:15px">
-      Consulter mon devis →
+    <a href="${publicUrl}" style="display:block;background:${accentColor};color:white;text-decoration:none;text-align:center;padding:14px 20px;border-radius:12px;font-weight:700;font-size:15px">
+      Consulter votre devis →
     </a>
     ${brand?.phone || brand?.email ? `<p style="color:#9A8E82;font-size:12px;text-align:center;margin-top:20px">Questions ? ${brand.phone ? `📞 ${brand.phone}` : ''} ${brand.email ? `✉ ${brand.email}` : ''}</p>` : ''}
   </div>
@@ -217,10 +241,9 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const body = req.body || {}
-  const { action, token } = body
-  if (!token) return res.status(400).json({ error: 'token manquant' })
+  const { action } = body
 
-  // ── send : artisan envoie le devis (auth requise) ──────────────────────
+  // ── send : artisan envoie le devis (auth requise, pas besoin de public_token côté client) ──
   if (action === 'send') {
     const auth = await authenticate(req, res)
     if (!auth) return
@@ -234,6 +257,14 @@ export default async function handler(req, res) {
       .eq('id', devis_id).eq('owner_id', user.id).maybeSingle()
     if (!devis) return res.status(404).json({ error: 'Devis introuvable' })
 
+    // Génère un public_token si absent (devis créé avant migration)
+    let publicToken = devis.public_token
+    if (!publicToken) {
+      const { randomUUID } = await import('crypto')
+      publicToken = randomUUID()
+      await admin.from('devis').update({ public_token: publicToken }).eq('id', devis.id)
+    }
+
     const { data: client } = await admin.from('clients')
       .select('raison_sociale, nom, prenom, email').eq('id', devis.client_id).maybeSingle()
     if (!client?.email) return res.status(400).json({ error: "Le client n'a pas d'email renseigné" })
@@ -243,12 +274,15 @@ export default async function handler(req, res) {
     const brand = (() => { try { return JSON.parse(profile?.brand_data || '{}') } catch { return {} } })()
     const company    = profile?.company_name || brand.companyName || ''
     const clientName = (`${client.prenom || ''} ${client.nom || ''}`).trim() || client.raison_sociale || ''
-    const publicUrl  = `${process.env.VITE_PUBLIC_URL || 'https://app.zenbat.fr'}/d/${devis.public_token}`
+    const publicUrl  = `${process.env.VITE_PUBLIC_URL || 'https://zenbat.vercel.app'}/d/${publicToken}`
 
+    const artisanEmail = brand.email || user.email || null
     try {
       await sendEmail({
         to: client.email,
-        subject: `${company ? company + ' — ' : ''}Votre devis ${devis.numero}${devis.objet ? ' · ' + devis.objet : ''}`,
+        cc: artisanEmail || undefined,
+        fromName: company || 'Consulter votre devis',
+        subject: `Consulter votre devis${devis.objet ? ' — ' + devis.objet : ' ' + devis.numero}${company ? ' · ' + company : ''}`,
         html: emailDevis({ clientName, company, brand, devis, fmtEurFn: fmtEur, publicUrl }),
       })
     } catch (e) {
@@ -258,8 +292,11 @@ export default async function handler(req, res) {
     await admin.from('devis').update({ statut: 'envoye', sent_to_client_at: new Date().toISOString() }).eq('id', devis.id)
     await admin.from('devis_audit_log').insert({ devis_id: devis.id, event: 'sent', from_party: 'artisan', meta: { to: client.email } })
 
-    return res.status(200).json({ ok: true, publicUrl, token: devis.public_token })
+    return res.status(200).json({ ok: true, publicUrl, token: publicToken })
   }
+
+  const { token } = body
+  if (!token) return res.status(400).json({ error: 'token manquant' })
 
   // ── artisan_respond : réponse à une négociation (auth requise) ─────────
   if (action === 'artisan_respond') {
@@ -347,14 +384,19 @@ export default async function handler(req, res) {
     if ((count || 0) >= 3) return res.status(429).json({ error: 'Trop de tentatives. Réessayez dans 15 minutes.' })
 
     const otp = genOtp()
-    const { data: sess } = await admin.from('devis_otp_sessions').insert({
+    const { data: sess, error: sessErr } = await admin.from('devis_otp_sessions').insert({
       public_token: token,
       email_hash:   hashStr(email.toLowerCase().trim()),
       otp_hash:     hashStr(otp),
       expires_at:   new Date(Date.now() + 15 * 60_000).toISOString(),
     }).select('id').single()
+    if (sessErr || !sess) return res.status(500).json({ error: 'Erreur création session OTP — vérifiez que la migration 0032 est appliquée' })
 
-    await sendEmail({ to: email, subject: `${otp} — Code d'accès devis ${devis.numero}`, html: emailOtp({ otp, devis }) })
+    try {
+      await sendEmail({ to: email, subject: `${otp} — Code d'accès devis ${devis.numero}`, html: emailOtp({ otp, devis }) })
+    } catch (e) {
+      return res.status(502).json({ error: `Échec envoi email : ${e.message}` })
+    }
 
     return res.status(200).json({ session_id: sess.id })
   }
