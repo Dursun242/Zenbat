@@ -24,13 +24,15 @@ const hashStr = s => createHash('sha256').update(String(s)).digest('hex')
 const genOtp  = () => Math.floor(100000 + Math.random() * 900000).toString()
 const fmtEur  = n => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n || 0)
 
-async function sendEmail({ to, subject, html }) {
+async function sendEmail({ to, subject, html, cc }) {
   const key = process.env.RESEND_API_KEY
   if (!key) { console.warn('[devis-public] RESEND_API_KEY non configurée'); return }
+  const payload = { from: process.env.RESEND_FROM || 'Zenbat <onboarding@resend.dev>', to, subject, html }
+  if (cc) payload.cc = Array.isArray(cc) ? cc : [cc]
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: process.env.RESEND_FROM || 'Zenbat <onboarding@resend.dev>', to, subject, html }),
+    body: JSON.stringify(payload),
   })
   if (!res.ok) {
     const e = await res.json().catch(() => ({}))
@@ -256,9 +258,11 @@ export default async function handler(req, res) {
     const clientName = (`${client.prenom || ''} ${client.nom || ''}`).trim() || client.raison_sociale || ''
     const publicUrl  = `${process.env.VITE_PUBLIC_URL || 'https://zenbat.vercel.app'}/d/${publicToken}`
 
+    const artisanEmail = brand.email || null
     try {
       await sendEmail({
         to: client.email,
+        cc: artisanEmail || undefined,
         subject: `${company ? company + ' — ' : ''}Votre devis ${devis.numero}${devis.objet ? ' · ' + devis.objet : ''}`,
         html: emailDevis({ clientName, company, brand, devis, fmtEurFn: fmtEur, publicUrl }),
       })
