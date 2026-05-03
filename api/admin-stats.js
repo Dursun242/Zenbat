@@ -118,6 +118,23 @@ export default async function handler(req, res) {
       }
     }
 
+    // ── Aujourd'hui & cette semaine (depuis recent déjà chargé) ────────
+    const todayStr      = new Date().toISOString().slice(0, 10)
+    const sevenDaysAgo  = new Date(Date.now() - 7 * 86400000).toISOString()
+    let todayInput = 0, todayOutput = 0, todayCost = 0, todayCalls = 0
+    let weekInput  = 0, weekOutput  = 0, weekCost  = 0, weekCalls  = 0
+    for (const r of recent || []) {
+      const inp  = r.input_tokens  || 0
+      const out  = r.output_tokens || 0
+      const cost = calcCost(r.model, inp, out)
+      if (r.created_at >= sevenDaysAgo) {
+        weekInput += inp; weekOutput += out; weekCost += cost; weekCalls++
+      }
+      if (r.created_at.slice(0, 10) === todayStr) {
+        todayInput += inp; todayOutput += out; todayCost += cost; todayCalls++
+      }
+    }
+
     // ── Tendance journalière (30 derniers jours) ────────────────────────
     const daily = {}
     for (const r of recent || []) {
@@ -161,6 +178,8 @@ export default async function handler(req, res) {
     return res.status(200).json({
       total:  { input: totalInput, output: totalOutput, cost: totalCost, calls: (allLogs || []).length },
       month:  { input: monthInput, output: monthOutput, cost: monthCost },
+      week:   { input: weekInput,  output: weekOutput,  cost: weekCost,  calls: weekCalls  },
+      today:  { input: todayInput, output: todayOutput, cost: todayCost, calls: todayCalls },
       byModel: Object.entries(byModel).map(([model, v]) => ({ model, ...v })).sort((a, b) => b.cost - a.cost),
       dailyTrend,
       topUsers,

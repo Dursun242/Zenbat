@@ -6,6 +6,7 @@ import Badge from "./ui/Badge.jsx";
 import LignesEditor from "./LignesEditor.jsx";
 import PDFViewer from "./PDFViewer.jsx";
 import ClientPickerModal from "./app/ClientPickerModal.jsx";
+import DevisClientActions from "./DevisClientActions.jsx";
 
 export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChange, onConvertToInvoice, onCreateAcompte, onDuplicate, onCreateIndice, groupVersions = [], goDevis, loading, autoOpenPDF, onAutoOpenPDFConsumed }) {
   const [showPDF,        setShowPDF]        = useState(false);
@@ -387,6 +388,9 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
               </div>
             )}
           </div>
+
+          {/* Suivi client — envoi, négociation, audit */}
+          <DevisClientActions devis={d} client={cl} onChange={onChange} />
 
           {/* Log Odoo Sign */}
           {showLog && log.length > 0 && (

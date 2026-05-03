@@ -151,7 +151,7 @@ export default function Signup({ onSwitchToLogin, onBack }) {
               </div>
               <div style={{height:12}}/>
               <label style={s.label}>Nom de l'entreprise</label>
-              <input required value={company} onChange={e=>setCompany(e.target.value)} style={s.input} autoComplete="organization" placeholder="Ex : Aila Façade, SARL Dupont…" />
+              <input required value={company} onChange={e=>setCompany(e.target.value)} style={s.input} autoComplete="organization" placeholder="Ex : SARL Dupont, Martin Plomberie…" />
               <div style={{height:12}}/>
               <label style={s.label}>Email</label>
               <input type="email" required value={email} onChange={e=>setEmail(e.target.value)} style={s.input} autoComplete="email" />

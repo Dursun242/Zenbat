@@ -7,6 +7,26 @@
 
 import { useEffect, useRef, useState } from "react";
 import { I } from "../ui/icons.jsx";
+import { getToken } from "../../lib/getToken.js";
+
+function fmtUsd(n) {
+  if (!n) return "$0.000";
+  if (n < 0.01) return `$${n.toFixed(4)}`;
+  if (n < 1)    return `$${n.toFixed(3)}`;
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n);
+}
+
+function TokenRow({ label, cost, calls }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "3px 0" }}>
+      <span style={{ fontSize: 11, color: "#6B6358" }}>{label}</span>
+      <span style={{ fontSize: 11, fontWeight: 700, color: "#1A1612" }}>
+        {fmtUsd(cost)}
+        <span style={{ fontWeight: 400, color: "#9A8E82", marginLeft: 4 }}>{calls > 0 ? `·${calls}` : ""}</span>
+      </span>
+    </div>
+  );
+}
 
 export default function HeaderMenu({
   isAdmin,
@@ -20,7 +40,9 @@ export default function HeaderMenu({
   onOpenSupport,
   onSignOut,
 }) {
-  const [open, setOpen] = useState(false);
+  const [open,       setOpen]       = useState(false);
+  const [tokenData,  setTokenData]  = useState(null);
+  const [tokenLoading, setTokenLoading] = useState(false);
   const btnRef = useRef(null);
 
   useEffect(() => {
@@ -29,6 +51,19 @@ export default function HeaderMenu({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
+
+  // Charge les stats de tokens quand le menu s'ouvre (admin uniquement)
+  useEffect(() => {
+    if (!open || !isAdmin || tokenData) return;
+    setTokenLoading(true);
+    getToken().then(tok =>
+      fetch("/api/admin-stats?type=tokens", { headers: { Authorization: `Bearer ${tok}` } })
+        .then(r => r.json())
+        .then(d => { if (d.total) setTokenData(d); })
+        .catch(() => {})
+        .finally(() => setTokenLoading(false))
+    );
+  }, [open, isAdmin]);
 
   const close = () => setOpen(false);
 
@@ -137,12 +172,32 @@ export default function HeaderMenu({
             )}
 
             {isAdmin && (
-              <button role="menuitem" onClick={() => { close(); onOpenAdmin(); }} style={itemBase}
-                onMouseEnter={e => e.currentTarget.style.background = "#FAF7F2"}
-                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                <span style={{ color: "#f59e0b", display: "inline-flex" }}>{I.cog}</span>
-                Panel admin
-              </button>
+              <>
+                <div style={{ padding: "10px 14px 8px", borderTop: "1px solid #F1ECE3" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#9A8E82", letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    Coûts IA
+                    <button
+                      onClick={() => { setTokenData(null); setTokenLoading(true); getToken().then(tok => fetch("/api/admin-stats?type=tokens", { headers: { Authorization: `Bearer ${tok}` } }).then(r => r.json()).then(d => { if (d.total) setTokenData(d); }).catch(() => {}).finally(() => setTokenLoading(false))); }}
+                      style={{ background: "none", border: "none", color: "#9A8E82", fontSize: 11, cursor: "pointer", padding: 0 }}>↻</button>
+                  </div>
+                  {tokenLoading && <div style={{ fontSize: 11, color: "#9A8E82" }}>Chargement…</div>}
+                  {!tokenLoading && !tokenData && <div style={{ fontSize: 11, color: "#9A8E82" }}>Aucune donnée</div>}
+                  {!tokenLoading && tokenData && (
+                    <>
+                      <TokenRow label="Aujourd'hui"   cost={tokenData.today.cost}  calls={tokenData.today.calls} />
+                      <TokenRow label="Cette semaine" cost={tokenData.week.cost}   calls={tokenData.week.calls} />
+                      <TokenRow label="Ce mois-ci"    cost={tokenData.month.cost}  calls={null} />
+                      <TokenRow label="Total"         cost={tokenData.total.cost}  calls={tokenData.total.calls} />
+                    </>
+                  )}
+                </div>
+                <button role="menuitem" onClick={() => { close(); onOpenAdmin(); }} style={itemBase}
+                  onMouseEnter={e => e.currentTarget.style.background = "#FAF7F2"}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  <span style={{ color: "#f59e0b", display: "inline-flex" }}>{I.cog}</span>
+                  Panel admin
+                </button>
+              </>
             )}
 
             {user && (

@@ -53,10 +53,12 @@ export default function AdminTokenStats({ data, loading, onRefresh }) {
       {!loading && data && (
         <>
           {/* KPIs globaux */}
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#9A8E82", letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 8 }}>Tout temps</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#9A8E82", letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 8 }}>Dépenses</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
-            <Card label="Coût total"       value={fmtUsd(data.total.cost)}    sub={`${data.total.calls.toLocaleString("fr-FR")} appels`} color="#ef4444" />
+            <Card label="Aujourd'hui"      value={fmtUsd(data.today.cost)}    sub={`${data.today.calls} appels`}                                        color="#6366f1" />
+            <Card label="Cette semaine"    value={fmtUsd(data.week.cost)}     sub={`${data.week.calls} appels`}                                         color="#0ea5e9" />
             <Card label="Ce mois-ci"       value={fmtUsd(data.month.cost)}    sub={`in: ${fmtTk(data.month.input)} · out: ${fmtTk(data.month.output)}`} color="#f59e0b" />
+            <Card label="Total"            value={fmtUsd(data.total.cost)}    sub={`${data.total.calls.toLocaleString("fr-FR")} appels`}                 color="#ef4444" />
             <Card label="Tokens input"     value={fmtTk(data.total.input)}    sub="prompts + contexte" />
             <Card label="Tokens output"    value={fmtTk(data.total.output)}   sub="réponses générées" />
           </div>
