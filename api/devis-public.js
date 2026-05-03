@@ -281,7 +281,7 @@ export default async function handler(req, res) {
       await sendEmail({
         to: client.email,
         cc: artisanEmail || undefined,
-        fromName: company || 'Consulter votre devis',
+        fromName: 'Consulter votre devis',
         subject: `Consulter votre devis${devis.objet ? ' — ' + devis.objet : ' ' + devis.numero}${company ? ' · ' + company : ''}`,
         html: emailDevis({ clientName, company, brand, devis, fmtEurFn: fmtEur, publicUrl }),
       })
