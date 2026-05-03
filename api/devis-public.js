@@ -59,7 +59,7 @@ async function sendEmail({ to, subject, html, cc, fromName, attachments }) {
   }
 }
 
-async function notifyTg(kind, payload) {
+function notifyTg(kind, payload) {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) return
@@ -67,7 +67,7 @@ async function notifyTg(kind, payload) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify({ kind, payload }),
-  }).catch(() => {})
+  }).catch(e => console.error('[notifyTg]', e?.message))
 }
 
 async function verifySession(admin, publicToken, sessionId) {
@@ -364,7 +364,8 @@ export default async function handler(req, res) {
         attachments,
       })
     } catch (e) {
-      return res.status(502).json({ error: `Impossible d'envoyer l'email : ${e.message}` })
+      console.error('[send email]', e?.message)
+      return res.status(502).json({ error: "Échec de l'envoi email. Vérifiez la configuration GMAIL ou réessayez." })
     }
 
     await admin.from('devis').update({ statut: 'envoye', sent_to_client_at: new Date().toISOString() }).eq('id', devis.id)
@@ -473,7 +474,8 @@ export default async function handler(req, res) {
     try {
       await sendEmail({ to: email, subject: `${otp} — Code d'accès devis ${devis.numero}`, html: emailOtp({ otp, devis }) })
     } catch (e) {
-      return res.status(502).json({ error: `Échec envoi email : ${e.message}` })
+      console.error('[otp email]', e?.message)
+      return res.status(502).json({ error: 'Échec envoi du code. Vérifiez votre adresse email ou réessayez.' })
     }
 
     return res.status(200).json({ session_id: sess.id })
@@ -491,8 +493,8 @@ export default async function handler(req, res) {
     if (new Date(sess.expires_at) < new Date()) return res.status(410).json({ error: 'Code expiré. Demandez-en un nouveau.' })
     if (sess.attempts >= 3) return res.status(429).json({ error: 'Trop de tentatives. Demandez un nouveau code.' })
 
-    await admin.from('devis_otp_sessions').update({ attempts: sess.attempts + 1 }).eq('id', session_id)
     if (hashStr(code.trim()) !== sess.otp_hash) {
+      await admin.from('devis_otp_sessions').update({ attempts: sess.attempts + 1 }).eq('id', session_id)
       const left = 2 - sess.attempts
       return res.status(401).json({ error: `Code incorrect${left > 0 ? ` (${left} essai${left > 1 ? 's' : ''} restant)` : ''}` })
     }

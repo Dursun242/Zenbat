@@ -9,10 +9,11 @@ export function AuthProvider({ children }) {
   const [recovery, setRecovery] = useState(false)
 
   useEffect(() => {
+    const timeout = setTimeout(() => setLoading(false), 8000)
     supabase.auth.getSession()
       .then(({ data }) => setSession(data.session))
       .catch((e) => console.error('[auth] getSession failed:', e?.message))
-      .finally(() => setLoading(false))
+      .finally(() => { clearTimeout(timeout); setLoading(false) })
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s)
