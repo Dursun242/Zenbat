@@ -463,7 +463,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
               {generatingPdf ? "⏳" : "⬇"}
             </button>
           )}
-          <button onClick={onClose} style={{background:"#2A231C",color:"#9A8E82",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer"}}>{Ix.x}</button>
+          <button onClick={onClose} aria-label="Fermer" style={{background:"#2A231C",color:"#9A8E82",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer"}}>{Ix.x}</button>
         </div>
       </div>
 

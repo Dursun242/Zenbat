@@ -1,7 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 import { cors } from './_cors.js'
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+// RFC 5322 simplifié : local@domain.tld, min 2 chars TLD, longueur max 254
+const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/
+const EMAIL_MAX_LENGTH = 254
 
 export default async function handler(req, res) {
   cors(req, res, { methods: 'POST, OPTIONS', auth: false })
@@ -9,7 +11,8 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const { email } = req.body ?? {}
-  if (!email || !EMAIL_RE.test(email))
+  const emailStr = typeof email === 'string' ? email.trim() : ''
+  if (!emailStr || emailStr.length > EMAIL_MAX_LENGTH || !EMAIL_RE.test(emailStr))
     return res.status(400).json({ error: 'Email invalide' })
 
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL

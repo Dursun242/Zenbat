@@ -7,8 +7,13 @@ const ALLOWED_MODELS = [
   "claude-sonnet-4-5",
 ];
 
-const MAX_SYSTEM_CHARS  = 40_000;
+const MAX_SYSTEM_CHARS   = 40_000;
 const MAX_MESSAGES_CHARS = 40_000;
+const STREAM_TIMEOUT_MS  = 55_000;
+const MS_PER_DAY         = 86_400_000;
+const AI_LIMIT_FREE      = 40;
+const AI_LIMIT_PRO       = 200;
+const TRIAL_DAYS_DEFAULT = 30;
 
 export default async function handler(req, res) {
   cors(req, res, { methods: "POST, OPTIONS", auth: true });
@@ -45,15 +50,14 @@ export default async function handler(req, res) {
   const isAdmin = adminEmail && norm(user.email) === norm(adminEmail);
   const effectivePlan = isAdmin ? "pro" : profile.plan;
 
-  const TRIAL_DAYS = 30;
   const accountAgeDays = Math.floor(
-    (Date.now() - new Date(user.created_at).getTime()) / 86_400_000
+    (Date.now() - new Date(user.created_at).getTime()) / MS_PER_DAY
   );
-  if (effectivePlan === "free" && accountAgeDays >= TRIAL_DAYS) {
+  if (effectivePlan === "free" && accountAgeDays >= TRIAL_DAYS_DEFAULT) {
     return res.status(403).json({ error: "Période d'essai expirée" });
   }
 
-  const AI_DAILY_LIMIT = effectivePlan === "pro" ? 200 : 40;
+  const AI_DAILY_LIMIT = effectivePlan === "pro" ? AI_LIMIT_PRO : AI_LIMIT_FREE;
   const todayStart = new Date();
   todayStart.setUTCHours(0, 0, 0, 0);
   const { count: callsToday } = await admin.from("ia_conversations")
@@ -127,7 +131,7 @@ export default async function handler(req, res) {
     // la réponse au client. Les T3 multi-lots (rénovation totale, extension)
     // peuvent légitimement prendre 30-50 s à générer.
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 55000);
+    const timeout = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
 
     let upstream;
     try {
