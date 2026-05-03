@@ -152,16 +152,54 @@ export default async function handler(req, res) {
         res.flushHeaders?.();
 
         const reader = upstream.body.getReader();
+        const decoder = new TextDecoder();
+        let sseBuffer = "";
+        let inputTokens = 0;
+        let outputTokens = 0;
+        const startTime = Date.now();
+
         try {
           while (true) {
             const { value, done } = await reader.read();
             if (done) break;
             res.write(value);
             res.flush?.();
+
+            // Parse SSE events to capture token usage
+            sseBuffer += decoder.decode(value, { stream: true });
+            const lines = sseBuffer.split("\n");
+            sseBuffer = lines.pop() ?? "";
+            for (const line of lines) {
+              if (!line.startsWith("data: ")) continue;
+              try {
+                const evt = JSON.parse(line.slice(6));
+                if (evt.type === "message_start" && evt.message?.usage) {
+                  inputTokens  = evt.message.usage.input_tokens  || 0;
+                  outputTokens = evt.message.usage.output_tokens || 0;
+                } else if (evt.type === "message_delta" && evt.usage) {
+                  outputTokens = evt.usage.output_tokens || 0;
+                }
+              } catch {}
+            }
           }
         } catch {
           // client abort ou erreur réseau — on ferme proprement
         }
+
+        // Log token usage (fire-and-forget)
+        if (inputTokens > 0 || outputTokens > 0) {
+          admin.from("claude_api_logs").insert({
+            model,
+            use_case:      support_ticket_id ? "support" : "devis",
+            input_tokens:  inputTokens,
+            output_tokens: outputTokens,
+            latency_ms:    Date.now() - startTime,
+            status_code:   200,
+            stream_enabled: true,
+            user_id:       user.id,
+          }).then(() => {}).catch(() => {});
+        }
+
         return res.end();
       } else {
         // Erreur Anthropic sur une requête stream : on lit le JSON d'erreur
@@ -171,7 +209,22 @@ export default async function handler(req, res) {
     }
 
     // ── Non-streaming ────────────────────────────────────────────────────────
+    const startTime = Date.now();
     const upstreamData = await upstream.json();
+
+    // Log token usage (fire-and-forget)
+    if (upstream.ok && upstreamData?.usage) {
+      admin.from("claude_api_logs").insert({
+        model,
+        use_case:      support_ticket_id ? "support" : "devis",
+        input_tokens:  upstreamData.usage.input_tokens  || 0,
+        output_tokens: upstreamData.usage.output_tokens || 0,
+        latency_ms:    Date.now() - startTime,
+        status_code:   200,
+        stream_enabled: false,
+        user_id:       user.id,
+      }).then(() => {}).catch(() => {});
+    }
 
     // Persistance support : si on est dans un ticket, on insère la réponse Claude
     // dans support_messages (role='claude'). L'utilisateur a déjà inséré son propre
