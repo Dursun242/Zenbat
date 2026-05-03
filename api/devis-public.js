@@ -30,7 +30,7 @@ async function sendEmail({ to, subject, html }) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: 'Zenbat <devis@zenbat.fr>', to, subject, html }),
+    body: JSON.stringify({ from: process.env.RESEND_FROM || 'Zenbat <onboarding@resend.dev>', to, subject, html }),
   })
   if (!res.ok) {
     const e = await res.json().catch(() => ({}))
@@ -254,7 +254,7 @@ export default async function handler(req, res) {
     const brand = (() => { try { return JSON.parse(profile?.brand_data || '{}') } catch { return {} } })()
     const company    = profile?.company_name || brand.companyName || ''
     const clientName = (`${client.prenom || ''} ${client.nom || ''}`).trim() || client.raison_sociale || ''
-    const publicUrl  = `${process.env.VITE_PUBLIC_URL || 'https://app.zenbat.fr'}/d/${publicToken}`
+    const publicUrl  = `${process.env.VITE_PUBLIC_URL || 'https://zenbat.vercel.app'}/d/${publicToken}`
 
     try {
       await sendEmail({
