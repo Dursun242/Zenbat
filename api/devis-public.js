@@ -82,11 +82,14 @@ async function verifySession(admin, publicToken, sessionId) {
 
 // ── Templates email ────────────────────────────────────────────────────────
 function emailDevis({ clientName, company, brand, devis, fmtEurFn, publicUrl }) {
+  const accentColor = brand?.color || '#22c55e'
   return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f5;font-family:Inter,system-ui,sans-serif">
 <div style="max-width:560px;margin:32px auto;background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
   <div style="background:#1A1612;padding:28px 32px;text-align:center">
-    <div style="font-size:26px;font-weight:800;letter-spacing:-1px"><span style="color:#22c55e">Zen</span><span style="color:white">bat</span></div>
-    ${company ? `<div style="color:#9A8E82;font-size:13px;margin-top:6px">${company}</div>` : ''}
+    <div style="font-size:26px;font-weight:800;letter-spacing:-1px;margin-bottom:${company ? '8' : '0'}px">
+      <span style="color:${accentColor}">Zen</span><span style="color:white">bat</span>
+    </div>
+    ${company ? `<div style="color:white;font-size:15px;font-weight:700">${company}</div>` : ''}
   </div>
   <div style="padding:32px">
     <h2 style="margin:0 0 8px;font-size:20px;color:#1A1612">Bonjour${clientName ? ' ' + clientName : ''},</h2>
@@ -105,8 +108,8 @@ function emailDevis({ clientName, company, brand, devis, fmtEurFn, publicUrl }) 
         <span style="font-weight:800;font-size:16px;color:#1A1612">${fmtEurFn(devis.montant_ht)}</span>
       </div>
     </div>
-    <a href="${publicUrl}" style="display:block;background:#22c55e;color:white;text-decoration:none;text-align:center;padding:14px 20px;border-radius:12px;font-weight:700;font-size:15px">
-      Consulter mon devis →
+    <a href="${publicUrl}" style="display:block;background:${accentColor};color:white;text-decoration:none;text-align:center;padding:14px 20px;border-radius:12px;font-weight:700;font-size:15px">
+      Consulter votre devis →
     </a>
     ${brand?.phone || brand?.email ? `<p style="color:#9A8E82;font-size:12px;text-align:center;margin-top:20px">Questions ? ${brand.phone ? `📞 ${brand.phone}` : ''} ${brand.email ? `✉ ${brand.email}` : ''}</p>` : ''}
   </div>
@@ -280,7 +283,7 @@ export default async function handler(req, res) {
       await sendEmail({
         to: client.email,
         cc: artisanEmail || undefined,
-        subject: `${company ? company + ' — ' : ''}Votre devis ${devis.numero}${devis.objet ? ' · ' + devis.objet : ''}`,
+        subject: `Consulter votre devis${devis.objet ? ' — ' + devis.objet : ' ' + devis.numero}${company ? ' · ' + company : ''}`,
         html: emailDevis({ clientName, company, brand, devis, fmtEurFn: fmtEur, publicUrl }),
       })
     } catch (e) {
