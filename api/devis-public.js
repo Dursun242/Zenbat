@@ -276,11 +276,11 @@ export default async function handler(req, res) {
     const clientName = (`${client.prenom || ''} ${client.nom || ''}`).trim() || client.raison_sociale || ''
     const publicUrl  = `${process.env.VITE_PUBLIC_URL || 'https://zenbat.vercel.app'}/d/${publicToken}`
 
-    const artisanEmail = brand.email || user.email || null
+    const ccEmails = [...new Set([user.email, brand.email].filter(Boolean))]
     try {
       await sendEmail({
         to: client.email,
-        cc: artisanEmail || undefined,
+        cc: ccEmails.length ? ccEmails : undefined,
         fromName: 'Consulter votre devis',
         subject: `Consulter votre devis${devis.objet ? ' — ' + devis.objet : ' ' + devis.numero}${company ? ' · ' + company : ''}`,
         html: emailDevis({ clientName, company, brand, devis, fmtEurFn: fmtEur, publicUrl }),
