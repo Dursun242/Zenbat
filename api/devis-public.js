@@ -241,7 +241,7 @@ export default async function handler(req, res) {
 
     const { data: profile } = await admin.from('profiles')
       .select('company_name, full_name, brand_data').eq('id', devis.owner_id).maybeSingle()
-    const brand = (() => { try { return JSON.parse(profile?.brand_data || '{}') } catch { return {} } })()
+    const brand = (() => { const r = profile?.brand_data; if (!r) return {}; if (typeof r === 'string') { try { return JSON.parse(r) } catch { return {} } } return r })()
 
     const artisan = {
       company: profile?.company_name || brand.companyName || '',
@@ -334,7 +334,7 @@ export default async function handler(req, res) {
 
     const { data: profile } = await admin.from('profiles')
       .select('company_name, brand_data').eq('id', user.id).maybeSingle()
-    const brand = (() => { try { return JSON.parse(profile?.brand_data || '{}') } catch { return {} } })()
+    const brand = (() => { const r = profile?.brand_data; if (!r) return {}; if (typeof r === 'string') { try { return JSON.parse(r) } catch { return {} } } return r })()
     const company    = profile?.company_name || brand.companyName || ''
     const clientName = (`${client.prenom || ''} ${client.nom || ''}`).trim() || client.raison_sociale || ''
     const publicUrl  = `${process.env.VITE_PUBLIC_URL || 'https://zenbat.vercel.app'}/d/${publicToken}`
