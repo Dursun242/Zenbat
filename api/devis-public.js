@@ -84,14 +84,10 @@ async function verifySession(admin, publicToken, sessionId) {
 // ── Templates email ────────────────────────────────────────────────────────
 function emailDevis({ clientName, company, brand, devis, fmtEurFn, publicUrl }) {
   const accentColor = brand?.color || '#22c55e'
-  const logo = brand?.logo || null
-  const headerContent = logo
-    ? `<img src="${logo}" alt="${company || ''}" style="max-height:64px;max-width:220px;object-fit:contain;display:block;margin:0 auto${company ? ';margin-bottom:10px' : ''}">${company ? `<div style="color:white;font-size:13px;font-weight:600;opacity:0.85">${company}</div>` : ''}`
-    : `<div style="font-size:22px;font-weight:800;letter-spacing:-0.5px;color:white">${company || 'Votre devis'}</div>`
   return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f5;font-family:Inter,system-ui,sans-serif">
 <div style="max-width:560px;margin:32px auto;background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
-  <div style="background:${accentColor};padding:28px 32px;text-align:center">
-    ${headerContent}
+  <div style="background:#1A1612;padding:28px 32px;text-align:center">
+    ${company ? `<div style="font-size:22px;font-weight:800;letter-spacing:-0.5px;color:${accentColor}">${company}</div>` : `<div style="font-size:22px;font-weight:800;letter-spacing:-1px"><span style="color:${accentColor}">Zen</span><span style="color:white">bat</span></div>`}
   </div>
   <div style="padding:32px">
     <h2 style="margin:0 0 8px;font-size:20px;color:#1A1612">Bonjour${clientName ? ' ' + clientName : ''},</h2>
@@ -269,6 +265,10 @@ export default async function handler(req, res) {
       .select('raison_sociale, nom, prenom, email').eq('id', devis.client_id).maybeSingle()
     if (!client?.email) return res.status(400).json({ error: "Le client n'a pas d'email renseigné" })
 
+    if (!process.env.RESEND_API_KEY) {
+      return res.status(503).json({ error: 'RESEND_API_KEY non configurée — ajoutez-la dans Vercel Settings → Environment Variables' })
+    }
+
     const { data: profile } = await admin.from('profiles')
       .select('company_name, brand_data').eq('id', user.id).maybeSingle()
     const brand = (() => { try { return JSON.parse(profile?.brand_data || '{}') } catch { return {} } })()
@@ -276,7 +276,7 @@ export default async function handler(req, res) {
     const clientName = (`${client.prenom || ''} ${client.nom || ''}`).trim() || client.raison_sociale || ''
     const publicUrl  = `${process.env.VITE_PUBLIC_URL || 'https://zenbat.vercel.app'}/d/${publicToken}`
 
-    const artisanEmail = brand.email || user.email || null
+    const artisanEmail = brand.email || null
     try {
       await sendEmail({
         to: client.email,

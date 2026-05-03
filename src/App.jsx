@@ -286,10 +286,7 @@ export default function App() {
 
         {/* Contenu principal */}
         <div className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "80px" }}>
-          {["devis", "devis_detail", "factures", "factures_detail"].includes(tab) && (
-            <SearchBar devis={devis} clients={clients} invoices={invoices} goDevis={goDevis} goClient={id => { setSelC(id); setTab("client_detail"); }} goInvoice={goInvoice}/>
-          )}
-          {tab === "dashboard"     && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}
+{tab === "dashboard"     && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}
                                          onOpenProfile={() => setScreen("onboarding")}
                                          onOpenPWAInstall={() => setScreen("pwa_install")}/>}
           {tab === "clients"       && <ClientsList clients={clients} onSave={onSaveClient} onDelete={onDeleteClient} onRestore={onRestoreClient} goClient={id => { setSelC(id); setTab("client_detail"); }} showUndo={showUndo}/>}

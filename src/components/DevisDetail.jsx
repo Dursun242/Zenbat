@@ -131,9 +131,6 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
       `}</style>
       {showPDF && (
         <PDFViewer d={d} cl={cl} brand={brand} onClose={() => setShowPDF(false)}
-          onSendOdoo={!["accepte", "refuse"].includes(d.statut) ? sendOdoo : undefined}
-          sending={sending}
-          sent={!!signUrl || d.statut === "en_signature"}
           onMarkSent={d.statut === "brouillon" ? () => onChange({ ...d, statut: "envoye" }) : undefined}
           onMarkSignature={["brouillon","envoye"].includes(d.statut) ? () => onChange({ ...d, statut: "en_signature" }) : undefined}
         />
@@ -237,14 +234,6 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
                   ✉️ Envoyé
                 </button>
               )}
-              {["brouillon","envoye"].includes(d.statut) && !isRemplace && (
-                <button onClick={sendOdoo} disabled={sending}
-                  style={{ background: "#faf5ff", color: "#6b21a8", border: "1px solid #e9d5ff", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: sending ? "default" : "pointer", whiteSpace: "nowrap", opacity: sending ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}>
-                  {sending
-                    ? <><span style={{display:"inline-block",width:10,height:10,border:"2px solid #6b21a8",borderTopColor:"transparent",borderRadius:"50%",animation:"spin 1s linear infinite"}}/> Envoi…</>
-                    : <>🖊 Signature Odoo</>}
-                </button>
-              )}
             </div>
           </div>
           {/* Numero + montant + badge */}
@@ -331,6 +320,9 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
         </div>
 
         <div style={{ padding: 18 }}>
+          {/* Suivi client — envoi, négociation, audit */}
+          <DevisClientActions devis={d} client={cl} onChange={onChange} />
+
           {/* Bouton PDF */}
           <button className="detail-pdf-btn" onClick={() => setShowPDF(true)}
             style={{ width: "100%", background: `linear-gradient(135deg,${ac}ee,${ac})`, color: "white", border: "none", borderRadius: 16, padding: 16, fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, cursor: "pointer", boxShadow: `0 6px 20px ${ac}44`, marginBottom: 12 }}>
@@ -388,9 +380,6 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
               </div>
             )}
           </div>
-
-          {/* Suivi client — envoi, négociation, audit */}
-          <DevisClientActions devis={d} client={cl} onChange={onChange} />
 
           {/* Log Odoo Sign */}
           {showLog && log.length > 0 && (
