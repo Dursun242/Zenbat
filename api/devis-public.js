@@ -83,42 +83,101 @@ async function verifySession(admin, publicToken, sessionId) {
 
 // ── Templates email ────────────────────────────────────────────────────────
 function emailDevis({ clientName, company, brand, devis, fmtEurFn, publicUrl }) {
-  const accentColor = brand?.color || '#22c55e'
-  const logo = brand?.logo || null
-  const headerContent = logo
-    ? `<img src="${logo}" alt="${company || ''}" style="max-height:64px;max-width:220px;object-fit:contain;display:block;margin:0 auto${company ? ';margin-bottom:10px' : ''}">${company ? `<div style="color:white;font-size:13px;font-weight:600;opacity:0.85">${company}</div>` : ''}`
-    : `<div style="font-size:22px;font-weight:800;letter-spacing:-0.5px;color:white">${company || 'Votre devis'}</div>`
-  return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f5;font-family:Inter,system-ui,sans-serif">
-<div style="max-width:560px;margin:32px auto;background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
-  <div style="background:${accentColor};padding:28px 32px;text-align:center">
-    ${headerContent}
-  </div>
-  <div style="padding:32px">
-    <h2 style="margin:0 0 8px;font-size:20px;color:#1A1612">Bonjour${clientName ? ' ' + clientName : ''},</h2>
-    <p style="color:#6B6358;font-size:14px;line-height:1.6;margin:0 0 24px">
-      Votre devis <strong>${devis.numero}</strong>${devis.objet ? ` — ${devis.objet}` : ''} est disponible en ligne.<br>
-      Consultez-le, posez vos questions ou acceptez-le directement depuis ce lien.
+  const accent = brand?.color || '#22c55e'
+  const logo   = brand?.logo  || null
+  const date   = devis.date_validite
+    ? new Date(devis.date_validite).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
+    : null
+
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f0f0f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f0f0;padding:40px 16px">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%">
+
+  <!-- Barre de marque -->
+  <tr><td style="background:${accent};height:4px;border-radius:4px 4px 0 0;font-size:0">&nbsp;</td></tr>
+
+  <!-- Corps principal -->
+  <tr><td style="background:#ffffff;padding:40px 48px 32px;border-radius:0 0 4px 4px">
+
+    <!-- Logo / Nom entreprise -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:36px">
+      <tr>
+        <td>
+          ${logo
+            ? `<img src="${logo}" alt="${company || ''}" style="max-height:40px;max-width:160px;object-fit:contain;display:block">`
+            : company
+              ? `<span style="font-size:16px;font-weight:700;color:#111;letter-spacing:-0.3px">${company}</span>`
+              : ''}
+        </td>
+        <td align="right" style="font-size:11px;color:#999;font-weight:500;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap">Devis</td>
+      </tr>
+    </table>
+
+    <!-- Accroche -->
+    <p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#111;line-height:1.3">
+      Bonjour${clientName ? ' ' + clientName : ''},
     </p>
-    <div style="background:#FAF7F2;border-radius:12px;padding:16px 20px;margin-bottom:24px">
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-        <span style="color:#9A8E82;font-size:13px">Référence</span>
-        <span style="font-weight:700;font-size:13px">${devis.numero}</span>
-      </div>
-      ${devis.objet ? `<div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="color:#9A8E82;font-size:13px">Objet</span><span style="font-size:13px">${devis.objet}</span></div>` : ''}
-      <div style="display:flex;justify-content:space-between">
-        <span style="color:#9A8E82;font-size:13px">Montant HT</span>
-        <span style="font-weight:800;font-size:16px;color:#1A1612">${fmtEurFn(devis.montant_ht)}</span>
-      </div>
-    </div>
-    <a href="${publicUrl}" style="display:block;background:${accentColor};color:white;text-decoration:none;text-align:center;padding:14px 20px;border-radius:12px;font-weight:700;font-size:15px">
-      Consulter votre devis →
-    </a>
-    ${brand?.phone || brand?.email ? `<p style="color:#9A8E82;font-size:12px;text-align:center;margin-top:20px">Questions ? ${brand.phone ? `📞 ${brand.phone}` : ''} ${brand.email ? `✉ ${brand.email}` : ''}</p>` : ''}
-  </div>
-  <div style="background:#FAF7F2;padding:16px 32px;text-align:center;color:#9A8E82;font-size:11px">
-    Propulsé par Zenbat · Ce lien est personnel, ne le partagez pas
-  </div>
-</div></body></html>`
+    <p style="margin:0 0 32px;font-size:15px;color:#555;line-height:1.6">
+      ${company ? company + ' vous ' : 'Vous '}a préparé un devis${devis.objet ? ` pour&nbsp;<strong style="color:#111">${devis.objet}</strong>` : ''}.<br>
+      Consultez-le, posez vos questions ou acceptez-le en ligne.
+    </p>
+
+    <!-- Carte devis -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e8e8;border-radius:8px;margin-bottom:28px;overflow:hidden">
+      <tr>
+        <td style="padding:20px 24px;border-bottom:1px solid #e8e8e8">
+          <p style="margin:0 0 2px;font-size:11px;color:#999;font-weight:500;text-transform:uppercase;letter-spacing:0.5px">Référence</p>
+          <p style="margin:0;font-size:15px;font-weight:700;color:#111">${devis.numero}</p>
+        </td>
+        <td style="padding:20px 24px;border-bottom:1px solid #e8e8e8;text-align:right">
+          <p style="margin:0 0 2px;font-size:11px;color:#999;font-weight:500;text-transform:uppercase;letter-spacing:0.5px">Montant HT</p>
+          <p style="margin:0;font-size:22px;font-weight:800;color:#111;letter-spacing:-0.5px">${fmtEurFn(devis.montant_ht)}</p>
+        </td>
+      </tr>
+      ${date ? `<tr><td colspan="2" style="padding:14px 24px;background:#fafafa">
+        <p style="margin:0;font-size:12px;color:#888">Valable jusqu'au <strong style="color:#555">${date}</strong></p>
+      </td></tr>` : ''}
+    </table>
+
+    <!-- CTA -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px">
+      <tr>
+        <td align="center">
+          <a href="${publicUrl}" style="display:inline-block;background:${accent};color:#fff;text-decoration:none;padding:14px 36px;border-radius:6px;font-size:15px;font-weight:700;letter-spacing:-0.2px">
+            Voir mon devis &rarr;
+          </a>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Contact -->
+    ${brand?.phone || brand?.email ? `
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr><td style="border-top:1px solid #f0f0f0;padding-top:24px">
+        <p style="margin:0;font-size:13px;color:#888">Une question ? Contactez-nous directement&nbsp;:
+          ${brand.phone ? `<br><strong style="color:#555">${brand.phone}</strong>` : ''}
+          ${brand.email ? `<br><a href="mailto:${brand.email}" style="color:${accent};text-decoration:none">${brand.email}</a>` : ''}
+        </p>
+      </td></tr>
+    </table>` : ''}
+
+  </td></tr>
+
+  <!-- Footer -->
+  <tr><td style="padding:20px 0;text-align:center;font-size:11px;color:#bbb;line-height:1.6">
+    Ce lien est personnel — ne le partagez pas<br>
+    <span style="color:#ddd">·</span> Zenbat, logiciel de devis pour artisans
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>`
 }
 
 function emailOtp({ otp, devis }) {
