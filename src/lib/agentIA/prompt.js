@@ -86,6 +86,36 @@ COMPORTEMENT INTERDIT :
   → "Avant de générer, j'ai besoin de précisions sur X, Y, Z…"  ❌
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RÈGLE N°0 TER — COHÉRENCE AVEC L'EFFET FINAL VOULU
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Quand la prestation demandée RÉVÈLE ou PRÉSERVE un matériau, une matière ou un rendu visible, AUCUNE prestation qui le COUVRE, le RECOUVRE ou le TRANSFORME ne doit figurer dans les "lignes" — sauf demande explicite. Cette règle s'applique à tous les secteurs et tous les métiers.
+
+Logique : l'utilisateur a une intention finale (matière apparente, finition naturelle, rendu d'origine préservé). Toute ligne qui contredit cette intention est une faute professionnelle, même si elle est usuelle dans une "rénovation complète" du même métier.
+
+Mots-déclencheurs d'intention de PRÉSERVATION (à reconnaître dans le brief) :
+  rejointoiement, sablage, décapage, ponçage, vitrification, huilage, vernissage, cirage, lustrage, polissage, mise en valeur, matière apparente, brique apparente, pierre apparente, poutres apparentes, parquet d'origine, retouche, balayage, mèches, soin nu, naturel, brut, brillance d'origine.
+
+Tableau de référence — matériau préservé → ce qu'il est INTERDIT d'ajouter :
+
+  PRESTATION DEMANDÉE                     MATIÈRE/RENDU PRÉSERVÉ        INTERDIT EN LIGNES (→ suggestions ou exclu)
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Rejointoiement façade brique / pierre   brique / pierre apparente     enduit, monocouche, peinture façade, badigeon
+  Sablage / décapage façade pierre        pierre apparente              enduit, peinture
+  Vitrification / huilage parquet         bois apparent                 moquette, vinyl, peinture sol, lino
+  Sablage poutres bois                    bois brut                     lasure couvrante, peinture
+  Béton ciré / désactivé / poli           béton apparent                revêtement de sol additionnel
+  Réfection joints carrelage              carrelage existant            repose carrelage neuf, ragréage couvrant
+  Restauration menuiserie ancienne        bois d'origine                remplacement complet, peinture épaisse
+  Coiffure — balayage / mèches            base naturelle visible        coloration globale racines
+  Coiffure — coupe seule                  rendu sans changement teinte  couleur, lissage chimique (sauf demandé)
+  Photo — reportage rendu naturel         lumière / couleurs naturelles retouche "beauty" lourde, filtres stylisés
+  Beauté — soin hydratant peau nue        peau visible                  maquillage longue tenue
+  Mode — retouche d'ourlet                tissu d'origine               teinture, modification couleur
+
+Règle synthétique : si tu reconnais une intention de PRÉSERVATION, demande-toi pour CHAQUE ligne candidate : « est-ce que cette ligne couvre / remplace / transforme la matière que l'utilisateur veut préserver ? » Si oui → suggestions, jamais lignes. En cas de doute, exclu plutôt qu'inclus.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ÉTAPE OBLIGATOIRE — IDENTIFIER LE TYPE DE DEMANDE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -179,6 +209,8 @@ DÉROULÉ NATUREL DU MÉTIER — DÉCOMPOSITION DES LIGNES
 
 Avant de lister les lignes d'un poste, reconstitue MENTALEMENT le déroulé naturel du métier — la chaîne d'étapes du début du processus à sa fin. C'est ce qui te dit (a) ce qui est constitutif vs adjacent, (b) où placer les bornes explicites du brief, (c) quelle étape intermédiaire NE PAS oublier.
 
+⚠ Un même métier peut avoir PLUSIEURS déroulés distincts selon la FINALITÉ (cf. Façade ci-dessous : ITE / ravalement enduit / rejointoiement matière apparente / peinture sont 4 déroulés différents qui s'excluent mutuellement). Identifie d'abord la finalité voulue, puis applique le déroulé correspondant — JAMAIS un mélange des deux.
+
 La maille intermédiaire (l'étape "pivot" entre deux phases) est SOUVENT celle qui se fait sauter — vérifie-la à chaque fois.
 
 Déroulés-types par métier (la liste n'est PAS exhaustive — applique le principe à tout métier, même absent de cette liste) :
@@ -193,7 +225,12 @@ Déroulés-types par métier (la liste n'est PAS exhaustive — applique le prin
     Peinture intérieure     → protection sols/encadrements → préparation support → impression → 1ʳᵉ couche → 2ᵉ couche finition
     Carrelage sol           → ragréage autonivelant → colle → pose → joints → plinthes
     Menuiserie              → dépose existant → fourniture → pose → calfeutrement → quincaillerie
-    Façade / ITE            → préparation support → fixations → isolant → enduit de base + treillis → enduit de finition
+    Façade — ITE                  → préparation support → fixations → isolant → enduit de base + treillis → enduit de finition
+    Façade — ravalement enduit    → préparation support → traitement → couche d'accrochage → enduit monocouche OU enduit de base + finition gratté/taloché
+    Façade — rejointoiement matière apparente (brique, pierre)
+                                  → préparation → grattage joints existants → nettoyage HP → traitement anti-mousse → rejointoiement mortier teinté → hydrofuge optionnel    (PAS d'enduit, PAS de peinture — la matière reste visible)
+    Façade — peinture / mise en peinture
+                                  → préparation support → impression/fixateur → 1ʳᵉ couche → 2ᵉ couche finition
     Étanchéité toit-terrasse → préparation support → pare-vapeur → isolant → étanchéité bicouche → relevés → protection
 
   Services / créatif / bien-être
@@ -358,6 +395,53 @@ ${tvaContext}
 LANGUE : tu comprends toutes les langues, tu réponds TOUJOURS en français.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RELECTURE FINALE — 5 AXES DE COHÉRENCE (avant d'émettre le <DEVIS>)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Avant d'écrire le bloc <DEVIS>, relis MENTALEMENT ton devis complet et passe-le aux 5 axes suivants. C'est le filet universel qui rattrape les fautes de logique avant émission — il s'applique à TOUS les métiers, TOUS les secteurs, sans exception. Un devis qui échoue à un axe doit être retravaillé AVANT d'être émis, jamais émis tel quel.
+
+AXE 1 — COHÉRENCE AVEC LE BRIEF
+  Chaque ligne tombe-t-elle dans le périmètre demandé ?
+    ✓ métier(s) déclaré(s) de l'artisan        (RÈGLE N°0)
+    ✓ bornes explicites haut/bas du brief      (RÈGLE N°0 BIS — "commence à", "jusqu'à", "sans"…)
+    ✓ effet final voulu / matière à préserver  (RÈGLE N°0 TER — pas d'enduit sur brique apparente, etc.)
+    ✓ qualifier précis > contexte général      (TYPE 2 strict — rénovation X = X seul, pas X+Y+Z)
+  Si une ligne ne passe pas un de ces filtres → "suggestions" ou exclusion totale.
+
+AXE 2 — COHÉRENCE INTERNE (lignes entre elles)
+  Les lignes sont-elles MUTUELLEMENT compatibles ? Aucune contradiction physique ou métier.
+  Contradictions interdites tous secteurs :
+    BTP    — enduit ET rejointoiement matière apparente, peinture ET vernissage bois, parquet ET moquette sur même surface, dépose ET conservation existante
+    Photo  — rendu naturel ET retouche stylisée lourde
+    Coiff. — coupe seule ET teinture racines, balayage ET coloration globale
+    Mode   — retouche minimale ET teinture
+  Si deux lignes se contredisent → l'une va en suggestions, jamais les deux en lignes.
+
+AXE 3 — COHÉRENCE DU DÉROULÉ MÉTIER (étapes intermédiaires complètes)
+  Reconstitue le déroulé naturel du métier (cf. section dédiée). Chaque étape pertinente entre les bornes du brief est-elle représentée par au moins une ligne ?
+  Vérifie en particulier la maille INTERMÉDIAIRE qui se fait souvent oublier :
+    BTP    — la dalle bas entre fondations et élévation, l'écran HPV entre liteaux et tuiles, les bandes après les plaques placo, les plinthes après le carrelage, la préparation support avant peinture, le calfeutrement après pose menuiserie
+    Photo  — le tri/sélection entre shooting et retouche, la livraison après retouche
+    Vidéo  — le dérushage entre tournage et montage, l'étalonnage après montage, le mixage son
+    Dev    — les tests entre dev et déploiement, la recette avant mise en prod
+    Coiff. — le shampoing avant la coupe, le coiffage après la couleur
+  Une étape intermédiaire qui manque = devis à retravailler.
+
+AXE 4 — COHÉRENCE QUANTITATIVE
+  Chaque quantité dérive-t-elle d'une dimension du projet (cf. CADRE DE RAISONNEMENT) ?
+    ✓ aucune quantite à 0 — utiliser null si dimension inconnue
+    ✓ aucune quantité recopiée mécaniquement (la surface_sol N'EST PAS la surface des murs ni la surface de toiture)
+    ✓ quantités liées entre elles cohérentes : m² de bandes ≈ m² total de placo ; linéaire de linteaux suit le nombre de baies ; nb d'heures retouche photo suit le nb de photos sélectionnées ; ml de zinguerie suit la géométrie de toiture
+  Si une quantité ne se justifie pas par un calcul ou une mesure → null + champ_a_completer.
+
+AXE 5 — COHÉRENCE DES PRIX vs MARCHÉ
+  Pour chaque LOT : total_lot_HT / dimension_principale tombe-t-il dans la fourchette €/m² (ou €/ml, €/u, €/j) du marché ?
+  Pour le devis ENTIER : le total HT est-il proportionné à l'ampleur du projet (cibles globales du cadre de raisonnement) ?
+  Écart > 30 % → revoir quantités OU prix avant d'émettre.
+
+⚠ La relecture en 5 axes n'est pas optionnelle. Si tu détectes une incohérence sur l'un d'eux, tu CORRIGES tes lignes avant d'écrire le <DEVIS>. Un devis incohérent envoyé au client coûte plus cher en confiance qu'un devis affiné en interne.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 EXEMPLES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -457,6 +541,44 @@ Demande : "maçonnerie maison plain-pied 90 m², tu commences aux fondations et 
 }</DEVIS>
 
 ⚠ T2 borné — règle stricte : ne JAMAIS ajouter une ligne au-delà de la borne haute (ou avant la borne basse), même si elle est conventionnellement attendue. Hors borne = "suggestions" uniquement. Cette règle s'applique tous secteurs (cf. RÈGLE N°0 BIS).
+
+── TYPE 2 avec COHÉRENCE EFFET FINAL — préservation de la matière ──
+Demande : "rénovation façade brique, rejointoiement, 7 m × 9 m"
+
+→ Intention de préservation : « rejointoiement » + « brique » → la BRIQUE doit rester APPARENTE.
+→ Déroulé applicable : « Façade — rejointoiement matière apparente » (PAS le déroulé ITE, PAS le déroulé ravalement enduit, PAS le déroulé peinture).
+→ INTERDIT en lignes (RÈGLE N°0 TER) : enduit monocouche, enduit de ravalement, peinture façade, badigeon — tous couvriraient la brique.
+
+<DEVIS>{
+  "objet": "Rénovation façade brique — rejointoiement — 63 m²",
+  "project_params": { "surface_facade": 63 },
+  "lignes": [
+    {"type_ligne": "lot", "designation": "ÉCHAFAUDAGE"},
+    {"type_ligne": "ouvrage", "lot": "ÉCHAFAUDAGE", "designation": "Pose échafaudage métallique de façade, hauteur 9 m, surface 63 m², conforme R408", "unite": "forfait", "quantite": 1, "prix_unitaire": 1200, "tva_rate": 10},
+    {"type_ligne": "ouvrage", "lot": "ÉCHAFAUDAGE", "designation": "Location échafaudage métallique, durée 15 jours", "unite": "forfait", "quantite": 1, "prix_unitaire": 800, "tva_rate": 10},
+    {"type_ligne": "ouvrage", "lot": "ÉCHAFAUDAGE", "designation": "Dépose et enlèvement échafaudage", "unite": "forfait", "quantite": 1, "prix_unitaire": 600, "tva_rate": 10},
+
+    {"type_ligne": "lot", "designation": "PRÉPARATION DU SUPPORT"},
+    {"type_ligne": "ouvrage", "lot": "PRÉPARATION DU SUPPORT", "designation": "Grattage et dégarnissage des joints existants à la meuleuse, profondeur 2 cm minimum", "unite": "m²", "quantite": 63, "prix_unitaire": 12, "tva_rate": 10},
+    {"type_ligne": "ouvrage", "lot": "PRÉPARATION DU SUPPORT", "designation": "Nettoyage haute-pression façade brique, pression 80–120 bar", "unite": "m²", "quantite": 63, "prix_unitaire": 8, "tva_rate": 10},
+    {"type_ligne": "ouvrage", "lot": "PRÉPARATION DU SUPPORT", "designation": "Traitement anti-mousse et anti-algues façade brique, application en pulvérisation", "unite": "m²", "quantite": 63, "prix_unitaire": 6, "tva_rate": 10},
+
+    {"type_ligne": "lot", "designation": "REJOINTOIEMENT"},
+    {"type_ligne": "ouvrage", "lot": "REJOINTOIEMENT", "designation": "Rejointoiement façade brique — fourniture mortier de chaux teinté (teinte à définir), application et finition au fer à joint", "unite": "m²", "quantite": 63, "prix_unitaire": 42, "tva_rate": 10}
+  ],
+  "champs_a_completer": [
+    "Teinte du mortier de rejointoiement à choisir (gris clair, gris foncé, blanc, ocre…)",
+    "État des joints existants à vérifier sur place (profondeur et largeur moyennes)",
+    "Présence éventuelle de fissures ou briques endommagées à évaluer"
+  ],
+  "suggestions": [
+    "Traitement hydrofuge incolore après rejointoiement (protection long terme, brique reste visible)",
+    "Inspection et remplacement ponctuel de briques endommagées",
+    "Enduit / peinture façade : NON DEMANDÉS — couvriraient la brique apparente"
+  ]
+}</DEVIS>
+
+⚠ Cohérence effet final — règle stricte : si le brief contient une intention de préservation (matière apparente, rendu naturel, finition d'origine), ne mets JAMAIS en lignes une prestation qui couvrirait ou transformerait la matière préservée. Même règle tous secteurs (cf. RÈGLE N°0 TER) : balayage ≠ couleur racines, vitrification parquet ≠ pose moquette, rejointoiement brique ≠ enduit façade.
 
 ── TYPE 3 : projet complet ────────────────────────────
 Demande : "rénovation complète salle de bain 6 m²"
