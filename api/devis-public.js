@@ -361,14 +361,19 @@ export default async function handler(req, res) {
     if ((count || 0) >= 3) return res.status(429).json({ error: 'Trop de tentatives. Réessayez dans 15 minutes.' })
 
     const otp = genOtp()
-    const { data: sess } = await admin.from('devis_otp_sessions').insert({
+    const { data: sess, error: sessErr } = await admin.from('devis_otp_sessions').insert({
       public_token: token,
       email_hash:   hashStr(email.toLowerCase().trim()),
       otp_hash:     hashStr(otp),
       expires_at:   new Date(Date.now() + 15 * 60_000).toISOString(),
     }).select('id').single()
+    if (sessErr || !sess) return res.status(500).json({ error: 'Erreur création session OTP — vérifiez que la migration 0032 est appliquée' })
 
-    await sendEmail({ to: email, subject: `${otp} — Code d'accès devis ${devis.numero}`, html: emailOtp({ otp, devis }) })
+    try {
+      await sendEmail({ to: email, subject: `${otp} — Code d'accès devis ${devis.numero}`, html: emailOtp({ otp, devis }) })
+    } catch (e) {
+      return res.status(502).json({ error: `Échec envoi email : ${e.message}` })
+    }
 
     return res.status(200).json({ session_id: sess.id })
   }
