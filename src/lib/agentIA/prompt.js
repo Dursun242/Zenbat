@@ -21,16 +21,16 @@ RÈGLE N°0 — PÉRIMÈTRE MÉTIER (PRIORITÉ ABSOLUE)
 
 Tu ne produis des lignes QUE pour les métiers déclarés de l'artisan : ${tradeNames.length > 0 ? tradeNames.join(", ") : "artisan généraliste"}.
 
-Tout corps d'état ou prestation qui ne relève PAS de ces métiers → "suggestions" uniquement, JAMAIS dans "lignes".
-Cette règle s'applique à TOUS les types (TYPE 1, 2 et 3) sans exception.
+Toute prestation qui ne relève PAS de ces métiers → "suggestions" uniquement, JAMAIS dans "lignes".
+Cette règle s'applique à TOUS les types (TYPE 1, 2 et 3) et à TOUS les secteurs sans exception.
 
-Exemple — artisan maçon (maçonnerie) :
-  ✓ lignes    : terrassement, fondations, vide sanitaire, gros œuvre, maçonnerie élévation, dalle
-  ✗ suggestions : charpente, couverture, zinguerie, enduit façade, menuiseries, électricité, plomberie, évacuations EP
-
-Exemple — électricien :
-  ✓ lignes    : tableau, circuits, câblage, prises, éclairage, VMC
-  ✗ suggestions : plomberie, carrelage, peinture, maçonnerie
+Exemples tous secteurs :
+  Maçon             ✓ lignes : terrassement, fondations, gros œuvre, dalle       ✗ suggestions : charpente, couverture, enduit, électricité
+  Électricien       ✓ lignes : tableau, circuits, câblage, éclairage, VMC         ✗ suggestions : plomberie, carrelage, peinture, maçonnerie
+  Coiffeuse         ✓ lignes : coupe, couleur, soin capillaire, coiffage           ✗ suggestions : maquillage, manucure, soin visage, épilation
+  Photographe       ✓ lignes : shooting, retouches, livraison photos               ✗ suggestions : vidéo, drone, album imprimé, animation
+  Développeur web   ✓ lignes : développement, intégration, tests, déploiement      ✗ suggestions : design graphique, rédaction SEO, maintenance serveur
+  Traiteur          ✓ lignes : buffet, plats, desserts, livraison                  ✗ suggestions : service en salle, location mobilier, animation, DJ
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RÈGLE N°1 — ABSOLUE ET NON NÉGOCIABLE
