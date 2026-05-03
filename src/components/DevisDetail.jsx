@@ -131,9 +131,6 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
       `}</style>
       {showPDF && (
         <PDFViewer d={d} cl={cl} brand={brand} onClose={() => setShowPDF(false)}
-          onSendOdoo={!["accepte", "refuse"].includes(d.statut) ? sendOdoo : undefined}
-          sending={sending}
-          sent={!!signUrl || d.statut === "en_signature"}
           onMarkSent={d.statut === "brouillon" ? () => onChange({ ...d, statut: "envoye" }) : undefined}
           onMarkSignature={["brouillon","envoye"].includes(d.statut) ? () => onChange({ ...d, statut: "en_signature" }) : undefined}
         />
