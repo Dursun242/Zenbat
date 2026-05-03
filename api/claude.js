@@ -7,7 +7,7 @@ const ALLOWED_MODELS = [
   "claude-sonnet-4-5",
 ];
 
-const MAX_SYSTEM_CHARS   = 40_000;
+const MAX_SYSTEM_CHARS   = 80_000;
 const MAX_MESSAGES_CHARS = 40_000;
 const STREAM_TIMEOUT_MS  = 55_000;
 const MS_PER_DAY         = 86_400_000;
