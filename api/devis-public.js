@@ -24,7 +24,7 @@ const hashStr = s => createHash('sha256').update(String(s)).digest('hex')
 const genOtp  = () => Math.floor(100000 + Math.random() * 900000).toString()
 const fmtEur  = n => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n || 0)
 
-async function sendEmail({ to, subject, html, cc, fromName }) {
+async function sendEmail({ to, subject, html, cc, fromName, attachments }) {
   const gmailUser = process.env.GMAIL_USER
   const gmailPass = process.env.GMAIL_APP_PASSWORD || process.env.GMAIL_APP_PASWORD
   const displayName = fromName || 'Consulter votre devis'
@@ -39,6 +39,7 @@ async function sendEmail({ to, subject, html, cc, fromName }) {
       from: `${displayName} <${gmailUser}>`,
       to, subject, html,
       ...(cc ? { cc: Array.isArray(cc) ? cc.join(',') : cc } : {}),
+      ...(attachments?.length ? { attachments } : {}),
     })
     return
   }
@@ -82,9 +83,9 @@ async function verifySession(admin, publicToken, sessionId) {
 }
 
 // ── Templates email ────────────────────────────────────────────────────────
-function emailDevis({ clientName, company, brand, devis, fmtEurFn, publicUrl }) {
+function emailDevis({ clientName, company, brand, devis, fmtEurFn, publicUrl, logoSrc }) {
   const accent = brand?.color || '#22c55e'
-  const logo   = brand?.logo  || null
+  const logo   = logoSrc || (brand?.logo?.startsWith('http') ? brand.logo : null)
   const date   = devis.date_validite
     ? new Date(devis.date_validite).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
     : null
@@ -337,6 +338,20 @@ export default async function handler(req, res) {
     const clientName = (`${client.prenom || ''} ${client.nom || ''}`).trim() || client.raison_sociale || ''
     const publicUrl  = `${process.env.VITE_PUBLIC_URL || 'https://zenbat.vercel.app'}/d/${publicToken}`
 
+    // Si le logo est une data URL base64, le passer en inline attachment (évite le blocage client mail)
+    let logoSrc = null
+    const attachments = []
+    const rawLogo = brand.logo || ''
+    if (rawLogo.startsWith('data:')) {
+      const m = rawLogo.match(/^data:([^;]+);base64,(.+)$/)
+      if (m) {
+        attachments.push({ filename: 'logo.png', content: m[2], encoding: 'base64', cid: 'company-logo', contentType: m[1] })
+        logoSrc = 'cid:company-logo'
+      }
+    } else if (rawLogo.startsWith('http')) {
+      logoSrc = rawLogo
+    }
+
     const ccEmails = [...new Set([user.email, brand.email].filter(Boolean))]
     try {
       await sendEmail({
@@ -344,7 +359,8 @@ export default async function handler(req, res) {
         cc: ccEmails.length ? ccEmails : undefined,
         fromName: 'Consulter votre devis',
         subject: `Consulter votre devis${devis.objet ? ' — ' + devis.objet : ' ' + devis.numero}${company ? ' · ' + company : ''}`,
-        html: emailDevis({ clientName, company, brand, devis, fmtEurFn: fmtEur, publicUrl }),
+        html: emailDevis({ clientName, company, brand, devis, fmtEurFn: fmtEur, publicUrl, logoSrc }),
+        attachments,
       })
     } catch (e) {
       return res.status(502).json({ error: `Impossible d'envoyer l'email : ${e.message}` })
