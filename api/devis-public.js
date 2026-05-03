@@ -244,9 +244,11 @@ export default async function handler(req, res) {
 
     const artisan = {
       company: profile?.company_name || brand.companyName || '',
-      email:   brand.email  || '',
-      phone:   brand.phone  || '',
+      email:   brand.email   || '',
+      phone:   brand.phone   || '',
       address: brand.address || '',
+      color:   brand.color   || '',
+      logo:    brand.logo    || '',
     }
 
     const { data: client } = await admin.from('clients')
