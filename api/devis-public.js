@@ -250,6 +250,7 @@ export default async function handler(req, res) {
       address: brand.address || '',
       color:   brand.color   || '',
       logo:    brand.logo    || '',
+      brand,
     }
 
     const { data: client } = await admin.from('clients')
