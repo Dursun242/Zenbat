@@ -25,8 +25,25 @@ const genOtp  = () => Math.floor(100000 + Math.random() * 900000).toString()
 const fmtEur  = n => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n || 0)
 
 async function sendEmail({ to, subject, html, cc }) {
+  const gmailUser = process.env.GMAIL_USER
+  const gmailPass = process.env.GMAIL_APP_PASSWORD
+
+  if (gmailUser && gmailPass) {
+    const { createTransport } = await import('nodemailer')
+    const transporter = createTransport({
+      host: 'smtp.gmail.com', port: 587, secure: false,
+      auth: { user: gmailUser, pass: gmailPass },
+    })
+    await transporter.sendMail({
+      from: `Zenbat <${gmailUser}>`,
+      to, subject, html,
+      ...(cc ? { cc: Array.isArray(cc) ? cc.join(',') : cc } : {}),
+    })
+    return
+  }
+
   const key = process.env.RESEND_API_KEY
-  if (!key) { console.warn('[devis-public] RESEND_API_KEY non configurée'); return }
+  if (!key) throw new Error('Aucun service email configuré (GMAIL_USER+GMAIL_APP_PASSWORD ou RESEND_API_KEY)')
   const payload = { from: process.env.RESEND_FROM || 'Zenbat <onboarding@resend.dev>', to, subject, html }
   if (cc) payload.cc = Array.isArray(cc) ? cc : [cc]
   const res = await fetch('https://api.resend.com/emails', {
