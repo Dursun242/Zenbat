@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { useAuth } from "./lib/auth.jsx";
 import { supabase } from "./lib/supabase.js";
 import { getMyProfile } from "./lib/api.js";
@@ -22,18 +22,26 @@ import Dashboard     from "./components/Dashboard.jsx";
 import ClientsList   from "./components/ClientsList.jsx";
 import ClientDetail  from "./components/ClientDetail.jsx";
 import DevisList     from "./components/DevisList.jsx";
-import DevisDetail   from "./components/DevisDetail.jsx";
 import InvoicesList  from "./components/InvoicesList.jsx";
-import InvoiceDetail from "./components/InvoiceDetail.jsx";
-import AgentIA       from "./components/AgentIA.jsx";
-import AdminPanel    from "./components/AdminPanel.jsx";
 import SupportChat   from "./components/SupportChat.jsx";
-import Onboarding        from "./pages/Onboarding.jsx";
-import TradesQuickPicker from "./pages/TradesQuickPicker.jsx";
-import AuthScreen        from "./pages/AuthScreen.jsx";
-import PaywallScreen     from "./pages/PaywallScreen.jsx";
-import PWAInstallScreen  from "./pages/PWAInstallScreen.jsx";
-import SubscriptionScreen from "./pages/SubscriptionScreen.jsx";
+import AuthScreen    from "./pages/AuthScreen.jsx";
+
+// Écrans lourds — chargés à la demande uniquement
+const DevisDetail        = lazy(() => import("./components/DevisDetail.jsx"))
+const InvoiceDetail      = lazy(() => import("./components/InvoiceDetail.jsx"))
+const AgentIA            = lazy(() => import("./components/AgentIA.jsx"))
+const AdminPanel         = lazy(() => import("./components/AdminPanel.jsx"))
+const Onboarding         = lazy(() => import("./pages/Onboarding.jsx"))
+const TradesQuickPicker  = lazy(() => import("./pages/TradesQuickPicker.jsx"))
+const PaywallScreen      = lazy(() => import("./pages/PaywallScreen.jsx"))
+const PWAInstallScreen   = lazy(() => import("./pages/PWAInstallScreen.jsx"))
+const SubscriptionScreen = lazy(() => import("./pages/SubscriptionScreen.jsx"))
+
+const ScreenLoader = () => (
+  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 200 }}>
+    <div style={{ width: 20, height: 20, border: "2px solid #E8E2D8", borderTopColor: "#22c55e", borderRadius: "50%", animation: "spin 0.7s linear infinite" }}/>
+  </div>
+)
 
 const NAV = [
   { id: "dashboard", label: "Accueil",  icon: I.trend },
@@ -47,12 +55,10 @@ export default function App() {
   const [screen, setScreen] = useState("app");
   const [tab,    setTab]    = useState("dashboard");
   const [selC,   setSelC]   = useState(null);
-  const [plan,      setPlan]      = useState("free");   // "free" | "pro"
-  const [billingType, setBillingType] = useState(null); // "monthly" | "biannual" — défini à l'abonnement
+  const [plan,      setPlan]      = useState("free");
+  const [billingType, setBillingType] = useState(null);
   const [showPwa,setShowPwa]= useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
-  // Étape intermédiaire payée déclenchée depuis la landing (« S'abonner directement »).
-  // Reste true tant qu'on attend l'URL Stripe Checkout — bloque l'affichage des autres écrans.
   const [checkoutPending, setCheckoutPending] = useState(() => {
     try { return ['monthly','biannual'].includes(localStorage.getItem('pending_checkout_plan')) }
     catch { return false }
@@ -79,20 +85,14 @@ export default function App() {
   const isAdmin = !!user?.email && !!import.meta.env.VITE_ADMIN_EMAIL &&
     user.email.trim().toLowerCase() === import.meta.env.VITE_ADMIN_EMAIL.trim().toLowerCase();
 
-  // L'admin est toujours en plan Pro côté UI (cohérent avec api/claude.js qui
-  // applique déjà ce traitement côté serveur). Évite le paywall et le bandeau
-  // « essai gratuit » sur le compte admin.
   const effectivePlan = isAdmin ? "pro" : plan;
 
-  // Capture beforeinstallprompt for Android PWA
   useEffect(() => {
     const handler = e => { e.preventDefault(); deferredPrompt.current = e; };
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  // Charge le plan d'abonnement depuis Supabase au login pour que les clients
-  // ayant déjà payé n'atterrissent pas sur le paywall ou le bandeau « essai ».
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -102,9 +102,6 @@ export default function App() {
     return () => { cancelled = true; };
   }, [user?.id]);
 
-  // Si l'utilisateur a cliqué « S'abonner directement » sur la landing,
-  // on déclenche Stripe Checkout dès qu'il est authentifié — étape payée
-  // intercalée entre la création du compte et le picker des métiers.
   useEffect(() => {
     if (!user || !checkoutPending) return;
     let pendingPlan;
@@ -152,9 +149,6 @@ export default function App() {
 
   const activeNav = NAV.find(n => tab.startsWith(n.id))?.id || "dashboard";
 
-  // ── Étape intermédiaire : redirection vers Stripe Checkout ──
-  // Bloque tout autre écran (notamment le picker des métiers) tant qu'on
-  // n'a pas redirigé l'utilisateur vers le paiement.
   if (checkoutPending) {
     return (
       <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#FAF7F2", fontFamily: "Inter, system-ui, sans-serif", padding: 24 }}>
@@ -189,20 +183,40 @@ export default function App() {
     setShowPwa(!!isSignup);
     setScreen(isSignup ? "trades_picker" : "app");
   }}/>;
-  if (screen === "trades_picker") return <TradesQuickPicker
-    brand={brand}
-    setBrand={setBrand}
-    onDone={() => { setTab("agent"); setScreen(showPwa ? "pwa_install" : "app"); }}
-    onSkip={() => {
-      setBrand(b => ({ ...b, initialSetupDoneAt: new Date().toISOString() }));
-      setTab("agent");
-      setScreen(showPwa ? "pwa_install" : "app");
-    }}
-  />;
-  if (screen === "onboarding")  return <Onboarding brand={brand} setBrand={setBrand} onDone={() => setScreen(showPwa ? "pwa_install" : "app")}/>;
-  if (screen === "pwa_install") return <PWAInstallScreen deferredPrompt={deferredPrompt.current} onDone={() => { setShowPwa(false); setScreen("app"); }}/>;
-  if (screen === "paywall")     return <PaywallScreen daysLeft={daysLeft} onBack={() => setScreen("app")} onSubscribe={(type) => { setPlan("pro"); setBillingType(type); setScreen("app"); }}/>;
-  if (screen === "subscription") return <SubscriptionScreen isAdmin={isAdmin} daysLeft={daysLeft} plan={effectivePlan} onBack={() => setScreen("app")}/>;
+  if (screen === "trades_picker") return (
+    <Suspense fallback={<ScreenLoader />}>
+      <TradesQuickPicker
+        brand={brand}
+        setBrand={setBrand}
+        onDone={() => { setTab("agent"); setScreen(showPwa ? "pwa_install" : "app"); }}
+        onSkip={() => {
+          setBrand(b => ({ ...b, initialSetupDoneAt: new Date().toISOString() }));
+          setTab("agent");
+          setScreen(showPwa ? "pwa_install" : "app");
+        }}
+      />
+    </Suspense>
+  );
+  if (screen === "onboarding") return (
+    <Suspense fallback={<ScreenLoader />}>
+      <Onboarding brand={brand} setBrand={setBrand} onDone={() => setScreen(showPwa ? "pwa_install" : "app")}/>
+    </Suspense>
+  );
+  if (screen === "pwa_install") return (
+    <Suspense fallback={<ScreenLoader />}>
+      <PWAInstallScreen deferredPrompt={deferredPrompt.current} onDone={() => { setShowPwa(false); setScreen("app"); }}/>
+    </Suspense>
+  );
+  if (screen === "paywall") return (
+    <Suspense fallback={<ScreenLoader />}>
+      <PaywallScreen daysLeft={daysLeft} onBack={() => setScreen("app")} onSubscribe={(type) => { setPlan("pro"); setBillingType(type); setScreen("app"); }}/>
+    </Suspense>
+  );
+  if (screen === "subscription") return (
+    <Suspense fallback={<ScreenLoader />}>
+      <SubscriptionScreen isAdmin={isAdmin} daysLeft={daysLeft} plan={effectivePlan} onBack={() => setScreen("app")}/>
+    </Suspense>
+  );
 
   return (
     <div style={{ fontFamily: "Inter, system-ui, sans-serif", height: "100dvh", display: "flex", flexDirection: "column", background: "#FAF7F2", overflow: "hidden" }}>
@@ -286,7 +300,7 @@ export default function App() {
 
         {/* Contenu principal */}
         <div className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "80px" }}>
-{tab === "dashboard"     && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}
+          {tab === "dashboard"     && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}
                                          onOpenProfile={() => setScreen("onboarding")}
                                          onOpenPWAInstall={() => setScreen("pwa_install")}/>}
           {tab === "clients"       && <ClientsList clients={clients} onSave={onSaveClient} onDelete={onDeleteClient} onRestore={onRestoreClient} goClient={id => { setSelC(id); setTab("client_detail"); }} showUndo={showUndo}/>}
@@ -299,31 +313,33 @@ export default function App() {
               onUpdate={onSaveClient}
               onDelete={async () => { await onDeleteClient(selC); setTab("clients"); }}/>
           )}
-          {tab === "devis"        && <DevisList devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} onDelete={onDeleteDevis}/>}
-          {tab === "devis_detail" && selD && (
-            <DevisDetail
-              d={devis.find(x => x.id === selD)}
-              cl={clients.find(c => c.id === devis.find(x => x.id === selD)?.client_id)}
-              clients={clients}
-              onBack={() => setTab("devis")}
-              brand={brand}
-              onChange={onSaveDevis}
-              onConvertToInvoice={() => onCreateInvoiceFromDevis(selD)}
-              onCreateAcompte={onCreateAcompte}
-              onDuplicate={() => onDuplicateDevis(selD)}
-              onCreateIndice={() => onCreateIndice(selD)}
-              groupVersions={(() => {
-                const cur    = devis.find(x => x.id === selD);
-                if (!cur) return [];
-                const rootId = cur.root_devis_id || cur.id;
-                return devis
-                  .filter(x => x.id === rootId || x.root_devis_id === rootId)
-                  .sort((a, b) => !a.indice ? -1 : !b.indice ? 1 : a.indice.localeCompare(b.indice));
-              })()}
-              goDevis={goDevis}
-              autoOpenPDF={autoOpenPDF === selD}
-              onAutoOpenPDFConsumed={() => setAutoOpenPDF(null)}
-              loading={loadingDevis.has(selD)}/>
+          {tab === "devis"         && <DevisList devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} onDelete={onDeleteDevis}/>}
+          {tab === "devis_detail"  && selD && (
+            <Suspense fallback={<ScreenLoader />}>
+              <DevisDetail
+                d={devis.find(x => x.id === selD)}
+                cl={clients.find(c => c.id === devis.find(x => x.id === selD)?.client_id)}
+                clients={clients}
+                onBack={() => setTab("devis")}
+                brand={brand}
+                onChange={onSaveDevis}
+                onConvertToInvoice={() => onCreateInvoiceFromDevis(selD)}
+                onCreateAcompte={onCreateAcompte}
+                onDuplicate={() => onDuplicateDevis(selD)}
+                onCreateIndice={() => onCreateIndice(selD)}
+                groupVersions={(() => {
+                  const cur    = devis.find(x => x.id === selD);
+                  if (!cur) return [];
+                  const rootId = cur.root_devis_id || cur.id;
+                  return devis
+                    .filter(x => x.id === rootId || x.root_devis_id === rootId)
+                    .sort((a, b) => !a.indice ? -1 : !b.indice ? 1 : a.indice.localeCompare(b.indice));
+                })()}
+                goDevis={goDevis}
+                autoOpenPDF={autoOpenPDF === selD}
+                onAutoOpenPDFConsumed={() => setAutoOpenPDF(null)}
+                loading={loadingDevis.has(selD)}/>
+            </Suspense>
           )}
           {tab === "factures"        && <InvoicesList invoices={invoices} clients={clients} goInvoice={goInvoice} onCreateEmpty={onCreateEmptyInvoice} onDelete={onDeleteInvoice}/>}
           {tab === "factures_detail" && selI && (() => {
@@ -331,32 +347,40 @@ export default function App() {
             if (!inv) return null;
             const linkedDevis = inv.devis_id ? devis.find(d => d.id === inv.devis_id) : null;
             return (
-              <InvoiceDetail
-                invoice={linkedDevis ? { ...inv, devis_numero: linkedDevis.numero } : inv}
-                client={clients.find(c => c.id === inv.client_id)}
-                clients={clients}
-                brand={brand}
-                invoices={invoices}
-                onBack={() => setTab("factures")}
-                onChange={onSaveInvoice}
-                onCreateAvoir={onCreateAvoir}
-                onDelete={() => { if (confirm("Supprimer cette facture ?")) onDeleteInvoice(inv.id); }}/>
+              <Suspense fallback={<ScreenLoader />}>
+                <InvoiceDetail
+                  invoice={linkedDevis ? { ...inv, devis_numero: linkedDevis.numero } : inv}
+                  client={clients.find(c => c.id === inv.client_id)}
+                  clients={clients}
+                  brand={brand}
+                  invoices={invoices}
+                  onBack={() => setTab("factures")}
+                  onChange={onSaveInvoice}
+                  onCreateAvoir={onCreateAvoir}
+                  onDelete={() => { if (confirm("Supprimer cette facture ?")) onDeleteInvoice(inv.id); }}/>
+              </Suspense>
             );
           })()}
           {tab === "agent" && (
-            <AgentIA
-              devis={devis}
-              onCreateDevis={onCreateDevis}
-              clients={clients}
-              onSaveClient={onSaveClient}
-              plan={effectivePlan}
-              trialExpired={trialExpired}
-              onPaywall={() => setScreen("paywall")}
-              setTab={setTab}
-              onOpenDevisPDF={(id) => { setAutoOpenPDF(id); goDevis(id); }}
-              brand={brand}/>
+            <Suspense fallback={<ScreenLoader />}>
+              <AgentIA
+                devis={devis}
+                onCreateDevis={onCreateDevis}
+                clients={clients}
+                onSaveClient={onSaveClient}
+                plan={effectivePlan}
+                trialExpired={trialExpired}
+                onPaywall={() => setScreen("paywall")}
+                setTab={setTab}
+                onOpenDevisPDF={(id) => { setAutoOpenPDF(id); goDevis(id); }}
+                brand={brand}/>
+            </Suspense>
           )}
-          {tab === "admin" && isAdmin && <AdminPanel onBack={() => setTab("dashboard")}/>}
+          {tab === "admin" && isAdmin && (
+            <Suspense fallback={<ScreenLoader />}>
+              <AdminPanel onBack={() => setTab("dashboard")}/>
+            </Suspense>
+          )}
         </div>
       </div>
 

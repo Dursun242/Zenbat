@@ -12,15 +12,11 @@
 // mais centralise la logique pour qu'on puisse facilement ajouter des
 // polices embarquées, compression, signature, etc. plus tard.
 
-import { PDFDocument, AFRelationship, PDFName, PDFRawStream, PDFRef } from "pdf-lib";
-import fontkit from "@pdf-lib/fontkit";
+import { PDFDocument, AFRelationship, PDFName, PDFRawStream } from "pdf-lib";
 import { readFile } from "node:fs/promises";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { cors } from "./_cors.js"
 import { authenticate } from "./_withAuth.js"
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const XML_FILENAME    = "factur-x.xml";
 // Profil EN 16931 (norme européenne, obligatoire PPF/PDP à partir de 09/2026).
@@ -317,61 +313,10 @@ async function loadSRGBProfile() {
   return new Uint8Array(Buffer.from(SRGB_ICC_B64, "base64"));
 }
 
-// ── Embedding de polices pour conformité PDF/A-3 ────────────────────────────
-// jsPDF côté client utilise les polices standard PDF "Helvetica" / "Helvetica-Bold"
-// qui ne sont JAMAIS embarquées (par convention PDF, ces 14 fonts standard sont
-// supposées disponibles dans le reader). Or PDF/A-3 exige que TOUTES les fonts
-// soient embarquées (ISO 19005-3 § 6.2.11.4). On contourne en chargeant DejaVu
-// Sans depuis node_modules, en l'embarquant via pdf-lib, et en réécrivant les
-// références Helvetica dans les Resources des pages pour pointer vers ces
-// fonts maintenant embarquées.
-
-// Cache module-level : la lecture disque ne se fait qu'une fois par cold-start.
-let _fontCache = null;
-async function loadEmbeddingFonts() {
-  if (_fontCache) return _fontCache;
-  const base = join(__dirname, "fonts");
-  const [regular, bold] = await Promise.all([
-    readFile(join(base, "DejaVuSans.ttf")),
-    readFile(join(base, "DejaVuSans-Bold.ttf")),
-  ]);
-  _fontCache = { regular: new Uint8Array(regular), bold: new Uint8Array(bold) };
-  return _fontCache;
-}
-
-// Réécrit les Resources des pages pour faire pointer chaque entrée de font
-// dont le BaseFont est /Helvetica ou /Helvetica-Bold vers la PDFRef du font
-// embarqué correspondant. Le content stream conserve ses opérateurs `/Fxx Tf`
-// et leurs character codes WinAnsi : tant que le font embarqué utilise la
-// même encoding (DejaVu Sans accepte WinAnsi), les glyphes rendus sont les
-// bons. La métrique change légèrement (DejaVu n'est pas métriquement
-// compatible avec Helvetica) — c'est le compromis acceptable pour la
-// conformité PDF/A-3 sans avoir à régénérer tout le PDF côté serveur.
-function replaceHelveticaRefs(pdfDoc, regularRef, boldRef) {
-  let replaced = 0;
-  for (const page of pdfDoc.getPages()) {
-    const resources = page.node.Resources();
-    if (!resources) continue;
-    const fontsDict = resources.lookup(PDFName.of("Font"));
-    if (!fontsDict || typeof fontsDict.entries !== "function") continue;
-
-    for (const [key, value] of fontsDict.entries()) {
-      const ref = value instanceof PDFRef ? value : null;
-      const fontObj = ref ? pdfDoc.context.lookup(ref) : value;
-      if (!fontObj || typeof fontObj.get !== "function") continue;
-      const baseFont = fontObj.get(PDFName.of("BaseFont"));
-      const name = baseFont ? baseFont.toString() : "";
-      if (name === "/Helvetica") {
-        fontsDict.set(key, regularRef);
-        replaced++;
-      } else if (name === "/Helvetica-Bold") {
-        fontsDict.set(key, boldRef);
-        replaced++;
-      }
-    }
-  }
-  return replaced;
-}
+// Note conformité PDF/A-3 : les polices sont embarquées côté client par jsPDF
+// (DejaVu Sans via VFS, voir src/lib/pdfBuilder.js). On n'a donc plus besoin
+// de réécrire les références de fonts ici — le PDF arrive déjà conforme à
+// ISO 19005-3 § 6.2.11.4 / 6.2.11.5 / 6.2.11.8.
 
 // Ajoute un OutputIntent sRGB au catalogue PDF (nécessaire pour PDF/A-3).
 function addSRGBOutputIntent(pdfDoc, iccBytes) {
@@ -422,15 +367,6 @@ export default async function handler(req, res) {
   try {
     const pdfBytes = Uint8Array.from(Buffer.from(pdf_base64, "base64"));
     const pdfDoc   = await PDFDocument.load(pdfBytes);
-
-    // 0. Embed des polices DejaVu Sans (regular + bold) et remplacement des
-    //    références Helvetica côté PDF. Sans cela, le validateur PDF/A-3
-    //    rejette le fichier (ISO 19005-3 § 6.2.11.4 — fonts non embarquées).
-    pdfDoc.registerFontkit(fontkit);
-    const fontBytes = await loadEmbeddingFonts();
-    const regularFont = await pdfDoc.embedFont(fontBytes.regular);
-    const boldFont    = await pdfDoc.embedFont(fontBytes.bold);
-    replaceHelveticaRefs(pdfDoc, regularFont.ref, boldFont.ref);
 
     // 1. Attache l'XML Factur-X
     const xml      = buildXML({ invoice, client, brand, sourceInvoice });
