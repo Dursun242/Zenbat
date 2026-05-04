@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase.js";
 
 async function getToken() {
@@ -41,12 +41,34 @@ const PLANS = {
   },
 };
 
+const DEFAULT_AVG_DEVIS = 1_200; // € HT — valeur artisan BTP si aucun historique
+
 export default function PaywallScreen({ daysLeft = 0, onBack }) {
   const [billing,  setBilling]  = useState("biannual");
   const [loading,  setLoading]  = useState(false);
   const [ctaError, setCtaError] = useState(null);
+  const [myStats,  setMyStats]  = useState(null); // { count, ca, avg }
   const expired = daysLeft <= 0;
   const plan    = PLANS[billing];
+
+  useEffect(() => {
+    const startMonth = new Date();
+    startMonth.setUTCDate(1);
+    startMonth.setUTCHours(0, 0, 0, 0);
+    supabase
+      .from("devis")
+      .select("montant_ht, statut")
+      .gte("created_at", startMonth.toISOString())
+      .is("deleted_at", null)
+      .then(({ data }) => {
+        if (!data || data.length === 0) return;
+        const count = data.length;
+        const ca    = data.reduce((s, d) => s + Number(d.montant_ht || 0), 0);
+        const avg   = count ? Math.round(ca / count) : DEFAULT_AVG_DEVIS;
+        setMyStats({ count, ca: Math.round(ca), avg });
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSubscribe = async () => {
     setLoading(true); setCtaError(null)
@@ -87,6 +109,33 @@ export default function PaywallScreen({ daysLeft = 0, onBack }) {
             ? "Passez à Pro pour continuer à créer des devis avec l'Agent IA, le PDF brandé et l'envoi en signature."
             : "Passez à Pro à tout moment pour débloquer toutes les fonctionnalités sans limite."}
         </p>
+
+        {/* Bandeau personnalisé — données du mois courant */}
+        {myStats && myStats.count > 0 && (() => {
+          const projected = Math.round((myStats.avg || DEFAULT_AVG_DEVIS) * myStats.count * 5);
+          const fmtEur = n => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
+          return (
+            <div style={{ background: "#2A231C", border: "1px solid #3D3028", borderRadius: 16, padding: "14px 16px", marginBottom: 16, textAlign: "left" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#6B6358", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 }}>Ce mois-ci avec l'essai</div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 12, color: "#9A8E82" }}>Devis créés</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "white" }}>{myStats.count}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+                <span style={{ fontSize: 12, color: "#9A8E82" }}>CA généré</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "white" }}>{fmtEur(myStats.ca)}</span>
+              </div>
+              <div style={{ height: 1, background: "#3D3028", marginBottom: 12 }} />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 11, color: "#9A8E82" }}>Avec Pro (×5 devis)</div>
+                  <div style={{ fontSize: 10, color: "#6B6358" }}>votre potentiel ce mois</div>
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: "#22c55e" }}>{fmtEur(projected)}</div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Sélecteur mensuel / 6 mois */}
         <div style={{ display: "flex", background: "#2A231C", borderRadius: 14, padding: 4, marginBottom: 16, position: "relative" }}>

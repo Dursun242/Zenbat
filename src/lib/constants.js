@@ -42,12 +42,13 @@ export const TVA_RATES = [20, 10, 5.5];
 
 // ── Statuts devis ─────────────────────────────────────────
 export const STATUT = {
-  brouillon:    { label: "Brouillon",    bg: "#f1f5f9", color: "#64748b", dot: "#94a3b8" },
-  envoye:       { label: "Envoyé",       bg: "#eff6ff", color: "#1d4ed8", dot: "#3b82f6" },
-  en_signature: { label: "En signature", bg: "#fffbeb", color: "#b45309", dot: "#f59e0b" },
-  accepte:      { label: "Accepté",      bg: "#ecfdf5", color: "#065f46", dot: "#10b981" },
-  refuse:       { label: "Refusé",       bg: "#fef2f2", color: "#991b1b", dot: "#ef4444" },
-  remplace:     { label: "Remplacé",     bg: "#f5f3ff", color: "#6b21a8", dot: "#a855f7" },
+  brouillon:      { label: "Brouillon",      bg: "#f1f5f9", color: "#64748b", dot: "#94a3b8" },
+  envoye:         { label: "Envoyé",         bg: "#eff6ff", color: "#1d4ed8", dot: "#3b82f6" },
+  en_signature:   { label: "En signature",   bg: "#fffbeb", color: "#b45309", dot: "#f59e0b" },
+  en_negociation: { label: "Négociation",    bg: "#fff7ed", color: "#c2410c", dot: "#f97316" },
+  accepte:        { label: "Accepté",        bg: "#ecfdf5", color: "#065f46", dot: "#10b981" },
+  refuse:         { label: "Refusé",         bg: "#fef2f2", color: "#991b1b", dot: "#ef4444" },
+  remplace:       { label: "Remplacé",       bg: "#f5f3ff", color: "#6b21a8", dot: "#a855f7" },
 };
 
 // ── Statuts factures électroniques (B2Brouter / DGFiP) ─────

@@ -1,5 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
 import { cors } from "./_cors.js";
+import { authenticate } from "./_withAuth.js";
 
 const ALLOWED_MODELS = [
   "claude-haiku-4-5-20251001",
@@ -7,8 +7,13 @@ const ALLOWED_MODELS = [
   "claude-sonnet-4-5",
 ];
 
-const MAX_SYSTEM_CHARS  = 40_000;
+const MAX_SYSTEM_CHARS   = 80_000;
 const MAX_MESSAGES_CHARS = 40_000;
+const STREAM_TIMEOUT_MS  = 55_000;
+const MS_PER_DAY         = 86_400_000;
+const AI_LIMIT_FREE      = 40;
+const AI_LIMIT_PRO       = 200;
+const TRIAL_DAYS_DEFAULT = 30;
 
 export default async function handler(req, res) {
   cors(req, res, { methods: "POST, OPTIONS", auth: true });
@@ -17,19 +22,9 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   // ── Auth Supabase ───────────────────────────────────────────────────────────
-  const token = req.headers.authorization?.replace("Bearer ", "");
-  if (!token) return res.status(401).json({ error: "Non authentifié" });
-
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceKey)
-    return res.status(500).json({ error: "Supabase non configuré" });
-
-  const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-  const { data: { user }, error: authErr } = await admin.auth.getUser(token);
-  if (authErr || !user) return res.status(401).json({ error: "Token invalide" });
+  const auth = await authenticate(req, res);
+  if (!auth) return;
+  const { user, admin } = auth;
 
   // ── Plan + rate limit ────────────────────────────────────────────────────────
   const { data: profile } = await admin.from("profiles")
@@ -45,15 +40,14 @@ export default async function handler(req, res) {
   const isAdmin = adminEmail && norm(user.email) === norm(adminEmail);
   const effectivePlan = isAdmin ? "pro" : profile.plan;
 
-  const TRIAL_DAYS = 30;
   const accountAgeDays = Math.floor(
-    (Date.now() - new Date(user.created_at).getTime()) / 86_400_000
+    (Date.now() - new Date(user.created_at).getTime()) / MS_PER_DAY
   );
-  if (effectivePlan === "free" && accountAgeDays >= TRIAL_DAYS) {
+  if (effectivePlan === "free" && accountAgeDays >= TRIAL_DAYS_DEFAULT) {
     return res.status(403).json({ error: "Période d'essai expirée" });
   }
 
-  const AI_DAILY_LIMIT = effectivePlan === "pro" ? 200 : 40;
+  const AI_DAILY_LIMIT = effectivePlan === "pro" ? AI_LIMIT_PRO : AI_LIMIT_FREE;
   const todayStart = new Date();
   todayStart.setUTCHours(0, 0, 0, 0);
   const { count: callsToday } = await admin.from("ia_conversations")
@@ -127,7 +121,7 @@ export default async function handler(req, res) {
     // la réponse au client. Les T3 multi-lots (rénovation totale, extension)
     // peuvent légitimement prendre 30-50 s à générer.
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 55000);
+    const timeout = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
 
     let upstream;
     try {
@@ -158,16 +152,54 @@ export default async function handler(req, res) {
         res.flushHeaders?.();
 
         const reader = upstream.body.getReader();
+        const decoder = new TextDecoder();
+        let sseBuffer = "";
+        let inputTokens = 0;
+        let outputTokens = 0;
+        const startTime = Date.now();
+
         try {
           while (true) {
             const { value, done } = await reader.read();
             if (done) break;
             res.write(value);
             res.flush?.();
+
+            // Parse SSE events to capture token usage
+            sseBuffer += decoder.decode(value, { stream: true });
+            const lines = sseBuffer.split("\n");
+            sseBuffer = lines.pop() ?? "";
+            for (const line of lines) {
+              if (!line.startsWith("data: ")) continue;
+              try {
+                const evt = JSON.parse(line.slice(6));
+                if (evt.type === "message_start" && evt.message?.usage) {
+                  inputTokens  = evt.message.usage.input_tokens  || 0;
+                  outputTokens = evt.message.usage.output_tokens || 0;
+                } else if (evt.type === "message_delta" && evt.usage) {
+                  outputTokens = evt.usage.output_tokens || 0;
+                }
+              } catch {}
+            }
           }
         } catch {
           // client abort ou erreur réseau — on ferme proprement
         }
+
+        // Log token usage (fire-and-forget)
+        if (inputTokens > 0 || outputTokens > 0) {
+          admin.from("claude_api_logs").insert({
+            model,
+            use_case:      support_ticket_id ? "support" : "devis",
+            input_tokens:  inputTokens,
+            output_tokens: outputTokens,
+            latency_ms:    Date.now() - startTime,
+            status_code:   200,
+            stream_enabled: true,
+            user_id:       user.id,
+          }).then(() => {}).catch(() => {});
+        }
+
         return res.end();
       } else {
         // Erreur Anthropic sur une requête stream : on lit le JSON d'erreur
@@ -177,7 +209,22 @@ export default async function handler(req, res) {
     }
 
     // ── Non-streaming ────────────────────────────────────────────────────────
+    const startTime = Date.now();
     const upstreamData = await upstream.json();
+
+    // Log token usage (fire-and-forget)
+    if (upstream.ok && upstreamData?.usage) {
+      admin.from("claude_api_logs").insert({
+        model,
+        use_case:      support_ticket_id ? "support" : "devis",
+        input_tokens:  upstreamData.usage.input_tokens  || 0,
+        output_tokens: upstreamData.usage.output_tokens || 0,
+        latency_ms:    Date.now() - startTime,
+        status_code:   200,
+        stream_enabled: false,
+        user_id:       user.id,
+      }).then(() => {}).catch(() => {});
+    }
 
     // Persistance support : si on est dans un ticket, on insère la réponse Claude
     // dans support_messages (role='claude'). L'utilisateur a déjà inséré son propre

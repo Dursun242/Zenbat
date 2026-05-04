@@ -68,16 +68,68 @@ export function rescaleToTarget(lignes, targetTotalHt) {
   }).reverse();
 }
 
+const VALID_TVA    = new Set([0, 2.1, 5.5, 8.5, 10, 20]);
+const VALID_TYPES  = new Set(["lot", "ouvrage"]);
+const MAX_STR      = 500;
+const MAX_LIGNES   = 200;
+
+function safeStr(v, max = MAX_STR) {
+  return typeof v === "string" ? v.slice(0, max) : "";
+}
+
+// Valide et nettoie le JSON Claude avant toute sauvegarde.
+// Tolère les champs manquants (defaults), rejette les structures malformées.
+export function sanitizeDevisJson(parsed) {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+
+  const rawLignes = Array.isArray(parsed.lignes) ? parsed.lignes : [];
+  const lignes = rawLignes
+    .slice(0, MAX_LIGNES)
+    .filter(l => l && VALID_TYPES.has(l.type_ligne))
+    .map(l => {
+      if (l.type_ligne === "lot") {
+        return { type_ligne: "lot", designation: safeStr(l.designation) || "—" };
+      }
+      const pu  = Number(l.prix_unitaire);
+      const qty = l.quantite === null ? null : Number(l.quantite);
+      const tva = VALID_TVA.has(Number(l.tva_rate)) ? Number(l.tva_rate) : 20;
+      return {
+        type_ligne:    "ouvrage",
+        lot:           safeStr(l.lot),
+        designation:   safeStr(l.designation) || "—",
+        unite:         safeStr(l.unite, 30) || "forfait",
+        quantite:      qty === null || isNaN(qty) || qty < 0 ? null : qty,
+        prix_unitaire: isFinite(pu) && pu > 0 ? pu : null,
+        tva_rate:      tva,
+      };
+    });
+
+  const strArray = (v) =>
+    Array.isArray(v) ? v.filter(s => typeof s === "string").map(s => s.slice(0, 300)) : [];
+
+  return {
+    objet:              safeStr(parsed.objet, 200),
+    lignes,
+    champs_a_completer: strArray(parsed.champs_a_completer),
+    suggestions:        strArray(parsed.suggestions),
+    target_total_ht:    parsed.target_total_ht ?? undefined,
+    project_params:     (parsed.project_params && typeof parsed.project_params === "object") ? parsed.project_params : {},
+  };
+}
+
 // Pipeline complet : raw text → { parsed, lignes, objet } prêts à être affichés.
 // Renvoie null si pas de JSON exploitable (l'appelant gère le fallback).
 export function processDevisFromRaw(raw, brand) {
   const devisJsonStr = extractDevisJson(raw);
   if (!devisJsonStr) return null;
 
-  let parsed;
-  try { parsed = JSON.parse(devisJsonStr); } catch { return null; }
+  let rawParsed;
+  try { rawParsed = JSON.parse(devisJsonStr); } catch { return null; }
 
-  const initialLignes = (parsed.lignes || []).map(l => ({ ...l, id: uid() }));
+  const parsed = sanitizeDevisJson(rawParsed);
+  if (!parsed) return null;
+
+  const initialLignes = parsed.lignes.map(l => ({ ...l, id: uid() }));
   const vatApplied    = applyVatRegime(initialLignes, brand.vatRegime);
   const finalLignes   = rescaleToTarget(vatApplied, parsed.target_total_ht);
 

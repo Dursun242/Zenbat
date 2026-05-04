@@ -11,6 +11,7 @@ import AdminNewsletter    from "./admin/AdminNewsletter.jsx"
 import AdminCoherenceStats from "./admin/AdminCoherenceStats.jsx"
 import AdminFeedback       from "./admin/AdminFeedback.jsx"
 import AdminAgentBenchmark from "./admin/AdminAgentBenchmark.jsx"
+import AdminQuotesSent    from "./admin/AdminQuotesSent.jsx"
 import DeleteUserModal    from "./admin/DeleteUserModal.jsx"
 import UserDetailDrawer  from "./admin/UserDetailDrawer.jsx"
 
@@ -32,11 +33,14 @@ export default function AdminPanel({ onBack }) {
   const [coherenceLoading, setCoherenceLoading] = useState(false)
   const [feedback,         setFeedback]         = useState(null)
   const [feedbackLoading,  setFeedbackLoading]  = useState(false)
+  const [quotesSent,       setQuotesSent]       = useState(null)
+  const [quotesSentLoading,setQuotesSentLoading]= useState(false)
   const [openConvUser, setOpenConvUser] = useState(null)
   const [convSearch,   setConvSearch]   = useState("")
   const [userSearch,   setUserSearch]   = useState("")
   const [sortBy,       setSortBy]       = useState("joined")
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteMode,   setDeleteMode]   = useState("delete") // 'delete' | 'reset_data'
   const [confirmInput, setConfirmInput] = useState("")
   const [deleting,     setDeleting]     = useState(false)
   const [deleteError,  setDeleteError]  = useState(null)
@@ -46,7 +50,7 @@ export default function AdminPanel({ onBack }) {
   const [detailError,  setDetailError]  = useState(null)
   const [detailTab,    setDetailTab]    = useState("overview")
 
-  useEffect(() => { if (session) { load(); loadLogs(); loadNegs(); loadConvs(); loadNewsletter(); loadCoherence(); loadFeedback() } }, [session?.access_token])
+  useEffect(() => { if (session) { load(); loadLogs(); loadNegs(); loadConvs(); loadNewsletter(); loadCoherence(); loadFeedback(); loadQuotesSent() } }, [session?.access_token])
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -120,7 +124,18 @@ export default function AdminPanel({ onBack }) {
     } catch {} finally { setFeedbackLoading(false) }
   }
 
-  const openDelete = (u) => { setDeleteTarget(u); setConfirmInput(""); setDeleteError(null) }
+  const loadQuotesSent = async () => {
+    setQuotesSentLoading(true)
+    try {
+      const token = await getToken()
+      const res  = await fetch("/api/admin-stats?type=quotes_sent", { headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json()
+      if (res.ok) setQuotesSent(data.quotes_sent || [])
+    } catch {} finally { setQuotesSentLoading(false) }
+  }
+
+  const openDelete = (u) => { setDeleteMode("delete"); setDeleteTarget(u); setConfirmInput(""); setDeleteError(null) }
+  const openReset  = (u) => { setDeleteMode("reset_data"); setDeleteTarget(u); setConfirmInput(""); setDeleteError(null) }
 
   const openDetail = async (u) => {
     setDetailUser(u); setDetailData(null); setDetailError(null)
@@ -149,13 +164,21 @@ export default function AdminPanel({ onBack }) {
       const res  = await fetch("/api/admin-delete-user", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ userId: deleteTarget.id, confirmEmail: confirmInput }),
+        body: JSON.stringify({ userId: deleteTarget.id, confirmEmail: confirmInput, mode: deleteMode }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || "Erreur serveur")
-      setStats(s => s ? { ...s, usersDetail: s.usersDetail.filter(u => u.id !== deleteTarget.id) } : s)
+      if (deleteMode === "delete") {
+        setStats(s => s ? { ...s, usersDetail: s.usersDetail.filter(u => u.id !== deleteTarget.id) } : s)
+      }
       setDeleteTarget(null); setConfirmInput("")
       load()
+      // Si on était en train de regarder le détail de ce user, on le rafraîchit
+      // pour voir 0 devis / 0 factures après reset.
+      if (detailUser && detailUser.id === deleteTarget.id) {
+        if (deleteMode === "delete") closeDetail()
+        else openDetail(detailUser)
+      }
     } catch (e) {
       setDeleteError(e.message)
     } finally {
@@ -170,7 +193,9 @@ export default function AdminPanel({ onBack }) {
       return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.fullName || "").toLowerCase().includes(q)
     })
     .sort((a, b) => {
-      if (sortBy === "joined" || sortBy === "lastSignIn") return new Date(b[sortBy] || 0) - new Date(a[sortBy] || 0)
+      if (["joined", "lastSignIn", "lastDevis"].includes(sortBy)) return new Date(b[sortBy] || 0) - new Date(a[sortBy] || 0)
+      if (sortBy === "name") return (a.fullName || a.name || "").localeCompare(b.fullName || b.name || "", "fr")
+      if (sortBy === "accepte") return (b.byStatut?.accepte || 0) - (a.byStatut?.accepte || 0)
       return (b[sortBy] || 0) - (a[sortBy] || 0)
     })
 
@@ -197,6 +222,13 @@ export default function AdminPanel({ onBack }) {
       {stats && (
         <div style={{ padding: 16 }}>
           <AdminKPIs stats={stats} />
+          <AdminQuotesSent data={quotesSent} loading={quotesSentLoading} onRefresh={loadQuotesSent} />
+          <AdminConversations
+            iaConvs={iaConvs}      loading={convsLoading}
+            convSearch={convSearch} setConvSearch={setConvSearch}
+            openConvUser={openConvUser} setOpenConvUser={setOpenConvUser}
+            onRefresh={loadConvs}
+          />
           <AdminUsersTable
             users={filteredUsers}
             userSearch={userSearch}    setUserSearch={setUserSearch}
@@ -206,12 +238,6 @@ export default function AdminPanel({ onBack }) {
           />
           <AdminErrorLogs    iaLogs={iaLogs}  loading={logsLoading}  onRefresh={loadLogs} />
           <AdminNegativeLogs iaNegs={iaNegs}  loading={negsLoading}  negFilter={negFilter} setNegFilter={setNegFilter} onRefresh={loadNegs} />
-          <AdminConversations
-            iaConvs={iaConvs}      loading={convsLoading}
-            convSearch={convSearch} setConvSearch={setConvSearch}
-            openConvUser={openConvUser} setOpenConvUser={setOpenConvUser}
-            onRefresh={loadConvs}
-          />
           <AdminNewsletter
             subscribers={newsletter}  loading={newsletterLoading}
             onRefresh={loadNewsletter}
@@ -237,13 +263,15 @@ export default function AdminPanel({ onBack }) {
           error={detailError}  tab={detailTab}         onTabChange={setDetailTab}
           onClose={closeDetail}
           onRequestDelete={() => { closeDetail(); openDelete(detailUser); }}
+          onRequestReset={() => { openReset(detailUser); }}
           currentUserId={currentUser?.id}
         />
       )}
 
       {deleteTarget && (
         <DeleteUserModal
-          target={deleteTarget}  confirmInput={confirmInput}  setConfirmInput={setConfirmInput}
+          target={deleteTarget}  mode={deleteMode}
+          confirmInput={confirmInput}  setConfirmInput={setConfirmInput}
           deleting={deleting}    error={deleteError}          onClose={closeDelete}
           onConfirm={confirmDelete}
         />

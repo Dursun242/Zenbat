@@ -10,6 +10,7 @@
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
 import { cors } from './_cors.js'
+import { authenticate, notifyTelegram } from './_withAuth.js'
 
 // Vercel doit recevoir le body brut pour vérifier la signature Stripe.
 // Pour les actions non-webhook on parse manuellement le JSON.
@@ -45,21 +46,6 @@ function appUrl() {
   if (origins.length) return origins[0].replace(/\/$/, '')
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
   return 'http://localhost:5173'
-}
-
-async function notifyTelegram(kind, payload) {
-  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) return
-  try {
-    await fetch(`${url}/functions/v1/notify-telegram`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ kind, payload }),
-    })
-  } catch (err) {
-    console.error('[stripe] notifyTelegram failed:', err.message)
-  }
 }
 
 // ─── Webhook Stripe ──────────────────────────────────────────────────
@@ -160,21 +146,15 @@ async function handleAction(req, res, rawBody) {
   }
 
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '')
-    if (!token) return res.status(401).json({ error: 'Non authentifié' })
+    const auth = await authenticate(req, res)
+    if (!auth) return
+    const { user, admin } = auth
 
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-    const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
-    const stripeKey   = process.env.STRIPE_SECRET_KEY
-    if (!supabaseUrl || !serviceKey) return res.status(500).json({ error: 'Config Supabase manquante' })
+    const stripeKey = process.env.STRIPE_SECRET_KEY
     if (!stripeKey) return res.status(500).json({ error: 'STRIPE_SECRET_KEY non configurée' })
 
     const action = body.action || 'checkout'
-    const admin  = createClient(supabaseUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
     const stripe = new Stripe(stripeKey)
-
-    const { data: { user }, error: authErr } = await admin.auth.getUser(token)
-    if (authErr || !user) return res.status(401).json({ error: 'Token invalide' })
 
     if (action === 'info') {
       const { data: profile } = await admin.from('profiles')

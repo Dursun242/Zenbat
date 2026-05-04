@@ -3,6 +3,7 @@ import {
   extractDevisJson,
   applyVatRegime,
   rescaleToTarget,
+  sanitizeDevisJson,
   processDevisFromRaw,
 } from "./extractDevis.js";
 
@@ -111,6 +112,63 @@ describe("rescaleToTarget", () => {
     const out = rescaleToTarget(baseLignes, 2500);
     const lot = out.find(l => l.type_ligne === "lot");
     expect(lot).toEqual(baseLignes[2]);
+  });
+});
+
+describe("sanitizeDevisJson", () => {
+  it("retourne null pour une entrée non-objet", () => {
+    expect(sanitizeDevisJson(null)).toBeNull();
+    expect(sanitizeDevisJson("string")).toBeNull();
+    expect(sanitizeDevisJson([])).toBeNull();
+  });
+
+  it("accepte un objet vide et produit une structure valide", () => {
+    const out = sanitizeDevisJson({});
+    expect(out).not.toBeNull();
+    expect(Array.isArray(out.lignes)).toBe(true);
+    expect(Array.isArray(out.champs_a_completer)).toBe(true);
+    expect(Array.isArray(out.suggestions)).toBe(true);
+  });
+
+  it("filtre les lignes avec type_ligne inconnu", () => {
+    const out = sanitizeDevisJson({ lignes: [{ type_ligne: "unknown" }, { type_ligne: "ouvrage", prix_unitaire: 10 }] });
+    expect(out.lignes).toHaveLength(1);
+    expect(out.lignes[0].type_ligne).toBe("ouvrage");
+  });
+
+  it("default tva_rate à 20 si la valeur n'est pas dans la liste valide", () => {
+    const out = sanitizeDevisJson({ lignes: [{ type_ligne: "ouvrage", tva_rate: 7, prix_unitaire: 100, quantite: 1 }] });
+    expect(out.lignes[0].tva_rate).toBe(20);
+  });
+
+  it("accepte les tva_rate valides (0, 5.5, 10, 20...)", () => {
+    for (const rate of [0, 2.1, 5.5, 8.5, 10, 20]) {
+      const out = sanitizeDevisJson({ lignes: [{ type_ligne: "ouvrage", tva_rate: rate, prix_unitaire: 50, quantite: 1 }] });
+      expect(out.lignes[0].tva_rate).toBe(rate);
+    }
+  });
+
+  it("met prix_unitaire à null si <= 0 ou non fini", () => {
+    const out = sanitizeDevisJson({ lignes: [{ type_ligne: "ouvrage", prix_unitaire: -10 }, { type_ligne: "ouvrage", prix_unitaire: "abc" }] });
+    expect(out.lignes[0].prix_unitaire).toBeNull();
+    expect(out.lignes[1].prix_unitaire).toBeNull();
+  });
+
+  it("tronque la désignation à 500 caractères", () => {
+    const long = "x".repeat(600);
+    const out = sanitizeDevisJson({ lignes: [{ type_ligne: "ouvrage", designation: long, prix_unitaire: 10 }] });
+    expect(out.lignes[0].designation.length).toBe(500);
+  });
+
+  it("ignore les non-strings dans champs_a_completer et suggestions", () => {
+    const out = sanitizeDevisJson({ champs_a_completer: ["ok", 42, null, "bien"], suggestions: [true, "test"] });
+    expect(out.champs_a_completer).toEqual(["ok", "bien"]);
+    expect(out.suggestions).toEqual(["test"]);
+  });
+
+  it("tronque objet à 200 caractères", () => {
+    const out = sanitizeDevisJson({ objet: "a".repeat(250) });
+    expect(out.objet.length).toBe(200);
   });
 });
 

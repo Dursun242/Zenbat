@@ -3,7 +3,8 @@ import { fmtEur, fmtDT, relTime, SC, SL } from "../../lib/admin/format.js";
 // Drawer de détail d'un utilisateur dans le panel admin.
 // Présentation pure : reçoit data + callbacks, n'effectue aucun appel réseau.
 export default function UserDetailDrawer({
-  user, data, loading, error, tab, onTabChange, onClose, onRequestDelete, currentUserId,
+  user, data, loading, error, tab, onTabChange, onClose,
+  onRequestDelete, onRequestReset, currentUserId,
 }) {
   return (
     <div onClick={onClose}
@@ -85,6 +86,12 @@ export default function UserDetailDrawer({
                 {data.profile?.brand_data?.city && <div><strong style={{ color: "#1A1612" }}>Ville :</strong> {data.profile.brand_data.city}</div>}
                 {data.profile?.brand_data?.phone && <div><strong style={{ color: "#1A1612" }}>Téléphone :</strong> {data.profile.brand_data.phone}</div>}
               </div>
+              {onRequestReset && (data.stats.devisTotal > 0 || data.stats.invoicesTotal > 0) && (
+                <button onClick={onRequestReset}
+                  style={{ background: "#fffbeb", border: "1px solid #fde68a", color: "#92400e", borderRadius: 10, padding: "10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                  🧹 Réinitialiser les données ({data.stats.devisTotal} devis · {data.stats.invoicesTotal} factures)
+                </button>
+              )}
               {data.user.id !== currentUserId && (
                 <button onClick={onRequestDelete}
                   style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", borderRadius: 10, padding: "10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>

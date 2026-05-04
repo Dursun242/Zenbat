@@ -6,6 +6,7 @@ import Badge from "./ui/Badge.jsx";
 import LignesEditor from "./LignesEditor.jsx";
 import PDFViewer from "./PDFViewer.jsx";
 import ClientPickerModal from "./app/ClientPickerModal.jsx";
+import DevisClientActions from "./DevisClientActions.jsx";
 
 export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChange, onConvertToInvoice, onCreateAcompte, onDuplicate, onCreateIndice, groupVersions = [], goDevis, loading, autoOpenPDF, onAutoOpenPDFConsumed }) {
   const [showPDF,        setShowPDF]        = useState(false);
@@ -16,7 +17,8 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
   const [acompteModal,   setAcompteModal]   = useState(false);
   const [acomptePct,     setAcomptePct]     = useState(30);
   const [acompteLoading, setAcompteLoading] = useState(false);
-  const [clientPicker,   setClientPicker]   = useState(false);
+  const [clientPicker,      setClientPicker]      = useState(false);
+  const [pickerRequireEmail, setPickerRequireEmail] = useState(false);
   const [statutBusy,    setStatutBusy]    = useState(false);
 
   // Ouvre automatiquement le PDF quand on arrive depuis l'Agent IA après save
@@ -49,7 +51,8 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
   const sendOdoo = async () => {
     if (sending) return;
     if (!signerEmail) {
-      alert("Le contact de ce devis n'a pas d'email — impossible d'envoyer la signature.");
+      setPickerRequireEmail(true);
+      setClientPicker(true);
       return;
     }
     setSending(true); setLog([]); setShowLog(true);
@@ -128,9 +131,6 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
       `}</style>
       {showPDF && (
         <PDFViewer d={d} cl={cl} brand={brand} onClose={() => setShowPDF(false)}
-          onSendOdoo={!["accepte", "refuse"].includes(d.statut) ? sendOdoo : undefined}
-          sending={sending}
-          sent={!!signUrl || d.statut === "en_signature"}
           onMarkSent={d.statut === "brouillon" ? () => onChange({ ...d, statut: "envoye" }) : undefined}
           onMarkSignature={["brouillon","envoye"].includes(d.statut) ? () => onChange({ ...d, statut: "en_signature" }) : undefined}
         />
@@ -194,7 +194,8 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
           clients={clients}
           current={cl}
           onSelect={c => onChange({ ...d, client_id: c?.id ?? null })}
-          onClose={() => setClientPicker(false)}/>
+          onClose={() => { setClientPicker(false); setPickerRequireEmail(false); }}
+          requireEmail={pickerRequireEmail}/>
       )}
       <div className="detail-shell" style={{ minHeight: "100%", background: "#FAF7F2", display: "flex", flexDirection: "column" }}>
         <div className="detail-row" style={{ flex: 1, display: "flex" }}>
@@ -231,14 +232,6 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
                 <button onClick={() => onChange({ ...d, statut: "envoye" })}
                   style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                   ✉️ Envoyé
-                </button>
-              )}
-              {["brouillon","envoye"].includes(d.statut) && !isRemplace && (
-                <button onClick={sendOdoo} disabled={sending}
-                  style={{ background: "#faf5ff", color: "#6b21a8", border: "1px solid #e9d5ff", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: sending ? "default" : "pointer", whiteSpace: "nowrap", opacity: sending ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}>
-                  {sending
-                    ? <><span style={{display:"inline-block",width:10,height:10,border:"2px solid #6b21a8",borderTopColor:"transparent",borderRadius:"50%",animation:"spin 1s linear infinite"}}/> Envoi…</>
-                    : <>🖊 Signature Odoo</>}
                 </button>
               )}
             </div>
@@ -283,7 +276,17 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
           )}
 
           {/* Client */}
-          <button onClick={() => !isRemplace && setClientPicker(true)} disabled={isRemplace}
+          {["brouillon","envoye"].includes(d.statut) && !isRemplace && !signerEmail && (
+            <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10,
+              padding: "10px 12px", marginBottom: 8, display: "flex", alignItems: "flex-start", gap: 8 }}>
+              <span style={{ fontSize: 16, lineHeight: "1.3", flexShrink: 0 }}>✉️</span>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#92400e", marginBottom: 2 }}>Email requis pour la signature</div>
+                <div style={{ fontSize: 11, color: "#b45309", lineHeight: "1.4" }}>Sélectionnez un client avec une adresse email pour envoyer ce devis en signature électronique.</div>
+              </div>
+            </div>
+          )}
+          <button onClick={() => { if (!isRemplace) { setPickerRequireEmail(false); setClientPicker(true); } }} disabled={isRemplace}
             style={{ width: "100%", display: "flex", alignItems: "center", gap: 8,
               background: isRemplace ? "#F0EBE3" : "#FAF7F2",
               border: "1px solid #E8E2D8", borderRadius: 10, padding: "7px 10px", marginBottom: 8,
@@ -317,6 +320,9 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
         </div>
 
         <div style={{ padding: 18 }}>
+          {/* Suivi client — envoi, négociation, audit */}
+          <DevisClientActions devis={d} client={cl} onChange={onChange} />
+
           {/* Bouton PDF */}
           <button className="detail-pdf-btn" onClick={() => setShowPDF(true)}
             style={{ width: "100%", background: `linear-gradient(135deg,${ac}ee,${ac})`, color: "white", border: "none", borderRadius: 16, padding: 16, fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, cursor: "pointer", boxShadow: `0 6px 20px ${ac}44`, marginBottom: 12 }}>

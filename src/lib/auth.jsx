@@ -9,10 +9,11 @@ export function AuthProvider({ children }) {
   const [recovery, setRecovery] = useState(false)
 
   useEffect(() => {
+    const timeout = setTimeout(() => setLoading(false), 8000)
     supabase.auth.getSession()
       .then(({ data }) => setSession(data.session))
       .catch((e) => console.error('[auth] getSession failed:', e?.message))
-      .finally(() => setLoading(false))
+      .finally(() => { clearTimeout(timeout); setLoading(false) })
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s)
@@ -48,6 +49,12 @@ export function AuthProvider({ children }) {
     return res
   }, [])
 
+  const resendConfirmation = useCallback(async () => {
+    const email = session?.user?.email
+    if (!email) return { error: { message: "Email introuvable" } }
+    return supabase.auth.resend({ type: 'signup', email })
+  }, [session])
+
   const value = {
     session,
     user: session?.user ?? null,
@@ -58,6 +65,7 @@ export function AuthProvider({ children }) {
     signOut,
     resetPasswordForEmail,
     updatePassword,
+    resendConfirmation,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
