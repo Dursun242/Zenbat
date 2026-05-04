@@ -7,6 +7,7 @@ import LandingMetiers  from '../components/landing/LandingMetiers'
 import LandingRelance  from '../components/landing/LandingRelance'
 import LandingHow      from '../components/landing/LandingHow'
 import PricingSection  from '../components/landing/PricingSection'
+import LandingTrustpilot from '../components/landing/LandingTrustpilot'
 import LandingFAQ        from '../components/landing/LandingFAQ'
 import LandingNewsletter from '../components/landing/LandingNewsletter'
 import LandingFooter     from '../components/landing/LandingFooter'
@@ -84,6 +85,7 @@ export default function Landing({ onLogin, onSignup }) {
       <LandingRelance />
       <LandingHow     />
       <PricingSection onSignup={onSignup} />
+      <LandingTrustpilot />
       <LandingFAQ        />
       <LandingNewsletter />
       <LandingFooter     onSignup={onSignup} />
