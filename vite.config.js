@@ -5,6 +5,14 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig({
   build: {
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react':    ['react', 'react-dom'],
+          'vendor-supabase': ['@supabase/supabase-js'],
+        },
+      },
+    },
   },
   plugins: [
     react(),
