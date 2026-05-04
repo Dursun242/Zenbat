@@ -370,6 +370,7 @@ export default async function handler(req, res) {
 
     await admin.from('devis').update({ statut: 'envoye', sent_to_client_at: new Date().toISOString() }).eq('id', devis.id)
     await admin.from('devis_audit_log').insert({ devis_id: devis.id, event: 'sent', from_party: 'artisan', meta: { to: client.email } })
+    notifyTg('devis_sent', { numero: devis.numero, objet: devis.objet, montant_ht: devis.montant_ht, to: client.email, company })
 
     return res.status(200).json({ ok: true, publicUrl, token: publicToken })
   }

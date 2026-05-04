@@ -104,6 +104,7 @@ type EventKind =
   | "account_deleted"
   | "support_escalation"
   | "pdf_generated"
+  | "devis_sent"
   | "raw";
 
 async function formatEvent(kind: EventKind, payload: Record<string, unknown>): Promise<string> {
@@ -233,6 +234,20 @@ async function formatEvent(kind: EventKind, payload: Record<string, unknown>): P
         head,
         p.client_email && p.client_email !== client ? `Email : ${escapeHtml(p.client_email)}` : "",
         p.total_ttc    ? `Montant : ${fmtAmount(p.total_ttc)}` : "",
+      ].filter(Boolean).join("\n");
+    }
+
+    case "devis_sent": {
+      const numero = escapeHtml(clip(p.numero, 30));
+      const objet  = escapeHtml(clip(p.objet, 80));
+      const to     = escapeHtml(clip(p.to, 80));
+      const cie    = escapeHtml(clip(p.company, 60));
+      const amt    = p.montant_ht ? ` — ${fmtAmount(Number(p.montant_ht) * 1.2)}` : "";
+      return [
+        `📤 Devis <b>${numero}</b> envoyé${amt}`,
+        objet ? `Objet : ${objet}` : "",
+        to    ? `À : ${to}` : "",
+        cie   ? `Artisan : ${cie}` : "",
       ].filter(Boolean).join("\n");
     }
 

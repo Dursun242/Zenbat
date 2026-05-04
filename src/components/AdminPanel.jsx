@@ -11,6 +11,7 @@ import AdminNewsletter    from "./admin/AdminNewsletter.jsx"
 import AdminCoherenceStats from "./admin/AdminCoherenceStats.jsx"
 import AdminFeedback       from "./admin/AdminFeedback.jsx"
 import AdminAgentBenchmark from "./admin/AdminAgentBenchmark.jsx"
+import AdminQuotesSent    from "./admin/AdminQuotesSent.jsx"
 import DeleteUserModal    from "./admin/DeleteUserModal.jsx"
 import UserDetailDrawer  from "./admin/UserDetailDrawer.jsx"
 
@@ -32,6 +33,8 @@ export default function AdminPanel({ onBack }) {
   const [coherenceLoading, setCoherenceLoading] = useState(false)
   const [feedback,         setFeedback]         = useState(null)
   const [feedbackLoading,  setFeedbackLoading]  = useState(false)
+  const [quotesSent,       setQuotesSent]       = useState(null)
+  const [quotesSentLoading,setQuotesSentLoading]= useState(false)
   const [openConvUser, setOpenConvUser] = useState(null)
   const [convSearch,   setConvSearch]   = useState("")
   const [userSearch,   setUserSearch]   = useState("")
@@ -47,7 +50,7 @@ export default function AdminPanel({ onBack }) {
   const [detailError,  setDetailError]  = useState(null)
   const [detailTab,    setDetailTab]    = useState("overview")
 
-  useEffect(() => { if (session) { load(); loadLogs(); loadNegs(); loadConvs(); loadNewsletter(); loadCoherence(); loadFeedback() } }, [session?.access_token])
+  useEffect(() => { if (session) { load(); loadLogs(); loadNegs(); loadConvs(); loadNewsletter(); loadCoherence(); loadFeedback(); loadQuotesSent() } }, [session?.access_token])
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -119,6 +122,16 @@ export default function AdminPanel({ onBack }) {
       const data = await res.json()
       if (res.ok) setFeedback(data.feedback || [])
     } catch {} finally { setFeedbackLoading(false) }
+  }
+
+  const loadQuotesSent = async () => {
+    setQuotesSentLoading(true)
+    try {
+      const token = await getToken()
+      const res  = await fetch("/api/admin-stats?type=quotes_sent", { headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json()
+      if (res.ok) setQuotesSent(data.quotes_sent || [])
+    } catch {} finally { setQuotesSentLoading(false) }
   }
 
   const openDelete = (u) => { setDeleteMode("delete"); setDeleteTarget(u); setConfirmInput(""); setDeleteError(null) }
@@ -209,6 +222,7 @@ export default function AdminPanel({ onBack }) {
       {stats && (
         <div style={{ padding: 16 }}>
           <AdminKPIs stats={stats} />
+          <AdminQuotesSent data={quotesSent} loading={quotesSentLoading} onRefresh={loadQuotesSent} />
           <AdminConversations
             iaConvs={iaConvs}      loading={convsLoading}
             convSearch={convSearch} setConvSearch={setConvSearch}

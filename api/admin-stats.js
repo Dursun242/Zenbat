@@ -218,7 +218,36 @@ export default async function handler(req, res) {
     return res.status(200).json({ [cfg.key]: enriched, generatedAt: new Date().toISOString() })
   }
 
-  if (type) return res.status(400).json({ error: "Paramètre 'type' invalide (conversations | logs | negatives | newsletter | coherence | feedback | tokens)" })
+  if (type === 'quotes_sent') {
+    const { data: rows, error: re } = await admin.from('devis_audit_log')
+      .select('id, devis_id, meta, created_at, devis:devis_id(numero, objet, montant_ht, owner_id)')
+      .eq('event', 'sent')
+      .order('created_at', { ascending: false })
+      .limit(200)
+    if (re) return res.status(500).json({ error: re.message })
+    const ownerIds = [...new Set((rows || []).map(r => r.devis?.owner_id).filter(Boolean))]
+    const [{ data: profiles }, { data: authUsers }] = await Promise.all([
+      admin.from('profiles').select('id, company_name, full_name').in('id', ownerIds.length ? ownerIds : ['00000000-0000-0000-0000-000000000000']),
+      admin.auth.admin.listUsers({ perPage: 1000 }).then(r => ({ data: r.data?.users || [], error: r.error })),
+    ])
+    const profById = new Map((profiles || []).map(p => [p.id, p]))
+    const authById = new Map((authUsers || []).map(u => [u.id, u]))
+    const enriched = (rows || []).map(r => {
+      const ownerId = r.devis?.owner_id
+      const p = profById.get(ownerId)
+      const a = authById.get(ownerId)
+      return {
+        id: r.id, devis_id: r.devis_id,
+        numero: r.devis?.numero, objet: r.devis?.objet, montant_ht: r.devis?.montant_ht,
+        to: r.meta?.to, created_at: r.created_at,
+        artisan_email: a?.email || null,
+        artisan_name: p?.company_name || p?.full_name || a?.email || '—',
+      }
+    })
+    return res.status(200).json({ quotes_sent: enriched, generatedAt: new Date().toISOString() })
+  }
+
+  if (type) return res.status(400).json({ error: "Paramètre 'type' invalide (conversations | logs | negatives | newsletter | coherence | feedback | tokens | quotes_sent)" })
 
   // ── Récupération des données ─────────────────────────────────────────
   const [
