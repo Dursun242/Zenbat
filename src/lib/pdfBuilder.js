@@ -2,6 +2,42 @@ import { jsPDF } from "jspdf";
 import { fmt, fmtD } from "./utils.js";
 import { notifyAdminPdf } from "./telegramNotify.js";
 
+// Polices DejaVu Sans embarquées dans jsPDF — indispensable pour la conformité
+// PDF/A-3 du Factur-X. Les fonts standard PDF "Helvetica" ne sont pas embarquées
+// (ISO 19005-3 § 6.2.11.4 rejette le PDF). On charge DejaVu depuis /public/fonts
+// et on l'enregistre dans le VFS de jsPDF, qui l'embarque alors comme TrueType
+// CIDFontType2 (Identity-H + ToUnicode + /W cohérent avec le programme TTF).
+let _dejaVuPromise = null;
+async function loadDejaVuFonts() {
+  if (_dejaVuPromise) return _dejaVuPromise;
+  _dejaVuPromise = (async () => {
+    const toBase64 = (ab) => {
+      const bytes = new Uint8Array(ab);
+      let bin = "";
+      const CHUNK = 0x8000;
+      for (let i = 0; i < bytes.length; i += CHUNK) {
+        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+      }
+      return btoa(bin);
+    };
+    const [reg, bold] = await Promise.all([
+      fetch("/fonts/DejaVuSans.ttf").then(r => r.arrayBuffer()),
+      fetch("/fonts/DejaVuSans-Bold.ttf").then(r => r.arrayBuffer()),
+    ]);
+    return { regular: toBase64(reg), bold: toBase64(bold) };
+  })().catch(err => { _dejaVuPromise = null; throw err; });
+  return _dejaVuPromise;
+}
+
+function registerDejaVu(pdf, fonts) {
+  pdf.addFileToVFS("DejaVuSans.ttf", fonts.regular);
+  pdf.addFont("DejaVuSans.ttf", "DejaVuSans", "normal");
+  pdf.addFileToVFS("DejaVuSans-Bold.ttf", fonts.bold);
+  pdf.addFont("DejaVuSans-Bold.ttf", "DejaVuSans", "bold");
+}
+
+const FONT = "DejaVuSans";
+
 const A4_W = 210, A4_H = 297, PAD = 10;
 const CW = A4_W - 2 * PAD; // 190mm
 const X = PAD;
@@ -92,7 +128,7 @@ function hline(pdf, x1, x2, y, rgb, w = 0.2) {
 
 function txt(pdf, text, x, y, { size = 10, bold = false, color = DARK, align = "left" } = {}) {
   pdf.setFontSize(size);
-  pdf.setFont("helvetica", bold ? "bold" : "normal");
+  pdf.setFont(FONT, bold ? "bold" : "normal");
   setTxt(pdf, color);
   pdf.text(s(text), x, y, { align });
 }
@@ -193,6 +229,9 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
   validDate.setDate(validDate.getDate() + (brand.validityDays || 30));
 
   const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+  const dejaVu = await loadDejaVuFonts();
+  registerDejaVu(pdf, dejaVu);
+  pdf.setFont(FONT, "normal");
   let y = PAD;
 
   // ── Header ────────────────────────────────────────────────────────────────
@@ -276,7 +315,7 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
   // Table header row
   const drawTableHeader = (atY) => {
     box(pdf, X, atY, CW, 8, accent);
-    pdf.setFontSize(8); pdf.setFont("helvetica", "bold"); setTxt(pdf, accentTxt);
+    pdf.setFontSize(8); pdf.setFont(FONT, "bold"); setTxt(pdf, accentTxt);
     let cx = X;
     pdf.text("Description",  cx + 3,                        atY + 4.5);
     pdf.text("Unité",        cx + CD + CU / 2,              atY + 4.5, { align: "center" });
@@ -310,7 +349,7 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
       hline(pdf, X, X + CW, y + rowH, BORDER);
 
       const ty = y + 4;
-      pdf.setFont("helvetica", "normal"); setTxt(pdf, DARK);
+      pdf.setFont(FONT, "normal"); setTxt(pdf, DARK);
       pdf.text(descLines, X + 3, ty);
 
       const total   = (l.quantite || 0) * (l.prix_unitaire || 0);
@@ -373,7 +412,7 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
     y = need(pdf, y, obsH);
     txt(pdf, "OBSERVATIONS", X, y + 3, { size: 7, bold: true, color: accent });
     y += 7;
-    pdf.setFont("helvetica", "normal"); setTxt(pdf, MID);
+    pdf.setFont(FONT, "normal"); setTxt(pdf, MID);
     pdf.text(obsLines, X, y);
     y += obsH - 8 + 5;
   }
@@ -392,7 +431,7 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
       const bh        = Math.max(22, termLines.length * 4.5 + 12);
       box(pdf, bx, y, colW, bh, BG_LIGHT, BORDER);
       txt(pdf, "CONDITIONS", bx + 3, y + 4, { size: 7, bold: true, color: accent });
-      pdf.setFont("helvetica", "normal"); setTxt(pdf, MID); pdf.setFontSize(8.5);
+      pdf.setFont(FONT, "normal"); setTxt(pdf, MID); pdf.setFontSize(8.5);
       pdf.text(termLines, bx + 3, y + 10);
       bx += colW + 5;
     }
@@ -424,7 +463,7 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
     if (brand.travelFees)  items.push(`• Frais de déplacement : ${brand.travelFees}`);
     if (brand.validityDays) items.push(`• Validité : ${brand.validityDays} jour${brand.validityDays > 1 ? "s" : ""} à compter de l'émission.`);
     const mLines = wrap(pdf, items.join("   "), CW, 8);
-    pdf.setFont("helvetica", "normal"); setTxt(pdf, LIGHT); pdf.setFontSize(8);
+    pdf.setFont(FONT, "normal"); setTxt(pdf, LIGHT); pdf.setFontSize(8);
     pdf.text(mLines, X, y);
     y += mLines.length * 4 + 4;
   }
@@ -483,7 +522,7 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
 
   if (footParts.length) {
     const fLines = wrap(pdf, footParts.join("\n"), CW - 36, 7);
-    pdf.setFont("helvetica", "normal"); setTxt(pdf, VMUTED); pdf.setFontSize(7);
+    pdf.setFont(FONT, "normal"); setTxt(pdf, VMUTED); pdf.setFontSize(7);
     pdf.text(fLines, X, y + 3);
   }
   txt(pdf, "Généré via Zenbat", X + CW, y + 3, { size: 7, color: VMUTED, align: "right" });
