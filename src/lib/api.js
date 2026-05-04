@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { getToken } from './getToken'
 
 async function withRetry(fn, retries = 2, delay = 700) {
   try {
@@ -486,13 +487,13 @@ export async function createAvoirFromInvoice(invoiceId) {
 
 // Appelle le proxy /api/b2brouter avec l'access_token courant.
 async function callB2B(action, payload = {}) {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session?.access_token) throw new Error('Session expirée — reconnectez-vous')
+  const token = await getToken()
+  if (!token) throw new Error('Session expirée — reconnectez-vous')
   const res = await fetch('/api/b2brouter', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ action, payload }),
   })

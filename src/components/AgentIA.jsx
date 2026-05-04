@@ -260,7 +260,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
 
         // Tout premier devis jamais généré sur ce compte :
         // on déclenche une modale festive si aucun devis n'existe encore en DB.
-        if (devis.length === 0 && resolvedLignes.some(l => l.type_ligne === "ouvrage")) {
+        if (devis.length === 0 && Array.isArray(resolvedLignes) && resolvedLignes.some(l => l.type_ligne === "ouvrage")) {
           const elapsed = celebrateStartRef.current
             ? Math.max(1, Math.round((Date.now() - celebrateStartRef.current) / 1000))
             : 0;

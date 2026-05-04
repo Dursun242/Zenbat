@@ -1,4 +1,6 @@
 // Stats tableau de bord admin + données IA — routage par ?type= :
+const parseBrand = b => { if (!b) return {}; if (typeof b === 'string') { try { return JSON.parse(b) } catch { return {} } } return b }
+
 //   (aucun type)              → dashboard stats global
 //   ?type=conversations       → logs ia_conversations
 //   ?type=logs                → logs ia_error_logs
@@ -66,7 +68,7 @@ export default async function handler(req, res) {
     const enriched2 = (rows || []).map(r => {
       const p = profById2.get(r.user_id)
       const a = authById2.get(r.user_id)
-      const trades = r.trades || JSON.parse(p?.brand_data || '{}')?.trades || []
+      const trades = r.trades || parseBrand(p?.brand_data)?.trades || []
       return { ...r, email: a?.email || null, name: p?.company_name || p?.full_name || a?.email || '—', trades }
     })
     return res.status(200).json({ feedback: enriched2, generatedAt: new Date().toISOString() })
