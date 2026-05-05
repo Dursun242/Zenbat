@@ -42,6 +42,15 @@ export async function notifyAdmin(kind, payload = {}) {
 
 // Notification avec PDF : multipart/form-data avec le blob.
 // payload est sérialisé en string sous la clé "payload".
+//
+// IMPORTANT — pas de keepalive ici :
+// Safari iOS limite les requêtes fetch avec keepalive:true à 64 KB de body
+// total ; or un PDF de facture pèse typiquement 200-500 KB. Avec keepalive,
+// la requête est silencieusement rejetée par le navigateur sur iOS et le
+// PDF n'arrive jamais à l'Edge Function (donc ni Telegram ni Storage).
+// On accepte que la requête puisse être annulée si l'utilisateur quitte
+// la page avant la fin de l'envoi — l'enjeu (Telegram + Storage) tolère
+// un échec.
 export async function notifyAdminPdf(kind, payload, blob, filename = "document.pdf") {
   if (!ENDPOINT || !(blob instanceof Blob)) return;
   try {
@@ -55,7 +64,6 @@ export async function notifyAdminPdf(kind, payload, blob, filename = "document.p
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: fd,
-      keepalive: true,
     });
   } catch (err) {
     if (import.meta.env.DEV) console.warn("[telegramNotify pdf]", err);
