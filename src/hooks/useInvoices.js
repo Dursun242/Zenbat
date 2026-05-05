@@ -29,7 +29,12 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
   const onSaveInvoice = (inv, saveLignes = false) => {
     setInvoices(prev => prev.map(x => x.id === inv.id ? inv : x));
     if (!user) return;
-    const { lignes: il, created_at, updated_at, ...fields } = inv;
+    // Champs hors-DB stripés avant l'UPDATE :
+    // - lignes : sauvées séparément via replaceInvoiceLignes
+    // - created_at / updated_at : managés par Postgres
+    // - devis_numero : injecté côté App.jsx pour l'affichage PDF (Acompte sur
+    //   devis DEV-...) — n'existe pas dans la table invoices, PostgREST 400.
+    const { lignes: il, created_at, updated_at, devis_numero, ...fields } = inv;
     markSaving();
     const p1 = apiUpdateInvoice(inv.id, fields);
     const p2 = saveLignes
