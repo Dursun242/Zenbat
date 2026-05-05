@@ -79,7 +79,10 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
 
       // Conformité : la génération Factur-X est l'émission de la facture.
       // On bascule statut → 'envoyee' ; le trigger Postgres pose locked=true.
-      if (invoice.statut === "brouillon") {
+      // Double-check sur invoice.locked en plus du statut : la closure peut
+      // être stale après les ~5s d'awaits ci-dessus, et un autre flux a pu
+      // déjà verrouiller la facture (race entre 2 clics).
+      if (invoice.statut === "brouillon" && !invoice.locked) {
         try {
           onChange({ ...invoice, statut: "envoyee", locked: true }, false);
         } catch (lockErr) {

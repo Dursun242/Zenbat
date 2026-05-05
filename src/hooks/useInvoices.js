@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { calcInvoiceTotals } from "../lib/invoiceCalc.js";
 import {
   listInvoices,
@@ -15,6 +15,15 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
   const [invoices, setInvoices] = useState([]);
   const [selI,     setSelI]     = useState(null);
 
+  // Ref synchronisée avec invoices : permet aux callbacks asynchrones (ex.
+  // handleFacturX qui await pendant 5s puis appelle onSaveInvoice) de lire
+  // l'état COURANT, pas la closure stale du moment où la fonction a été
+  // créée. Sans ce ref, deux clics rapides sur Factur-X peuvent envoyer
+  // deux PATCH consécutifs : le premier verrouille la facture côté DB, le
+  // second tombe en RLS 42501 parce que la closure ne voit pas le verrou.
+  const invoicesRef = useRef(invoices);
+  invoicesRef.current = invoices;
+
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -29,10 +38,10 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
   const onSaveInvoice = (inv, saveLignes = false) => {
     // Garde-fou : une facture verrouillée (CGI art. 289) ne peut pas être
     // modifiée côté DB. La RLS la rejette → toast d'erreur inutile pour
-    // l'utilisateur. On no-op : on rafraîchit le state local au cas où la
-    // donnée locale serait stale (ex. lecture-seule d'un input verrouillé)
-    // mais on n'envoie aucune requête.
-    const previous = invoices.find(x => x.id === inv.id);
+    // l'utilisateur. On lit invoicesRef pour avoir l'état COURANT (pas la
+    // closure stale) — cas critique : double-clic Factur-X où le 1er save
+    // verrouille la facture pendant que le 2e attend déjà.
+    const previous = invoicesRef.current.find(x => x.id === inv.id);
     if (previous?.locked) {
       setInvoices(prev => prev.map(x => x.id === inv.id ? { ...inv, locked: true, statut: previous.statut } : x));
       return;
