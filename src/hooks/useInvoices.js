@@ -27,6 +27,16 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
   const goInvoice = (id) => { setSelI(id); setTab("factures_detail"); };
 
   const onSaveInvoice = (inv, saveLignes = false) => {
+    // Garde-fou : une facture verrouillée (CGI art. 289) ne peut pas être
+    // modifiée côté DB. La RLS la rejette → toast d'erreur inutile pour
+    // l'utilisateur. On no-op : on rafraîchit le state local au cas où la
+    // donnée locale serait stale (ex. lecture-seule d'un input verrouillé)
+    // mais on n'envoie aucune requête.
+    const previous = invoices.find(x => x.id === inv.id);
+    if (previous?.locked) {
+      setInvoices(prev => prev.map(x => x.id === inv.id ? { ...inv, locked: true, statut: previous.statut } : x));
+      return;
+    }
     setInvoices(prev => prev.map(x => x.id === inv.id ? inv : x));
     if (!user) return;
     // Champs hors-DB stripés avant l'UPDATE :
