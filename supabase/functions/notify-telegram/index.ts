@@ -313,6 +313,53 @@ async function sendDocument(filename: string, blob: Blob, caption: string): Prom
   return r.ok;
 }
 
+// ─── Persistance Storage des PDFs factures ───────────────────────────────
+// Décode le JWT du user (sub = user_id Supabase). On ne re-vérifie pas la
+// signature (verify_jwt:true côté config a déjà validé en amont).
+function userIdFromJwt(authHeader: string | null): string | null {
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  const parts = authHeader.slice(7).split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = atob(b64.padEnd(b64.length + (4 - (b64.length % 4)) % 4, "="));
+    return JSON.parse(json)?.sub ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Sanitize un numéro de facture pour usage en path Storage.
+function sanitizeNumero(s: unknown): string {
+  return String(s ?? "").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
+}
+
+// Upload le PDF d'une facture dans devis-pdfs/{owner_id}/invoices/{numero}.pdf
+// Best-effort : un échec ne bloque pas l'envoi Telegram.
+async function uploadInvoicePdf(ownerId: string, numero: string, blob: Blob): Promise<boolean> {
+  if (!SUPABASE_URL || !SERVICE_ROLE_KEY || !ownerId || !numero) return false;
+  const path = `${ownerId}/invoices/${sanitizeNumero(numero)}.pdf`;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/storage/v1/object/devis-pdfs/${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+        "Content-Type": "application/pdf",
+        "x-upsert": "true",
+      },
+      body: blob,
+    });
+    if (!r.ok) {
+      console.warn("[notify-telegram] upload invoice PDF failed:", r.status, await r.text());
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn("[notify-telegram] upload invoice PDF exception:", err);
+    return false;
+  }
+}
+
 // ─── Handler ──────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -345,6 +392,20 @@ Deno.serve(async (req: Request) => {
 
       const file = fd.get("pdf");
       const caption = (await formatEvent(kind, payload)) || "📎 PDF";
+
+      // Persiste le PDF dans Storage si c'est une facture (utilisé ensuite
+      // par l'export comptable). Best-effort : ne bloque jamais Telegram.
+      if (
+        kind === "pdf_generated" &&
+        payload?.kind === "facture" &&
+        payload?.numero &&
+        file instanceof File
+      ) {
+        const ownerId = userIdFromJwt(req.headers.get("authorization"));
+        if (ownerId) {
+          uploadInvoicePdf(ownerId, String(payload.numero), file).catch(() => {});
+        }
+      }
 
       let ok = false;
       if (file instanceof File) {

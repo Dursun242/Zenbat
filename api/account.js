@@ -278,6 +278,37 @@ async function handleSendComptable({ req, res, user, admin }) {
     const totalTVA = invoices.reduce((s, i) => s + Number(i.montant_tva || 0), 0)
     const totalTTC = invoices.reduce((s, i) => s + Number(i.montant_ttc || 0), 0)
 
+    // PDFs des factures stockés par notify-telegram dans devis-pdfs/{user_id}/invoices/
+    // On télécharge ceux qui matchent les numéros de la période.
+    // Limite de taille totale : 20 MB pour rester sous les contraintes Gmail/Resend.
+    const MAX_ATTACHMENTS_BYTES = 20 * 1024 * 1024
+    const sanitize = s => String(s ?? '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80)
+    const pdfAttachments = []
+    let pdfTotalBytes = 0
+    let pdfsTruncated = false
+    for (const inv of invoices) {
+      const safeNumero = sanitize(inv.numero)
+      const path = `${user.id}/invoices/${safeNumero}.pdf`
+      try {
+        const { data: blob, error } = await admin.storage.from('devis-pdfs').download(path)
+        if (error || !blob) continue
+        const buf = Buffer.from(await blob.arrayBuffer())
+        if (pdfTotalBytes + buf.length > MAX_ATTACHMENTS_BYTES) {
+          pdfsTruncated = true
+          break
+        }
+        pdfTotalBytes += buf.length
+        pdfAttachments.push({
+          filename:    `${safeNumero}.pdf`,
+          content:     buf.toString('base64'),
+          contentType: 'application/pdf',
+        })
+      } catch (e) {
+        // PDF manquant (jamais ouvert) ou erreur réseau : on passe
+        console.warn(`[send-comptable] PDF ${inv.numero} indisponible:`, e?.message)
+      }
+    }
+
     const periodTxt = periodLabel(period, from, to)
     const dateTag   = new Date().toISOString().slice(0, 10)
     const slug      = (profile?.company_name || profile?.full_name || 'zenbat')
@@ -296,12 +327,15 @@ async function handleSendComptable({ req, res, user, admin }) {
     <tr><td style="padding:10px 14px;color:#6B6358;border-top:1px solid #E8E2D8">TVA collectée</td><td style="padding:10px 14px;text-align:right;font-weight:600;border-top:1px solid #E8E2D8">${fmtEur(totalTVA)}</td></tr>
     <tr><td style="padding:10px 14px;color:#6B6358;border-top:1px solid #E8E2D8">Total TTC</td><td style="padding:10px 14px;text-align:right;font-weight:700;border-top:1px solid #E8E2D8">${fmtEur(totalTTC)}</td></tr>
   </table>
-  <p>Deux fichiers CSV en pièce jointe :</p>
+  <p>Pièces jointes :</p>
   <ul>
     <li><strong>factures.csv</strong> — une ligne par facture (avec client, montants HT/TVA/TTC)</li>
     <li><strong>lignes.csv</strong> — détail des lignes pour chaque facture</li>
+    ${pdfAttachments.length ? `<li><strong>${pdfAttachments.length} PDF${pdfAttachments.length > 1 ? 's' : ''}</strong> des factures (<code>F-numero.pdf</code>)</li>` : ''}
   </ul>
-  <p style="color:#6B6358;font-size:13px;margin-top:24px">Encodage UTF-8 avec BOM, séparateur point-virgule (compatible Excel France).</p>
+  ${pdfsTruncated ? `<p style="color:#92400e;font-size:12px;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:8px 12px">⚠️ Volume PDF dépassant 20 MB : seuls les premiers PDFs sont attachés. Les autres restent disponibles depuis votre compte Zenbat.</p>` : ''}
+  ${pdfAttachments.length < invoices.length && !pdfsTruncated ? `<p style="color:#6B6358;font-size:12px">Note : ${invoices.length - pdfAttachments.length} facture(s) n'ont pas encore de PDF généré (PDF disponibles uniquement pour les factures déjà ouvertes/exportées dans Zenbat).</p>` : ''}
+  <p style="color:#6B6358;font-size:13px;margin-top:24px">CSV : encodage UTF-8 avec BOM, séparateur point-virgule (compatible Excel France).</p>
   <hr style="border:none;border-top:1px solid #E8E2D8;margin:24px 0"/>
   <p style="color:#9A8E82;font-size:12px">Envoyé depuis Zenbat — l'assistant commercial vocal des artisans.<br/>Pour répondre, écrivez directement à ${user.email}.</p>
 </body></html>`.trim()
@@ -314,6 +348,7 @@ async function handleSendComptable({ req, res, user, admin }) {
       attachments: [
         { filename: `factures-${slug}-${dateTag}.csv`, content: Buffer.from(csvFactures, 'utf-8').toString('base64'), contentType: 'text/csv' },
         { filename: `lignes-${slug}-${dateTag}.csv`,   content: Buffer.from(csvLignes,   'utf-8').toString('base64'), contentType: 'text/csv' },
+        ...pdfAttachments,
       ],
     })
 
@@ -323,12 +358,14 @@ async function handleSendComptable({ req, res, user, admin }) {
       period:       periodTxt,
       count:        invoices.length,
       total_ttc:    Number(totalTTC.toFixed(2)),
+      pdfs_attached: pdfAttachments.length,
     }).catch(() => {})
 
     return res.status(200).json({
       ok: true,
       sent_to: comptableEmail,
       count:   invoices.length,
+      pdfs:    pdfAttachments.length,
       total_ht:  Number(totalHT.toFixed(2)),
       total_tva: Number(totalTVA.toFixed(2)),
       total_ttc: Number(totalTTC.toFixed(2)),

@@ -109,6 +109,13 @@ export default function SendToComptableModal({ user, onClose }) {
               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>✓ Email envoyé à {result.sent_to}</div>
               <div style={{ fontSize: 13, lineHeight: 1.5 }}>
                 {result.count} facture{result.count > 1 ? 's' : ''} · Total TTC : {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(result.total_ttc || 0)}
+                {typeof result.pdfs === 'number' && (
+                  <div style={{ marginTop: 4, fontSize: 12, color: '#15803D' }}>
+                    {result.pdfs > 0
+                      ? `+ ${result.pdfs} PDF${result.pdfs > 1 ? 's' : ''} en pièce jointe`
+                      : 'CSV uniquement (aucun PDF disponible)'}
+                  </div>
+                )}
               </div>
             </div>
           ) : (
