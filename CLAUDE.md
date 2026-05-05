@@ -30,8 +30,10 @@ Les fichiers dans `/supabase/migrations/` ne s'appliquent **pas automatiquement*
 L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - Prévenir l'utilisateur à chaque nouvelle migration créée.
 - Dernière migration appliquée : `0033_devis_documents.sql`
-- Migration en attente d'application : `0034_profiles_comptable_email.sql` (créée, à coller dans le SQL Editor avant d'utiliser l'envoi au comptable depuis le menu hamburger).
-- Prochaine migration : préfixer avec `0035_`.
+- Migrations en attente d'application :
+  - `0034_profiles_comptable_email.sql` (à coller avant d'utiliser l'envoi au comptable depuis le menu hamburger).
+  - `0035_fix_rls_invoices_lock_transition.sql` (à coller pour débloquer l'émission Factur-X — sans elle, les factures émises repassent en brouillon à la session suivante).
+- Prochaine migration : préfixer avec `0036_`.
 
 ### position:fixed et animations CSS transform
 Tout composant React qui contient des enfants `position:fixed` (modales, drawers, toasts)
@@ -163,3 +165,4 @@ Pour changer de modèle : modifier la variable d'env `VITE_CLAUDE_MODEL` dans Ve
 - **Drawer admin invisible** : `className="fu"` sur le wrapper AdminPanel piégeait `position:fixed`. Corrigé en retirant la classe.
 - **Token périmé admin** : utiliser `getToken()` au lieu de `session?.access_token`. Corrigé dans `AdminPanel.jsx`.
 - **app bloquée si Supabase indisponible** : `getSession()` sans `.catch()` laissait `loading=true` à jamais. Corrigé dans `auth.jsx`.
+- **Factures émises qui repassent en brouillon à chaque session** : la migration `0022` avait ajouté `and not locked` au `WITH CHECK` de la policy `invoices_update_own`, ce qui rejetait l'UPDATE d'émission (le trigger `BEFORE UPDATE` posait `new.locked := true` avant l'évaluation du `WITH CHECK`, qui exigeait `not locked`). UPDATE rejeté silencieusement, DB inchangée, listInvoices() relisait le brouillon à la session suivante. Corrigé dans `0035_fix_rls_invoices_lock_transition.sql` — la sécurité reste assurée par le `USING` et le trigger.
