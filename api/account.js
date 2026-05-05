@@ -5,6 +5,7 @@
 
 import { cors } from "./_cors.js"
 import { authenticate, notifyTelegram } from "./_withAuth.js"
+import { sendEmail } from "./_email.js"
 
 export default async function handler(req, res) {
   cors(req, res, { methods: "GET, POST, OPTIONS" })
@@ -200,23 +201,6 @@ function periodLabel(period, from, to) {
   }
 }
 
-async function sendViaResend({ to, subject, html, attachments }) {
-  const key = process.env.RESEND_API_KEY
-  if (!key) throw new Error('RESEND_API_KEY non configuré')
-  const from = process.env.RESEND_FROM || 'Zenbat <onboarding@resend.dev>'
-  const payload = { from, to, subject, html }
-  if (attachments?.length) payload.attachments = attachments
-  const r = await fetch('https://api.resend.com/emails', {
-    method:  'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body:    JSON.stringify(payload),
-  })
-  if (!r.ok) {
-    const e = await r.json().catch(() => ({}))
-    throw new Error(e.message || `Resend ${r.status}`)
-  }
-}
-
 async function handleSendComptable({ req, res, user, admin }) {
   try {
     const { period = 'last_month', from, to, email: bodyEmail } = req.body || {}
@@ -322,13 +306,14 @@ async function handleSendComptable({ req, res, user, admin }) {
   <p style="color:#9A8E82;font-size:12px">Envoyé depuis Zenbat — l'assistant commercial vocal des artisans.<br/>Pour répondre, écrivez directement à ${user.email}.</p>
 </body></html>`.trim()
 
-    await sendViaResend({
-      to:      comptableEmail,
-      subject: `Export factures ${profile?.company_name || profile?.full_name || ''} — ${periodTxt}`.trim(),
+    await sendEmail({
+      to:       comptableEmail,
+      subject:  `Export factures ${profile?.company_name || profile?.full_name || ''} — ${periodTxt}`.trim(),
+      fromName: profile?.company_name || profile?.full_name || 'Zenbat',
       html,
       attachments: [
-        { filename: `factures-${slug}-${dateTag}.csv`, content: Buffer.from(csvFactures, 'utf-8').toString('base64') },
-        { filename: `lignes-${slug}-${dateTag}.csv`,   content: Buffer.from(csvLignes,   'utf-8').toString('base64') },
+        { filename: `factures-${slug}-${dateTag}.csv`, content: Buffer.from(csvFactures, 'utf-8').toString('base64'), contentType: 'text/csv' },
+        { filename: `lignes-${slug}-${dateTag}.csv`,   content: Buffer.from(csvLignes,   'utf-8').toString('base64'), contentType: 'text/csv' },
       ],
     })
 
