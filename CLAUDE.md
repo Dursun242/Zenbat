@@ -29,9 +29,9 @@ Les anciennes URL externes (Stripe Dashboard, B2Brouter webhook) sont préservé
 Les fichiers dans `/supabase/migrations/` ne s'appliquent **pas automatiquement**.
 L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - Prévenir l'utilisateur à chaque nouvelle migration créée.
-- Dernière migration appliquée : `0029_profile_signup_email.sql`
-- Migration en attente d'application : `0030_support_tickets.sql` (créée, à coller dans le SQL Editor avant le déploiement du bot Telegram support).
-- Prochaine migration : préfixer avec `0031_`.
+- Dernière migration appliquée : `0033_devis_documents.sql`
+- Migration en attente d'application : `0034_profiles_comptable_email.sql` (créée, à coller dans le SQL Editor avant d'utiliser l'envoi au comptable depuis le menu hamburger).
+- Prochaine migration : préfixer avec `0035_`.
 
 ### position:fixed et animations CSS transform
 Tout composant React qui contient des enfants `position:fixed` (modales, drawers, toasts)

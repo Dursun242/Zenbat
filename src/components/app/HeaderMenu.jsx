@@ -38,6 +38,7 @@ export default function HeaderMenu({
   onOpenSubscription,
   onOpenPaywall,
   onOpenSupport,
+  onOpenComptable,
   onSignOut,
 }) {
   const [open,       setOpen]       = useState(false);
@@ -161,6 +162,15 @@ export default function HeaderMenu({
               <span style={{ color: "#6B6358", display: "inline-flex" }}>{I.paint}</span>
               Mon profil
             </button>
+
+            {onOpenComptable && (
+              <button role="menuitem" onClick={() => { close(); onOpenComptable(); }} style={itemBase}
+                onMouseEnter={e => e.currentTarget.style.background = "#FAF7F2"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                <span style={{ color: "#C97B5C", display: "inline-flex" }}>{I.file}</span>
+                Envoyer au comptable
+              </button>
+            )}
 
             {onOpenSupport && (
               <button role="menuitem" onClick={() => { close(); onOpenSupport(); }} style={itemBase}

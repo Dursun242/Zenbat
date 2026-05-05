@@ -24,6 +24,7 @@ import ClientDetail  from "./components/ClientDetail.jsx";
 import DevisList     from "./components/DevisList.jsx";
 import InvoicesList  from "./components/InvoicesList.jsx";
 import SupportChat   from "./components/SupportChat.jsx";
+import SendToComptableModal from "./components/app/SendToComptableModal.jsx";
 import AuthScreen    from "./pages/AuthScreen.jsx";
 
 // Écrans lourds — chargés à la demande uniquement
@@ -59,6 +60,7 @@ export default function App() {
   const [billingType, setBillingType] = useState(null);
   const [showPwa,setShowPwa]= useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [comptableOpen, setComptableOpen] = useState(false);
   const [checkoutPending, setCheckoutPending] = useState(() => {
     try { return ['monthly','biannual'].includes(localStorage.getItem('pending_checkout_plan')) }
     catch { return false }
@@ -262,6 +264,7 @@ export default function App() {
             onOpenSubscription={() => setScreen("subscription")}
             onOpenPaywall={() => setScreen("paywall")}
             onOpenSupport={tab !== "agent" && tab !== "admin" ? () => setSupportOpen(true) : null}
+            onOpenComptable={() => setComptableOpen(true)}
             onSignOut={handleSignOut}
           />
         </div>
@@ -386,6 +389,9 @@ export default function App() {
 
       <Toast toast={toast} onDismiss={dismissToast}/>
       <SupportChat accent={brand?.color || "#22c55e"} open={supportOpen} onClose={() => setSupportOpen(false)}/>
+      {comptableOpen && (
+        <SendToComptableModal user={user} onClose={() => setComptableOpen(false)}/>
+      )}
       <BottomNav items={NAV} activeNav={activeNav} onSelect={setTab} plan={effectivePlan} daysLeft={daysLeft}/>
     </div>
   );
