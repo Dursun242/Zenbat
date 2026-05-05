@@ -394,7 +394,11 @@ Deno.serve(async (req: Request) => {
       const caption = (await formatEvent(kind, payload)) || "📎 PDF";
 
       // Persiste le PDF dans Storage si c'est une facture (utilisé ensuite
-      // par l'export comptable). Best-effort : ne bloque jamais Telegram.
+      // par l'export comptable).
+      // IMPORTANT — pas de fire-and-forget : Deno Deploy peut tuer une
+      // promesse non-await dès que la réponse HTTP est renvoyée. On Promise.all
+      // l'upload avec sendDocument pour que les deux soient awaited en parallèle.
+      let uploadPromise: Promise<unknown> = Promise.resolve();
       if (
         kind === "pdf_generated" &&
         payload?.kind === "facture" &&
@@ -403,14 +407,20 @@ Deno.serve(async (req: Request) => {
       ) {
         const ownerId = userIdFromJwt(req.headers.get("authorization"));
         if (ownerId) {
-          uploadInvoicePdf(ownerId, String(payload.numero), file).catch(() => {});
+          uploadPromise = uploadInvoicePdf(ownerId, String(payload.numero), file)
+            .catch((e) => { console.warn("[notify-telegram] upload failed:", e); });
         }
       }
 
       let ok = false;
       if (file instanceof File) {
-        ok = await sendDocument(file.name || "document.pdf", file, caption);
+        const [, telegramOk] = await Promise.all([
+          uploadPromise,
+          sendDocument(file.name || "document.pdf", file, caption),
+        ]);
+        ok = telegramOk;
       } else {
+        await uploadPromise;
         ok = await sendText(caption);
       }
       return new Response(

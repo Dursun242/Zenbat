@@ -402,6 +402,20 @@ export default async function handler(req, res) {
     pdfDoc.catalog.set(PDFName.of("Metadata"), metaRef);
 
     const out = await pdfDoc.save({ useObjectStreams: false });
+
+    // Persiste le Factur-X final dans Storage pour l'export comptable.
+    // Path identique à celui utilisé par notify-telegram (qui uploade le
+    // brouillon en best-effort) : on écrase via upsert pour que le comptable
+    // reçoive la version légale (XML CII embarqué) et pas le brouillon.
+    if (invoice.numero) {
+      const safeNumero = String(invoice.numero).replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
+      const path = `${user.id}/invoices/${safeNumero}.pdf`;
+      const { error: upErr } = await admin.storage
+        .from("devis-pdfs")
+        .upload(path, Buffer.from(out), { contentType: "application/pdf", upsert: true });
+      if (upErr) console.warn("[facturx] storage upload:", upErr.message);
+    }
+
     return res.status(200).json({
       pdf_base64: Buffer.from(out).toString("base64"),
       icc_applied: !!icc,
