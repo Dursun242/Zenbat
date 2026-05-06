@@ -666,7 +666,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
             <div title="L'IA utilise vos devis passés pour proposer des tarifs cohérents avec votre historique"
               style={{ alignSelf: "center", display: "flex", alignItems: "center", gap: 6, background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 20, padding: "4px 11px", fontSize: 10, fontWeight: 600, color: "#15803d", marginBottom: 4 }}>
               <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-              Mémoire active · {historySummary.total} devis · {historySummary.topOuvrages.length} ouvrages référencés
+              Mémoire active · {historySummary.total} devis · {historySummary.topOuvrages.length} prestations référencées
             </div>
           )}
           {msgs.map((m, i) => {
