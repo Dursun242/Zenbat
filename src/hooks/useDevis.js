@@ -11,7 +11,7 @@ import { uid } from "../lib/utils.js";
 import { DEMO_DEVIS } from "../lib/constants.js";
 import { TRIAL_DAILY_DEVIS_LIMIT, countDevisToday } from "../lib/appShell.js";
 
-export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, setTab, effectivePlan, daysLeft }) {
+export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, setTab, effectivePlan, daysLeft, stickyDevisToday = 0, onDevisCreated = () => {} }) {
   const [devis,        setDevis]        = useState(DEMO_DEVIS);
   const [selD,         setSelD]         = useState(null);
   const [loadingDevis, setLoadingDevis] = useState(new Set());
@@ -51,7 +51,10 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
   };
 
   const onCreateDevis = async (d) => {
-    if (user && effectivePlan === "free" && daysLeft > 0 && countDevisToday(devis) >= TRIAL_DAILY_DEVIS_LIMIT) {
+    // Limite essai : MAX(compteur sticky localStorage, count du state) — résiste
+    // au bypass "créer 5 puis supprimer puis recréer".
+    const todayCount = Math.max(stickyDevisToday, countDevisToday(devis));
+    if (user && effectivePlan === "free" && daysLeft > 0 && todayCount >= TRIAL_DAILY_DEVIS_LIMIT) {
       showErr(`Limite de ${TRIAL_DAILY_DEVIS_LIMIT} devis/jour atteinte en période d'essai. Passez Pro pour un nombre illimité.`);
       return false;
     }
@@ -74,6 +77,7 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
           setDevis(prev => prev.map(x => x.id === d.id ? { ...x, lignes: fresh.lignes } : x));
         }
       }
+      onDevisCreated();
       return true;
     } catch (err) {
       console.error("[create devis]", err);
@@ -138,7 +142,8 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
 
   const onCreateIndice = async (sourceId) => {
     if (!user) { showErr("Vous devez être connecté."); return; }
-    if (effectivePlan === "free" && daysLeft > 0 && countDevisToday(devis) >= TRIAL_DAILY_DEVIS_LIMIT) {
+    const todayCount = Math.max(stickyDevisToday, countDevisToday(devis));
+    if (effectivePlan === "free" && daysLeft > 0 && todayCount >= TRIAL_DAILY_DEVIS_LIMIT) {
       showErr(`Limite de ${TRIAL_DAILY_DEVIS_LIMIT} devis/jour atteinte en période d'essai. Passez Pro pour un nombre illimité.`);
       return;
     }
@@ -146,6 +151,7 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
       const src = devis.find(d => d.id === sourceId);
       if (!src) throw new Error("Devis introuvable");
       const created = await apiCreateIndice(src);
+      onDevisCreated();
       setDevis(prev => prev.map(d => d.id === sourceId && d.statut !== "remplace"
         ? { ...d, statut: "remplace" } : d));
       setDevis(prev => [{ ...created }, ...prev]);

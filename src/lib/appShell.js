@@ -3,6 +3,9 @@
 export const TRIAL_DAYS = 30;
 export const TRIAL_DAILY_DEVIS_LIMIT = 5;
 
+// Compte les devis du state dont la création remonte à aujourd'hui (timezone locale).
+// NB : ne résiste pas à la suppression (un devis supprimé fait baisser le compte).
+// Utilisé en complément du compteur sticky localStorage via Math.max.
 export function countDevisToday(devis) {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
@@ -12,6 +15,32 @@ export function countDevisToday(devis) {
     const t = new Date(d.created_at).getTime();
     return Number.isFinite(t) && t >= startMs ? n + 1 : n;
   }, 0);
+}
+
+// Compteur sticky par jour stocké en localStorage. Ne décrémente jamais à la
+// suppression (résiste au bypass "créer 5, supprimer, recréer"). Reset auto
+// au changement de date.
+const STICKY_COUNTER_KEY = "zenbat_devis_daily_counter";
+
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+export function readStickyDevisToday() {
+  try {
+    const raw = localStorage.getItem(STICKY_COUNTER_KEY);
+    if (!raw) return 0;
+    const parsed = JSON.parse(raw);
+    return parsed?.date === todayKey() ? Number(parsed.count) || 0 : 0;
+  } catch { return 0; }
+}
+
+export function bumpStickyDevisToday() {
+  const today = todayKey();
+  const next = readStickyDevisToday() + 1;
+  try { localStorage.setItem(STICKY_COUNTER_KEY, JSON.stringify({ date: today, count: next })); } catch {}
+  return next;
 }
 
 // Recopie les champs de l'inscription (prénom, nom, société, email de
