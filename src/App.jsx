@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { useAuth } from "./lib/auth.jsx";
 import { supabase } from "./lib/supabase.js";
 import { getMyProfile } from "./lib/api.js";
-import { TRIAL_DAYS, TRIAL_DAILY_DEVIS_LIMIT, countDevisToday } from "./lib/appShell.js";
+import { TRIAL_DAYS, TRIAL_DAILY_DEVIS_LIMIT, countDevisToday, readStickyDevisToday, bumpStickyDevisToday } from "./lib/appShell.js";
 
 import { useSaveState } from "./hooks/useSaveState.js";
 import { useToast }     from "./hooks/useToast.js";
@@ -83,12 +83,25 @@ export default function App() {
   const trialExpired = effectivePlan === "free" && daysLeft === 0;
   const trialActive  = effectivePlan === "free" && daysLeft > 0;
 
+  // Compteur sticky : nombre de devis créés aujourd'hui par l'utilisateur sur
+  // cet appareil. Ne décrémente pas à la suppression (anti-bypass).
+  const [stickyDevisToday, setStickyDevisToday] = useState(() => readStickyDevisToday());
+  useEffect(() => {
+    // Re-synchronise le compteur au changement de date (et toutes les minutes
+    // pour gérer le passage de minuit pendant qu'une session est ouverte).
+    const tick = () => setStickyDevisToday(readStickyDevisToday());
+    tick();
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const onDevisCreated = () => setStickyDevisToday(bumpStickyDevisToday());
+
   const { brand, setBrand }                             = useBrand(user, setScreen);
   const { clients, setClients, onSaveClient, onDeleteClient, onRestoreClient } = useClients(user, saveCallbacks);
   const {
     devis, setDevis, selD, setSelD, loadingDevis, autoOpenPDF, setAutoOpenPDF,
     onSaveDevis, onCreateDevis, onDuplicateDevis, onCreateIndice, onDeleteDevis, goDevis,
-  } = useDevis(user, { ...saveCallbacks, setTab, effectivePlan, daysLeft });
+  } = useDevis(user, { ...saveCallbacks, setTab, effectivePlan, daysLeft, stickyDevisToday, onDevisCreated });
   const {
     invoices, selI, onSaveInvoice, onCreateInvoiceFromDevis, onCreateEmptyInvoice,
     onCreateAcompte, onCreateAvoir, onDeleteInvoice, goInvoice,
@@ -143,7 +156,11 @@ export default function App() {
     signOut();
   };
 
-  const devisTodayCount = trialActive ? countDevisToday(devis) : 0;
+  // On prend le MAX entre le compteur sticky et le compte des devis du state :
+  // - sticky résiste à la suppression (créer 5 puis tout supprimer reste à 5)
+  // - count du state couvre le cas d'un nouvel appareil où localStorage est vide
+  //   mais où la DB contient déjà des devis créés aujourd'hui.
+  const devisTodayCount = trialActive ? Math.max(stickyDevisToday, countDevisToday(devis)) : 0;
   const trialQuotaReached = trialActive && devisTodayCount >= TRIAL_DAILY_DEVIS_LIMIT;
 
   const stats = {

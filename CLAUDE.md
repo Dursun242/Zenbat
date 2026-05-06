@@ -34,7 +34,8 @@ L'utilisateur les copie-colle dans le SQL Editor de Supabase.
   - `0034_profiles_comptable_email.sql` (à coller avant d'utiliser l'envoi au comptable depuis le menu hamburger).
   - `0035_fix_rls_invoices_lock_transition.sql` (à coller pour débloquer l'émission Factur-X — sans elle, les factures émises repassent en brouillon à la session suivante).
   - `0036_trial_devis_daily_limit.sql` (à coller pour durcir côté DB la limite de 5 devis/jour pendant l'essai — sans elle, l'enforcement reste seulement frontend et peut être bypassé).
-- Prochaine migration : préfixer avec `0037_`.
+  - `0037_devis_daily_counters.sql` (à coller APRÈS la 0036 — table compteur sticky + trigger pour empêcher le bypass "créer 5 / supprimer / recréer", réécrit `devis_today_count()`).
+- Prochaine migration : préfixer avec `0038_`.
 
 ### position:fixed et animations CSS transform
 Tout composant React qui contient des enfants `position:fixed` (modales, drawers, toasts)
