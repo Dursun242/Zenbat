@@ -220,12 +220,12 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
           placeholder="Objet de la facture"
           style={{ fontSize: 14, fontWeight: 700, color: isLocked ? "#9A8E82" : "#1A1612", border: "1px solid #E8E2D8", borderRadius: 8, background: isLocked ? "#F0EBE3" : "#FAF7F2", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box", cursor: isLocked ? "not-allowed" : "text" }}
         />
-        <label style={{ display: "block", fontSize: 10, color: "#9A8E82", fontWeight: 600, marginBottom: 2 }}>CHANTIER</label>
+        <label style={{ display: "block", fontSize: 10, color: "#9A8E82", fontWeight: 600, marginBottom: 2 }}>LIEU</label>
         <input
           value={invoice.ville_chantier || ""}
           onChange={e => onChange({ ...invoice, ville_chantier: e.target.value })}
           disabled={isLocked}
-          placeholder="Ville / chantier"
+          placeholder="Ville / lieu"
           style={{ fontSize: 13, color: "#6B6358", border: "1px solid #E8E2D8", borderRadius: 8, background: isLocked ? "#F0EBE3" : "#FAF7F2", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", boxSizing: "border-box", cursor: isLocked ? "not-allowed" : "text" }}
         />
       </div>
@@ -280,7 +280,7 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
         </div>
 
         <div style={{ background: "white", borderRadius: 14, border: "1px solid #F0EBE3", padding: 14, marginBottom: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#1A1612", marginBottom: 10 }}>Spécificités BTP</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#1A1612", marginBottom: 10 }}>Spécificités sectorielles</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <div>
                 <div style={{ fontSize: 10, color: "#6B6358", marginBottom: 4 }}>Type d'opération</div>

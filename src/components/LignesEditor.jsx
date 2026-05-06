@@ -39,13 +39,13 @@ export default function LignesEditor({ lignes, onChange, ac, vatRegime }) {
       <div style={{ padding: "12px 16px", borderBottom: "1px solid #FAF7F2", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ fontWeight: 600, fontSize: 13, color: "#1A1612" }}>Modifier les lignes</div>
         <div style={{ fontSize: 10, color: "#9A8E82" }}>
-          {lignes.filter(l => l.type_ligne === "ouvrage").length} ouvrage{lignes.filter(l => l.type_ligne === "ouvrage").length > 1 ? "s" : ""}
+          {lignes.filter(l => l.type_ligne === "ouvrage").length} prestation{lignes.filter(l => l.type_ligne === "ouvrage").length > 1 ? "s" : ""}
         </div>
       </div>
 
       {lignes.length === 0 && (
         <div style={{ padding: "20px 16px", textAlign: "center", fontSize: 12, color: "#9A8E82" }}>
-          Aucune ligne. Ajoutez un lot puis des ouvrages ci-dessous.
+          Aucune ligne. Ajoutez un lot puis des prestations ci-dessous.
         </div>
       )}
 
@@ -147,7 +147,7 @@ export default function LignesEditor({ lignes, onChange, ac, vatRegime }) {
       <div style={{ display: "flex", gap: 8, padding: 10, background: "#FAF7F2" }}>
         <button onClick={addOuvrage}
           style={{ flex: 1, background: "white", color: ac, border: `1px solid ${ac}55`, borderRadius: 10, padding: "9px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-          + Ajouter ouvrage
+          + Ajouter prestation
         </button>
         <button onClick={addLot}
           style={{ flex: 1, background: "white", color: "#1A1612", border: "1px solid #e5e7eb", borderRadius: 10, padding: "9px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>

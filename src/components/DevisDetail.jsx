@@ -309,12 +309,12 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
             placeholder="Objet du devis"
             style={{ fontSize: 15, fontWeight: 700, color: isRemplace ? "#9A8E82" : "#1A1612", border: "1px solid #E8E2D8", borderRadius: 8, background: isRemplace ? "#F0EBE3" : "#FAF7F2", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box", cursor: isRemplace ? "not-allowed" : "text" }}
           />
-          <label style={{ display: "block", fontSize: 10, color: "#9A8E82", fontWeight: 600, marginBottom: 2 }}>CHANTIER</label>
+          <label style={{ display: "block", fontSize: 10, color: "#9A8E82", fontWeight: 600, marginBottom: 2 }}>LIEU</label>
           <input
             value={d.ville_chantier || ""}
             onChange={e => !isRemplace && onChange({ ...d, ville_chantier: e.target.value })}
             readOnly={isRemplace}
-            placeholder="Ville / chantier"
+            placeholder="Ville / lieu"
             style={{ fontSize: 13, color: isRemplace ? "#9A8E82" : "#6B6358", border: "1px solid #E8E2D8", borderRadius: 8, background: isRemplace ? "#F0EBE3" : "#FAF7F2", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", boxSizing: "border-box", cursor: isRemplace ? "not-allowed" : "text" }}
           />
         </div>
