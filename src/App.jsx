@@ -301,11 +301,11 @@ export default function App() {
 
       {/* Compteur quota devis pendant l'essai */}
       {trialActive && devisTodayCount > 0 && (
-        <button onClick={trialQuotaReached ? () => setScreen("paywall") : undefined}
-          style={{ flexShrink: 0, width: "100%", background: trialQuotaReached ? "#fef2f2" : "#f0fdf4", borderBottom: `1px solid ${trialQuotaReached ? "#fecaca" : "#bbf7d0"}`, padding: "6px 14px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: trialQuotaReached ? "pointer" : "default", border: "none", color: trialQuotaReached ? "#991b1b" : "#166534", fontSize: 11, fontWeight: 600 }}>
+        <button onClick={() => setScreen("paywall")}
+          style={{ flexShrink: 0, width: "100%", background: trialQuotaReached ? "#fef2f2" : "#f0fdf4", borderBottom: `1px solid ${trialQuotaReached ? "#fecaca" : "#bbf7d0"}`, padding: "6px 14px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", border: "none", color: trialQuotaReached ? "#991b1b" : "#166534", fontSize: 11, fontWeight: 600 }}>
           {trialQuotaReached
             ? `⛔ Limite atteinte (${TRIAL_DAILY_DEVIS_LIMIT}/${TRIAL_DAILY_DEVIS_LIMIT} devis aujourd'hui) — passer en Pro`
-            : `📝 ${devisTodayCount}/${TRIAL_DAILY_DEVIS_LIMIT} devis aujourd'hui (essai gratuit)`}
+            : `📝 ${devisTodayCount}/${TRIAL_DAILY_DEVIS_LIMIT} devis aujourd'hui (essai gratuit) — passer en Pro`}
         </button>
       )}
 
