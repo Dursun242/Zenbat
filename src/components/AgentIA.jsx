@@ -422,11 +422,11 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     setEditing({ id: l.id, field: "designation" });
   };
 
-  const finalizeSave = (clientId) => {
+  const finalizeSave = async (clientId) => {
     const ht2     = lignes.filter(l => l.type_ligne === "ouvrage").reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0), 0);
     const picked  = clientId ? clients.find(c => c.id === clientId) : null;
     const newId   = uid();
-    onCreateDevis({
+    const ok = await onCreateDevis({
       id: newId,
       numero: `DEV-${new Date().getFullYear()}-${String(devis.length + 1).padStart(4, "0")}`,
       objet: objet || "Devis IA",
@@ -440,6 +440,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       odoo_sign_url: null,
     });
     setPickingClient(false);
+    if (!ok) return;
     try { localStorage.removeItem("zenbat_ia_draft"); } catch {}
     setLignes([]); setObjet("");
     setMsgs([{ role: "assistant", content: TX.quoteSaved }]);

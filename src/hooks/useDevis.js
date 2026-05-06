@@ -53,11 +53,11 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
   const onCreateDevis = async (d) => {
     if (user && effectivePlan === "free" && daysLeft > 0 && countDevisToday(devis) >= TRIAL_DAILY_DEVIS_LIMIT) {
       showErr(`Limite de ${TRIAL_DAILY_DEVIS_LIMIT} devis/jour atteinte en période d'essai. Passez Pro pour un nombre illimité.`);
-      return;
+      return false;
     }
     const dStamped = { ...d, created_at: d.created_at || new Date().toISOString() };
     setDevis(prev => [dStamped, ...prev]);
-    if (!user) return;
+    if (!user) return true;
     try {
       const { lignes: dl, client, created_at, updated_at, ...fields } = dStamped;
       const saved = await apiCreateDevis(fields, (dl || []).map(({ id, created_at, ...l }) => l));
@@ -74,7 +74,17 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
           setDevis(prev => prev.map(x => x.id === d.id ? { ...x, lignes: fresh.lignes } : x));
         }
       }
-    } catch (err) { console.error("[create devis]", err); showErr("Erreur lors de l'enregistrement du devis"); }
+      return true;
+    } catch (err) {
+      console.error("[create devis]", err);
+      // Rollback de l'ajout optimiste pour ne pas laisser un devis fantôme dans le state
+      setDevis(prev => prev.filter(x => x.id !== d.id));
+      const isRlsBlock = err?.code === "42501" || /row-level security|new row violates/i.test(err?.message || "");
+      showErr(isRlsBlock
+        ? `Limite de ${TRIAL_DAILY_DEVIS_LIMIT} devis/jour atteinte en période d'essai. Passez Pro pour un nombre illimité.`
+        : "Erreur lors de l'enregistrement du devis");
+      return false;
+    }
   };
 
   const goDevis = (id) => {
@@ -122,8 +132,8 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
       date_emission:  new Date().toISOString().split("T")[0],
       lignes:         (src.lignes || []).map(l => ({ ...l, id: uid() })),
     };
-    await onCreateDevis(copy);
-    goDevis(newId);
+    const ok = await onCreateDevis(copy);
+    if (ok) goDevis(newId);
   };
 
   const onCreateIndice = async (sourceId) => {

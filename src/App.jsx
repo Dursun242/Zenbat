@@ -331,33 +331,46 @@ export default function App() {
               onDelete={async () => { await onDeleteClient(selC); setTab("clients"); }}/>
           )}
           {tab === "devis"         && <DevisList devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} onDelete={onDeleteDevis}/>}
-          {tab === "devis_detail"  && selD && (
-            <Suspense fallback={<ScreenLoader />}>
-              <DevisDetail
-                d={devis.find(x => x.id === selD)}
-                cl={clients.find(c => c.id === devis.find(x => x.id === selD)?.client_id)}
-                clients={clients}
-                onBack={() => setTab("devis")}
-                brand={brand}
-                onChange={onSaveDevis}
-                onConvertToInvoice={() => onCreateInvoiceFromDevis(selD)}
-                onCreateAcompte={onCreateAcompte}
-                onDuplicate={() => onDuplicateDevis(selD)}
-                onCreateIndice={() => onCreateIndice(selD)}
-                groupVersions={(() => {
-                  const cur    = devis.find(x => x.id === selD);
-                  if (!cur) return [];
-                  const rootId = cur.root_devis_id || cur.id;
-                  return devis
-                    .filter(x => x.id === rootId || x.root_devis_id === rootId)
-                    .sort((a, b) => !a.indice ? -1 : !b.indice ? 1 : a.indice.localeCompare(b.indice));
-                })()}
-                goDevis={goDevis}
-                autoOpenPDF={autoOpenPDF === selD}
-                onAutoOpenPDFConsumed={() => setAutoOpenPDF(null)}
-                loading={loadingDevis.has(selD)}/>
-            </Suspense>
-          )}
+          {tab === "devis_detail"  && selD && (() => {
+            const cur = devis.find(x => x.id === selD);
+            // Devis introuvable dans le state (ex. création bloquée par la limite d'essai)
+            if (!cur) {
+              if (loadingDevis.has(selD)) return <ScreenLoader />;
+              return (
+                <div style={{ padding: 24, textAlign: "center" }}>
+                  <div style={{ fontSize: 14, color: "#6B6358", marginBottom: 12 }}>Ce devis est introuvable.</div>
+                  <button onClick={() => { setSelD(null); setTab("devis"); }}
+                    style={{ background: "#1A1612", color: "#fff", border: "none", borderRadius: 10, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                    Retour à la liste
+                  </button>
+                </div>
+              );
+            }
+            const rootId = cur.root_devis_id || cur.id;
+            const groupVersions = devis
+              .filter(x => x.id === rootId || x.root_devis_id === rootId)
+              .sort((a, b) => !a.indice ? -1 : !b.indice ? 1 : a.indice.localeCompare(b.indice));
+            return (
+              <Suspense fallback={<ScreenLoader />}>
+                <DevisDetail
+                  d={cur}
+                  cl={clients.find(c => c.id === cur.client_id)}
+                  clients={clients}
+                  onBack={() => setTab("devis")}
+                  brand={brand}
+                  onChange={onSaveDevis}
+                  onConvertToInvoice={() => onCreateInvoiceFromDevis(selD)}
+                  onCreateAcompte={onCreateAcompte}
+                  onDuplicate={() => onDuplicateDevis(selD)}
+                  onCreateIndice={() => onCreateIndice(selD)}
+                  groupVersions={groupVersions}
+                  goDevis={goDevis}
+                  autoOpenPDF={autoOpenPDF === selD}
+                  onAutoOpenPDFConsumed={() => setAutoOpenPDF(null)}
+                  loading={loadingDevis.has(selD)}/>
+              </Suspense>
+            );
+          })()}
           {tab === "factures"        && <InvoicesList invoices={invoices} clients={clients} goInvoice={goInvoice} onCreateEmpty={onCreateEmptyInvoice} onDelete={onDeleteInvoice}/>}
           {tab === "factures_detail" && selI && (() => {
             const inv = invoices.find(x => x.id === selI);
