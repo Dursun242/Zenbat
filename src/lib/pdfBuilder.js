@@ -508,6 +508,8 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
   const footParts = [];
   if (brand.vatRegime === "franchise" && !/(293\s*B|TVA\s+non\s+applicable)/i.test(brand.mentionsLegales || ""))
     footParts.push("TVA non applicable, art. 293 B du CGI");
+  if (d?.auto_liquidation_btp)
+    footParts.push("Autoliquidation — TVA due par le preneur, art. 283-2 nonies du CGI");
   if (brand.mentionsLegales) footParts.push(brand.mentionsLegales);
   const legalId = [
     brand.companyName && brand.legalForm ? `${brand.companyName} — ${brand.legalForm}` : brand.legalForm || "",
