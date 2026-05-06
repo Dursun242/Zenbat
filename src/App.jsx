@@ -400,6 +400,7 @@ export default function App() {
                 onSaveClient={onSaveClient}
                 plan={effectivePlan}
                 trialExpired={trialExpired}
+                trialQuotaReached={trialQuotaReached}
                 onPaywall={() => setScreen("paywall")}
                 setTab={setTab}
                 onOpenDevisPDF={(id) => { setAutoOpenPDF(id); goDevis(id); }}
