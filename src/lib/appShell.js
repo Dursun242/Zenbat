@@ -1,6 +1,18 @@
 // Constantes et helpers de l'enveloppe App.
 
 export const TRIAL_DAYS = 30;
+export const TRIAL_DAILY_DEVIS_LIMIT = 5;
+
+export function countDevisToday(devis) {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const startMs = start.getTime();
+  return (devis || []).reduce((n, d) => {
+    if (!d?.created_at) return n;
+    const t = new Date(d.created_at).getTime();
+    return Number.isFinite(t) && t >= startMs ? n + 1 : n;
+  }, 0);
+}
 
 // Recopie les champs de l'inscription (prénom, nom, société, email de
 // connexion) dans le brand si celui-ci est encore vierge. L'email de

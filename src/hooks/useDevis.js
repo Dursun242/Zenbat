@@ -9,8 +9,9 @@ import {
 } from "../lib/api";
 import { uid } from "../lib/utils.js";
 import { DEMO_DEVIS } from "../lib/constants.js";
+import { TRIAL_DAILY_DEVIS_LIMIT, countDevisToday } from "../lib/appShell.js";
 
-export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, setTab }) {
+export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, setTab, effectivePlan, daysLeft }) {
   const [devis,        setDevis]        = useState(DEMO_DEVIS);
   const [selD,         setSelD]         = useState(null);
   const [loadingDevis, setLoadingDevis] = useState(new Set());
@@ -50,10 +51,15 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
   };
 
   const onCreateDevis = async (d) => {
-    setDevis(prev => [d, ...prev]);
+    if (user && effectivePlan === "free" && daysLeft > 0 && countDevisToday(devis) >= TRIAL_DAILY_DEVIS_LIMIT) {
+      showErr(`Limite de ${TRIAL_DAILY_DEVIS_LIMIT} devis/jour atteinte en période d'essai. Passez Pro pour un nombre illimité.`);
+      return;
+    }
+    const dStamped = { ...d, created_at: d.created_at || new Date().toISOString() };
+    setDevis(prev => [dStamped, ...prev]);
     if (!user) return;
     try {
-      const { lignes: dl, client, created_at, updated_at, ...fields } = d;
+      const { lignes: dl, client, created_at, updated_at, ...fields } = dStamped;
       const saved = await apiCreateDevis(fields, (dl || []).map(({ id, created_at, ...l }) => l));
       // Synchronise le numéro réel (peut différer si retry sur collision unique)
       if (saved.numero !== d.numero) {
@@ -122,6 +128,10 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
 
   const onCreateIndice = async (sourceId) => {
     if (!user) { showErr("Vous devez être connecté."); return; }
+    if (effectivePlan === "free" && daysLeft > 0 && countDevisToday(devis) >= TRIAL_DAILY_DEVIS_LIMIT) {
+      showErr(`Limite de ${TRIAL_DAILY_DEVIS_LIMIT} devis/jour atteinte en période d'essai. Passez Pro pour un nombre illimité.`);
+      return;
+    }
     try {
       const src = devis.find(d => d.id === sourceId);
       if (!src) throw new Error("Devis introuvable");
