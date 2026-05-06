@@ -29,13 +29,8 @@ Les anciennes URL externes (Stripe Dashboard, B2Brouter webhook) sont préservé
 Les fichiers dans `/supabase/migrations/` ne s'appliquent **pas automatiquement**.
 L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - Prévenir l'utilisateur à chaque nouvelle migration créée.
-- Dernière migration appliquée : `0033_devis_documents.sql`
-- Migrations en attente d'application :
-  - `0034_profiles_comptable_email.sql` (à coller avant d'utiliser l'envoi au comptable depuis le menu hamburger).
-  - `0035_fix_rls_invoices_lock_transition.sql` (à coller pour débloquer l'émission Factur-X — sans elle, les factures émises repassent en brouillon à la session suivante).
-  - `0036_trial_devis_daily_limit.sql` (à coller pour durcir côté DB la limite de 5 devis/jour pendant l'essai — sans elle, l'enforcement reste seulement frontend et peut être bypassé).
-  - `0037_devis_daily_counters.sql` (à coller APRÈS la 0036 — table compteur sticky + trigger pour empêcher le bypass "créer 5 / supprimer / recréer", réécrit `devis_today_count()`).
-  - `0038_invoice_auto_liquidation.sql` (à coller pour activer le toggle "Auto-liquidation BTP" dans l'éditeur de facture — ajoute `auto_liquidation_btp boolean` aux tables `invoices` et `devis`, met à jour `create_avoir_from()` pour propager le flag à l'avoir).
+- Dernière migration appliquée : `0038_invoice_auto_liquidation.sql`
+- Aucune migration en attente.
 - Prochaine migration : préfixer avec `0039_`.
 
 ### position:fixed et animations CSS transform
