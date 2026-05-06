@@ -17,7 +17,7 @@ import ClientPickerModal from "./ClientPickerModal.jsx";
 import CelebrateModal from "./agent/CelebrateModal.jsx";
 import CoherenceSettings from "./CoherenceSettings.jsx";
 
-export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, plan, trialExpired, onPaywall, setTab, onOpenDevisPDF, brand }) {
+export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, plan, trialExpired, trialQuotaReached, onPaywall, setTab, onOpenDevisPDF, brand }) {
   const [msgs,         setMsgs]         = useState(() => [{ role: "assistant", content: buildAgentGreeting(brand) }]);
   const [input,        setInput]        = useState("");
   const [loading,      setLoading]      = useState(false);
@@ -124,7 +124,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     const source = typeof overrideText === "string" ? overrideText : input;
     const payload = source.trim();
     if (!payload || loading) return;
-    if (trialExpired) { onPaywall(); return; }
+    if (trialExpired || trialQuotaReached) { onPaywall(); return; }
 
     // Chrono pour la modale festive "X secondes"
     celebrateStartRef.current = Date.now();
