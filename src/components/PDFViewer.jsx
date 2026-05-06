@@ -71,7 +71,8 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
   })
 
   const ouvrages = filteredLignes.filter(l => l.type_ligne === "ouvrage")
-  const rateOf = (l) => Number(l.tva_rate ?? d.tva_rate ?? 20)
+  const noTva    = brand.vatRegime === "franchise" || !!d.auto_liquidation_btp
+  const rateOf = (l) => noTva ? 0 : Number(l.tva_rate ?? d.tva_rate ?? 20)
   const ht = ouvrages.reduce((s, l) => s + ((l.quantite||0) * (l.prix_unitaire||0)), 0)
   const tvaGroups = ouvrages.reduce((acc, l) => {
     const r = rateOf(l)
@@ -288,6 +289,9 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
         <div style={{flex:1}}>
           {brand.vatRegime === "franchise" && !/(293\s*B|TVA\s+non\s+applicable)/i.test(brand.mentionsLegales || "") && (
             <div style={{fontWeight:600,color:"#6b7280",marginBottom:2}}>TVA non applicable, art. 293 B du CGI</div>
+          )}
+          {d?.auto_liquidation_btp && (
+            <div style={{fontWeight:600,color:"#6b7280",marginBottom:2}}>Autoliquidation — TVA due par le preneur, art. 283-2 nonies du CGI</div>
           )}
           {brand.mentionsLegales}
           {(() => {

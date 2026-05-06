@@ -16,8 +16,10 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
   const lignes = invoice.lignes || [];
   const ouvrages = lignes.filter(l => l.type_ligne === "ouvrage");
   const franchise = brand.vatRegime === "franchise";
+  const autoLiq   = !!invoice.auto_liquidation_btp;
+  const noTva     = franchise || autoLiq;
   const ht   = ouvrages.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0);
-  const tva  = ouvrages.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * Number(l.tva_rate ?? (franchise ? 0 : 20)) / 100, 0);
+  const tva  = ouvrages.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (noTva ? 0 : Number(l.tva_rate ?? 20)) / 100, 0);
   const ttc  = ht + tva;
   const retenue = Number(invoice.retenue_garantie_eur) || 0;
   const netAPayer = ttc - retenue;
@@ -305,6 +307,19 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
                   style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "7px 8px", fontSize: 12, background: isLocked ? "#F0EBE3" : "white", cursor: isLocked ? "not-allowed" : "text" }}/>
               </div>
             </div>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 12, cursor: isLocked ? "not-allowed" : "pointer", opacity: isLocked ? 0.6 : 1 }}>
+              <input type="checkbox"
+                checked={!!invoice.auto_liquidation_btp}
+                onChange={e => onChange({ ...invoice, auto_liquidation_btp: e.target.checked }, false)}
+                disabled={isLocked}
+                style={{ marginTop: 2, accentColor: "#22c55e", cursor: isLocked ? "not-allowed" : "pointer" }}/>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1612" }}>Auto-liquidation TVA (sous-traitance BTP)</div>
+                <div style={{ fontSize: 10, color: "#6B6358", marginTop: 2, lineHeight: 1.4 }}>
+                  Force la TVA à 0 % sur toutes les lignes et ajoute la mention <em>« Autoliquidation — TVA due par le preneur, art. 283-2 nonies CGI »</em> sur le PDF. À cocher uniquement si vous facturez en tant que sous-traitant BTP à un donneur d'ordre assujetti.
+                </div>
+              </div>
+            </label>
           </div>
 
         {/* Créer un avoir : uniquement sur facture verrouillée ET qui n'est PAS déjà un avoir */}

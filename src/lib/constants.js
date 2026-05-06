@@ -38,7 +38,7 @@ export const UNITES = [
 
 // Aliases pour rétrocompatibilité avec les anciennes valeurs ASCII stockées en base
 export const UNITE_ALIASES = { m2: "m²", m3: "m³" };
-export const TVA_RATES = [20, 10, 5.5];
+export const TVA_RATES = [20, 10, 5.5, 2.1, 0];
 
 // ── Statuts devis ─────────────────────────────────────────
 export const STATUT = {

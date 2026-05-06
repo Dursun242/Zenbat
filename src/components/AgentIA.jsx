@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { CLAUDE_MODEL, TX } from "../lib/constants.js";
+import { CLAUDE_MODEL, TX, TVA_RATES } from "../lib/constants.js";
 import { fmt, uid } from "../lib/utils.js";
 import { tradesLabels } from "../lib/trades.js";
 import { buildDevisHistorySummary } from "../lib/devisHistory.js";
@@ -547,9 +547,9 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
                           <button
                             onClick={() => {
                               if (brand.vatRegime === "franchise") return;
-                              const cycle = [20, 10, 5.5];
                               const cur   = Number(l.tva_rate ?? 20);
-                              const next  = cycle[(cycle.indexOf(cur) + 1) % cycle.length];
+                              const idx   = TVA_RATES.indexOf(cur);
+                              const next  = TVA_RATES[(idx >= 0 ? idx + 1 : 0) % TVA_RATES.length];
                               setLignes(prev => prev.map(x => x.id === l.id ? { ...x, tva_rate: next } : x));
                             }}
                             disabled={brand.vatRegime === "franchise"}

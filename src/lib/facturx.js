@@ -88,20 +88,22 @@ function num(n, decimals = 2) {
 export function buildFacturXXML({ invoice, client, brand, sourceInvoice }) {
   const ouvrages = (invoice.lignes || []).filter(l => l.type_ligne === "ouvrage");
   const franchise = brand.vatRegime === "franchise";
+  const autoLiq   = !!invoice.auto_liquidation_btp;
+  const noTva     = franchise || autoLiq;
   const isAvoir  = !!invoice.avoir_of_invoice_id || !!sourceInvoice;
   const typeCode = isAvoir ? TYPE_CREDIT : TYPE_INVOICE;
 
-  // Regroupement TVA par taux
+  // Regroupement TVA par taux (forcé à 0 si franchise ou autoliquidation)
   const taxByRate = {};
   for (const l of ouvrages) {
-    const rate = Number(l.tva_rate ?? (franchise ? 0 : 20));
+    const rate = noTva ? 0 : Number(l.tva_rate ?? 20);
     const ht   = (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0);
     if (!taxByRate[rate]) taxByRate[rate] = { base: 0, montant: 0 };
     taxByRate[rate].base    += ht;
     taxByRate[rate].montant += ht * rate / 100;
   }
   // Cas dégénéré : aucune ligne → au moins un bloc TVA à 0 sinon le schéma râle
-  if (!Object.keys(taxByRate).length) taxByRate[franchise ? 0 : 20] = { base: 0, montant: 0 };
+  if (!Object.keys(taxByRate).length) taxByRate[noTva ? 0 : 20] = { base: 0, montant: 0 };
 
   const totalHT  = Number(invoice.montant_ht)  || ouvrages.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0);
   const totalTVA = Number(invoice.montant_tva) || Object.values(taxByRate).reduce((s, t) => s + t.montant, 0);
@@ -132,10 +134,11 @@ export function buildFacturXXML({ invoice, client, brand, sourceInvoice }) {
   const lineBlocks = ouvrages.map((l, i) => {
     const qty   = Number(l.quantite) || 0;
     const pu    = Number(l.prix_unitaire) || 0;
-    const rate  = Number(l.tva_rate ?? (franchise ? 0 : 20));
+    const rate  = noTva ? 0 : Number(l.tva_rate ?? 20);
     const lineTotal = qty * pu;
     const unitCode  = mapUnit(l.unite);
-    const category  = rate > 0 ? "S" : "E"; // S = Standard, E = Exempt
+    // S = Standard, E = Exempt, AE = VAT Reverse Charge (autoliquidation BTP)
+    const category  = autoLiq ? "AE" : (rate > 0 ? "S" : "E");
     return `
     <ram:IncludedSupplyChainTradeLineItem>
       <ram:AssociatedDocumentLineDocument>
@@ -166,13 +169,16 @@ export function buildFacturXXML({ invoice, client, brand, sourceInvoice }) {
   }).join("");
 
   // Blocs <ApplicableTradeTax> (un par taux).
-  // Règle BR-E-10 : si CategoryCode = E, ExemptionReason obligatoire.
+  // Règle BR-E-10 / BR-AE-10 : si CategoryCode = E ou AE, ExemptionReason obligatoire.
   const taxBlocks = Object.entries(taxByRate).map(([rate, t]) => {
     const r = Number(rate);
-    const category = r > 0 ? "S" : "E";
-    const exemption = category === "E"
-      ? `<ram:ExemptionReason>${esc(FRANCHISE_NOTICE)}</ram:ExemptionReason>`
-      : "";
+    const category = autoLiq ? "AE" : (r > 0 ? "S" : "E");
+    const exemptionText = autoLiq
+      ? "Autoliquidation — TVA due par le preneur, art. 283-2 nonies CGI"
+      : FRANCHISE_NOTICE;
+    const exemption = category === "S"
+      ? ""
+      : `<ram:ExemptionReason>${esc(exemptionText)}</ram:ExemptionReason>`;
     return `
     <ram:ApplicableTradeTax>
       <ram:CalculatedAmount>${num(t.montant)}</ram:CalculatedAmount>
