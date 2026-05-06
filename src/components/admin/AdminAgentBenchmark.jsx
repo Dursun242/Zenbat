@@ -10,7 +10,7 @@ import { PROMPTS } from "../../lib/agentIA/testPrompts.js";
 // plafonne à 50k input tokens/min et 10k output tokens/min, donc 3 requêtes
 // parallèles saturent immédiatement et 90 % des prompts retombent en rate limit.
 const CONCURRENCY = 1;
-const MIN_INTERVAL_MS = 6000;
+const MIN_INTERVAL_MS = 12000;
 const REFUSAL_RE = /ne r[ée]alis(ons|e|ent) pas|ne fais(ons|ent)? pas|ne propos(ons|e|ent) pas|ne traitons pas|pas (notre|de) sp[ée]cialit[ée]/i;
 
 function analyseResponse(rawText) {

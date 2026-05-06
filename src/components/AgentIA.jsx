@@ -325,10 +325,12 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       let msg;
       if (!navigator.onLine) {
         msg = TX.errNetwork;
-      } else if (apiError?.includes("journalière") || apiError?.includes("429")) {
-        msg = apiError; // affiche le message précis (ex: "Limite journalière atteinte (40 appels/jour)")
+      } else if (apiError?.includes("journalière")) {
+        msg = apiError; // limite quotidienne interne (ex: "Limite journalière atteinte (40 appels/jour)")
       } else if (apiError?.includes("Période d'essai")) {
         msg = apiError;
+      } else if (/rate.?limit|tokens per minute|too many requests/i.test(apiError || "") || apiError?.includes("429")) {
+        msg = "L'assistant est très sollicité, réessayez dans quelques secondes.";
       } else if (apiError?.includes("55 secondes") || apiError?.includes("504")) {
         msg = "La demande a pris trop de temps. Réessayez avec une description plus courte.";
       } else if (apiError?.includes("529") || apiError?.includes("overloaded") || apiError?.includes("Upstream")) {
