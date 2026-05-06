@@ -73,8 +73,13 @@ export default function App() {
   const { toast, showUndo, showErr, dismissToast } = useToast();
   const saveCallbacks = { markSaving, markSaved, setSaveState, showErr };
 
-  const isAdmin = !!user?.email && !!import.meta.env.VITE_ADMIN_EMAIL &&
+  const [serverIsAdmin, setServerIsAdmin] = useState(false);
+  const isAdminViaEnv = !!user?.email && !!import.meta.env.VITE_ADMIN_EMAIL &&
     user.email.trim().toLowerCase() === import.meta.env.VITE_ADMIN_EMAIL.trim().toLowerCase();
+  // Détection admin : env var côté front (rapide) OR check server-side basé
+  // sur ADMIN_EMAIL (robuste — couvre le cas où VITE_ADMIN_EMAIL n'est pas
+  // configuré dans Vercel).
+  const isAdmin = isAdminViaEnv || serverIsAdmin;
 
   const effectivePlan = isAdmin ? "pro" : plan;
 
@@ -121,6 +126,30 @@ export default function App() {
       .catch(() => {});
     return () => { cancelled = true; };
   }, [user?.id]);
+
+  // Vérifie côté serveur si l'utilisateur est l'admin (matching sur ADMIN_EMAIL).
+  // Robuste : fonctionne même si VITE_ADMIN_EMAIL n'est pas configuré dans Vercel.
+  useEffect(() => {
+    if (!user) { setServerIsAdmin(false); return; }
+    if (isAdminViaEnv) { setServerIsAdmin(true); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (!token) return;
+        const res = await fetch('/api/account', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ action: 'whoami' }),
+        });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        if (!cancelled && data?.is_admin) setServerIsAdmin(true);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, isAdminViaEnv]);
 
   useEffect(() => {
     if (!user || !checkoutPending) return;
