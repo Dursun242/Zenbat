@@ -21,6 +21,14 @@ export default async function handler(req, res) {
   if (req.method === 'POST' && req.body?.action === 'send-comptable') {
     return handleSendComptable({ req, res, user, admin })
   }
+  // Check léger pour le frontend : "suis-je admin ?" (basé sur ADMIN_EMAIL
+  // côté serveur — évite de devoir exposer VITE_ADMIN_EMAIL côté client).
+  if (req.method === 'POST' && req.body?.action === 'whoami') {
+    const adminEmail = process.env.ADMIN_EMAIL
+    const norm = (s) => String(s || "").trim().toLowerCase()
+    const isAdmin = !!adminEmail && norm(user.email) === norm(adminEmail)
+    return res.status(200).json({ is_admin: isAdmin })
+  }
 
   // ── GET : export portabilité ─────────────────────────────────────────
   if (req.method === 'GET') {
