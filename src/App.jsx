@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { useAuth } from "./lib/auth.jsx";
 import { supabase } from "./lib/supabase.js";
 import { getMyProfile } from "./lib/api.js";
-import { TRIAL_DAYS } from "./lib/appShell.js";
+import { TRIAL_DAYS, TRIAL_DAILY_DEVIS_LIMIT, countDevisToday } from "./lib/appShell.js";
 
 import { useSaveState } from "./hooks/useSaveState.js";
 import { useToast }     from "./hooks/useToast.js";
@@ -73,21 +73,26 @@ export default function App() {
   const { toast, showUndo, showErr, dismissToast } = useToast();
   const saveCallbacks = { markSaving, markSaved, setSaveState, showErr };
 
+  const isAdmin = !!user?.email && !!import.meta.env.VITE_ADMIN_EMAIL &&
+    user.email.trim().toLowerCase() === import.meta.env.VITE_ADMIN_EMAIL.trim().toLowerCase();
+
+  const effectivePlan = isAdmin ? "pro" : plan;
+
+  const trialStart   = user?.created_at ? new Date(user.created_at).getTime() : null;
+  const daysLeft     = trialStart !== null ? Math.max(0, TRIAL_DAYS - Math.floor((Date.now() - trialStart) / 86400000)) : TRIAL_DAYS;
+  const trialExpired = effectivePlan === "free" && daysLeft === 0;
+  const trialActive  = effectivePlan === "free" && daysLeft > 0;
+
   const { brand, setBrand }                             = useBrand(user, setScreen);
   const { clients, setClients, onSaveClient, onDeleteClient, onRestoreClient } = useClients(user, saveCallbacks);
   const {
     devis, setDevis, selD, setSelD, loadingDevis, autoOpenPDF, setAutoOpenPDF,
     onSaveDevis, onCreateDevis, onDuplicateDevis, onCreateIndice, onDeleteDevis, goDevis,
-  } = useDevis(user, { ...saveCallbacks, setTab });
+  } = useDevis(user, { ...saveCallbacks, setTab, effectivePlan, daysLeft });
   const {
     invoices, selI, onSaveInvoice, onCreateInvoiceFromDevis, onCreateEmptyInvoice,
     onCreateAcompte, onCreateAvoir, onDeleteInvoice, goInvoice,
   } = useInvoices(user, devis, brand, { ...saveCallbacks, setTab });
-
-  const isAdmin = !!user?.email && !!import.meta.env.VITE_ADMIN_EMAIL &&
-    user.email.trim().toLowerCase() === import.meta.env.VITE_ADMIN_EMAIL.trim().toLowerCase();
-
-  const effectivePlan = isAdmin ? "pro" : plan;
 
   useEffect(() => {
     const handler = e => { e.preventDefault(); deferredPrompt.current = e; };
@@ -138,9 +143,8 @@ export default function App() {
     signOut();
   };
 
-  const trialStart   = user?.created_at ? new Date(user.created_at).getTime() : null;
-  const daysLeft     = trialStart !== null ? Math.max(0, TRIAL_DAYS - Math.floor((Date.now() - trialStart) / 86400000)) : TRIAL_DAYS;
-  const trialExpired = effectivePlan === "free" && daysLeft === 0;
+  const devisTodayCount = trialActive ? countDevisToday(devis) : 0;
+  const trialQuotaReached = trialActive && devisTodayCount >= TRIAL_DAILY_DEVIS_LIMIT;
 
   const stats = {
     clients:  clients.length,
@@ -275,6 +279,16 @@ export default function App() {
         <button onClick={() => setScreen("paywall")}
           style={{ flexShrink: 0, width: "100%", background: daysLeft === 0 ? "#fef2f2" : "#fff7ed", borderBottom: `1px solid ${daysLeft === 0 ? "#fecaca" : "#fed7aa"}`, padding: "8px 14px", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer", border: "none", color: daysLeft === 0 ? "#991b1b" : "#9a3412", fontSize: 11, fontWeight: 600 }}>
           {daysLeft === 0 ? "⛔ Période d'essai terminée — passer en Pro" : `⏳ Plus que ${daysLeft} jour${daysLeft > 1 ? "s" : ""} d'essai — découvrir Pro`}
+        </button>
+      )}
+
+      {/* Compteur quota devis pendant l'essai */}
+      {trialActive && devisTodayCount > 0 && (
+        <button onClick={trialQuotaReached ? () => setScreen("paywall") : undefined}
+          style={{ flexShrink: 0, width: "100%", background: trialQuotaReached ? "#fef2f2" : "#f0fdf4", borderBottom: `1px solid ${trialQuotaReached ? "#fecaca" : "#bbf7d0"}`, padding: "6px 14px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: trialQuotaReached ? "pointer" : "default", border: "none", color: trialQuotaReached ? "#991b1b" : "#166534", fontSize: 11, fontWeight: 600 }}>
+          {trialQuotaReached
+            ? `⛔ Limite atteinte (${TRIAL_DAILY_DEVIS_LIMIT}/${TRIAL_DAILY_DEVIS_LIMIT} devis aujourd'hui) — passer en Pro`
+            : `📝 ${devisTodayCount}/${TRIAL_DAILY_DEVIS_LIMIT} devis aujourd'hui (essai gratuit)`}
         </button>
       )}
 
