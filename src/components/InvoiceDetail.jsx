@@ -115,6 +115,19 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
   const handleSendPDP = async () => {
     if (!lignes.length) { setExportMsg("Ajoutez au moins une ligne avant d'envoyer."); return; }
     if (invoice.pdp_invoice_id) { setExportMsg("Cette facture a déjà été transmise à Super PDP."); return; }
+    // Champs obligatoires EN 16931 / Peppol côté vendeur :
+    //   BT-27 Name        → brand.companyName ou nom/prénom
+    //   BT-30 Legal id    → brand.siret (le XML extrait le SIREN à la volée)
+    //   BT-34 Electronic  → SIRET / SIREN / email (au moins l'email)
+    const sellerSiret = String(brand?.siret || "").replace(/\s+/g, "");
+    if (!sellerSiret) {
+      setExportMsg("❌ Renseignez votre SIRET dans votre profil avant d'envoyer une facture électronique (Compte → Profil).");
+      return;
+    }
+    if (sellerSiret.length < 9) {
+      setExportMsg("❌ SIRET invalide dans votre profil — il doit contenir 14 chiffres.");
+      return;
+    }
     setSendingPDP(true); setExportMsg(null);
     try {
       const [{ renderDataToPdf }] = await Promise.all([
