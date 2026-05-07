@@ -85,8 +85,8 @@ export default function App() {
 
   const trialStart   = user?.created_at ? new Date(user.created_at).getTime() : null;
   const daysLeft     = trialStart !== null ? Math.max(0, TRIAL_DAYS - Math.floor((Date.now() - trialStart) / 86400000)) : TRIAL_DAYS;
-  const trialExpired = effectivePlan === "free" && daysLeft === 0;
-  const trialActive  = effectivePlan === "free" && daysLeft > 0;
+  const trialExpired = !isAdmin && effectivePlan === "free" && daysLeft === 0;
+  const trialActive  = !isAdmin && effectivePlan === "free" && daysLeft > 0;
 
   // Compteur sticky : nombre de devis créés aujourd'hui par l'utilisateur sur
   // cet appareil. Ne décrémente pas à la suppression (anti-bypass).
@@ -106,7 +106,7 @@ export default function App() {
   const {
     devis, setDevis, selD, setSelD, loadingDevis, autoOpenPDF, setAutoOpenPDF,
     onSaveDevis, onCreateDevis, onDuplicateDevis, onCreateIndice, onDeleteDevis, goDevis,
-  } = useDevis(user, { ...saveCallbacks, setTab, effectivePlan, daysLeft, stickyDevisToday, onDevisCreated });
+  } = useDevis(user, { ...saveCallbacks, setTab, effectivePlan, daysLeft, stickyDevisToday, onDevisCreated, isAdmin });
   const {
     invoices, selI, onSaveInvoice, onCreateInvoiceFromDevis, onCreateEmptyInvoice,
     onCreateAcompte, onCreateAvoir, onDeleteInvoice, goInvoice,
