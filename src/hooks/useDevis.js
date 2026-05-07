@@ -11,7 +11,7 @@ import { uid } from "../lib/utils.js";
 import { DEMO_DEVIS } from "../lib/constants.js";
 import { TRIAL_DAILY_DEVIS_LIMIT, countDevisToday } from "../lib/appShell.js";
 
-export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, setTab, effectivePlan, daysLeft, stickyDevisToday = 0, onDevisCreated = () => {} }) {
+export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, setTab, effectivePlan, daysLeft, stickyDevisToday = 0, onDevisCreated = () => {}, isAdmin = false }) {
   const [devis,        setDevis]        = useState(DEMO_DEVIS);
   const [selD,         setSelD]         = useState(null);
   const [loadingDevis, setLoadingDevis] = useState(new Set());
@@ -52,9 +52,9 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
 
   const onCreateDevis = async (d) => {
     // Limite essai : MAX(compteur sticky localStorage, count du state) — résiste
-    // au bypass "créer 5 puis supprimer puis recréer".
+    // au bypass "créer 5 puis supprimer puis recréer". Admin toujours exempté.
     const todayCount = Math.max(stickyDevisToday, countDevisToday(devis));
-    if (user && effectivePlan === "free" && daysLeft > 0 && todayCount >= TRIAL_DAILY_DEVIS_LIMIT) {
+    if (user && !isAdmin && effectivePlan === "free" && daysLeft > 0 && todayCount >= TRIAL_DAILY_DEVIS_LIMIT) {
       showErr(`Limite de ${TRIAL_DAILY_DEVIS_LIMIT} devis/jour atteinte en période d'essai. Passez Pro pour un nombre illimité.`);
       return false;
     }
@@ -143,7 +143,7 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
   const onCreateIndice = async (sourceId) => {
     if (!user) { showErr("Vous devez être connecté."); return; }
     const todayCount = Math.max(stickyDevisToday, countDevisToday(devis));
-    if (effectivePlan === "free" && daysLeft > 0 && todayCount >= TRIAL_DAILY_DEVIS_LIMIT) {
+    if (!isAdmin && effectivePlan === "free" && daysLeft > 0 && todayCount >= TRIAL_DAILY_DEVIS_LIMIT) {
       showErr(`Limite de ${TRIAL_DAILY_DEVIS_LIMIT} devis/jour atteinte en période d'essai. Passez Pro pour un nombre illimité.`);
       return;
     }
