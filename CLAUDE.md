@@ -9,29 +9,29 @@ Stack : React + Vite (frontend) · Vercel Serverless Functions (API) · Supabase
 
 ### Vercel : limite 12 fonctions serverless
 Le plan Hobby de Vercel autorise **maximum 12 fichiers** dans `/api/`.
-Fichiers actuels (10/12 — `_cors.js` est un helper non déployé, `*.test.js` ignorés, `fonts/` est un dossier d'assets) :
+Fichiers actuels (11/12 — `_*.js` sont des helpers non déployés, `*.test.js` ignorés, `fonts/` est un dossier d'assets) :
 ```
 account.js             admin-delete-user.js   admin-stats.js     admin-user-detail.js
-b2brouter.js           claude.js              facturx.js         newsletter.js
-odoo-sign.js           stripe.js
+claude.js              devis-public.js        facturx.js         newsletter.js
+odoo-sign.js           stripe.js              superpdp.js
 ```
 → Ne jamais créer un nouveau fichier `/api/` sans en supprimer un autre ou fusionner des endpoints.
 
-**Convention de fusion** : quand on doit fusionner des endpoints, on regroupe par domaine (Stripe, B2Brouter…) dans un seul fichier qui route en interne :
+**Convention de fusion** : quand on doit fusionner des endpoints, on regroupe par domaine (Stripe, Super PDP…) dans un seul fichier qui route en interne :
 - soit par méthode HTTP (`account.js` : GET = export, POST = suppression)
-- soit par paramètre de requête (`admin-stats.js` : `?type=conversations|logs|...`)
-- soit par champ `action` dans le body (`b2brouter.js`, `stripe.js`)
-- soit par présence d'un header de signature (`stripe.js` détecte le webhook via `stripe-signature`, `b2brouter.js` via `x-b2b-signature`)
+- soit par paramètre de requête (`admin-stats.js` : `?type=conversations|logs|...`, `superpdp.js` : `?route=poll`)
+- soit par champ `action` dans le body (`superpdp.js`, `stripe.js`)
+- soit par présence d'un header de signature (`stripe.js` détecte le webhook via `stripe-signature`)
 
-Les anciennes URL externes (Stripe Dashboard, B2Brouter webhook) sont préservées via `vercel.json` rewrites.
+Les anciennes URL externes (Stripe Dashboard) sont préservées via `vercel.json` rewrites.
 
 ### Migrations Supabase : application manuelle
 Les fichiers dans `/supabase/migrations/` ne s'appliquent **pas automatiquement**.
 L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - Prévenir l'utilisateur à chaque nouvelle migration créée.
 - Dernière migration appliquée : `0038_invoice_auto_liquidation.sql`
-- Aucune migration en attente.
-- Prochaine migration : préfixer avec `0039_`.
+- Migration en attente d'application : `0039_pdp_accounts.sql` (rename b2b_accounts → pdp_accounts, ajout colonnes Super PDP, table pdp_state).
+- Prochaine migration : préfixer avec `0040_`.
 
 ### position:fixed et animations CSS transform
 Tout composant React qui contient des enfants `position:fixed` (modales, drawers, toasts)
@@ -90,12 +90,12 @@ Les endpoints admin vérifient en plus que `caller.email === ADMIN_EMAIL`.
 | `admin-delete-user.js` | Suppression compte par l'admin |
 | `admin-stats.js` | Stats globales + logs IA (conversations, erreurs, négatifs, feedback, newsletter, cohérence) — paramètre `?type=` |
 | `admin-user-detail.js` | Données complètes d'un utilisateur (profil, devis, factures, clients, IA) |
-| `b2brouter.js` | Proxy B2Brouter eDocExchange + webhook entrant (détection par header `x-b2b-signature`) |
 | `claude.js` | Proxy Claude API avec timeout 28s + AbortController |
 | `facturx.js` | Génération PDF Factur-X (XML CII embarqué) |
 | `newsletter.js` | Inscription newsletter |
 | `odoo-sign.js` | Proxy Odoo Sign (signature électronique) |
 | `stripe.js` | Stripe checkout/portal/info (POST authentifié) + webhook (détection par header `stripe-signature`) |
+| `superpdp.js` | Proxy Super PDP (PA agréée DGFiP) — actions authentifiées (`test_connection`, `send_invoice`, `get_invoice_status`) + polling des statuts AFNOR via `?route=poll` (auth `CRON_SECRET`). V0 single-tenant : credentials sandbox partagés en env vars |
 
 ### Architecture Telegram
 
@@ -123,7 +123,8 @@ Variables d'env Edge Functions (Supabase Dashboard → Project Settings → Edge
 Tables principales : `profiles`, `clients`, `devis`, `lignes_devis`, `invoices`, `lignes_invoices`
 Tables IA : `ia_conversations`, `ia_error_logs`, `ia_negative_logs`, `ia_feedback`
 Tables support : `support_tickets`, `support_messages` (migration `0030`)
-Autres : `b2b_accounts`, `activity_log`, `cgu_acceptances`, `newsletter_subscribers`, `app_logs`
+Tables Super PDP : `pdp_accounts` (ex-`b2b_accounts`), `pdp_state` (curseur global polling) — migration `0039`
+Autres : `activity_log`, `cgu_acceptances`, `newsletter_subscribers`, `app_logs`
 
 RLS activé sur toutes les tables — les endpoints admin contournent via `SUPABASE_SERVICE_ROLE_KEY`.
 
@@ -139,9 +140,10 @@ RLS activé sur toutes les tables — les endpoints admin contournent via `SUPAB
 | `ANTHROPIC_KEY` | Clé API Anthropic (Claude) |
 | `ADMIN_EMAIL` | Email de l'administrateur |
 | `ALLOWED_ORIGINS` | Origines CORS autorisées (séparées par virgule) |
-| `B2B_API_KEY` | Clé B2Brouter |
-| `B2B_API_URL` | URL B2Brouter (défaut: staging) |
-| `B2B_WEBHOOK_SECRET` | Secret HMAC webhook B2Brouter |
+| `PDP_API_BASE` | URL Super PDP (défaut `https://api.superpdp.tech`) |
+| `PDP_CLIENT_ID` | Identifiant OAuth Super PDP (sandbox v0 partagé, v1 = par-tenant) |
+| `PDP_CLIENT_SECRET` | Secret OAuth Super PDP (idem) |
+| `CRON_SECRET` | Secret partagé Vercel Cron / pg_cron pour `/api/superpdp?route=poll` |
 | `STRIPE_SECRET_KEY` | Clé secrète Stripe (checkout / portal / abonnements) |
 | `STRIPE_WEBHOOK_SECRET` | Secret de signature webhook Stripe |
 | `ODOO_URL` / `ODOO_DB` / `ODOO_USERNAME` / `ODOO_API_KEY` | Odoo Sign |
@@ -154,6 +156,40 @@ Défini dans `src/lib/constants.js` :
 export const CLAUDE_MODEL = import.meta.env.VITE_CLAUDE_MODEL || "claude-haiku-4-5-20251001"
 ```
 Pour changer de modèle : modifier la variable d'env `VITE_CLAUDE_MODEL` dans Vercel, pas le code.
+
+---
+
+## Architecture Super PDP (PA / DGFiP)
+
+Zenbat est intégré à **Super PDP** (PA agréée DGFiP) pour la facturation électronique B2B obligatoire à partir de septembre 2026.
+
+### V0 — single shared sandbox
+- Tous les artisans partagent **un seul compte sandbox Zenbat** sur Super PDP (credentials dans `PDP_CLIENT_ID` / `PDP_CLIENT_SECRET` côté Vercel env)
+- Les factures de test partent avec le SIREN de la sandbox (Burger Queen `000000002`)
+- Aucun mandat SEPA artisan en v0 (sandbox = gratuit)
+- Permet de valider tout le flow technique avant la mise en prod
+
+### V1 — multi-tenant (à venir)
+- Chaque artisan aura sa propre application OAuth Super PDP (le SIREN est lié à l'app)
+- Credentials chiffrés AES-GCM dans `pdp_accounts.encrypted_client_secret` (colonnes déjà créées en `0039`, non utilisées en v0)
+- Modèle de facturation à confirmer avec Super PDP : 1 mandat SEPA Zenbat centralisé OU 1 mandat par artisan
+
+### API Super PDP (confirmée)
+- Endpoint : `https://api.superpdp.tech` (prod + sandbox = même URL, distinction via `env` retourné par `/v1.beta/companies/me`)
+- Auth : OAuth 2.1 `client_credentials` sur `POST /oauth2/token`
+- Envoi facture : `POST /v1.beta/invoices` avec **PDF Factur-X brut** (`Content-Type: application/pdf`) — `api/facturx.js` produit déjà le bon format
+- Statuts : codes AFNOR `fr:200` à `fr:212` retournés via `GET /v1.beta/invoice_events?starting_after_id=N` (polling, **pas de webhook**)
+- Polling : Vercel Cron (`vercel.json` `crons`) à `0 6 * * *` (Hobby = 1/jour). Pour 15 min : Pro requis OU pg_cron Supabase.
+
+### Mapping statuts AFNOR → Zenbat (`api/superpdp.js#mapStatus`)
+- `fr:200` → `envoyee`
+- `fr:201`, `fr:203`, `fr:210` → `rejetee`
+- `fr:202`, `fr:204`, `fr:206` → `recue`
+- `fr:212` → `payee`
+- Autres codes (`fr:205`, `fr:207`, `fr:208`) : intermédiaires, le statut Zenbat reste inchangé
+
+### Plan de migration complet
+Voir `MIGRATION_PDP.md` (sera supprimé après bascule prod réussie).
 
 ---
 

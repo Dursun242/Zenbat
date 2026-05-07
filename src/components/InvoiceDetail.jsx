@@ -5,11 +5,13 @@ import LignesEditor from "./LignesEditor.jsx";
 import PDFViewer from "./PDFViewer.jsx";
 import ClientPickerModal from "./app/ClientPickerModal.jsx";
 import { getToken } from "../lib/getToken.js";
+import { pdp } from "../lib/api.js";
 
 export default function InvoiceDetail({ invoice, client, clients = [], brand, invoices, onBack, onChange, onCreateAvoir, onDelete }) {
   const [showPDF,      setShowPDF]      = useState(false);
   const [exporting,    setExporting]    = useState(false);
   const [exportMsg,    setExportMsg]    = useState(null);
+  const [sendingPDP,   setSendingPDP]   = useState(false);
   const [clientPicker, setClientPicker] = useState(false);
   const ac = brand.color || "#22c55e";
 
@@ -108,6 +110,60 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
     }
   };
 
+  // Génère le PDF Factur-X enrichi (mêmes étapes que handleFacturX, sans téléchargement)
+  // et l'envoie à Super PDP (PA). En v0, l'envoi part avec le SIREN sandbox partagé Zenbat.
+  const handleSendPDP = async () => {
+    if (!lignes.length) { setExportMsg("Ajoutez au moins une ligne avant d'envoyer."); return; }
+    if (invoice.pdp_invoice_id) { setExportMsg("Cette facture a déjà été transmise à Super PDP."); return; }
+    setSendingPDP(true); setExportMsg(null);
+    try {
+      const [{ renderDataToPdf }] = await Promise.all([
+        import("../lib/pdf.js"),
+      ]);
+      const { base64 } = await renderDataToPdf(asDevisShape, client, brand, "facture", { filename: `${invoice.numero}.pdf` });
+
+      const sourcePayload = isAvoir && sourceInvoice
+        ? { numero: sourceInvoice.numero, date_emission: sourceInvoice.date_emission }
+        : undefined;
+
+      const token = await getToken();
+      const fxRes = await fetch("/api/facturx", {
+        method:  "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          pdf_base64: base64,
+          invoice:    { ...invoice, lignes },
+          client,
+          brand,
+          sourceInvoice: sourcePayload,
+        }),
+      });
+      const fxData = await fxRes.json();
+      if (!fxRes.ok) throw new Error(fxData?.error || `Factur-X HTTP ${fxRes.status}`);
+
+      const result = await pdp.sendInvoice(invoice.id, fxData.pdf_base64);
+
+      onChange({
+        ...invoice,
+        statut:         "envoyee",
+        locked:         true,
+        pdp_invoice_id: result.pdp_invoice_id,
+        pdp_status:     "sent",
+        pdp_status_raw: "fr:200",
+      }, false);
+
+      setExportMsg(`✓ Facture transmise à Super PDP (id ${result.pdp_invoice_id}). En sandbox — émetteur fictif Zenbat.`);
+    } catch (err) {
+      console.error("[superpdp/send]", err);
+      setExportMsg("❌ Échec envoi Super PDP : " + (err.message || err));
+    } finally {
+      setSendingPDP(false);
+    }
+  };
+
   // Adapte la facture au format attendu par PDFViewer (qui parle "devis")
   const asDevisShape = {
     ...invoice,
@@ -165,6 +221,13 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
               style={{ background: exporting || !lignes.length ? "#cbd5e1" : "#1A1612", color: "white", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 700, cursor: exporting || !lignes.length ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
               {exporting ? "⏳…" : isLocked ? "⬇ Factur-X" : "🔒 Émettre"}
             </button>
+            {!invoice.pdp_invoice_id && (
+              <button onClick={handleSendPDP} disabled={sendingPDP || exporting || !lignes.length}
+                title="Envoyer la facture à Super PDP (sandbox de test)"
+                style={{ background: sendingPDP || !lignes.length ? "#cbd5e1" : "#0e7490", color: "white", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 700, cursor: sendingPDP || !lignes.length ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
+                {sendingPDP ? "⏳…" : "📡 PDP test"}
+              </button>
+            )}
           </div>
         </div>
         {/* Numero + badge */}
@@ -193,6 +256,16 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
           <div style={{ background: "#fef3c7", border: "1px solid #fde68a", color: "#92400e", padding: "8px 10px", borderRadius: 10, fontSize: 11, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 14 }}>🔒</span>
             <span><strong>Facture verrouillée</strong> — émise et immuable (CGI art. 289). Pour corriger, créez une facture d'avoir.</span>
+          </div>
+        )}
+        {invoice.pdp_invoice_id && (
+          <div style={{ background: "#ecfeff", border: "1px solid #a5f3fc", color: "#0e7490", padding: "8px 10px", borderRadius: 10, fontSize: 11, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 14 }}>📡</span>
+            <span>
+              <strong>Transmise à Super PDP</strong> — id <code style={{ fontFamily: "monospace" }}>{invoice.pdp_invoice_id}</code>
+              {invoice.pdp_status_raw ? <> · code AFNOR <code style={{ fontFamily: "monospace" }}>{invoice.pdp_status_raw}</code></> : null}
+              {" "}(sandbox v0)
+            </span>
           </div>
         )}
         {isLocked && isAvoir && (
