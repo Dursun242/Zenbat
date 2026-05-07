@@ -157,6 +157,23 @@ function buildXML({ invoice, client, brand, sourceInvoice }) {
     ? `<ram:DefinedTradeContact>${sellerContactParts}</ram:DefinedTradeContact>`
     : "";
 
+  // BT-34 / BT-49 — Seller/Buyer Electronic Address (obligatoire EN 16931 pour
+  // la transmission via PA/PDP : c'est l'identifiant utilisé pour router la
+  // facture dans le réseau Peppol). Schemes courants :
+  //   "EM"   = email (universel, sandbox/dev)
+  //   "0009" = SIRET FR
+  //   "0212" = SIREN FR
+  //   "0225" = FR-SIRENE (Peppol)
+  // Stratégie : SIRET (0009) si dispo, sinon SIREN (0212), sinon email (EM).
+  function buildElectronicAddress(siret, siren, email) {
+    if (siret && siret.length === 14) return `<ram:URIUniversalCommunication><ram:URIID schemeID="0009">${esc(siret)}</ram:URIID></ram:URIUniversalCommunication>`;
+    if (siren && siren.length === 9)  return `<ram:URIUniversalCommunication><ram:URIID schemeID="0212">${esc(siren)}</ram:URIID></ram:URIUniversalCommunication>`;
+    if (email)                        return `<ram:URIUniversalCommunication><ram:URIID schemeID="EM">${esc(email)}</ram:URIID></ram:URIUniversalCommunication>`;
+    return "";
+  }
+  const sellerElectronicAddress = buildElectronicAddress(sellerSiret, sellerSiren, brand.email);
+  const buyerElectronicAddress  = buildElectronicAddress(buyerSiret,  buyerSiren,  client?.email);
+
   // BT-10 BuyerReference (obligatoire EN 16931 si pas de PurchaseOrderReference)
   const buyerRef = esc(invoice.buyer_reference || client?.reference || client?.raison_sociale || client?.nom || "—");
 
@@ -203,6 +220,7 @@ function buildXML({ invoice, client, brand, sourceInvoice }) {
           ${sellerAddr.city ? `<ram:CityName>${sellerAddr.city}</ram:CityName>` : ""}
           <ram:CountryID>FR</ram:CountryID>
         </ram:PostalTradeAddress>
+        ${sellerElectronicAddress}
         ${sellerTaxRegs}
       </ram:SellerTradeParty>
       <ram:BuyerTradeParty>
@@ -214,6 +232,7 @@ function buildXML({ invoice, client, brand, sourceInvoice }) {
           ${buyerAddr.city ? `<ram:CityName>${buyerAddr.city}</ram:CityName>` : ""}
           <ram:CountryID>FR</ram:CountryID>
         </ram:PostalTradeAddress>
+        ${buyerElectronicAddress}
       </ram:BuyerTradeParty>
     </ram:ApplicableHeaderTradeAgreement>
     <ram:ApplicableHeaderTradeDelivery>
