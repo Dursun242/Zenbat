@@ -130,9 +130,29 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
     }
     setSendingPDP(true); setExportMsg(null);
     try {
+      // V0 — la sandbox Zenbat sur Super PDP est liée à un SIREN partagé.
+      // Super PDP exige sender SIREN == app SIREN, sinon rejet :
+      //   "L'entreprise X liée à cette session ne correspond pas au vendeur".
+      // On récupère le SIREN de l'app OAuth puis on swap juste pour le XML CII
+      // embarqué (le PDF visuel garde le vrai SIRET de l'artisan).
+      const companyInfo = await pdp.testConnection();
+      const sandboxSiren = String(companyInfo?.number || "").replace(/\D/g, "");
+      if (!sandboxSiren) {
+        throw new Error("Identité Super PDP introuvable (vérifie les credentials Vercel).");
+      }
+      // Reconstruit un SIRET 14 chiffres à partir du SIREN sandbox (NIC par défaut 00024).
+      const sandboxSiret = (sandboxSiren + "00024").slice(0, 14).padStart(14, "0");
+      const pdpBrand = {
+        ...brand,
+        siret: sandboxSiret,
+        // Évite l'incohérence TVA/SIREN en sandbox
+        tva: "",
+      };
+
       const [{ renderDataToPdf }] = await Promise.all([
         import("../lib/pdf.js"),
       ]);
+      // Visual : on garde le brand RÉEL pour la cohérence UX du PDF
       const { base64 } = await renderDataToPdf(asDevisShape, client, brand, "facture", { filename: `${invoice.numero}.pdf` });
 
       const sourcePayload = isAvoir && sourceInvoice
@@ -150,7 +170,8 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
           pdf_base64: base64,
           invoice:    { ...invoice, lignes },
           client,
-          brand,
+          // XML CII : on injecte le SIRET sandbox pour matcher l'app OAuth Super PDP
+          brand:      pdpBrand,
           sourceInvoice: sourcePayload,
         }),
       });
@@ -168,7 +189,7 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
         pdp_status_raw: "fr:200",
       }, false);
 
-      setExportMsg(`✓ Facture transmise à Super PDP (id ${result.pdp_invoice_id}). En sandbox — émetteur fictif Zenbat.`);
+      setExportMsg(`✓ Facture transmise à Super PDP (id ${result.pdp_invoice_id}). En sandbox — l'émetteur du XML est le SIREN ${sandboxSiren} (partagé Zenbat), le PDF visuel a votre vrai SIRET.`);
     } catch (err) {
       console.error("[superpdp/send]", err);
       setExportMsg("❌ Échec envoi Super PDP : " + (err.message || err));
