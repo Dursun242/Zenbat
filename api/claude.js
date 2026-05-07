@@ -55,7 +55,8 @@ export default async function handler(req, res) {
     .eq("owner_id", user.id)
     .gte("created_at", todayStart.toISOString());
 
-  if ((callsToday || 0) >= AI_DAILY_LIMIT) {
+  // L'admin est exempté de toute limite journalière (debug, support, tests).
+  if (!isAdmin && (callsToday || 0) >= AI_DAILY_LIMIT) {
     return res.status(429).json({
       error: `Limite journalière atteinte (${AI_DAILY_LIMIT} appels/jour). Réessayez demain.`,
     });
