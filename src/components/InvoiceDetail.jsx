@@ -35,10 +35,19 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
 
   const updateLignes = (newLignes) => {
     if (isLocked) return;
+    // Sur un avoir : Peppol BIS 3.0 / EN 16931 attendent des montants
+    // positifs (le TypeCode=381 signale le crédit). On force positif dès la
+    // saisie pour cohérence Zenbat ↔ PA et conformité standard compta FR
+    // (un avoir présente des montants positifs avec mention "AVOIR").
+    const sanitized = isAvoir
+      ? newLignes.map(l => l.type_ligne === "ouvrage"
+          ? { ...l, quantite: Math.abs(Number(l.quantite) || 0), prix_unitaire: Math.abs(Number(l.prix_unitaire) || 0) }
+          : l)
+      : newLignes;
     onChange({
       ...invoice,
-      lignes: newLignes,
-      montant_ht:  newLignes.filter(l => l.type_ligne === "ouvrage").reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0),
+      lignes: sanitized,
+      montant_ht:  sanitized.filter(l => l.type_ligne === "ouvrage").reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0),
     }, true);
   };
 
@@ -401,6 +410,11 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
           </div>
         )}
 
+        {isAvoir && !isLocked && (
+          <div style={{ fontSize: 11, color: "#1e40af", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "8px 10px", marginBottom: 10, lineHeight: 1.45 }}>
+            ℹ Sur un avoir, saisis les <strong>montants en positif</strong> — le caractère "crédit" est signalé par le type de document (TypeCode=381). Pratique standard compta FR + Peppol BIS 3.0.
+          </div>
+        )}
         <LignesEditor lignes={lignes} onChange={updateLignes} ac={ac} vatRegime={brand.vatRegime}/>
 
         <div style={{ background: "white", borderRadius: 14, border: "1px solid #F0EBE3", padding: 14, marginBottom: 12 }}>
