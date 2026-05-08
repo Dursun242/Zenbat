@@ -54,7 +54,7 @@ const fmtDate = d => {
   return `${x.getFullYear()}${String(x.getMonth()+1).padStart(2,"0")}${String(x.getDate()).padStart(2,"0")}`;
 };
 
-function buildXML({ invoice, client, brand, sourceInvoice }) {
+export function buildXML({ invoice, client, brand, sourceInvoice }) {
   const ouvrages   = (invoice.lignes || []).filter(l => l.type_ligne === "ouvrage");
   const franchise  = brand.vatRegime === "franchise";
   const autoLiqBtp = !!invoice.auto_liquidation_btp;
