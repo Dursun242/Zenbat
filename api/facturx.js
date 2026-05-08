@@ -60,20 +60,33 @@ function buildXML({ invoice, client, brand, sourceInvoice }) {
   const isAvoir    = !!invoice.avoir_of_invoice_id || !!sourceInvoice;
   const typeCode   = isAvoir ? TYPE_CREDIT : TYPE_INVOICE;
 
+  // Sur un avoir (TypeCode=381 / credit note), Peppol BIS 3.0 et la plupart
+  // des PA/PDP refusent les montants négatifs et les mix +/- : c'est le
+  // TypeCode qui implique le caractère "crédit", pas le signe des lignes.
+  // → on force la valeur absolue partout dans le XML CII pour les avoirs.
+  // Le PDF visuel garde les signes que l'utilisateur a saisis.
+  const sgn = isAvoir ? Math.abs : (x => x);
+
   const taxByRate = {};
   for (const l of ouvrages) {
     const rate = Number(l.tva_rate ?? (franchise ? 0 : 20));
-    const ht   = (Number(l.quantite)||0) * (Number(l.prix_unitaire)||0);
+    const ht   = sgn((Number(l.quantite)||0) * (Number(l.prix_unitaire)||0));
     if (!taxByRate[rate]) taxByRate[rate] = { base: 0, montant: 0 };
     taxByRate[rate].base    += ht;
     taxByRate[rate].montant += ht * rate / 100;
   }
   if (!Object.keys(taxByRate).length) taxByRate[franchise ? 0 : 20] = { base: 0, montant: 0 };
 
-  const totalHT  = Number(invoice.montant_ht)  || ouvrages.reduce((s,l)=>s+(Number(l.quantite)||0)*(Number(l.prix_unitaire)||0),0);
-  const totalTVA = Number(invoice.montant_tva) || Object.values(taxByRate).reduce((s,t)=>s+t.montant,0);
-  const totalTTC = Number(invoice.montant_ttc) || totalHT + totalTVA;
-  const retenue  = Number(invoice.retenue_garantie_eur) || 0;
+  // Pour avoir : on IGNORE invoice.montant_* stocké (peut refléter une somme
+  // signée +X/-X du visuel) et on recalcule TOUT depuis les lignes abs'd —
+  // sinon mismatch sum(LineTotalAmount) ≠ TotalHT dans le XML, refus PDP.
+  // Pour facture normale : on garde le comportement existant.
+  const totalHTFromLines = ouvrages.reduce((s,l)=>s+sgn((Number(l.quantite)||0)*(Number(l.prix_unitaire)||0)),0);
+  const totalTVAFromTax  = Object.values(taxByRate).reduce((s,t)=>s+t.montant,0);
+  const totalHT  = isAvoir ? totalHTFromLines : (Number(invoice.montant_ht)  || totalHTFromLines);
+  const totalTVA = isAvoir ? totalTVAFromTax  : (Number(invoice.montant_tva) || totalTVAFromTax);
+  const totalTTC = isAvoir ? (totalHT + totalTVA) : (Number(invoice.montant_ttc) || totalHT + totalTVA);
+  const retenue  = sgn(Number(invoice.retenue_garantie_eur) || 0);
   const duePayable = totalTTC - retenue;
 
   const sellerSiret = (brand.siret||"").replace(/\s+/g,"").slice(0,14);
@@ -96,8 +109,10 @@ function buildXML({ invoice, client, brand, sourceInvoice }) {
   };
 
   const lineBlocks = ouvrages.map((l,i) => {
-    const qty = Number(l.quantite)||0;
-    const pu  = Number(l.prix_unitaire)||0;
+    // Pour avoir (sgn = abs) : on positivise qty, pu et le total ligne — Peppol
+    // BIS 3.0 refuse les montants négatifs sur TypeCode=381 (le crédit est implicite).
+    const qty = sgn(Number(l.quantite)||0);
+    const pu  = sgn(Number(l.prix_unitaire)||0);
     const rate= Number(l.tva_rate ?? (franchise?0:20));
     const cat = rate>0 ? "S" : "E";
     return `
@@ -157,6 +172,35 @@ function buildXML({ invoice, client, brand, sourceInvoice }) {
     ? `<ram:DefinedTradeContact>${sellerContactParts}</ram:DefinedTradeContact>`
     : "";
 
+  // BT-34 / BT-49 — Seller/Buyer Electronic Address (obligatoire EN 16931 pour
+  // la transmission via PA/PDP : c'est l'identifiant utilisé pour router la
+  // facture dans le réseau Peppol). Schemes courants :
+  //   "EM"   = email (universel, sandbox/dev)
+  //   "0009" = SIRET FR
+  //   "0212" = SIREN FR
+  //   "0225" = FR-SIRENE (Peppol)
+  // Stratégie : SIRET (0009) si dispo, sinon SIREN (0212), sinon email (EM).
+  // Override : si brand/client.peppolAddress est posé (format "<scheme>:<id>",
+  // ex "0225:315143296_6591"), on l'utilise tel quel — utile pour matcher
+  // l'annuaire Peppol-sandbox Super PDP qui utilise des identifiants non-SIRET.
+  function buildElectronicAddress(siret, siren, email) {
+    if (siret && siret.length === 14) return `<ram:URIUniversalCommunication><ram:URIID schemeID="0009">${esc(siret)}</ram:URIID></ram:URIUniversalCommunication>`;
+    if (siren && siren.length === 9)  return `<ram:URIUniversalCommunication><ram:URIID schemeID="0212">${esc(siren)}</ram:URIID></ram:URIUniversalCommunication>`;
+    if (email)                        return `<ram:URIUniversalCommunication><ram:URIID schemeID="EM">${esc(email)}</ram:URIID></ram:URIUniversalCommunication>`;
+    return "";
+  }
+  function buildElectronicAddressFromPeppol(peppol) {
+    const m = String(peppol || "").trim().match(/^(\d{4}):(.+)$/);
+    if (!m) return null;
+    return `<ram:URIUniversalCommunication><ram:URIID schemeID="${esc(m[1])}">${esc(m[2])}</ram:URIID></ram:URIUniversalCommunication>`;
+  }
+  const sellerElectronicAddress =
+    buildElectronicAddressFromPeppol(brand?.peppolAddress) ||
+    buildElectronicAddress(sellerSiret, sellerSiren, brand.email);
+  const buyerElectronicAddress =
+    buildElectronicAddressFromPeppol(client?.peppolAddress) ||
+    buildElectronicAddress(buyerSiret, buyerSiren, client?.email);
+
   // BT-10 BuyerReference (obligatoire EN 16931 si pas de PurchaseOrderReference)
   const buyerRef = esc(invoice.buyer_reference || client?.reference || client?.raison_sociale || client?.nom || "—");
 
@@ -203,6 +247,7 @@ function buildXML({ invoice, client, brand, sourceInvoice }) {
           ${sellerAddr.city ? `<ram:CityName>${sellerAddr.city}</ram:CityName>` : ""}
           <ram:CountryID>FR</ram:CountryID>
         </ram:PostalTradeAddress>
+        ${sellerElectronicAddress}
         ${sellerTaxRegs}
       </ram:SellerTradeParty>
       <ram:BuyerTradeParty>
@@ -214,13 +259,13 @@ function buildXML({ invoice, client, brand, sourceInvoice }) {
           ${buyerAddr.city ? `<ram:CityName>${buyerAddr.city}</ram:CityName>` : ""}
           <ram:CountryID>FR</ram:CountryID>
         </ram:PostalTradeAddress>
+        ${buyerElectronicAddress}
       </ram:BuyerTradeParty>
     </ram:ApplicableHeaderTradeAgreement>
     <ram:ApplicableHeaderTradeDelivery>
       <ram:ActualDeliverySupplyChainEvent><ram:OccurrenceDateTime><udt:DateTimeString format="102">${issue}</udt:DateTimeString></ram:OccurrenceDateTime></ram:ActualDeliverySupplyChainEvent>
     </ram:ApplicableHeaderTradeDelivery>
     <ram:ApplicableHeaderTradeSettlement>
-      ${sourceRefBlock}
       <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
       ${iban ? `
       <ram:SpecifiedTradeSettlementPaymentMeans>
@@ -238,6 +283,7 @@ function buildXML({ invoice, client, brand, sourceInvoice }) {
         <ram:GrandTotalAmount>${num(totalTTC)}</ram:GrandTotalAmount>
         <ram:DuePayableAmount>${num(duePayable)}</ram:DuePayableAmount>
       </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+      ${sourceRefBlock}
     </ram:ApplicableHeaderTradeSettlement>
   </rsm:SupplyChainTradeTransaction>
 </rsm:CrossIndustryInvoice>`;
