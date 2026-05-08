@@ -57,6 +57,7 @@ const fmtDate = d => {
 function buildXML({ invoice, client, brand, sourceInvoice }) {
   const ouvrages   = (invoice.lignes || []).filter(l => l.type_ligne === "ouvrage");
   const franchise  = brand.vatRegime === "franchise";
+  const autoLiqBtp = !!invoice.auto_liquidation_btp;
   const isAvoir    = !!invoice.avoir_of_invoice_id || !!sourceInvoice;
   const typeCode   = isAvoir ? TYPE_CREDIT : TYPE_INVOICE;
 
@@ -67,15 +68,28 @@ function buildXML({ invoice, client, brand, sourceInvoice }) {
   // Le PDF visuel garde les signes que l'utilisateur a saisis.
   const sgn = isAvoir ? Math.abs : (x => x);
 
+  // Catégorie TVA EN 16931 (UNTDID 5305) :
+  //   "S"  = Standard rated (taux normal)
+  //   "E"  = Exempt from tax (franchise art. 293 B CGI)
+  //   "AE" = VAT Reverse Charge (auto-liquidation art. 283-2 CGI)
+  //   "Z"  = Zero rated (taux 0% non-exempt — peu utilisé en France)
+  // Priorité : auto-liquidation > franchise > taux ligne.
+  // Quand AE ou E s'applique, on force le rate à 0 — sinon contradiction
+  // entre cat (exempt/reverse) et rate>0, refus PDP.
+  const docVatCategory = autoLiqBtp ? "AE" : (franchise ? "E" : null);
+  const docExemptionReason = autoLiqBtp
+    ? "Autoliquidation — TVA due par le preneur, art. 283-2 nonies CGI"
+    : (franchise ? FRANCHISE_NOTE : "");
+
   const taxByRate = {};
   for (const l of ouvrages) {
-    const rate = Number(l.tva_rate ?? (franchise ? 0 : 20));
+    const rate = docVatCategory ? 0 : Number(l.tva_rate ?? (franchise ? 0 : 20));
     const ht   = sgn((Number(l.quantite)||0) * (Number(l.prix_unitaire)||0));
     if (!taxByRate[rate]) taxByRate[rate] = { base: 0, montant: 0 };
     taxByRate[rate].base    += ht;
     taxByRate[rate].montant += ht * rate / 100;
   }
-  if (!Object.keys(taxByRate).length) taxByRate[franchise ? 0 : 20] = { base: 0, montant: 0 };
+  if (!Object.keys(taxByRate).length) taxByRate[docVatCategory ? 0 : (franchise ? 0 : 20)] = { base: 0, montant: 0 };
 
   // Pour avoir : on IGNORE invoice.montant_* stocké (peut refléter une somme
   // signée +X/-X du visuel) et on recalcule TOUT depuis les lignes abs'd —
@@ -113,8 +127,10 @@ function buildXML({ invoice, client, brand, sourceInvoice }) {
     // BIS 3.0 refuse les montants négatifs sur TypeCode=381 (le crédit est implicite).
     const qty = sgn(Number(l.quantite)||0);
     const pu  = sgn(Number(l.prix_unitaire)||0);
-    const rate= Number(l.tva_rate ?? (franchise?0:20));
-    const cat = rate>0 ? "S" : "E";
+    // Force rate=0 et cat=docVatCategory si auto-liq ou franchise (cohérence
+    // avec ventilation TVA — sinon contradiction line ↔ document).
+    const rate= docVatCategory ? 0 : Number(l.tva_rate ?? (franchise?0:20));
+    const cat = docVatCategory || (rate>0 ? "S" : "E");
     return `
     <ram:IncludedSupplyChainTradeLineItem>
       <ram:AssociatedDocumentLineDocument><ram:LineID>${i+1}</ram:LineID></ram:AssociatedDocumentLineDocument>
@@ -133,8 +149,13 @@ function buildXML({ invoice, client, brand, sourceInvoice }) {
   }).join("");
 
   const taxBlocks = Object.entries(taxByRate).map(([rate,t]) => {
-    const r = Number(rate), cat = r>0 ? "S" : "E";
-    const exempt = cat==="E" ? `<ram:ExemptionReason>${esc(FRANCHISE_NOTE)}</ram:ExemptionReason>` : "";
+    const r = Number(rate);
+    const cat = docVatCategory || (r>0 ? "S" : "E");
+    // BG-23 VAT BREAKDOWN : ExemptionReason obligatoire pour "E" (franchise)
+    // et "AE" (auto-liquidation) — BR-E-09, BR-AE-09.
+    const exempt = (cat === "E" || cat === "AE")
+      ? `<ram:ExemptionReason>${esc(docExemptionReason || FRANCHISE_NOTE)}</ram:ExemptionReason>`
+      : "";
     return `
     <ram:ApplicableTradeTax>
       <ram:CalculatedAmount>${num(t.montant)}</ram:CalculatedAmount>
