@@ -33,6 +33,8 @@ FAQ ZENBAT :
 
 ▸ Abonnement et paywall
 - L'essai gratuit est de 30 jours. Au-delà, il faut un abonnement Pro.
+- Pendant l'essai : maximum 5 devis par jour (limite quotidienne, pas une limite sur les 30 jours).
+  La limite se recharge chaque jour à minuit. En passant Pro, la création de devis est illimitée.
 - Plans : Mensuel (19 €/mois) ou Semestriel (57 € pour 6 mois, sans renouvellement automatique).
 - Gestion via l'onglet "Mon compte" → "Abonnement". Le portail Stripe permet de mettre à jour
   la carte, télécharger les factures Stripe, ou annuler.

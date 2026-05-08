@@ -43,7 +43,7 @@ const PLANS = {
 
 const DEFAULT_AVG_DEVIS = 1_200; // € HT — valeur artisan BTP si aucun historique
 
-export default function PaywallScreen({ daysLeft = 0, onBack }) {
+export default function PaywallScreen({ daysLeft = 0, quotaReached = false, onBack }) {
   const [billing,  setBilling]  = useState("biannual");
   const [loading,  setLoading]  = useState(false);
   const [ctaError, setCtaError] = useState(null);
@@ -102,12 +102,18 @@ export default function PaywallScreen({ daysLeft = 0, onBack }) {
 
         {/* Titre */}
         <h2 style={{ color: "white", fontSize: 20, fontWeight: 600, marginBottom: 8, fontFamily: "'Syne', sans-serif", letterSpacing: '-0.3px' }}>
-          {expired ? "Période d'essai terminée" : `Encore ${daysLeft} jour${daysLeft > 1 ? "s" : ""} d'essai`}
+          {expired
+            ? "Période d'essai terminée"
+            : quotaReached
+              ? "5 devis créés aujourd'hui"
+              : `Encore ${daysLeft} jour${daysLeft > 1 ? "s" : ""} d'essai`}
         </h2>
         <p style={{ color: "#6B6358", fontSize: 13, marginBottom: 24, lineHeight: 1.6 }}>
           {expired
             ? "Passez à Pro pour continuer à créer des devis avec l'Agent IA, le PDF brandé et l'envoi en signature."
-            : "Passez à Pro à tout moment pour débloquer toutes les fonctionnalités sans limite."}
+            : quotaReached
+              ? "La limite est de 5 devis par jour en période d'essai. Elle se recharge chaque jour à minuit — ou passez Pro pour un nombre illimité."
+              : "Passez à Pro à tout moment pour débloquer toutes les fonctionnalités sans limite."}
         </p>
 
         {/* Bandeau personnalisé — données du mois courant */}
