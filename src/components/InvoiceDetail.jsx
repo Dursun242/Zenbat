@@ -5,11 +5,13 @@ import LignesEditor from "./LignesEditor.jsx";
 import PDFViewer from "./PDFViewer.jsx";
 import ClientPickerModal from "./app/ClientPickerModal.jsx";
 import { getToken } from "../lib/getToken.js";
+import { pdp } from "../lib/api.js";
 
 export default function InvoiceDetail({ invoice, client, clients = [], brand, invoices, onBack, onChange, onCreateAvoir, onDelete }) {
   const [showPDF,      setShowPDF]      = useState(false);
   const [exporting,    setExporting]    = useState(false);
   const [exportMsg,    setExportMsg]    = useState(null);
+  const [sendingPDP,   setSendingPDP]   = useState(false);
   const [clientPicker, setClientPicker] = useState(false);
   const ac = brand.color || "#22c55e";
 
@@ -108,6 +110,134 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
     }
   };
 
+  // Génère le PDF Factur-X enrichi (mêmes étapes que handleFacturX, sans téléchargement)
+  // et l'envoie à Super PDP (PA). En v0, l'envoi part avec le SIREN sandbox partagé Zenbat.
+  const handleSendPDP = async () => {
+    if (!lignes.length) { setExportMsg("Ajoutez au moins une ligne avant d'envoyer."); return; }
+    if (invoice.pdp_invoice_id) { setExportMsg("Cette facture a déjà été transmise à Super PDP."); return; }
+    // Champs obligatoires EN 16931 / Peppol côté vendeur :
+    //   BT-27 Name        → brand.companyName ou nom/prénom
+    //   BT-30 Legal id    → brand.siret (le XML extrait le SIREN à la volée)
+    //   BT-34 Electronic  → SIRET / SIREN / email (au moins l'email)
+    const sellerSiret = String(brand?.siret || "").replace(/\s+/g, "");
+    if (!sellerSiret) {
+      setExportMsg("❌ Renseignez votre SIRET dans votre profil avant d'envoyer une facture électronique (Compte → Profil).");
+      return;
+    }
+    if (sellerSiret.length < 9) {
+      setExportMsg("❌ SIRET invalide dans votre profil — il doit contenir 14 chiffres.");
+      return;
+    }
+    setSendingPDP(true); setExportMsg(null);
+    // Hoist hors du try : ces variables sont référencées dans le catch
+    // (block scoping const/let : try et catch sont des blocs séparés).
+    let sandboxSiren = "";
+    let receiverPeppol = "";
+    try {
+      // V0 — la sandbox Zenbat sur Super PDP est liée à un SIREN partagé.
+      // Super PDP exige sender SIREN == app SIREN, sinon rejet :
+      //   "L'entreprise X liée à cette session ne correspond pas au vendeur".
+      // On récupère le SIREN de l'app OAuth puis on swap juste pour le XML CII
+      // embarqué (le PDF visuel garde le vrai SIRET de l'artisan).
+      const companyInfo = await pdp.testConnection();
+      sandboxSiren = String(companyInfo?.number || "").replace(/\D/g, "");
+      if (!sandboxSiren) {
+        throw new Error("Identité Super PDP introuvable (vérifie les credentials Vercel).");
+      }
+      // Reconstruit un SIRET 14 chiffres à partir du SIREN sandbox (NIC par défaut 00024).
+      const sandboxSiret = (sandboxSiren + "00024").slice(0, 14).padStart(14, "0");
+      const pdpBrand = {
+        ...brand,
+        siret: sandboxSiret,
+        // Évite l'incohérence TVA/SIREN en sandbox
+        tva: "",
+      };
+      // Super PDP exige que le receiver soit enrôlé dans l'annuaire Peppol-sandbox.
+      // L'annuaire utilise le scheme 0225 avec un identifiant non-SIRET
+      // (ex "315143296_6591"), pas un SIRET classique.
+      // → on récupère l'adresse Peppol complète via l'env Vercel
+      // PDP_SANDBOX_RECEIVER_PEPPOL exposée par test_connection.
+      receiverPeppol = String(companyInfo?.sandbox_receiver_peppol || "").trim();
+      if (!receiverPeppol) {
+        throw new Error(
+          "PDP_SANDBOX_RECEIVER_PEPPOL non configuré côté Vercel. " +
+          "Va sur ton compte Super PDP → « lignes d'annuaire », copie l'adresse Peppol complète " +
+          "(format \"0225:xxxxxxxxx_xxxx\", ligne en status receiver OK) et ajoute-la comme " +
+          "variable d'environnement PDP_SANDBOX_RECEIVER_PEPPOL dans Vercel."
+        );
+      }
+      if (!/^\d{4}:.+/.test(receiverPeppol)) {
+        throw new Error(
+          `Adresse Peppol receiver invalide : "${receiverPeppol}". Format attendu "<scheme>:<id>", ex "0225:315143296_6591".`
+        );
+      }
+      // BT-49 buyer electronic address — override direct dans le XML CII via
+      // client.peppolAddress consommé par api/facturx.js. Le siret du client
+      // n'est pas swappé car le scheme 0225 n'est pas un SIRET.
+      const pdpClient = {
+        ...client,
+        peppolAddress: receiverPeppol,
+      };
+
+      const [{ renderDataToPdf }] = await Promise.all([
+        import("../lib/pdf.js"),
+      ]);
+      // Visual : on garde le brand + client RÉELS pour la cohérence UX du PDF
+      const { base64 } = await renderDataToPdf(asDevisShape, client, brand, "facture", { filename: `${invoice.numero}.pdf` });
+
+      const sourcePayload = isAvoir && sourceInvoice
+        ? { numero: sourceInvoice.numero, date_emission: sourceInvoice.date_emission }
+        : undefined;
+
+      const token = await getToken();
+      const fxRes = await fetch("/api/facturx", {
+        method:  "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          pdf_base64: base64,
+          invoice:    { ...invoice, lignes },
+          // XML CII : on injecte le SIRET sandbox pour seller ET buyer
+          // afin de matcher l'app OAuth Super PDP et l'annuaire Peppol-sandbox.
+          client:     pdpClient,
+          brand:      pdpBrand,
+          sourceInvoice: sourcePayload,
+        }),
+      });
+      const fxData = await fxRes.json();
+      if (!fxRes.ok) throw new Error(fxData?.error || `Factur-X HTTP ${fxRes.status}`);
+
+      const result = await pdp.sendInvoice(invoice.id, fxData.pdf_base64);
+
+      onChange({
+        ...invoice,
+        statut:         "envoyee",
+        locked:         true,
+        pdp_invoice_id: result.pdp_invoice_id,
+        pdp_status:     "sent",
+        pdp_status_raw: "fr:200",
+      }, false);
+
+      setExportMsg(`✓ Facture transmise à Super PDP (id ${result.pdp_invoice_id}). En sandbox — émetteur SIREN ${sandboxSiren} (app OAuth) → destinataire ${receiverPeppol} (Peppol-sandbox). Le PDF visuel garde vos vraies infos.`);
+    } catch (err) {
+      console.error("[superpdp/send]", err, "detail:", err?.detail);
+      const raw = String(err.message || err);
+      // Pre-check Peppol : message plus parlant que le brut Super PDP
+      const friendly = /receiver address does not exist in peppol directory/i.test(raw)
+        ? `L'adresse Peppol destinataire (${receiverPeppol || "—"}) n'est pas trouvée dans l'annuaire Peppol-sandbox de Super PDP. Recopie EXACTEMENT l'adresse depuis ton compte Super PDP → "lignes d'annuaire" (la ligne en status receiver OK, format 0225:xxxxxxxxx_xxxx) dans la variable Vercel PDP_SANDBOX_RECEIVER_PEPPOL.`
+        : raw;
+      // Inclut le détail brut Super PDP pour diagnostic (validation XML, etc.)
+      const detailStr = err?.detail
+        ? "\n\nDétail Super PDP : " + (typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail).slice(0, 400))
+        : "";
+      setExportMsg("❌ Échec envoi Super PDP : " + friendly + detailStr);
+    } finally {
+      setSendingPDP(false);
+    }
+  };
+
   // Adapte la facture au format attendu par PDFViewer (qui parle "devis")
   const asDevisShape = {
     ...invoice,
@@ -165,6 +295,13 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
               style={{ background: exporting || !lignes.length ? "#cbd5e1" : "#1A1612", color: "white", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 700, cursor: exporting || !lignes.length ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
               {exporting ? "⏳…" : isLocked ? "⬇ Factur-X" : "🔒 Émettre"}
             </button>
+            {!invoice.pdp_invoice_id && (
+              <button onClick={handleSendPDP} disabled={sendingPDP || exporting || !lignes.length}
+                title="Envoyer la facture à Super PDP (sandbox de test)"
+                style={{ background: sendingPDP || !lignes.length ? "#cbd5e1" : "#0e7490", color: "white", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 700, cursor: sendingPDP || !lignes.length ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
+                {sendingPDP ? "⏳…" : "📡 PDP test"}
+              </button>
+            )}
           </div>
         </div>
         {/* Numero + badge */}
@@ -193,6 +330,16 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
           <div style={{ background: "#fef3c7", border: "1px solid #fde68a", color: "#92400e", padding: "8px 10px", borderRadius: 10, fontSize: 11, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 14 }}>🔒</span>
             <span><strong>Facture verrouillée</strong> — émise et immuable (CGI art. 289). Pour corriger, créez une facture d'avoir.</span>
+          </div>
+        )}
+        {invoice.pdp_invoice_id && (
+          <div style={{ background: "#ecfeff", border: "1px solid #a5f3fc", color: "#0e7490", padding: "8px 10px", borderRadius: 10, fontSize: 11, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 14 }}>📡</span>
+            <span>
+              <strong>Transmise à Super PDP</strong> — id <code style={{ fontFamily: "monospace" }}>{invoice.pdp_invoice_id}</code>
+              {invoice.pdp_status_raw ? <> · code AFNOR <code style={{ fontFamily: "monospace" }}>{invoice.pdp_status_raw}</code></> : null}
+              {" "}(sandbox v0)
+            </span>
           </div>
         )}
         {isLocked && isAvoir && (

@@ -331,7 +331,7 @@ export async function deleteDevis(id) {
 }
 
 // =========================================================
-// INVOICES (factures électroniques B2Brouter)
+// INVOICES (factures électroniques — Super PDP)
 // =========================================================
 export async function listInvoices() {
   return withRetry(async () => {
@@ -485,11 +485,11 @@ export async function createAvoirFromInvoice(invoiceId) {
   return data // UUID du nouvel avoir
 }
 
-// Appelle le proxy /api/b2brouter avec l'access_token courant.
-async function callB2B(action, payload = {}) {
+// Appelle le proxy /api/superpdp avec l'access_token courant.
+async function callPDP(action, payload = {}) {
   const token = await getToken()
   if (!token) throw new Error('Session expirée — reconnectez-vous')
-  const res = await fetch('/api/b2brouter', {
+  const res = await fetch('/api/superpdp', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -498,15 +498,20 @@ async function callB2B(action, payload = {}) {
     body: JSON.stringify({ action, payload }),
   })
   const data = await res.json().catch(() => null)
-  if (!res.ok) throw new Error(data?.error || `B2Brouter HTTP ${res.status}`)
+  if (!res.ok) {
+    const err = new Error(data?.error || `Super PDP HTTP ${res.status}`)
+    // Attache le detail brut Super PDP pour diagnostic côté UI/console.
+    err.detail = data?.detail || null
+    err.status = res.status
+    throw err
+  }
   return data
 }
 
-export const b2b = {
-  ensureAccount: (info) => callB2B('ensure_account', info),
-  sendInvoice:   (invoice_id) => callB2B('send_invoice', { invoice_id }),
-  getStatus:     (b2brouter_id) => callB2B('get_invoice_status', { b2brouter_id }),
-  listReceived:  () => callB2B('list_received'),
+export const pdp = {
+  testConnection: ()                    => callPDP('test_connection'),
+  sendInvoice:    (invoice_id, pdf_b64) => callPDP('send_invoice', { invoice_id, pdf_base64: pdf_b64 }),
+  getStatus:      (invoice_id)          => callPDP('get_invoice_status', { invoice_id }),
 }
 
 // =========================================================

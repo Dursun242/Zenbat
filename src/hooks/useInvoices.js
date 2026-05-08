@@ -61,7 +61,21 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
       : Promise.resolve();
     Promise.all([p1, p2]).then(
       () => markSaved(),
-      (e) => { console.error("[save invoice]", e); showErr("Impossible de sauvegarder la facture"); setSaveState("idle"); },
+      (e) => {
+        // Race condition après émission via /api/facturx ou /api/superpdp :
+        // le serveur a déjà UPDATE locked=true côté DB (admin bypass RLS).
+        // Cet UPDATE client arrive après → la policy USING (not locked)
+        // filtre 0 rows → .single() crash PGRST116. La DB est dans l'état
+        // souhaité, on sync juste le local state sans alarmer l'utilisateur.
+        if (e?.code === "PGRST116" && inv.locked) {
+          console.warn("[save invoice] race lock OK, DB déjà à jour");
+          markSaved();
+          return;
+        }
+        console.error("[save invoice]", e);
+        showErr("Impossible de sauvegarder la facture");
+        setSaveState("idle");
+      },
     );
   };
 

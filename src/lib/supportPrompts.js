@@ -29,7 +29,7 @@ FAQ ZENBAT :
 - Les factures sont créées depuis un devis accepté ("Convertir en facture") ou directement
   via l'onglet "Factures".
 - Une fois la facture émise, elle est verrouillée (obligation légale française).
-- Pour les factures électroniques (B2B), l'envoi passe par B2Brouter.
+- Pour les factures électroniques B2B, l'envoi passe par Super PDP (PA agréée DGFiP).
 
 ▸ Abonnement et paywall
 - L'essai gratuit est de 30 jours. Au-delà, il faut un abonnement Pro.
