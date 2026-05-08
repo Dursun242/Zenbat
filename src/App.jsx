@@ -261,7 +261,7 @@ export default function App() {
   );
   if (screen === "paywall") return (
     <Suspense fallback={<ScreenLoader />}>
-      <PaywallScreen daysLeft={daysLeft} onBack={() => setScreen("app")} onSubscribe={(type) => { setPlan("pro"); setBillingType(type); setScreen("app"); }}/>
+      <PaywallScreen daysLeft={daysLeft} quotaReached={trialQuotaReached} onBack={() => setScreen("app")} onSubscribe={(type) => { setPlan("pro"); setBillingType(type); setScreen("app"); }}/>
     </Suspense>
   );
   if (screen === "subscription") return (
