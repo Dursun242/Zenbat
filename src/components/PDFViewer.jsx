@@ -7,6 +7,24 @@ const Ix = {
   odoo: <svg width="15" height="15" viewBox="0 0 24 24" fill="#714B67"><circle cx="12" cy="12" r="3"/><circle cx="4" cy="12" r="3"/><circle cx="20" cy="12" r="3"/></svg>,
 }
 
+async function sharePdf(blob, filename) {
+  const file = new File([blob], filename, { type: "application/pdf" })
+  if (navigator.share && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: filename, url: window.location.origin })
+      return true
+    } catch (e) {
+      if (e?.name === "AbortError") return true
+    }
+  }
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url; a.download = filename
+  document.body.appendChild(a); a.click(); document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(url), 3000)
+  return true
+}
+
 export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageReady, onSendOdoo, sending=false, sent=false, kind="devis", noDownload=false, inline=false, onMarkSent, onMarkSignature }) {
   const isAvoir  = kind === "facture" && !!d?.avoir_of_invoice_id;
   const docLabel = isAvoir ? "FACTURE D'AVOIR" : kind === "facture" ? "FACTURE" : "DEVIS";
@@ -336,11 +354,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
       try {
         const { renderDataToPdf } = await import("../lib/pdf.js")
         const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename: `${d.numero}.pdf` })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.href = url; a.download = `${d.numero}.pdf`
-        document.body.appendChild(a); a.click(); document.body.removeChild(a)
-        setTimeout(() => URL.revokeObjectURL(url), 3000)
+        await sharePdf(blob, `${d.numero}.pdf`)
       } catch (e) {
         if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
           window.location.reload()
@@ -443,14 +457,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
                 try {
                   const { renderDataToPdf } = await import("../lib/pdf.js")
                   const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename: `${d.numero}.pdf` })
-                  const url = URL.createObjectURL(blob)
-                  const a = document.createElement("a")
-                  a.href = url
-                  a.download = `${d.numero}.pdf`
-                  document.body.appendChild(a)
-                  a.click()
-                  document.body.removeChild(a)
-                  setTimeout(() => URL.revokeObjectURL(url), 3000)
+                  await sharePdf(blob, `${d.numero}.pdf`)
                 } catch (e) {
                   console.error("[pdf download]", e)
                   if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
