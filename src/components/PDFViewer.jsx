@@ -41,8 +41,6 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
   const scale = hidden ? 1 : fitScale * userZoom
   const [pageH, setPageH] = useState(null)
   const [generatingPdf, setGeneratingPdf] = useState(false)
-  const [sharingPdf,    setSharingPdf]    = useState(false)
-  const canNativeShare = typeof navigator !== "undefined" && "share" in navigator
 
   useEffect(() => {
     if (hidden || !wrapRef.current) return
@@ -369,20 +367,6 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
         }
       } finally { setGeneratingPdf(false) }
     }
-    const share = async () => {
-      setSharingPdf(true)
-      try {
-        const { renderDataToPdf } = await import("../lib/pdf.js")
-        const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename: `${d.numero}.pdf` })
-        await sharePdf(blob, `${d.numero}.pdf`)
-      } catch (e) {
-        if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
-          window.location.reload()
-        } else {
-          alert("Impossible de générer le PDF : " + (e.message || e))
-        }
-      } finally { setSharingPdf(false) }
-    }
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         {/* Toolbar inline */}
@@ -399,12 +383,6 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
               <button onClick={() => { onMarkSignature(); onClose?.() }}
                 style={{ background: "#faf5ff", color: "#6b21a8", border: "1px solid #e9d5ff", borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                 🖊 Passer en signature
-              </button>
-            )}
-            {!noDownload && canNativeShare && (
-              <button onClick={share} disabled={sharingPdf}
-                style={{ background: "#2A231C", color: sharingPdf ? "#9A8E82" : "#fff", border: "1px solid #3D3028", borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: sharingPdf ? "default" : "pointer" }}>
-                {sharingPdf ? "⏳" : "📤"}
               </button>
             )}
             {!noDownload && (
@@ -474,29 +452,6 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
               style={{background:"#faf5ff",color:"#6b21a8",border:"1px solid #e9d5ff",borderRadius:10,padding:"7px 10px",fontSize:12,fontWeight:700,cursor:"pointer"}}
               title="Passer en signature">
               🖊
-            </button>
-          )}
-          {!noDownload && canNativeShare && (
-            <button
-              onClick={async () => {
-                setSharingPdf(true)
-                try {
-                  const { renderDataToPdf } = await import("../lib/pdf.js")
-                  const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename: `${d.numero}.pdf` })
-                  await sharePdf(blob, `${d.numero}.pdf`)
-                } catch (e) {
-                  console.error("[pdf share]", e)
-                  if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
-                    window.location.reload()
-                  } else {
-                    alert("Impossible de partager le PDF : " + (e.message || e))
-                  }
-                } finally { setSharingPdf(false) }
-              }}
-              disabled={sharingPdf}
-              title="Partager le PDF"
-              style={{background:sharingPdf?"#9ca3af":"#2A231C",color:"white",border:"1px solid #3D3028",borderRadius:10,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:sharingPdf?"default":"pointer"}}>
-              {sharingPdf ? "⏳" : "📤"}
             </button>
           )}
           {!noDownload && (
