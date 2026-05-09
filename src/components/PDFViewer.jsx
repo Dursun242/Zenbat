@@ -41,6 +41,8 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
   const scale = hidden ? 1 : fitScale * userZoom
   const [pageH, setPageH] = useState(null)
   const [generatingPdf, setGeneratingPdf] = useState(false)
+  const [sharingPdf,    setSharingPdf]    = useState(false)
+  const canNativeShare = typeof navigator !== "undefined" && "share" in navigator
 
   useEffect(() => {
     if (hidden || !wrapRef.current) return
@@ -354,7 +356,11 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
       try {
         const { renderDataToPdf } = await import("../lib/pdf.js")
         const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename: `${d.numero}.pdf` })
-        await sharePdf(blob, `${d.numero}.pdf`)
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url; a.download = `${d.numero}.pdf`
+        document.body.appendChild(a); a.click(); document.body.removeChild(a)
+        setTimeout(() => URL.revokeObjectURL(url), 3000)
       } catch (e) {
         if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
           window.location.reload()
@@ -362,6 +368,20 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
           alert("Impossible de générer le PDF : " + (e.message || e))
         }
       } finally { setGeneratingPdf(false) }
+    }
+    const share = async () => {
+      setSharingPdf(true)
+      try {
+        const { renderDataToPdf } = await import("../lib/pdf.js")
+        const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename: `${d.numero}.pdf` })
+        await sharePdf(blob, `${d.numero}.pdf`)
+      } catch (e) {
+        if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
+          window.location.reload()
+        } else {
+          alert("Impossible de générer le PDF : " + (e.message || e))
+        }
+      } finally { setSharingPdf(false) }
     }
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -381,10 +401,16 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
                 🖊 Passer en signature
               </button>
             )}
+            {!noDownload && canNativeShare && (
+              <button onClick={share} disabled={sharingPdf}
+                style={{ background: "#2A231C", color: sharingPdf ? "#9A8E82" : "#fff", border: "1px solid #3D3028", borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: sharingPdf ? "default" : "pointer" }}>
+                {sharingPdf ? "⏳" : "📤"}
+              </button>
+            )}
             {!noDownload && (
-              <button onClick={download}
-                style={{ background: "#22c55e", color: "white", border: "none", borderRadius: 8, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                ⬇ Télécharger
+              <button onClick={download} disabled={generatingPdf}
+                style={{ background: "#22c55e", color: "white", border: "none", borderRadius: 8, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: generatingPdf ? "default" : "pointer" }}>
+                {generatingPdf ? "⏳" : "⬇ Télécharger"}
               </button>
             )}
           </div>
@@ -450,6 +476,29 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
               🖊
             </button>
           )}
+          {!noDownload && canNativeShare && (
+            <button
+              onClick={async () => {
+                setSharingPdf(true)
+                try {
+                  const { renderDataToPdf } = await import("../lib/pdf.js")
+                  const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename: `${d.numero}.pdf` })
+                  await sharePdf(blob, `${d.numero}.pdf`)
+                } catch (e) {
+                  console.error("[pdf share]", e)
+                  if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
+                    window.location.reload()
+                  } else {
+                    alert("Impossible de partager le PDF : " + (e.message || e))
+                  }
+                } finally { setSharingPdf(false) }
+              }}
+              disabled={sharingPdf}
+              title="Partager le PDF"
+              style={{background:sharingPdf?"#9ca3af":"#2A231C",color:"white",border:"1px solid #3D3028",borderRadius:10,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:sharingPdf?"default":"pointer"}}>
+              {sharingPdf ? "⏳" : "📤"}
+            </button>
+          )}
           {!noDownload && (
             <button
               onClick={async () => {
@@ -457,7 +506,11 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
                 try {
                   const { renderDataToPdf } = await import("../lib/pdf.js")
                   const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename: `${d.numero}.pdf` })
-                  await sharePdf(blob, `${d.numero}.pdf`)
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement("a")
+                  a.href = url; a.download = `${d.numero}.pdf`
+                  document.body.appendChild(a); a.click(); document.body.removeChild(a)
+                  setTimeout(() => URL.revokeObjectURL(url), 3000)
                 } catch (e) {
                   console.error("[pdf download]", e)
                   if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
@@ -465,8 +518,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
                   } else {
                     alert("Impossible de générer le PDF : " + (e.message || e))
                   }
-                }
-                finally { setGeneratingPdf(false) }
+                } finally { setGeneratingPdf(false) }
               }}
               disabled={generatingPdf}
               title="Télécharger le PDF"
