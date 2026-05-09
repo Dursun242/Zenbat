@@ -354,11 +354,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
       try {
         const { renderDataToPdf } = await import("../lib/pdf.js")
         const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename: `${d.numero}.pdf` })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.href = url; a.download = `${d.numero}.pdf`
-        document.body.appendChild(a); a.click(); document.body.removeChild(a)
-        setTimeout(() => URL.revokeObjectURL(url), 3000)
+        await sharePdf(blob, `${d.numero}.pdf`)
       } catch (e) {
         if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
           window.location.reload()
@@ -461,11 +457,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
                 try {
                   const { renderDataToPdf } = await import("../lib/pdf.js")
                   const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename: `${d.numero}.pdf` })
-                  const url = URL.createObjectURL(blob)
-                  const a = document.createElement("a")
-                  a.href = url; a.download = `${d.numero}.pdf`
-                  document.body.appendChild(a); a.click(); document.body.removeChild(a)
-                  setTimeout(() => URL.revokeObjectURL(url), 3000)
+                  await sharePdf(blob, `${d.numero}.pdf`)
                 } catch (e) {
                   console.error("[pdf download]", e)
                   if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
