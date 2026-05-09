@@ -7,16 +7,8 @@ const Ix = {
   odoo: <svg width="15" height="15" viewBox="0 0 24 24" fill="#714B67"><circle cx="12" cy="12" r="3"/><circle cx="4" cy="12" r="3"/><circle cx="20" cy="12" r="3"/></svg>,
 }
 
-function openPdfPreview(blob, filename, previewWin) {
-  const url = URL.createObjectURL(blob)
-  if (previewWin) {
-    previewWin.location.href = url
-  } else {
-    const a = document.createElement("a")
-    a.href = url; a.download = filename
-    document.body.appendChild(a); a.click(); document.body.removeChild(a)
-  }
-  setTimeout(() => URL.revokeObjectURL(url), 60000)
+function openPdfPreview(blob) {
+  window.location.href = URL.createObjectURL(blob)
 }
 
 export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageReady, onSendOdoo, sending=false, sent=false, kind="devis", noDownload=false, inline=false, onMarkSent, onMarkSignature }) {
@@ -364,14 +356,12 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
             {!noDownload && (
               <button
                 onClick={async () => {
-                  const previewWin = window.open('', '_blank')
                   setGeneratingPdf(true)
                   try {
                     const { renderDataToPdf } = await import("../lib/pdf.js")
                     const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename: `${d.numero}.pdf` })
-                    openPdfPreview(blob, `${d.numero}.pdf`, previewWin)
+                    openPdfPreview(blob)
                   } catch (e) {
-                    previewWin?.close()
                     if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
                       window.location.reload()
                     } else {
@@ -450,14 +440,12 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
           {!noDownload && (
             <button
               onClick={async () => {
-                const previewWin = window.open('', '_blank')
                 setGeneratingPdf(true)
                 try {
                   const { renderDataToPdf } = await import("../lib/pdf.js")
                   const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename: `${d.numero}.pdf` })
-                  openPdfPreview(blob, `${d.numero}.pdf`, previewWin)
+                  openPdfPreview(blob)
                 } catch (e) {
-                  previewWin?.close()
                   console.error("[pdf preview]", e)
                   if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
                     window.location.reload()
