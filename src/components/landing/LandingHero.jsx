@@ -196,6 +196,14 @@ export default function LandingHero({ onSignup }) {
             <motion.div
               initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, ease: [.16,1,.3,1] }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(34,197,94,.10)', border: '1px solid rgba(34,197,94,.28)', borderRadius: 20, padding: '6px 14px' }}>
+              <span style={{ fontSize: 13 }}>🎁</span>
+              <span style={{ color: '#15803d', fontSize: 11, fontWeight: 700, letterSpacing: '.6px' }}>GRATUIT À VIE · 5 DEVIS / SEMAINE</span>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.04, ease: [.16,1,.3,1] }}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(201,123,92,.10)', border: '1px solid rgba(201,123,92,.22)', borderRadius: 20, padding: '6px 14px' }}>
               <span style={{ fontSize: 13 }}>🇫🇷</span>
               <span style={{ color: '#C97B5C', fontSize: 11, fontWeight: 600, letterSpacing: '.6px' }}>1ʳᵉ APP FRANÇAISE · DEVISEUR ASSISTANT IA</span>
@@ -249,7 +257,7 @@ export default function LandingHero({ onSignup }) {
             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             transition={{ delay: 0.38 }}
             style={{ fontSize: 12, color: '#9A9088', marginBottom: 28 }}>
-            Sans CB · Sans engagement · Annulable en 1 clic
+            <span style={{ color: '#15803d', fontWeight: 700 }}>5 devis gratuits chaque semaine, à vie.</span> Sans carte bancaire, sans engagement.
           </motion.p>
 
           {/* Badges plateformes */}
