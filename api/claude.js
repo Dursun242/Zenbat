@@ -10,10 +10,8 @@ const ALLOWED_MODELS = [
 const MAX_SYSTEM_CHARS   = 80_000;
 const MAX_MESSAGES_CHARS = 40_000;
 const STREAM_TIMEOUT_MS  = 55_000;
-const MS_PER_DAY         = 86_400_000;
 const AI_LIMIT_FREE      = 40;
 const AI_LIMIT_PRO       = 200;
-const TRIAL_DAYS_DEFAULT = 30;
 
 export default async function handler(req, res) {
   cors(req, res, { methods: "POST, OPTIONS", auth: true });
@@ -39,13 +37,6 @@ export default async function handler(req, res) {
   const norm = (s) => String(s || "").trim().toLowerCase();
   const isAdmin = adminEmail && norm(user.email) === norm(adminEmail);
   const effectivePlan = isAdmin ? "pro" : profile.plan;
-
-  const accountAgeDays = Math.floor(
-    (Date.now() - new Date(user.created_at).getTime()) / MS_PER_DAY
-  );
-  if (effectivePlan === "free" && accountAgeDays >= TRIAL_DAYS_DEFAULT) {
-    return res.status(403).json({ error: "Période d'essai expirée" });
-  }
 
   const AI_DAILY_LIMIT = effectivePlan === "pro" ? AI_LIMIT_PRO : AI_LIMIT_FREE;
   const todayStart = new Date();

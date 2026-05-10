@@ -26,7 +26,7 @@ export default function AdminKPIs({ stats }) {
         <Card label="Total inscrits"      value={stats.users.total.toLocaleString("fr-FR")}       sub={`+${stats.users.newThisMonth} ce mois / +${stats.users.newLast7} cette semaine`} />
         <Card label="Abonnés Pro"         value={stats.users.pro.toLocaleString("fr-FR")}         sub={`${pct(stats.users.pro, stats.users.total)}% de conversion`} color="#22c55e" />
         <Card label="Actifs (≥1 devis)"   value={stats.users.activeUsers.toLocaleString("fr-FR")} sub={`${pct(stats.users.activeUsers, stats.users.total)}% des inscrits`} color="#0ea5e9" />
-        <Card label="Essai ≤7j restants"  value={stats.users.trialEndingSoon.toLocaleString("fr-FR")} sub="à relancer en priorité" color="#f59e0b" />
+        <Card label="Freemium au plafond" value={(stats.users.freemiumAtCap ?? 0).toLocaleString("fr-FR")} sub="≥5 devis cette semaine — à relancer" color="#f59e0b" />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
         <Card label="Appels IA total"  value={stats.users.totalAiUsed.toLocaleString("fr-FR")} sub={`moy. ${stats.users.total ? Math.round(stats.users.totalAiUsed / stats.users.total) : 0} / user`} color="#7c3aed" />

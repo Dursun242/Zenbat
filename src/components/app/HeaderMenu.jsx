@@ -32,7 +32,9 @@ export default function HeaderMenu({
   isAdmin,
   user,
   effectivePlan,
-  daysLeft,
+  billingCycle,
+  weekCount = 0,
+  weekLimit = 5,
   onOpenAdmin,
   onOpenProfile,
   onOpenSubscription,
@@ -68,8 +70,10 @@ export default function HeaderMenu({
 
   const close = () => setOpen(false);
 
-  const isPro = effectivePlan === "pro";
-  const trialUrgent = !isPro && daysLeft <= 7;
+  const isPro          = effectivePlan === "pro";
+  const isBiannual     = isPro && billingCycle === "biannual";
+  const quotaReached   = !isPro && weekCount >= weekLimit;
+  const quotaWarning   = !isPro && weekCount >= weekLimit - 1 && weekCount < weekLimit;
 
   const itemBase = {
     display: "flex", alignItems: "center", gap: 10,
@@ -94,11 +98,11 @@ export default function HeaderMenu({
           color: "#E8E2D8", cursor: "pointer",
         }}>
         {I.menu}
-        {trialUrgent && (
+        {(quotaReached || quotaWarning) && (
           <span style={{
             position: "absolute", top: -3, right: -3,
             width: 8, height: 8, borderRadius: "50%",
-            background: daysLeft === 0 ? "#ef4444" : "#f97316",
+            background: quotaReached ? "#ef4444" : "#f97316",
             border: "2px solid #1A1612",
           }}/>
         )}
@@ -141,18 +145,18 @@ export default function HeaderMenu({
                 onClick={() => { close(); isPro ? onOpenSubscription() : onOpenPaywall(); }}
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 6,
-                  background: isPro ? "rgba(34,197,94,.12)" : (trialUrgent ? "rgba(249,115,22,.12)" : "#F5F0E8"),
-                  color:      isPro ? "#16a34a"            : (trialUrgent ? "#c2410c"             : "#6B6358"),
-                  border:     `1px solid ${isPro ? "rgba(34,197,94,.25)" : (trialUrgent ? "rgba(249,115,22,.25)" : "#E8E2D8")}`,
+                  background: isPro ? "rgba(34,197,94,.12)" : (quotaReached ? "rgba(239,68,68,.12)" : (quotaWarning ? "rgba(249,115,22,.12)" : "#F5F0E8")),
+                  color:      isPro ? "#16a34a"            : (quotaReached ? "#b91c1c"             : (quotaWarning ? "#c2410c"             : "#6B6358")),
+                  border:     `1px solid ${isPro ? "rgba(34,197,94,.25)" : (quotaReached ? "rgba(239,68,68,.25)" : (quotaWarning ? "rgba(249,115,22,.25)" : "#E8E2D8"))}`,
                   fontSize: 11, fontWeight: 700,
                   padding: "4px 10px", borderRadius: 20,
                   cursor: "pointer",
                 }}>
                 {isPro
-                  ? <>{I.crown} PRO · gérer</>
-                  : daysLeft === 0
-                    ? <>Essai terminé · passer Pro</>
-                    : <>Essai · {daysLeft}j · passer Pro</>}
+                  ? <>{I.crown} {isBiannual ? "PRO · 6 mois · gérer" : "PRO · gérer"}</>
+                  : quotaReached
+                    ? <>{weekCount}/{weekLimit} · passer Pro</>
+                    : <>Freemium · {weekCount}/{weekLimit} · passer Pro</>}
               </button>
             </div>
 

@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { useAuth } from "./lib/auth.jsx";
 import { supabase } from "./lib/supabase.js";
-import { getMyProfile } from "./lib/api.js";
-import { TRIAL_DAYS, TRIAL_DAILY_DEVIS_LIMIT, countDevisToday, readStickyDevisToday, bumpStickyDevisToday } from "./lib/appShell.js";
+import { getMyProfile, getDevisWeekCount } from "./lib/api.js";
+import { FREEMIUM_WEEKLY_DEVIS_LIMIT, countDevisThisWeek, readStickyDevisThisWeek, bumpStickyDevisThisWeek } from "./lib/appShell.js";
 
 import { useSaveState } from "./hooks/useSaveState.js";
 import { useToast }     from "./hooks/useToast.js";
@@ -56,8 +56,8 @@ export default function App() {
   const [screen, setScreen] = useState("app");
   const [tab,    setTab]    = useState("dashboard");
   const [selC,   setSelC]   = useState(null);
-  const [plan,      setPlan]      = useState("free");
-  const [billingType, setBillingType] = useState(null);
+  const [plan,         setPlan]         = useState("free");
+  const [billingCycle, setBillingCycle] = useState(null);
   const [showPwa,setShowPwa]= useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
   const [comptableOpen, setComptableOpen] = useState(false);
@@ -82,31 +82,45 @@ export default function App() {
   const isAdmin = isAdminViaEnv || serverIsAdmin;
 
   const effectivePlan = isAdmin ? "pro" : plan;
+  const isFreemium    = !isAdmin && effectivePlan === "free";
 
-  const trialStart   = user?.created_at ? new Date(user.created_at).getTime() : null;
-  const daysLeft     = trialStart !== null ? Math.max(0, TRIAL_DAYS - Math.floor((Date.now() - trialStart) / 86400000)) : TRIAL_DAYS;
-  const trialExpired = !isAdmin && effectivePlan === "free" && daysLeft === 0;
-  const trialActive  = !isAdmin && effectivePlan === "free" && daysLeft > 0;
+  // Compteur sticky : nombre de devis créés cette semaine ISO par
+  // l'utilisateur sur cet appareil. Ne décrémente pas à la suppression
+  // (anti-bypass). Source de vérité côté DB (RPC devis_week_count).
+  const [stickyDevisThisWeek, setStickyDevisThisWeek] = useState(() => readStickyDevisThisWeek());
+  const [weekCount,           setWeekCount]           = useState(0);
 
-  // Compteur sticky : nombre de devis créés aujourd'hui par l'utilisateur sur
-  // cet appareil. Ne décrémente pas à la suppression (anti-bypass).
-  const [stickyDevisToday, setStickyDevisToday] = useState(() => readStickyDevisToday());
   useEffect(() => {
-    // Re-synchronise le compteur au changement de date (et toutes les minutes
-    // pour gérer le passage de minuit pendant qu'une session est ouverte).
-    const tick = () => setStickyDevisToday(readStickyDevisToday());
+    // Re-synchronise le compteur sticky local au changement de semaine
+    // (toutes les minutes pour gérer le passage du dimanche au lundi
+    // pendant qu'une session est ouverte).
+    const tick = () => setStickyDevisThisWeek(readStickyDevisThisWeek());
     tick();
     const id = setInterval(tick, 60_000);
     return () => clearInterval(id);
   }, []);
-  const onDevisCreated = () => setStickyDevisToday(bumpStickyDevisToday());
+
+  useEffect(() => {
+    if (!user) { setWeekCount(0); return; }
+    let cancelled = false;
+    getDevisWeekCount()
+      .then(n => { if (!cancelled) setWeekCount(n); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  const onDevisCreated = () => {
+    setStickyDevisThisWeek(bumpStickyDevisThisWeek());
+    setWeekCount(c => c + 1);
+  };
+  const onQuotaReached = () => setScreen("paywall");
 
   const { brand, setBrand }                             = useBrand(user, setScreen);
   const { clients, setClients, onSaveClient, onDeleteClient, onRestoreClient } = useClients(user, saveCallbacks);
   const {
     devis, setDevis, selD, setSelD, loadingDevis, autoOpenPDF, setAutoOpenPDF,
     onSaveDevis, onCreateDevis, onDuplicateDevis, onCreateIndice, onDeleteDevis, goDevis,
-  } = useDevis(user, { ...saveCallbacks, setTab, effectivePlan, daysLeft, stickyDevisToday, onDevisCreated, isAdmin });
+  } = useDevis(user, { ...saveCallbacks, setTab, effectivePlan, weekCount, stickyDevisThisWeek, onDevisCreated, onQuotaReached, isAdmin });
   const {
     invoices, selI, onSaveInvoice, onCreateInvoiceFromDevis, onCreateEmptyInvoice,
     onCreateAcompte, onCreateAvoir, onDeleteInvoice, goInvoice,
@@ -122,7 +136,11 @@ export default function App() {
     if (!user) return;
     let cancelled = false;
     getMyProfile()
-      .then(p => { if (!cancelled && (p?.plan === "pro" || p?.plan === "free")) setPlan(p.plan); })
+      .then(p => {
+        if (cancelled) return;
+        if (p?.plan === "pro" || p?.plan === "free") setPlan(p.plan);
+        if (p?.billing_cycle === "monthly" || p?.billing_cycle === "biannual") setBillingCycle(p.billing_cycle);
+      })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [user?.id]);
@@ -185,12 +203,12 @@ export default function App() {
     signOut();
   };
 
-  // On prend le MAX entre le compteur sticky et le compte des devis du state :
-  // - sticky résiste à la suppression (créer 5 puis tout supprimer reste à 5)
-  // - count du state couvre le cas d'un nouvel appareil où localStorage est vide
-  //   mais où la DB contient déjà des devis créés aujourd'hui.
-  const devisTodayCount = trialActive ? Math.max(stickyDevisToday, countDevisToday(devis)) : 0;
-  const trialQuotaReached = trialActive && devisTodayCount >= TRIAL_DAILY_DEVIS_LIMIT;
+  // Compteur affiché : MAX entre la RPC DB, le sticky localStorage et le state.
+  // - DB : source de vérité, résiste à la suppression
+  // - sticky : couvre la création optimiste avant retour serveur
+  // - state : couvre le cas d'un nouvel appareil avant chargement de la RPC
+  const devisThisWeekCount  = isFreemium ? Math.max(weekCount, stickyDevisThisWeek, countDevisThisWeek(devis)) : 0;
+  const freemiumQuotaReached = isFreemium && devisThisWeekCount >= FREEMIUM_WEEKLY_DEVIS_LIMIT;
 
   const stats = {
     clients:  clients.length,
@@ -261,12 +279,17 @@ export default function App() {
   );
   if (screen === "paywall") return (
     <Suspense fallback={<ScreenLoader />}>
-      <PaywallScreen daysLeft={daysLeft} quotaReached={trialQuotaReached} onBack={() => setScreen("app")} onSubscribe={(type) => { setPlan("pro"); setBillingType(type); setScreen("app"); }}/>
+      <PaywallScreen
+        quotaReached={freemiumQuotaReached}
+        weekCount={devisThisWeekCount}
+        weekLimit={FREEMIUM_WEEKLY_DEVIS_LIMIT}
+        onBack={() => setScreen("app")}
+        onSubscribe={(type) => { setPlan("pro"); setBillingCycle(type); setScreen("app"); }}/>
     </Suspense>
   );
   if (screen === "subscription") return (
     <Suspense fallback={<ScreenLoader />}>
-      <SubscriptionScreen isAdmin={isAdmin} daysLeft={daysLeft} plan={effectivePlan} onBack={() => setScreen("app")}/>
+      <SubscriptionScreen isAdmin={isAdmin} plan={effectivePlan} billingCycle={billingCycle} onBack={() => setScreen("app")}/>
     </Suspense>
   );
 
@@ -308,7 +331,9 @@ export default function App() {
             isAdmin={isAdmin}
             user={user}
             effectivePlan={effectivePlan}
-            daysLeft={daysLeft}
+            billingCycle={billingCycle}
+            weekCount={devisThisWeekCount}
+            weekLimit={FREEMIUM_WEEKLY_DEVIS_LIMIT}
             onOpenAdmin={() => setTab("admin")}
             onOpenProfile={() => setScreen("onboarding")}
             onOpenSubscription={() => setScreen("subscription")}
@@ -320,21 +345,13 @@ export default function App() {
         </div>
       </header>
 
-      {/* Bandeau trial expiring */}
-      {effectivePlan === "free" && daysLeft <= 7 && (
+      {/* Compteur quota devis freemium (hebdomadaire) */}
+      {isFreemium && devisThisWeekCount > 0 && (
         <button onClick={() => setScreen("paywall")}
-          style={{ flexShrink: 0, width: "100%", background: daysLeft === 0 ? "#fef2f2" : "#fff7ed", borderBottom: `1px solid ${daysLeft === 0 ? "#fecaca" : "#fed7aa"}`, padding: "8px 14px", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer", border: "none", color: daysLeft === 0 ? "#991b1b" : "#9a3412", fontSize: 11, fontWeight: 600 }}>
-          {daysLeft === 0 ? "⛔ Période d'essai terminée — passer en Pro" : `⏳ Plus que ${daysLeft} jour${daysLeft > 1 ? "s" : ""} d'essai — découvrir Pro`}
-        </button>
-      )}
-
-      {/* Compteur quota devis pendant l'essai */}
-      {trialActive && devisTodayCount > 0 && (
-        <button onClick={() => setScreen("paywall")}
-          style={{ flexShrink: 0, width: "100%", background: trialQuotaReached ? "#fef2f2" : "#f0fdf4", borderBottom: `1px solid ${trialQuotaReached ? "#fecaca" : "#bbf7d0"}`, padding: "6px 14px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", border: "none", color: trialQuotaReached ? "#991b1b" : "#166534", fontSize: 11, fontWeight: 600 }}>
-          {trialQuotaReached
-            ? `⛔ Limite atteinte (${TRIAL_DAILY_DEVIS_LIMIT}/${TRIAL_DAILY_DEVIS_LIMIT} devis aujourd'hui) — passer en Pro`
-            : `📝 ${devisTodayCount}/${TRIAL_DAILY_DEVIS_LIMIT} devis aujourd'hui (essai gratuit) — passer en Pro`}
+          style={{ flexShrink: 0, width: "100%", background: freemiumQuotaReached ? "#fef2f2" : "#f0fdf4", borderBottom: `1px solid ${freemiumQuotaReached ? "#fecaca" : "#bbf7d0"}`, padding: "6px 14px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", border: "none", color: freemiumQuotaReached ? "#991b1b" : "#166534", fontSize: 11, fontWeight: 600 }}>
+          {freemiumQuotaReached
+            ? `⛔ Limite atteinte (${FREEMIUM_WEEKLY_DEVIS_LIMIT}/${FREEMIUM_WEEKLY_DEVIS_LIMIT} devis cette semaine) — passer en Pro`
+            : `📝 ${devisThisWeekCount}/${FREEMIUM_WEEKLY_DEVIS_LIMIT} devis cette semaine — passer en Pro`}
         </button>
       )}
 
@@ -351,9 +368,9 @@ export default function App() {
                 style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", background: active ? "rgba(34,197,94,.1)" : "transparent", border: "none", borderLeft: `3px solid ${active ? "#22c55e" : "transparent"}`, color: active ? "#22c55e" : "#6B6358", cursor: "pointer", width: "100%", textAlign: "left", fontSize: 14, fontWeight: active ? 600 : 400, transition: "all .15s", position: "relative" }}>
                 {icon}
                 <span>{label}</span>
-                {id === "agent" && effectivePlan === "free" && daysLeft <= 7 && (
-                  <span style={{ marginLeft: "auto", background: daysLeft === 0 ? "#ef4444" : "#f97316", color: "white", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 10 }}>
-                    {daysLeft === 0 ? "!" : `${daysLeft}j`}
+                {id === "agent" && isFreemium && freemiumQuotaReached && (
+                  <span style={{ marginLeft: "auto", background: "#ef4444", color: "white", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 10 }}>
+                    !
                   </span>
                 )}
               </button>
@@ -411,13 +428,15 @@ export default function App() {
                   onCreateIndice={() => onCreateIndice(selD)}
                   groupVersions={groupVersions}
                   goDevis={goDevis}
+                  isFreemium={isFreemium}
+                  onPaywall={() => setScreen("paywall")}
                   autoOpenPDF={autoOpenPDF === selD}
                   onAutoOpenPDFConsumed={() => setAutoOpenPDF(null)}
                   loading={loadingDevis.has(selD)}/>
               </Suspense>
             );
           })()}
-          {tab === "factures"        && <InvoicesList invoices={invoices} clients={clients} goInvoice={goInvoice} onCreateEmpty={onCreateEmptyInvoice} onDelete={onDeleteInvoice}/>}
+          {tab === "factures"        && <InvoicesList invoices={invoices} clients={clients} goInvoice={goInvoice} onCreateEmpty={onCreateEmptyInvoice} onDelete={onDeleteInvoice} isFreemium={isFreemium} onPaywall={() => setScreen("paywall")}/>}
           {tab === "factures_detail" && selI && (() => {
             const inv = invoices.find(x => x.id === selI);
             if (!inv) return null;
@@ -445,8 +464,7 @@ export default function App() {
                 clients={clients}
                 onSaveClient={onSaveClient}
                 plan={effectivePlan}
-                trialExpired={trialExpired}
-                trialQuotaReached={trialQuotaReached}
+                quotaReached={freemiumQuotaReached}
                 onPaywall={() => setScreen("paywall")}
                 setTab={setTab}
                 onOpenDevisPDF={(id) => { setAutoOpenPDF(id); goDevis(id); }}
@@ -466,7 +484,7 @@ export default function App() {
       {comptableOpen && (
         <SendToComptableModal user={user} onClose={() => setComptableOpen(false)}/>
       )}
-      <BottomNav items={NAV} activeNav={activeNav} onSelect={setTab} plan={effectivePlan} daysLeft={daysLeft}/>
+      <BottomNav items={NAV} activeNav={activeNav} onSelect={setTab} plan={effectivePlan} quotaReached={freemiumQuotaReached}/>
     </div>
   );
 }

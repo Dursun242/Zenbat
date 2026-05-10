@@ -29,7 +29,7 @@ const STATUS_LABELS = {
   paused:             { text: "En pause",             color: "#6b7280", bg: "#f9fafb", border: "#e5e7eb" },
 }
 
-export default function SubscriptionScreen({ isAdmin, daysLeft, plan, onBack }) {
+export default function SubscriptionScreen({ isAdmin, plan, billingCycle, onBack }) {
   const [info,    setInfo]    = useState(null)
   const [loading, setLoading] = useState(!isAdmin && plan === "pro")
   const [error,   setError]   = useState(null)
@@ -158,12 +158,12 @@ export default function SubscriptionScreen({ isAdmin, daysLeft, plan, onBack }) 
           </>
         )}
 
-        {/* ── Cas free / essai gratuit ─────────────────── */}
+        {/* ── Cas freemium permanent ───────────────────── */}
         {!isAdmin && plan !== "pro" && (
           <div style={s.card}>
-            <div style={s.row}><span style={s.label}>Statut</span><span style={s.value}>Essai gratuit</span></div>
-            <div style={s.row}><span style={s.label}>Jours restants</span><span style={s.value}>{daysLeft} jour{daysLeft > 1 ? "s" : ""}</span></div>
-            <p style={s.note}>Vous pouvez passer à Pro à tout moment depuis le bouton « Essai · {daysLeft}j » en haut de l'écran.</p>
+            <div style={s.row}><span style={s.label}>Statut</span><span style={s.value}>Freemium (gratuit à vie)</span></div>
+            <div style={s.row}><span style={s.label}>Quota</span><span style={s.value}>5 devis par semaine</span></div>
+            <p style={s.note}>Le compteur repart à zéro chaque lundi. Passez Pro pour des devis illimités et l'accès aux factures.</p>
           </div>
         )}
 

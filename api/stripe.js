@@ -92,6 +92,7 @@ async function handleWebhook(req, res, rawBody) {
 
     await admin.from('profiles').update({
       plan:                   'pro',
+      billing_cycle:          plan === 'biannual' ? 'biannual' : 'monthly',
       stripe_subscription_id: subscriptionId,
     }).eq('id', profile.id)
 
@@ -121,6 +122,7 @@ async function handleWebhook(req, res, rawBody) {
     if (profile) {
       await admin.from('profiles').update({
         plan:                   'free',
+        billing_cycle:          null,
         stripe_subscription_id: null,
       }).eq('id', profile.id)
       console.log(`[stripe webhook] subscription.deleted → user ${profile.id} plan=free`)

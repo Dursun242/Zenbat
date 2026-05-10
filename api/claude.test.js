@@ -129,14 +129,15 @@ describe("claude endpoint — plan, trial, rate-limit", () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it("renvoie 403 si la période d'essai est expirée (free + > 30j)", async () => {
+  it("autorise l'appel IA même pour un compte free ancien (freemium permanent)", async () => {
     const oldDate = new Date(Date.now() - 40 * 86_400_000).toISOString();
     authedUser({ created_at: oldDate });
     setupSupabaseProfile("free", 0);
     const res = makeRes();
     await handler(makeReq({ headers: { authorization: "Bearer t" } }), res);
-    expect(res.statusCode).toBe(403);
-    expect(res.body.error).toMatch(/Période d'essai/);
+    // Le statut ne doit pas être 403 « Période d'essai » : depuis la 0039,
+    // free = freemium permanent (limite à la création de devis, pas à l'IA).
+    expect(res.statusCode).not.toBe(403);
   });
 
   it("renvoie 429 si la limite journalière est atteinte (free=40)", async () => {

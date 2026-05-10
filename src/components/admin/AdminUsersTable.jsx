@@ -32,11 +32,8 @@ export default function AdminUsersTable({ users, userSearch, setUserSearch, sort
             </div>
             <div style={{ textAlign: "right", flexShrink: 0 }}>
               <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 20, display: "inline-block", background: u.plan === "pro" ? "rgba(34,197,94,.12)" : "#F0EBE3", color: u.plan === "pro" ? "#15803d" : "#6B6358" }}>
-                {u.plan === "pro" ? "PRO" : "FREE"}
+                {u.plan === "pro" ? "PRO" : "FREEMIUM"}
               </span>
-              {u.daysLeft !== null && u.daysLeft <= 10 && (
-                <div style={{ fontSize: 9, color: u.daysLeft <= 3 ? "#ef4444" : "#f59e0b", marginTop: 2, fontWeight: 600 }}>{u.daysLeft}j restants</div>
-              )}
             </div>
           </div>
 
