@@ -203,11 +203,50 @@ export default function PricingSection({ onSignup }) {
 
           <p style={{
             fontSize: 15, color: '#6B6358',
-            maxWidth: 420, margin: '0 auto', lineHeight: 1.7,
+            maxWidth: 460, margin: '0 auto', lineHeight: 1.7,
           }}>
-            Essai gratuit, sans carte bancaire.
-            Engagez-vous seulement quand vous êtes convaincu.
+            Forfait gratuit à vie — 5 devis par semaine, sans carte bancaire.
+            Passez Pro quand votre activité décolle.
           </p>
+        </div>
+
+        {/* ── Carte Freemium (gratuit à vie) ── */}
+        <div
+          className={visible ? 'ps-v1' : ''}
+          style={{
+            opacity: visible ? undefined : 0,
+            maxWidth: 720,
+            margin: '0 auto 28px',
+            background: '#FAF7F2',
+            border: '1.5px dashed #C97B5C',
+            borderRadius: 18,
+            padding: '18px 22px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            gap: 16, flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#C97B5C', letterSpacing: '.6px', textTransform: 'uppercase', marginBottom: 4 }}>
+              Forfait gratuit
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#1A1612', marginBottom: 4 }}>
+              5 devis par semaine · 0 €
+            </div>
+            <div style={{ fontSize: 13, color: '#6B6358', lineHeight: 1.5 }}>
+              Reset chaque lundi. Factures réservées au forfait Pro.
+            </div>
+          </div>
+          <button
+            onClick={onSignup}
+            style={{
+              padding: '11px 18px', borderRadius: 10,
+              border: '1.5px solid #1A1612', background: '#1A1612',
+              color: '#fff', fontSize: 13, fontWeight: 600,
+              cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+          >
+            Commencer gratuitement
+          </button>
         </div>
 
         {/* ── Toggle Mensuel / 6 mois ── */}

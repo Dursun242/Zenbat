@@ -238,7 +238,7 @@ export default function App() {
               <button
                 onClick={() => { setCheckoutError(null); setCheckoutPending(false); try { localStorage.removeItem('pending_checkout_plan') } catch {} }}
                 style={{ background: "#1A1612", color: "#fff", border: "none", borderRadius: 10, padding: "10px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                Continuer en essai gratuit
+                Continuer en freemium
               </button>
             </>
           )}
@@ -396,7 +396,7 @@ export default function App() {
           {tab === "devis"         && <DevisList devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} onDelete={onDeleteDevis}/>}
           {tab === "devis_detail"  && selD && (() => {
             const cur = devis.find(x => x.id === selD);
-            // Devis introuvable dans le state (ex. création bloquée par la limite d'essai)
+            // Devis introuvable dans le state (ex. création bloquée par le quota freemium)
             if (!cur) {
               if (loadingDevis.has(selD)) return <ScreenLoader />;
               return (
