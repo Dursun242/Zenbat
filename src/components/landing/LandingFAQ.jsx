@@ -18,8 +18,8 @@ const FAQ_ITEMS = [
     a: 'Oui, exportables à tout moment en un clic. Hébergement en France, RGPD strict. Vous restez propriétaire de vos données client et de vos documents.',
   },
   {
-    q: 'Que se passe-t-il après les 30 jours d\'essai ?',
-    a: 'Vous choisissez votre plan ou vous arrêtez. Aucun prélèvement automatique sans votre accord explicite. Zéro surprise.',
+    q: 'Comment fonctionne le forfait gratuit ?',
+    a: 'Vous créez jusqu\'à 5 devis par semaine, gratuitement et à vie. Le compteur repart à zéro chaque lundi. Aucune carte bancaire requise, aucun prélèvement automatique. Les factures sont réservées au forfait Pro.',
   },
   {
     q: 'Zenbat fonctionne-t-il sans connexion ?',

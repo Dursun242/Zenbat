@@ -58,6 +58,17 @@ export async function getMyProfile() {
   return data
 }
 
+// Compteur sticky : nombre de devis créés cette semaine ISO par l'utilisateur
+// connecté. Source de vérité côté DB (table devis_weekly_counters + trigger
+// après INSERT). Renvoie 0 si la RPC n'est pas (encore) disponible.
+export async function getDevisWeekCount() {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return 0
+  const { data, error } = await supabase.rpc('devis_week_count', { uid: user.id })
+  if (error) { console.warn('[devis_week_count]', error.message); return 0 }
+  return Number(data) || 0
+}
+
 export async function updateMyProfile(patch) {
   const { data: { user } } = await supabase.auth.getUser()
   const { data, error } = await supabase

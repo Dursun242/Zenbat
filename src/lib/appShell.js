@@ -1,15 +1,24 @@
 // Constantes et helpers de l'enveloppe App.
 
-export const TRIAL_DAYS = 30;
-export const TRIAL_DAILY_DEVIS_LIMIT = 5;
+export const FREEMIUM_WEEKLY_DEVIS_LIMIT = 5;
 
-// Compte les devis du state dont la création remonte à aujourd'hui (timezone locale).
-// NB : ne résiste pas à la suppression (un devis supprimé fait baisser le compte).
-// Utilisé en complément du compteur sticky localStorage via Math.max.
-export function countDevisToday(devis) {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const startMs = start.getTime();
+// Lundi 00:00 de la semaine ISO courante (timezone locale du navigateur).
+// On approxime Europe/Paris : pour un utilisateur français le résultat
+// coïncide ; la source de vérité reste public.current_week_start() côté DB.
+function isoWeekStart(date = new Date()) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  // getDay() : 0=dimanche, 1=lundi, …, 6=samedi → on veut 1..7 (lundi..dim).
+  const day = d.getDay() || 7;
+  if (day > 1) d.setDate(d.getDate() - (day - 1));
+  return d;
+}
+
+// Compte les devis du state dont la création remonte à la semaine ISO courante.
+// NB : ne résiste pas à la suppression. Utilisé en complément du compteur
+// sticky localStorage et du compteur DB (RPC devis_week_count) via Math.max.
+export function countDevisThisWeek(devis) {
+  const startMs = isoWeekStart().getTime();
   return (devis || []).reduce((n, d) => {
     if (!d?.created_at) return n;
     const t = new Date(d.created_at).getTime();
@@ -17,29 +26,29 @@ export function countDevisToday(devis) {
   }, 0);
 }
 
-// Compteur sticky par jour stocké en localStorage. Ne décrémente jamais à la
-// suppression (résiste au bypass "créer 5, supprimer, recréer"). Reset auto
-// au changement de date.
-const STICKY_COUNTER_KEY = "zenbat_devis_daily_counter";
+// Compteur sticky par semaine stocké en localStorage. Ne décrémente jamais à
+// la suppression (résiste au bypass "créer 5, supprimer, recréer"). Reset
+// auto au changement de semaine.
+const STICKY_COUNTER_KEY = "zenbat_devis_weekly_counter";
 
-function todayKey() {
-  const d = new Date();
+function weekKey() {
+  const d = isoWeekStart();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function readStickyDevisToday() {
+export function readStickyDevisThisWeek() {
   try {
     const raw = localStorage.getItem(STICKY_COUNTER_KEY);
     if (!raw) return 0;
     const parsed = JSON.parse(raw);
-    return parsed?.date === todayKey() ? Number(parsed.count) || 0 : 0;
+    return parsed?.week === weekKey() ? Number(parsed.count) || 0 : 0;
   } catch { return 0; }
 }
 
-export function bumpStickyDevisToday() {
-  const today = todayKey();
-  const next = readStickyDevisToday() + 1;
-  try { localStorage.setItem(STICKY_COUNTER_KEY, JSON.stringify({ date: today, count: next })); } catch {}
+export function bumpStickyDevisThisWeek() {
+  const week = weekKey();
+  const next = readStickyDevisThisWeek() + 1;
+  try { localStorage.setItem(STICKY_COUNTER_KEY, JSON.stringify({ week, count: next })); } catch {}
   return next;
 }
 

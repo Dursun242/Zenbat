@@ -3,7 +3,7 @@ import { STATUT_FACTURE } from "../lib/constants.js";
 import { fmt } from "../lib/utils.js";
 import Badge from "./ui/Badge.jsx";
 
-export default function InvoicesList({ invoices, clients, goInvoice, onCreateEmpty, onDelete }) {
+export default function InvoicesList({ invoices, clients, goInvoice, onCreateEmpty, onDelete, isFreemium = false, onPaywall = () => {} }) {
   const [filtre, setFiltre] = useState("tous");
   const [confirmDelete, setConfirmDelete] = useState(null);
   const filtered = filtre === "tous" ? invoices : invoices.filter(i => i.statut === filtre);
@@ -22,10 +22,18 @@ export default function InvoicesList({ invoices, clients, goInvoice, onCreateEmp
             {invoices.length} facture{invoices.length > 1 ? "s" : ""} · Facturation électronique 2026
           </p>
         </div>
-        <button onClick={onCreateEmpty}
-          style={{ background: "#1A1612", color: "white", border: "none", borderRadius: 12, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-          + Nouvelle
-        </button>
+        {isFreemium ? (
+          <button onClick={onPaywall}
+            title="Disponible en Pro — 9,50 €/mois"
+            style={{ background: "#E8E2D8", color: "#6B6358", border: "none", borderRadius: 12, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+            + Nouvelle · Pro
+          </button>
+        ) : (
+          <button onClick={onCreateEmpty}
+            style={{ background: "#1A1612", color: "white", border: "none", borderRadius: 12, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+            + Nouvelle
+          </button>
+        )}
       </div>
 
       <div style={{ display: "flex", gap: 6, marginBottom: 14, overflowX: "auto", paddingBottom: 4 }}>

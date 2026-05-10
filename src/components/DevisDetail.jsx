@@ -8,7 +8,7 @@ import PDFViewer from "./PDFViewer.jsx";
 import ClientPickerModal from "./app/ClientPickerModal.jsx";
 import DevisClientActions from "./DevisClientActions.jsx";
 
-export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChange, onConvertToInvoice, onCreateAcompte, onDuplicate, onCreateIndice, groupVersions = [], goDevis, loading, autoOpenPDF, onAutoOpenPDFConsumed }) {
+export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChange, onConvertToInvoice, onCreateAcompte, onDuplicate, onCreateIndice, groupVersions = [], goDevis, loading, autoOpenPDF, onAutoOpenPDFConsumed, isFreemium = false, onPaywall = () => {} }) {
   const [showPDF,        setShowPDF]        = useState(false);
   const [sending,        setSending]        = useState(false);
   const [signUrl,        setSignUrl]        = useState(d?.odoo_sign_url || null);
@@ -217,10 +217,18 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
                 </button>
               )}
               {onConvertToInvoice && lignes.length > 0 && (
-                <button onClick={onConvertToInvoice}
-                  style={{ background: "#FAF7F2", color: "#1A1612", border: "1px solid #E8E2D8", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-                  📄 Facturer
-                </button>
+                isFreemium ? (
+                  <button onClick={onPaywall}
+                    title="Disponible en Pro — 9,50 €/mois"
+                    style={{ background: "#F5F0E8", color: "#9A8E82", border: "1px solid #E8E2D8", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                    📄 Facturer · Pro
+                  </button>
+                ) : (
+                  <button onClick={onConvertToInvoice}
+                    style={{ background: "#FAF7F2", color: "#1A1612", border: "1px solid #E8E2D8", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                    📄 Facturer
+                  </button>
+                )
               )}
               {onCreateIndice && d.statut !== "accepte" && !isRemplace && (
                 <button onClick={onCreateIndice}

@@ -269,7 +269,6 @@ export default async function handler(req, res) {
   const startLast   = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   const start7      = new Date(now - 7  * 86400000)
   const start14     = new Date(now - 14 * 86400000)
-  const TRIAL_DAYS  = 30
 
   // ── Index rapides ────────────────────────────────────────────────────
   const authByProfileId = new Map((authUsers || []).map(u => [u.id, u]))
@@ -297,13 +296,22 @@ export default async function handler(req, res) {
   const activeUsers   = Object.keys(statsByOwner).length  // au moins 1 devis
   const mrr           = proUsers * 19  // 19€/mois HT
 
-  // Trial : utilisateurs dont l'essai se termine dans 7 jours
-  const trialEndingSoon = (profiles || []).filter(p => {
+  // Freemium au plafond : utilisateurs free qui ont créé >= 5 devis cette
+  // semaine (proches du paywall — cible prioritaire de relance commerciale).
+  const isoWeekStartMs = (() => {
+    const d = new Date()
+    d.setUTCHours(0, 0, 0, 0)
+    const day = d.getUTCDay() || 7
+    if (day > 1) d.setUTCDate(d.getUTCDate() - (day - 1))
+    return d.getTime()
+  })()
+  const freemiumAtCap = (profiles || []).filter(p => {
     if (p.plan === 'pro') return false
-    const auth = authByProfileId.get(p.id)
-    const created = new Date(auth?.created_at || p.created_at)
-    const daysLeft = TRIAL_DAYS - Math.floor((now - created) / 86400000)
-    return daysLeft >= 0 && daysLeft <= 7
+    const s = statsByOwner[p.id]
+    if (!s?.lastDevis) return false
+    // Approximation : devis du owner dont la création est >= début de semaine ISO.
+    const recent = (allDevis || []).filter(d => d.owner_id === p.id && new Date(d.created_at).getTime() >= isoWeekStartMs).length
+    return recent >= 5
   }).length
 
   // ── Devis : stats globales ───────────────────────────────────────────
@@ -334,8 +342,6 @@ export default async function handler(req, res) {
     .map(p => {
       const auth    = authByProfileId.get(p.id)
       const stats   = statsByOwner[p.id] || { total: 0, accepte: 0, ca: 0, lastDevis: null }
-      const created = new Date(auth?.created_at || p.created_at)
-      const daysLeft = Math.max(0, TRIAL_DAYS - Math.floor((now - created) / 86400000))
       const metaFull = (auth?.user_metadata?.full_name || '').trim()
       const fullName = (p.full_name || metaFull || '').trim()
       return {
@@ -351,7 +357,6 @@ export default async function handler(req, res) {
         devisTotal:   stats.total,
         devisAccepte: stats.accepte,
         caTotal:      stats.ca,
-        daysLeft:     p.plan === 'pro' ? null : daysLeft,
         txConv:       stats.total ? Math.round((stats.accepte / stats.total) * 100) : 0,
         byStatut: {
           brouillon:    stats.brouillon    || 0,
@@ -367,7 +372,7 @@ export default async function handler(req, res) {
     users: {
       total: totalUsers, pro: proUsers, free: totalUsers - proUsers,
       newThisMonth, newLastMonth, newLast7, totalAiUsed,
-      activeUsers, mrr, trialEndingSoon,
+      activeUsers, mrr, freemiumAtCap,
     },
     devis: {
       total: totalDevis, byStatut, caAccepte, caEnCours,

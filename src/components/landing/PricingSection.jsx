@@ -10,6 +10,13 @@ const FEATURES = [
   'Support par email',
 ]
 
+const FEATURES_FREE = [
+  '5 devis par semaine',
+  'Dictée vocale 12 langues',
+  'Multi-appareils (iOS, Android, Mac, Windows, web)',
+  'Support par email',
+]
+
 function CheckIcon() {
   return (
     <svg
@@ -203,10 +210,10 @@ export default function PricingSection({ onSignup }) {
 
           <p style={{
             fontSize: 15, color: '#6B6358',
-            maxWidth: 420, margin: '0 auto', lineHeight: 1.7,
+            maxWidth: 460, margin: '0 auto', lineHeight: 1.7,
           }}>
-            Essai gratuit, sans carte bancaire.
-            Engagez-vous seulement quand vous êtes convaincu.
+            Forfait gratuit à vie — 5 devis par semaine, sans carte bancaire.
+            Passez Pro quand votre activité décolle.
           </p>
         </div>
 
@@ -294,6 +301,90 @@ export default function PricingSection({ onSignup }) {
           }}
         >
 
+          {/* ── Carte Freemium (gratuit à vie) ── */}
+          <div
+            className="ps-card ps-card-plain"
+            style={{
+              flex:        1,
+              background:  '#fff',
+              border:      '1.5px solid #E4DAD0',
+              borderRadius: 24,
+              padding:     '32px 28px',
+              boxShadow:   '0 2px 12px rgba(26,22,18,.04)',
+              display:     'flex', flexDirection: 'column',
+            }}
+          >
+            <div style={{ marginBottom: 24 }}>
+              <span style={{
+                display:    'inline-block',
+                background: 'rgba(107,99,88,.08)', color: '#6B6358',
+                fontSize: 10.5, fontWeight: 700,
+                padding: '3px 10px', borderRadius: 8,
+                letterSpacing: '.6px', textTransform: 'uppercase',
+                marginBottom: 16,
+              }}>
+                Gratuit à vie
+              </span>
+
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+                <span style={{
+                  fontFamily:    "'Syne', sans-serif",
+                  fontSize:      52,
+                  fontWeight:    700,
+                  color:         '#1A1612',
+                  letterSpacing: '-2px',
+                  lineHeight:    1,
+                }}>
+                  0 €
+                </span>
+                <span style={{ fontSize: 13, color: '#9A9088' }}>/mois</span>
+              </div>
+
+              <div style={{ fontSize: 13, color: '#9A9088', marginTop: 7 }}>
+                5 devis par semaine · reset chaque lundi
+              </div>
+            </div>
+
+            <ul style={{
+              listStyle: 'none', flex: 1,
+              display: 'flex', flexDirection: 'column', gap: 10,
+              marginBottom: 28,
+            }}>
+              {FEATURES_FREE.map(f => (
+                <li key={f} style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 9,
+                  fontSize: 13.5, color: '#3D3832', lineHeight: 1.5,
+                }}>
+                  <CheckIcon />{f}
+                </li>
+              ))}
+              <li style={{
+                display: 'flex', alignItems: 'flex-start', gap: 9,
+                fontSize: 12.5, color: '#9A9088', lineHeight: 1.5, marginTop: 4,
+                fontStyle: 'italic',
+              }}>
+                Factures, Factur-X, signature : réservées au Pro
+              </li>
+            </ul>
+
+            <div>
+              <button
+                onClick={onSignup}
+                style={{
+                  width: '100%', padding: '13px 0', borderRadius: 12,
+                  border: '1.5px solid #1A1612', background: '#1A1612',
+                  color: '#fff', fontSize: 14, fontWeight: 600,
+                  cursor: 'pointer', transition: 'all .2s', marginBottom: 8,
+                }}
+              >
+                Commencer gratuitement
+              </button>
+              <p style={{ textAlign: 'center', fontSize: 11, color: '#B0A898', margin: '0 0 10px' }}>
+                Aucune carte bancaire requise
+              </p>
+            </div>
+          </div>
+
           {/* ── Carte Mensuel ── */}
           <div
             className="ps-card ps-card-plain"
@@ -316,7 +407,7 @@ export default function PricingSection({ onSignup }) {
                 letterSpacing: '.6px', textTransform: 'uppercase',
                 marginBottom: 16,
               }}>
-                Testez librement
+                Pro mensuel
               </span>
 
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
@@ -424,7 +515,7 @@ export default function PricingSection({ onSignup }) {
                 letterSpacing: '.6px', textTransform: 'uppercase',
                 marginBottom: 16,
               }}>
-                Le plus choisi
+                Pro 6 mois
               </span>
 
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>

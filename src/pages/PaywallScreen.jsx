@@ -43,12 +43,11 @@ const PLANS = {
 
 const DEFAULT_AVG_DEVIS = 1_200; // € HT — valeur artisan BTP si aucun historique
 
-export default function PaywallScreen({ daysLeft = 0, quotaReached = false, onBack }) {
+export default function PaywallScreen({ quotaReached = false, weekCount = 0, weekLimit = 5, onBack }) {
   const [billing,  setBilling]  = useState("biannual");
   const [loading,  setLoading]  = useState(false);
   const [ctaError, setCtaError] = useState(null);
   const [myStats,  setMyStats]  = useState(null); // { count, ca, avg }
-  const expired = daysLeft <= 0;
   const plan    = PLANS[billing];
 
   useEffect(() => {
@@ -102,19 +101,22 @@ export default function PaywallScreen({ daysLeft = 0, quotaReached = false, onBa
 
         {/* Titre */}
         <h2 style={{ color: "white", fontSize: 20, fontWeight: 600, marginBottom: 8, fontFamily: "'Syne', sans-serif", letterSpacing: '-0.3px' }}>
-          {expired
-            ? "Période d'essai terminée"
-            : quotaReached
-              ? "5 devis créés aujourd'hui"
-              : `Encore ${daysLeft} jour${daysLeft > 1 ? "s" : ""} d'essai`}
+          {quotaReached
+            ? `Limite de ${weekLimit} devis atteinte`
+            : "Passez Pro"}
         </h2>
         <p style={{ color: "#6B6358", fontSize: 13, marginBottom: 24, lineHeight: 1.6 }}>
-          {expired
-            ? "Passez à Pro pour continuer à créer des devis avec l'Agent IA, le PDF brandé et l'envoi en signature."
-            : quotaReached
-              ? "La limite est de 5 devis par jour en période d'essai. Elle se recharge chaque jour à minuit — ou passez Pro pour un nombre illimité."
-              : "Passez à Pro à tout moment pour débloquer toutes les fonctionnalités sans limite."}
+          {quotaReached
+            ? `Vous avez utilisé vos ${weekLimit} devis offerts cette semaine. Le compteur repart à zéro lundi prochain — ou passez Pro maintenant pour un nombre illimité.`
+            : `Le forfait gratuit vous permet de créer ${weekLimit} devis par semaine. Passez Pro pour des devis illimités, les factures et la conformité 2026.`}
         </p>
+
+        {/* Indicateur usage hebdo (freemium uniquement) */}
+        {weekCount > 0 && !quotaReached && (
+          <p style={{ color: "#9A8E82", fontSize: 11, marginBottom: 12 }}>
+            {weekCount}/{weekLimit} devis créés cette semaine
+          </p>
+        )}
 
         {/* Bandeau personnalisé — données du mois courant */}
         {myStats && myStats.count > 0 && (() => {
@@ -122,7 +124,7 @@ export default function PaywallScreen({ daysLeft = 0, quotaReached = false, onBa
           const fmtEur = n => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
           return (
             <div style={{ background: "#2A231C", border: "1px solid #3D3028", borderRadius: 16, padding: "14px 16px", marginBottom: 16, textAlign: "left" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#6B6358", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 }}>Ce mois-ci avec l'essai</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#6B6358", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 }}>Ce mois-ci en freemium</div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                 <span style={{ fontSize: 12, color: "#9A8E82" }}>Devis créés</span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "white" }}>{myStats.count}</span>
@@ -227,7 +229,9 @@ export default function PaywallScreen({ daysLeft = 0, quotaReached = false, onBa
           </p>
         </div>
 
-        <button onClick={onBack} style={{ background: "none", border: "none", color: "#6B6358", fontSize: 12, cursor: "pointer" }}>← Retour</button>
+        <button onClick={onBack} style={{ background: "none", border: "none", color: "#6B6358", fontSize: 12, cursor: "pointer" }}>
+          {quotaReached ? "Continuer en freemium (5 devis/semaine)" : "← Retour"}
+        </button>
       </div>
     </div>
   );

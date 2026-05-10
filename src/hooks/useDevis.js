@@ -9,9 +9,9 @@ import {
 } from "../lib/api";
 import { uid } from "../lib/utils.js";
 import { DEMO_DEVIS } from "../lib/constants.js";
-import { TRIAL_DAILY_DEVIS_LIMIT, countDevisToday } from "../lib/appShell.js";
+import { FREEMIUM_WEEKLY_DEVIS_LIMIT, countDevisThisWeek } from "../lib/appShell.js";
 
-export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, setTab, effectivePlan, daysLeft, stickyDevisToday = 0, onDevisCreated = () => {}, isAdmin = false }) {
+export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, setTab, effectivePlan, weekCount = 0, stickyDevisThisWeek = 0, onDevisCreated = () => {}, onQuotaReached = () => {}, isAdmin = false }) {
   const [devis,        setDevis]        = useState(DEMO_DEVIS);
   const [selD,         setSelD]         = useState(null);
   const [loadingDevis, setLoadingDevis] = useState(new Set());
@@ -51,11 +51,11 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
   };
 
   const onCreateDevis = async (d) => {
-    // Limite essai : MAX(compteur sticky localStorage, count du state) — résiste
-    // au bypass "créer 5 puis supprimer puis recréer". Admin toujours exempté.
-    const todayCount = Math.max(stickyDevisToday, countDevisToday(devis));
-    if (user && !isAdmin && effectivePlan === "free" && daysLeft > 0 && todayCount >= TRIAL_DAILY_DEVIS_LIMIT) {
-      showErr(`Limite de ${TRIAL_DAILY_DEVIS_LIMIT} devis/jour atteinte en période d'essai. Passez Pro pour un nombre illimité.`);
+    // Limite freemium : MAX(compteur DB, compteur sticky localStorage, count du state) —
+    // résiste au bypass "créer 5 puis supprimer puis recréer". Admin toujours exempté.
+    const wkCount = Math.max(weekCount, stickyDevisThisWeek, countDevisThisWeek(devis));
+    if (user && !isAdmin && effectivePlan === "free" && wkCount >= FREEMIUM_WEEKLY_DEVIS_LIMIT) {
+      onQuotaReached();
       return false;
     }
     const dStamped = { ...d, created_at: d.created_at || new Date().toISOString() };
@@ -84,9 +84,11 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
       // Rollback de l'ajout optimiste pour ne pas laisser un devis fantôme dans le state
       setDevis(prev => prev.filter(x => x.id !== d.id));
       const isRlsBlock = err?.code === "42501" || /row-level security|new row violates/i.test(err?.message || "");
-      showErr(isRlsBlock
-        ? `Limite de ${TRIAL_DAILY_DEVIS_LIMIT} devis/jour atteinte en période d'essai. Passez Pro pour un nombre illimité.`
-        : "Erreur lors de l'enregistrement du devis");
+      if (isRlsBlock) {
+        onQuotaReached();
+        return false;
+      }
+      showErr("Erreur lors de l'enregistrement du devis");
       return false;
     }
   };
@@ -142,9 +144,9 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
 
   const onCreateIndice = async (sourceId) => {
     if (!user) { showErr("Vous devez être connecté."); return; }
-    const todayCount = Math.max(stickyDevisToday, countDevisToday(devis));
-    if (!isAdmin && effectivePlan === "free" && daysLeft > 0 && todayCount >= TRIAL_DAILY_DEVIS_LIMIT) {
-      showErr(`Limite de ${TRIAL_DAILY_DEVIS_LIMIT} devis/jour atteinte en période d'essai. Passez Pro pour un nombre illimité.`);
+    const wkCount = Math.max(weekCount, stickyDevisThisWeek, countDevisThisWeek(devis));
+    if (!isAdmin && effectivePlan === "free" && wkCount >= FREEMIUM_WEEKLY_DEVIS_LIMIT) {
+      onQuotaReached();
       return;
     }
     try {
