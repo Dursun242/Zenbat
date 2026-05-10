@@ -119,8 +119,6 @@ export default function PricingSection({ onSignup }) {
         }
 
         @media (max-width: 680px) {
-          /* Carte mise en avant en premier sur mobile */
-          .ps-cards { flex-direction: column-reverse !important; }
           /* Toggle TTC centré sur mobile */
           .ps-ttc-row { justify-content: center !important; }
         }
