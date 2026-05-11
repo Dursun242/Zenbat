@@ -245,7 +245,10 @@ export async function createIndiceDevis(source) {
 
 export async function createDevis(devis, lignes = []) {
   const { data: { user } } = await supabase.auth.getUser()
-  let payload = { ...devis, owner_id: user.id }
+  // Strip des colonnes droppées par la migration 0040 (Odoo Sign) au cas
+  // où un ancien bundle PWA encore en cache continue de les envoyer.
+  const { odoo_sign_url, odoo_sign_id, ...clean } = devis
+  let payload = { ...clean, owner_id: user.id }
   let d, error
   // Retry jusqu'à 10× en cas de collision sur le numéro unique (owner_id, numero)
   for (let attempt = 0; attempt < 10; attempt++) {
@@ -279,13 +282,15 @@ export async function createDevis(devis, lignes = []) {
 }
 
 export async function updateDevis(id, patch) {
+  // Strip défensif : voir createDevis pour le contexte.
+  const { odoo_sign_url, odoo_sign_id, ...cleanPatch } = patch
   const { data, error } = await supabase
-    .from('devis').update(patch).eq('id', id).select().single()
+    .from('devis').update(cleanPatch).eq('id', id).select().single()
   if (!error) return data
   // Fallback : colonne inexistante (migration 0007 pas appliquée). On retire
   // les champs optionnels ajoutés tardivement et on retente.
   if (error.code === '42703') {
-    const { signed_at, signed_by, ...safe } = patch
+    const { signed_at, signed_by, ...safe } = cleanPatch
     const { data: d2, error: e2 } = await supabase
       .from('devis').update(safe).eq('id', id).select().single()
     if (!e2) return d2
