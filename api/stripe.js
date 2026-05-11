@@ -257,9 +257,10 @@ async function handleAction(req, res, rawBody) {
 
     return res.status(200).json({ url: session.url })
   } catch (err) {
+    // On loggue le détail côté serveur mais ne renvoie qu'un message
+    // générique au client (évite la fuite d'IDs / config Stripe).
     console.error('[stripe checkout] error:', err)
-    const message = err?.raw?.message || err?.message || 'Erreur interne Stripe'
-    return res.status(500).json({ error: message, code: err?.code || err?.type || null })
+    return res.status(500).json({ error: 'Erreur interne lors de la création de la session Stripe' })
   }
 }
 

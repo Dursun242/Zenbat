@@ -1,6 +1,12 @@
 import { useState, useRef, useEffect } from "react"
 import { fmt, fmtD } from "../lib/utils.js"
 
+// Délais pour stabiliser la mesure de hauteur après changement de scale ;
+// le 1er essai capture le 1er layout, le 2nd attrape les ajustements
+// post-render (polices chargées, ResizeObserver, etc.).
+const MEASURE_DELAY_MS      = 50
+const PAGE_READY_DELAY_MS   = 400
+
 const Ix = {
   pdf:  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><path d="M8 13h8M8 17h5"/></svg>,
   x:    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
@@ -47,7 +53,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
       setPageH(h * scale)
     }
     measure()
-    const id = setTimeout(measure, 50)
+    const id = setTimeout(measure, MEASURE_DELAY_MS)
     return () => clearTimeout(id)
   }, [scale, d.numero, hidden])
 
@@ -59,7 +65,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
         firedReadyRef.current = true
         onPageReady(pageRef.current)
       }
-    }, 400)
+    }, PAGE_READY_DELAY_MS)
     return () => clearTimeout(id)
   }, [onPageReady])
 

@@ -219,8 +219,12 @@ async function handleAction(req, res, raw) {
           .eq("invoice_id", invoice_id)
           .order("position");
 
+        // Récupération du client avec vérification d'ownership : on filtre
+        // sur owner_id pour éviter qu'une facture pointant (par bug) vers
+        // un client d'un autre utilisateur ne fuite ses coordonnées dans
+        // le payload envoyé à B2Brouter.
         const { data: client } = inv.client_id
-          ? await admin.from("clients").select("*").eq("id", inv.client_id).maybeSingle()
+          ? await admin.from("clients").select("*").eq("id", inv.client_id).eq("owner_id", user.id).maybeSingle()
           : { data: null };
 
         const b2bPayload = buildInvoicePayload({ inv, lignes, client, account });

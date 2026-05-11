@@ -80,10 +80,8 @@ export default async function handler(req, res) {
 
   const { ODOO_URL, ODOO_DB, ODOO_USERNAME, ODOO_API_KEY } = process.env;
   if (!ODOO_URL || !ODOO_DB || !ODOO_USERNAME || !ODOO_API_KEY) {
-    return res.status(500).json({
-      error: "Configuration Odoo manquante",
-      detail: "ODOO_URL, ODOO_DB, ODOO_USERNAME, ODOO_API_KEY doivent être définis.",
-    });
+    console.error("[odoo-sign] env manquant — vérifier ODOO_URL/ODOO_DB/ODOO_USERNAME/ODOO_API_KEY");
+    return res.status(500).json({ error: "Configuration serveur incomplète" });
   }
 
   try {
