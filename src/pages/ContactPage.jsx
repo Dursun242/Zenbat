@@ -127,21 +127,27 @@ export default function ContactPage() {
     <div style={{ minHeight: '100vh', background: C.cream, fontFamily: 'Inter, system-ui, sans-serif', color: C.ink }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700&family=DM+Sans:wght@400;600;700&display=swap');*{box-sizing:border-box;margin:0;padding:0}`}</style>
 
-      {/* Nav */}
-      <nav style={{ borderBottom: `1px solid ${C.border}`, background: 'white', padding: '0 24px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <a href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.terra }}>Zen</span>
-          <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.ink }}>bat</span>
-        </a>
-        <a
-          href="/"
-          style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: 13, color: C.muted, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
-        >
-          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <polyline points="15 18 9 12 15 6"/>
-          </svg>
-          Retour
-        </a>
+      {/* Nav — même style que LandingNav */}
+      <nav style={{ position: 'sticky', top: 0, zIndex: 1000, height: 64, background: C.cream, borderBottom: `1px solid ${C.border}`, fontFamily: "Inter, 'DM Sans', system-ui, sans-serif" }}>
+        <div style={{ maxWidth: 1120, margin: '0 auto', height: '100%', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <a href="/" aria-label="Zenbat — retour à l'accueil" style={{ textDecoration: 'none', flexShrink: 0 }}>
+            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 400, letterSpacing: '-.5px', lineHeight: 1 }}>
+              <span style={{ color: C.terra }}>Zen</span>
+              <span style={{ color: C.ink }}>bat</span>
+            </span>
+          </a>
+          <a
+            href="/"
+            style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: 14, fontWeight: 500, color: C.muted, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6, transition: 'color .18s' }}
+            onMouseEnter={e => e.currentTarget.style.color = C.ink}
+            onMouseLeave={e => e.currentTarget.style.color = C.muted}
+          >
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            Retour
+          </a>
+        </div>
       </nav>
 
       {/* Main */}
