@@ -80,7 +80,7 @@ function Textarea({ value, onChange, placeholder, focused, onFocus, onBlur, hasE
 }
 
 export default function ContactPage() {
-  const [form, setForm]     = useState({ name: '', email: '', subject: '', message: '' })
+  const [form, setForm]     = useState({ name: '', email: '', subject: '', message: '', website: '' })
   const [focus, setFocus]   = useState({})
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState('idle')
@@ -114,6 +114,7 @@ export default function ContactPage() {
           name:    form.name.trim(),
           email:   form.email.trim(),
           message: `Objet : ${form.subject.trim()}\n\n${form.message.trim()}`,
+          website: form.website,
         }),
       })
       setStatus(res.ok ? 'ok' : 'error')
@@ -206,6 +207,17 @@ export default function ContactPage() {
                 hasError={!!errors.message}
               />
             </Field>
+
+            {/* Honeypot — invisible pour les humains, rempli par les bots */}
+            <input
+              type="text"
+              value={form.website}
+              onChange={set('website')}
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+              style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }}
+            />
 
             {status === 'error' && (
               <p style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: 13, color: '#DC2626' }}>

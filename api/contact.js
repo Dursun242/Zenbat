@@ -8,7 +8,10 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const { name, email, message } = req.body ?? {}
+  const { name, email, message, website } = req.body ?? {}
+
+  // Honeypot : un humain laisse ce champ vide, un bot le remplit
+  if (website) return res.status(200).json({ ok: true })
 
   const nameStr    = typeof name    === 'string' ? name.trim()    : ''
   const emailStr   = typeof email   === 'string' ? email.trim()   : ''
