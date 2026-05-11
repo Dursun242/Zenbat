@@ -1,7 +1,7 @@
 // Page publique client — accès devis sans authentification Supabase
 // GET  ?token=xxx                 → aperçu (avant OTP) ou données complètes (après OTP)
 // POST {action:'send'}            → artisan envoie le devis par email (auth JWT requise)
-// POST {action:'request_otp'}     → envoie code 6 chiffres à l'email du client
+// POST {action:'request_otp'}     → envoie code 8 chiffres à l'email du client
 // POST {action:'verify_otp'}      → vérifie le code, ouvre la session 24h
 // POST {action:'accept'}          → client accepte (session OTP requise)
 // POST {action:'refuse'}          → client refuse avec raison (session OTP requise)
@@ -10,7 +10,8 @@
 
 import { cors }         from './_cors.js'
 import { authenticate } from './_withAuth.js'
-import { createHash }   from 'crypto'
+import { rateLimit, sendRateLimited } from './_rateLimit.js'
+import { createHash, randomInt } from 'crypto'
 import { createClient } from '@supabase/supabase-js'
 
 function makeAdmin() {
@@ -21,7 +22,9 @@ function makeAdmin() {
 }
 
 const hashStr = s => createHash('sha256').update(String(s)).digest('hex')
-const genOtp  = () => Math.floor(100000 + Math.random() * 900000).toString()
+// 8 chiffres via crypto.randomInt (CSPRNG) — 10⁸ combinaisons,
+// soit ~33 ans à brute-forcer même avec 10 essais/15 min.
+const genOtp  = () => randomInt(10_000_000, 100_000_000).toString()
 const fmtEur  = n => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n || 0)
 
 async function sendEmail({ to, subject, html, cc, fromName, attachments }) {
@@ -443,6 +446,9 @@ export default async function handler(req, res) {
 
   // ── request_otp ────────────────────────────────────────────────────────
   if (action === 'request_otp') {
+    const rl = rateLimit(req, { windowMs: 15 * 60_000, max: 10, prefix: 'otp' })
+    if (!rl.ok) return sendRateLimited(res, rl.retryAfterSec)
+
     const { email } = body
     if (!email) return res.status(400).json({ error: 'email manquant' })
 

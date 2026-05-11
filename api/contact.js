@@ -1,5 +1,6 @@
 import { cors } from './_cors.js'
 import { sendEmail } from './_email.js'
+import { rateLimit, sendRateLimited } from './_rateLimit.js'
 
 const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/
 
@@ -7,6 +8,9 @@ export default async function handler(req, res) {
   cors(req, res, { methods: 'POST, OPTIONS', auth: false })
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+
+  const rl = rateLimit(req, { windowMs: 60 * 60_000, max: 5, prefix: 'contact' })
+  if (!rl.ok) return sendRateLimited(res, rl.retryAfterSec)
 
   const { name, email, message, website } = req.body ?? {}
 

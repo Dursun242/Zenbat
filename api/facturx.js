@@ -351,18 +351,20 @@ export default async function handler(req, res) {
   const { user, admin } = auth;
 
   const { pdf_base64, invoice, client, brand, sourceInvoice } = req.body || {};
-  if (!pdf_base64 || !invoice) return res.status(400).json({ error: "pdf_base64 et invoice requis" });
-
-  // Vérification propriété de la facture (si elle existe en base)
-  if (invoice.id) {
-    const { data: row } = await admin
-      .from("invoices")
-      .select("id")
-      .eq("id", invoice.id)
-      .eq("owner_id", user.id)
-      .maybeSingle();
-    if (!row) return res.status(403).json({ error: "Accès refusé à cette facture" });
+  if (!pdf_base64 || !invoice?.id) {
+    return res.status(400).json({ error: "pdf_base64 et invoice.id requis" });
   }
+
+  // Vérification propriété : on exige toujours une facture persistée
+  // et appartenant à l'utilisateur. Sans ce check, l'endpoint deviendrait
+  // un proxy Factur-X non authentifié pour n'importe quel PDF.
+  const { data: row } = await admin
+    .from("invoices")
+    .select("id")
+    .eq("id", invoice.id)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!row) return res.status(403).json({ error: "Accès refusé à cette facture" });
 
   try {
     const pdfBytes = Uint8Array.from(Buffer.from(pdf_base64, "base64"));

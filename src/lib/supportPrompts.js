@@ -22,14 +22,13 @@ FAQ ZENBAT :
 ▸ Devis
 - Le devis est créé via l'onglet "Devis" → bouton "+" ou via l'Agent IA (saisie vocale ou texte).
 - Un devis verrouillé (signé ou converti en facture) ne peut plus être modifié.
-- L'envoi par email du devis se fait depuis le détail du devis ; l'envoi avec signature
-  électronique passe par Odoo Sign si activé.
+- L'envoi par email du devis se fait depuis le détail du devis (lien public avec OTP).
 
 ▸ Facturation
 - Les factures sont créées depuis un devis accepté ("Convertir en facture") ou directement
   via l'onglet "Factures".
 - Une fois la facture émise, elle est verrouillée (obligation légale française).
-- Pour les factures électroniques (B2B), l'envoi passe par B2Brouter.
+- L'export Factur-X (PDF/A-3 avec XML CII embarqué) est disponible depuis le détail facture.
 
 ▸ Abonnement et paywall
 - L'essai gratuit est de 30 jours. Au-delà, il faut un abonnement Pro.

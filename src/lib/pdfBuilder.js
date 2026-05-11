@@ -489,7 +489,7 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
 
     if (isSigned) {
       txt(pdf, signerLabel,                                X,   y + 5,  { size: 10, bold: true, color: GREEN });
-      txt(pdf, "✓ Signé électroniquement via Odoo Sign", X, y + 10, { size: 7, color: GREEN });
+      txt(pdf, "✓ Signé électroniquement", X, y + 10, { size: 7, color: GREEN });
       hline(pdf, X, X + sigW, y + 13, GREEN);
       txt(pdf, fmtD(d.signed_at), dtX, y + 5, { size: 10, bold: true, color: GREEN });
       hline(pdf, dtX, dtX + dtW - 5, y + 13, GREEN);

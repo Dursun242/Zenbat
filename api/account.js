@@ -7,6 +7,9 @@ import { cors } from "./_cors.js"
 import { authenticate, notifyTelegram } from "./_withAuth.js"
 import { sendEmail } from "./_email.js"
 
+// Regex RFC 5322 simplifiée, alignée sur contact.js / newsletter.js
+const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/
+
 export default async function handler(req, res) {
   cors(req, res, { methods: "GET, POST, OPTIONS" })
   if (req.method === 'OPTIONS') return res.status(204).end()
@@ -219,7 +222,7 @@ async function handleSendComptable({ req, res, user, admin }) {
       .eq('id', user.id).maybeSingle()
 
     let comptableEmail = (bodyEmail || profile?.comptable_email || '').trim()
-    if (!comptableEmail || !/^\S+@\S+\.\S+$/.test(comptableEmail)) {
+    if (!comptableEmail || comptableEmail.length > 254 || !EMAIL_RE.test(comptableEmail)) {
       return res.status(400).json({ error: 'Email du comptable invalide' })
     }
 
