@@ -205,7 +205,7 @@ export default function LandingHero({ onSignup }) {
               initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.04, ease: [.16,1,.3,1] }}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(201,123,92,.10)', border: '1px solid rgba(201,123,92,.22)', borderRadius: 20, padding: '6px 14px' }}>
-              <span style={{ fontSize: 13 }}>🇫🇷</span>
+              <svg width="18" height="13" viewBox="0 0 18 13" style={{ borderRadius: 2, flexShrink: 0 }}><rect width="6" height="13" fill="#002395"/><rect x="6" width="6" height="13" fill="#fff"/><rect x="12" width="6" height="13" fill="#ED2939"/></svg>
               <span style={{ color: '#C97B5C', fontSize: 11, fontWeight: 600, letterSpacing: '.6px' }}>1ʳᵉ APP FRANÇAISE · DEVISEUR ASSISTANT IA</span>
             </motion.div>
 
@@ -213,7 +213,7 @@ export default function LandingHero({ onSignup }) {
               initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.08, ease: [.16,1,.3,1] }}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(26,22,18,.05)', border: '1px solid rgba(26,22,18,.10)', borderRadius: 20, padding: '6px 14px' }}>
-              <span style={{ fontSize: 13 }}>🇫🇷</span>
+              <svg width="18" height="13" viewBox="0 0 18 13" style={{ borderRadius: 2, flexShrink: 0 }}><rect width="6" height="13" fill="#002395"/><rect x="6" width="6" height="13" fill="#fff"/><rect x="12" width="6" height="13" fill="#ED2939"/></svg>
               <span style={{ color: '#3D3832', fontSize: 11, fontWeight: 600, letterSpacing: '.6px' }}>FACTURATION ÉLECTRONIQUE · CONFORME LÉGISLATION FRANÇAISE</span>
             </motion.div>
           </div>
