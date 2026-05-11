@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react"
 import { searchTrades, tradesLabels, TRADE_EXAMPLES } from "../lib/trades.js"
 import { brandCompleteness } from "../lib/brandCompleteness.js"
 import { supabase } from "../lib/supabase.js"
+import { getToken } from "../lib/getToken.js"
 import { Icheck, Iimg, Logo, Field, FONTS, COLORS, STEPS } from "../components/onboarding/shared.jsx"
 import DeleteAccountModal from "../components/onboarding/DeleteAccountModal.jsx"
 
@@ -40,10 +41,10 @@ export default function Onboarding({ brand, setBrand, onDone }) {
   const exportMyData = async () => {
     setExportBusy(true); setExportMsg(null)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) throw new Error("Vous devez être connecté.")
+      const token = await getToken()
+      if (!token) throw new Error("Vous devez être connecté.")
       const res = await fetch("/api/account", {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -67,11 +68,11 @@ export default function Onboarding({ brand, setBrand, onDone }) {
   const deleteMyAccount = async () => {
     setDeleteBusy(true); setDeleteError(null)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) throw new Error("Session expirée — reconnectez-vous.")
+      const token = await getToken()
+      if (!token) throw new Error("Session expirée — reconnectez-vous.")
       const res = await fetch("/api/account", {
         method:  "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body:    JSON.stringify({ confirmEmail: deleteConfirm }),
       })
       const data = await res.json().catch(() => ({}))

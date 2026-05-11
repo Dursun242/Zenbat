@@ -9,13 +9,13 @@ Stack : React + Vite (frontend) · Vercel Serverless Functions (API) · Supabase
 
 ### Vercel : limite 12 fonctions serverless
 Le plan Hobby de Vercel autorise **maximum 12 fichiers** dans `/api/`.
-Fichiers actuels (10/12 — `_cors.js` est un helper non déployé, `*.test.js` ignorés, `fonts/` est un dossier d'assets) :
+Fichiers actuels (12/12 — limite atteinte ; les helpers `_cors.js`, `_email.js`, `_withAuth.js` ne comptent pas, `*.test.js` ignorés via `.vercelignore`, `fonts/` est un dossier d'assets) :
 ```
 account.js             admin-delete-user.js   admin-stats.js     admin-user-detail.js
-b2brouter.js           claude.js              facturx.js         newsletter.js
-odoo-sign.js           stripe.js
+b2brouter.js           claude.js              contact.js         devis-public.js
+facturx.js             newsletter.js          odoo-sign.js       stripe.js
 ```
-→ Ne jamais créer un nouveau fichier `/api/` sans en supprimer un autre ou fusionner des endpoints.
+→ **Limite atteinte** : ne plus créer aucun nouveau fichier `/api/` sans en supprimer un autre ou fusionner des endpoints.
 
 **Convention de fusion** : quand on doit fusionner des endpoints, on regroupe par domaine (Stripe, B2Brouter…) dans un seul fichier qui route en interne :
 - soit par méthode HTTP (`account.js` : GET = export, POST = suppression)
@@ -30,8 +30,8 @@ Les fichiers dans `/supabase/migrations/` ne s'appliquent **pas automatiquement*
 L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - Prévenir l'utilisateur à chaque nouvelle migration créée.
 - Dernière migration appliquée : `0038_invoice_auto_liquidation.sql`
-- Aucune migration en attente.
-- Prochaine migration : préfixer avec `0039_`.
+- Migration présente sur disque mais à confirmer côté prod : `0039_freemium_weekly_limit.sql` (bascule essai 30 j → freemium hebdomadaire ; crée `devis_weekly_counters` + trigger ; supprime les anciens objets `is_in_trial` / `devis_daily_counters`).
+- Prochaine migration à créer : préfixer avec `0040_`.
 
 ### position:fixed et animations CSS transform
 Tout composant React qui contient des enfants `position:fixed` (modales, drawers, toasts)
@@ -84,6 +84,11 @@ src/
 Tous les endpoints vérifient le CORS via `ALLOWED_ORIGINS` et authentifient via `supabase.auth.getUser(token)`.
 Les endpoints admin vérifient en plus que `caller.email === ADMIN_EMAIL`.
 
+Helpers non déployés (préfixés `_`, importés par les endpoints) :
+- `_cors.js` — gestion CORS centralisée
+- `_email.js` — envoi email (Gmail SMTP via nodemailer, fallback Brevo)
+- `_withAuth.js` — middleware `authenticate(req, res, { adminOnly? })`
+
 | Fichier | Rôle |
 |---------|------|
 | `account.js` | RGPD libre-service — `GET` = export portabilité, `POST` = suppression compte |
@@ -92,6 +97,8 @@ Les endpoints admin vérifient en plus que `caller.email === ADMIN_EMAIL`.
 | `admin-user-detail.js` | Données complètes d'un utilisateur (profil, devis, factures, clients, IA) |
 | `b2brouter.js` | Proxy B2Brouter eDocExchange + webhook entrant (détection par header `x-b2b-signature`) |
 | `claude.js` | Proxy Claude API avec timeout 28s + AbortController |
+| `contact.js` | Formulaire de contact public — POST avec honeypot anti-bot, envoie un email à l'admin |
+| `devis-public.js` | Endpoint public pour signature client de devis — token + OTP + audit, multi-routes par `action` |
 | `facturx.js` | Génération PDF Factur-X (XML CII embarqué) |
 | `newsletter.js` | Inscription newsletter |
 | `odoo-sign.js` | Proxy Odoo Sign (signature électronique) |
