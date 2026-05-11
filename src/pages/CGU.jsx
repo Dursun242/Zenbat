@@ -46,7 +46,7 @@ Hébergement : Supabase (Union européenne). Aucune donnée n'est revendue à de
 
 Conformément au RGPD (règlement UE 2016/679), l'utilisateur dispose à tout moment des droits suivants, exerçables EN LIBRE-SERVICE depuis l'application (Mon profil → Vos données) :\n• Droit d'accès et portabilité : téléchargement d'une archive JSON complète\n• Droit à l'effacement (art. 17) : suppression définitive du compte et de toutes les données associées\n• Droit de rectification : modification directe depuis Mon profil
 
-Pour les autres demandes (limitation, opposition, plainte), écrire à Zenbat76@gmail.com. À défaut de réponse satisfaisante, l'utilisateur peut saisir la CNIL (cnil.fr).`,
+Pour les autres demandes (limitation, opposition, plainte), utiliser le formulaire de contact disponible sur zenbat.fr/contact. À défaut de réponse satisfaisante, l'utilisateur peut saisir la CNIL (cnil.fr).`,
   },
   {
     n: 8, title: "Utilisation de l'intelligence artificielle",
@@ -88,7 +88,7 @@ En cas de non-respect des présentes CGU/CGV, Zenbat se réserve le droit de sus
   },
   {
     n: 14, title: "Droit applicable et contact",
-    body: `Les présentes CGU/CGV sont soumises au droit français. Tout litige sera porté devant les tribunaux compétents du ressort du siège social de l'éditeur, à défaut d'accord amiable préalable.\n\nPour toute question :\nEmail : Zenbat76@gmail.com\nWhatsApp : 06 79 11 60 85\nVersion en vigueur : 1.2 — 11 mai 2026`,
+    body: `Les présentes CGU/CGV sont soumises au droit français. Tout litige sera porté devant les tribunaux compétents du ressort du siège social de l'éditeur, à défaut d'accord amiable préalable.\n\nPour toute question :\nFormulaire : zenbat.fr/contact\nWhatsApp : 06 79 11 60 85\nVersion en vigueur : 1.2 — 11 mai 2026`,
   },
 ]
 

@@ -153,10 +153,8 @@ export default function ContactPage() {
           Une question ?<br />On vous répond.
         </h1>
         <p style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: 15, color: C.muted, lineHeight: 1.7, marginBottom: 48 }}>
-          Remplissez le formulaire ci-dessous ou contactez-nous directement :<br />
-          <a href="mailto:Zenbat76@gmail.com" style={{ color: C.terra, textDecoration: 'none', fontWeight: 600 }}>Zenbat76@gmail.com</a>
-          {' · '}
-          <a href="https://wa.me/33679116085" target="_blank" rel="noopener noreferrer" style={{ color: C.terra, textDecoration: 'none', fontWeight: 600 }}>WhatsApp</a>
+          Remplissez le formulaire ci-dessous ou écrivez-nous sur{' '}
+          <a href="https://wa.me/33679116085" target="_blank" rel="noopener noreferrer" style={{ color: C.terra, textDecoration: 'none', fontWeight: 600 }}>WhatsApp</a>.
         </p>
 
         {status === 'ok' ? (

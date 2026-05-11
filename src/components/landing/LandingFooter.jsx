@@ -38,7 +38,7 @@ const FOOTER_COLUMNS = [
   {
     heading: 'Contact',
     links: [
-      { label: 'Zenbat76@gmail.com',    href: 'mailto:Zenbat76@gmail.com' },
+      { label: 'Formulaire de contact', href: '/contact' },
       { label: 'WhatsApp · 06 79 11 60 85', href: 'https://wa.me/33679116085' },
     ],
   },
