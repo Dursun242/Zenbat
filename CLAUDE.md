@@ -30,8 +30,8 @@ Les fichiers dans `/supabase/migrations/` ne s'appliquent **pas automatiquement*
 L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - Prévenir l'utilisateur à chaque nouvelle migration créée.
 - Dernière migration appliquée : `0039_freemium_weekly_limit.sql` (bascule essai 30 j → freemium hebdomadaire ; crée `devis_weekly_counters` + trigger ; supprime les anciens objets `is_in_trial` / `devis_daily_counters`).
-- Aucune migration en attente.
-- Prochaine migration : préfixer avec `0040_`.
+- Migration en attente : `0040_drop_odoo_b2b.sql` (destructif — drop des colonnes et table héritées des intégrations Odoo Sign / B2Brouter retirées).
+- Prochaine migration à créer : préfixer avec `0041_`.
 
 ### position:fixed et animations CSS transform
 Tout composant React qui contient des enfants `position:fixed` (modales, drawers, toasts)
