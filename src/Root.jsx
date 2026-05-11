@@ -8,6 +8,7 @@ import ResetPassword from './pages/ResetPassword.jsx'
 import Landing from './pages/Landing.jsx'
 import CGU from './pages/CGU.jsx'
 import DevisPublicPage from './pages/DevisPublicPage.jsx'
+import ContactPage from './pages/ContactPage.jsx'
 import EmailVerificationGate from './components/EmailVerificationGate.jsx'
 
 const loader = {
@@ -24,7 +25,8 @@ export default function Root() {
 
   if (path === '/auth/callback') return <AuthCallback />
   if (path === '/reset-password' || recovery) return <ResetPassword />
-  if (path === '/cgu') return <CGU />
+  if (path === '/cgu')     return <CGU />
+  if (path === '/contact') return <ContactPage />
   if (path.startsWith('/d/')) return <DevisPublicPage token={path.slice(3)} />
 
   if (loading) {

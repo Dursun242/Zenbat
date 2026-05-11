@@ -434,7 +434,7 @@ export default function Onboarding({ brand, setBrand, onDone }) {
             </div>
 
             <div style={{fontSize:10,color:"#6B6358",lineHeight:1.6,padding:"0 4px"}}>
-              💡 Vous pouvez aussi exercer vos autres droits RGPD (rectification, limitation, opposition, plainte CNIL) en écrivant à <span style={{color:"#9A8E82"}}>Zenbat76@gmail.com</span>.
+              💡 Vous pouvez aussi exercer vos autres droits RGPD (rectification, limitation, opposition, plainte CNIL) via le <a href="/contact" style={{color:"#9A8E82"}}>formulaire de contact</a>.
             </div>
           </div>
         )}
