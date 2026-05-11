@@ -29,8 +29,8 @@ L'ancienne URL externe (Stripe Dashboard `/api/stripe-checkout`, `/api/stripe-we
 Les fichiers dans `/supabase/migrations/` ne s'appliquent **pas automatiquement**.
 L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - Prévenir l'utilisateur à chaque nouvelle migration créée.
-- Dernière migration appliquée : `0039_freemium_weekly_limit.sql` (bascule essai 30 j → freemium hebdomadaire ; crée `devis_weekly_counters` + trigger ; supprime les anciens objets `is_in_trial` / `devis_daily_counters`).
-- Migration en attente : `0040_drop_odoo_b2b.sql` (destructif — drop des colonnes et table héritées des intégrations Odoo Sign / B2Brouter retirées).
+- Dernière migration appliquée : `0040_drop_odoo_b2b.sql` (destructif — drop des colonnes et table héritées des intégrations Odoo Sign / B2Brouter retirées).
+- Aucune migration en attente.
 - Prochaine migration à créer : préfixer avec `0041_`.
 
 ### position:fixed et animations CSS transform
@@ -132,8 +132,6 @@ Tables support : `support_tickets`, `support_messages` (migration `0030`)
 Autres : `activity_log`, `cgu_acceptances`, `newsletter_subscribers`, `app_logs`
 
 RLS activé sur toutes les tables — les endpoints admin contournent via `SUPABASE_SERVICE_ROLE_KEY`.
-
-> Les tables/colonnes héritées de l'ancienne intégration B2Brouter (`b2b_accounts`, colonnes `b2brouter_*` sur `invoices`) et Odoo Sign (`odoo_sign_url`, `odoo_sign_id` sur `devis`) ne sont plus écrites par le code. Elles sont laissées telles quelles pour ne pas perdre l'historique ; à dropper via une migration `0040_` si besoin.
 
 ---
 
