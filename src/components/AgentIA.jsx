@@ -439,7 +439,6 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       tva_rate: 20,
       date_emission: new Date().toISOString().split("T")[0],
       lignes,
-      odoo_sign_url: null,
     });
     setPickingClient(false);
     if (!ok) return;

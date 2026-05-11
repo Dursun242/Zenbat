@@ -7,7 +7,6 @@
   "rewrites": [
     { "source": "/api/stripe-checkout",     "destination": "/api/stripe" },
     { "source": "/api/stripe-webhook",      "destination": "/api/stripe?route=webhook" },
-    { "source": "/api/b2brouter-webhook",   "destination": "/api/b2brouter?route=webhook" },
     { "source": "/aide", "destination": "/aide/index.html" },
     { "source": "/((?!api/|aide).*)", "destination": "/index.html" }
   ],
@@ -16,8 +15,6 @@
     "api/facturx.js":             { "maxDuration": 60 },
     "api/account.js":             { "maxDuration": 60 },
     "api/stripe.js":              { "maxDuration": 30 },
-    "api/b2brouter.js":           { "maxDuration": 30 },
-    "api/odoo-sign.js":           { "maxDuration": 30 },
     "api/devis-public.js":        { "maxDuration": 30 },
     "api/admin-stats.js":         { "maxDuration": 30 },
     "api/admin-user-detail.js":   { "maxDuration": 30 },

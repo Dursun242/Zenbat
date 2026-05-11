@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { fmt } from "../lib/utils.js";
-import { getToken } from "../lib/getToken.js";
 import { I } from "./ui/icons.jsx";
 import Badge from "./ui/Badge.jsx";
 import LignesEditor from "./LignesEditor.jsx";
@@ -10,16 +9,11 @@ import DevisClientActions from "./DevisClientActions.jsx";
 
 export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChange, onConvertToInvoice, onCreateAcompte, onDuplicate, onCreateIndice, groupVersions = [], goDevis, loading, autoOpenPDF, onAutoOpenPDFConsumed, isFreemium = false, onPaywall = () => {} }) {
   const [showPDF,        setShowPDF]        = useState(false);
-  const [sending,        setSending]        = useState(false);
-  const [signUrl,        setSignUrl]        = useState(d?.odoo_sign_url || null);
-  const [log,            setLog]            = useState([]);
-  const [showLog,        setShowLog]        = useState(false);
   const [acompteModal,   setAcompteModal]   = useState(false);
   const [acomptePct,     setAcomptePct]     = useState(30);
   const [acompteLoading, setAcompteLoading] = useState(false);
-  const [clientPicker,      setClientPicker]      = useState(false);
-  const [pickerRequireEmail, setPickerRequireEmail] = useState(false);
-  const [statutBusy,    setStatutBusy]    = useState(false);
+  const [clientPicker,   setClientPicker]   = useState(false);
+  const [statutBusy,     setStatutBusy]     = useState(false);
 
   // Ouvre automatiquement le PDF quand on arrive depuis l'Agent IA après save
   useEffect(() => {
@@ -41,59 +35,6 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
     const newHt = newLignes.filter(l => l.type_ligne === "ouvrage")
       .reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0), 0);
     onChange({ ...d, lignes: newLignes, montant_ht: newHt }, true);
-  };
-
-  const addLog = msg => setLog(l => [...l, { t: new Date().toLocaleTimeString("fr-FR"), msg }]);
-
-  const signerEmail = cl?.email || "";
-  const signerName  = cl?.raison_sociale?.trim() || `${cl?.prenom || ""} ${cl?.nom || ""}`.trim() || "";
-
-  const sendOdoo = async () => {
-    if (sending) return;
-    if (!signerEmail) {
-      setPickerRequireEmail(true);
-      setClientPicker(true);
-      return;
-    }
-    setSending(true); setLog([]); setShowLog(true);
-    addLog("Préparation du PDF…");
-    try {
-      const { renderDataToPdf } = await import("../lib/pdf.js");
-      const { base64 } = await renderDataToPdf(d, cl, brand, "devis", { filename: `${d.numero}.pdf` });
-      addLog("✓ PDF généré");
-      addLog("Envoi vers Odoo Sign…");
-      const token = await getToken();
-      const res = await fetch("/api/odoo-sign", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          pdf_base64:   base64,
-          filename:     `${d.numero}.pdf`,
-          reference:    d.numero,
-          signer_email: signerEmail,
-          signer_name:  signerName || signerEmail,
-          signer_phone: cl?.telephone || "",
-          company_name:  brand.companyName || "",
-          company_email: brand.email || "",
-          company_phone: brand.phone || "",
-          subject: `${brand.companyName ? brand.companyName + " — " : ""}Votre devis ${d.numero}`,
-          message: `Bonjour ${signerName || ""},\n\nVotre devis ${d.numero}${d.objet ? ` (${d.objet})` : ""} est prêt. Vous pouvez le consulter et le signer en ligne.\n\n${brand.companyName || "Notre entreprise"} reste à votre disposition pour toute question${brand.phone ? ` au ${brand.phone}` : ""}${brand.email ? ` ou par mail à ${brand.email}` : ""}.\n\nCordialement,\n${brand.companyName || ""}`,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.detail || data?.error || "Erreur Odoo");
-      addLog("✓ Demande de signature créée");
-      addLog(`🎉 Email envoyé à ${signerEmail}`);
-      setSignUrl(data.sign_url);
-      onChange({ ...d, statut: "en_signature", odoo_sign_url: data.sign_url, odoo_sign_id: String(data.request_id || "") }, false);
-    } catch (err) {
-      addLog(`❌ ${err.message || err}`);
-    } finally {
-      setSending(false);
-    }
   };
 
   const lotsResume = lignes.filter(l => l.type_ligne === "ouvrage").reduce((a, l) => {
@@ -194,8 +135,7 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
           clients={clients}
           current={cl}
           onSelect={c => onChange({ ...d, client_id: c?.id ?? null })}
-          onClose={() => { setClientPicker(false); setPickerRequireEmail(false); }}
-          requireEmail={pickerRequireEmail}/>
+          onClose={() => setClientPicker(false)}/>
       )}
       <div className="detail-shell" style={{ minHeight: "100%", background: "#FAF7F2", display: "flex", flexDirection: "column" }}>
         <div className="detail-row" style={{ flex: 1, display: "flex" }}>
@@ -284,17 +224,17 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
           )}
 
           {/* Client */}
-          {["brouillon","envoye"].includes(d.statut) && !isRemplace && !signerEmail && (
+          {["brouillon","envoye"].includes(d.statut) && !isRemplace && !cl?.email && (
             <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10,
               padding: "10px 12px", marginBottom: 8, display: "flex", alignItems: "flex-start", gap: 8 }}>
               <span style={{ fontSize: 16, lineHeight: "1.3", flexShrink: 0 }}>✉️</span>
               <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#92400e", marginBottom: 2 }}>Email requis pour la signature</div>
-                <div style={{ fontSize: 11, color: "#b45309", lineHeight: "1.4" }}>Sélectionnez un client avec une adresse email pour envoyer ce devis en signature électronique.</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#92400e", marginBottom: 2 }}>Email requis pour l'envoi</div>
+                <div style={{ fontSize: 11, color: "#b45309", lineHeight: "1.4" }}>Sélectionnez un client avec une adresse email pour envoyer ce devis au client.</div>
               </div>
             </div>
           )}
-          <button onClick={() => { if (!isRemplace) { setPickerRequireEmail(false); setClientPicker(true); } }} disabled={isRemplace}
+          <button onClick={() => { if (!isRemplace) setClientPicker(true); }} disabled={isRemplace}
             style={{ width: "100%", display: "flex", alignItems: "center", gap: 8,
               background: isRemplace ? "#F0EBE3" : "#FAF7F2",
               border: "1px solid #E8E2D8", borderRadius: 10, padding: "7px 10px", marginBottom: 8,
@@ -367,17 +307,13 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
 
           {/* Actions statut */}
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {signUrl && (
-              <div style={{ background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 12, padding: "12px 14px" }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#7c3aed", marginBottom: 5, display: "flex", alignItems: "center", gap: 5 }}>
-                  {I.odoo} Lien de signature Odoo actif
-                </div>
-                <div style={{ fontSize: 10, color: "#6b21a8", fontFamily: "monospace", wordBreak: "break-all" }}>{signUrl}</div>
-              </div>
-            )}
             {d.statut === "en_signature" && (
               <div style={{ display: "flex", gap: 8 }}>
-                <button disabled={statutBusy} onClick={() => { setStatutBusy(true); onChange({ ...d, statut: "accepte", signed_at: new Date().toISOString(), signed_by: signerName || signerEmail || "" }); }}
+                <button disabled={statutBusy} onClick={() => {
+                  setStatutBusy(true);
+                  const signedBy = cl?.raison_sociale?.trim() || `${cl?.prenom || ""} ${cl?.nom || ""}`.trim() || cl?.email || "";
+                  onChange({ ...d, statut: "accepte", signed_at: new Date().toISOString(), signed_by: signedBy });
+                }}
                   style={{ flex: 1, background: "#ecfdf5", color: "#065f46", border: "1px solid #a7f3d0", borderRadius: 12, padding: 10, fontSize: 12, fontWeight: 600, cursor: statutBusy ? "not-allowed" : "pointer", opacity: statutBusy ? 0.6 : 1 }}>
                   ✓ Accepté
                 </button>
@@ -388,18 +324,6 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
               </div>
             )}
           </div>
-
-          {/* Log Odoo Sign */}
-          {showLog && log.length > 0 && (
-            <div style={{ background: "#1A1612", borderRadius: 14, padding: 14, marginTop: 14 }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: "#6B6358", marginBottom: 8, fontFamily: "monospace" }}>LOG ODOO SIGN</div>
-              {log.map((l, i) => (
-                <div key={i} style={{ fontFamily: "monospace", fontSize: 11, marginBottom: 3, display: "flex", gap: 8, color: l.msg.startsWith("✓") || l.msg.startsWith("🎉") ? "#4ade80" : l.msg.startsWith("❌") ? "#f87171" : "#9A8E82" }}>
-                  <span style={{ color: "#6B6358" }}>{l.t}</span><span>{l.msg}</span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
           </div>{/* end detail-editor */}
 

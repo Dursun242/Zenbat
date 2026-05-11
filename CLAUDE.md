@@ -9,21 +9,21 @@ Stack : React + Vite (frontend) · Vercel Serverless Functions (API) · Supabase
 
 ### Vercel : limite 12 fonctions serverless
 Le plan Hobby de Vercel autorise **maximum 12 fichiers** dans `/api/`.
-Fichiers actuels (12/12 — limite atteinte ; les helpers `_cors.js`, `_email.js`, `_withAuth.js` ne comptent pas, `*.test.js` ignorés via `.vercelignore`, `fonts/` est un dossier d'assets) :
+Fichiers actuels (10/12 — les helpers `_cors.js`, `_email.js`, `_rateLimit.js`, `_withAuth.js` ne comptent pas, `*.test.js` ignorés via `.vercelignore`, `fonts/` est un dossier d'assets) :
 ```
 account.js             admin-delete-user.js   admin-stats.js     admin-user-detail.js
-b2brouter.js           claude.js              contact.js         devis-public.js
-facturx.js             newsletter.js          odoo-sign.js       stripe.js
+claude.js              contact.js             devis-public.js    facturx.js
+newsletter.js          stripe.js
 ```
-→ **Limite atteinte** : ne plus créer aucun nouveau fichier `/api/` sans en supprimer un autre ou fusionner des endpoints.
+→ Avant tout nouvel endpoint : vérifier la marge restante et préférer fusionner par domaine (header de signature, paramètre `?route=`, champ `action` du body).
 
-**Convention de fusion** : quand on doit fusionner des endpoints, on regroupe par domaine (Stripe, B2Brouter…) dans un seul fichier qui route en interne :
+**Convention de fusion** : quand on doit fusionner des endpoints, on regroupe par domaine dans un seul fichier qui route en interne :
 - soit par méthode HTTP (`account.js` : GET = export, POST = suppression)
 - soit par paramètre de requête (`admin-stats.js` : `?type=conversations|logs|...`)
-- soit par champ `action` dans le body (`b2brouter.js`, `stripe.js`)
-- soit par présence d'un header de signature (`stripe.js` détecte le webhook via `stripe-signature`, `b2brouter.js` via `x-b2b-signature`)
+- soit par champ `action` dans le body (`stripe.js`, `devis-public.js`)
+- soit par présence d'un header de signature (`stripe.js` détecte le webhook via `stripe-signature`)
 
-Les anciennes URL externes (Stripe Dashboard, B2Brouter webhook) sont préservées via `vercel.json` rewrites.
+L'ancienne URL externe (Stripe Dashboard `/api/stripe-checkout`, `/api/stripe-webhook`) est préservée via `vercel.json` rewrites.
 
 ### Migrations Supabase : application manuelle
 Les fichiers dans `/supabase/migrations/` ne s'appliquent **pas automatiquement**.
@@ -92,17 +92,15 @@ Helpers non déployés (préfixés `_`, importés par les endpoints) :
 
 | Fichier | Rôle |
 |---------|------|
-| `account.js` | RGPD libre-service — `GET` = export portabilité, `POST` = suppression compte |
+| `account.js` | RGPD libre-service — `GET` = export portabilité, `POST` = suppression compte ou envoi comptable |
 | `admin-delete-user.js` | Suppression compte par l'admin |
 | `admin-stats.js` | Stats globales + logs IA (conversations, erreurs, négatifs, feedback, newsletter, cohérence) — paramètre `?type=` |
 | `admin-user-detail.js` | Données complètes d'un utilisateur (profil, devis, factures, clients, IA) |
-| `b2brouter.js` | Proxy B2Brouter eDocExchange + webhook entrant (détection par header `x-b2b-signature`) |
 | `claude.js` | Proxy Claude API avec timeout 28s + AbortController |
 | `contact.js` | Formulaire de contact public — POST avec honeypot anti-bot, envoie un email à l'admin |
-| `devis-public.js` | Endpoint public pour signature client de devis — token + OTP + audit, multi-routes par `action` |
+| `devis-public.js` | Endpoint public pour signature client de devis — token + OTP 8 chiffres + audit, multi-routes par `action` |
 | `facturx.js` | Génération PDF Factur-X (XML CII embarqué) |
 | `newsletter.js` | Inscription newsletter |
-| `odoo-sign.js` | Proxy Odoo Sign (signature électronique) |
 | `stripe.js` | Stripe checkout/portal/info (POST authentifié) + webhook (détection par header `stripe-signature`) |
 
 ### Architecture Telegram
@@ -131,9 +129,11 @@ Variables d'env Edge Functions (Supabase Dashboard → Project Settings → Edge
 Tables principales : `profiles`, `clients`, `devis`, `lignes_devis`, `invoices`, `lignes_invoices`
 Tables IA : `ia_conversations`, `ia_error_logs`, `ia_negative_logs`, `ia_feedback`
 Tables support : `support_tickets`, `support_messages` (migration `0030`)
-Autres : `b2b_accounts`, `activity_log`, `cgu_acceptances`, `newsletter_subscribers`, `app_logs`
+Autres : `activity_log`, `cgu_acceptances`, `newsletter_subscribers`, `app_logs`
 
 RLS activé sur toutes les tables — les endpoints admin contournent via `SUPABASE_SERVICE_ROLE_KEY`.
+
+> Les tables/colonnes héritées de l'ancienne intégration B2Brouter (`b2b_accounts`, colonnes `b2brouter_*` sur `invoices`) et Odoo Sign (`odoo_sign_url`, `odoo_sign_id` sur `devis`) ne sont plus écrites par le code. Elles sont laissées telles quelles pour ne pas perdre l'historique ; à dropper via une migration `0040_` si besoin.
 
 ---
 
@@ -147,12 +147,10 @@ RLS activé sur toutes les tables — les endpoints admin contournent via `SUPAB
 | `ANTHROPIC_KEY` | Clé API Anthropic (Claude) |
 | `ADMIN_EMAIL` | Email de l'administrateur |
 | `ALLOWED_ORIGINS` | Origines CORS autorisées (séparées par virgule) |
-| `B2B_API_KEY` | Clé B2Brouter |
-| `B2B_API_URL` | URL B2Brouter (défaut: staging) |
-| `B2B_WEBHOOK_SECRET` | Secret HMAC webhook B2Brouter |
 | `STRIPE_SECRET_KEY` | Clé secrète Stripe (checkout / portal / abonnements) |
 | `STRIPE_WEBHOOK_SECRET` | Secret de signature webhook Stripe |
-| `ODOO_URL` / `ODOO_DB` / `ODOO_USERNAME` / `ODOO_API_KEY` | Odoo Sign |
+
+> Variables d'env caduques (à supprimer côté Vercel) : `B2B_API_KEY`, `B2B_API_URL`, `B2B_WEBHOOK_SECRET`, `ODOO_URL`, `ODOO_DB`, `ODOO_USERNAME`, `ODOO_API_KEY`.
 
 ---
 

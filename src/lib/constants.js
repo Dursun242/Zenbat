@@ -51,7 +51,7 @@ export const STATUT = {
   remplace:       { label: "Remplacé",       bg: "#f5f3ff", color: "#6b21a8", dot: "#a855f7" },
 };
 
-// ── Statuts factures électroniques (B2Brouter / DGFiP) ─────
+// ── Statuts factures ─────────────────────────────────────
 export const STATUT_FACTURE = {
   brouillon: { label: "Brouillon", bg: "#f1f5f9", color: "#64748b", dot: "#94a3b8" },
   envoyee:   { label: "Envoyée",   bg: "#eff6ff", color: "#1d4ed8", dot: "#3b82f6" },

@@ -12,7 +12,7 @@ const articles = [
   },
   {
     n: 3, title: "Description du service",
-    body: `Zenbat est une application web progressive (PWA) permettant de :\n• Générer des devis professionnels assistés par intelligence artificielle (IA Claude d'Anthropic)\n• Gérer un portefeuille clients\n• Émettre des factures conformes à la réglementation française (TVA, Factur-X)\n• Envoyer des documents en signature électronique via Odoo Sign\n• Accéder au service depuis tout appareil (smartphone, tablette, ordinateur)`,
+    body: `Zenbat est une application web progressive (PWA) permettant de :\n• Générer des devis professionnels assistés par intelligence artificielle (IA Claude d'Anthropic)\n• Gérer un portefeuille clients\n• Émettre des factures conformes à la réglementation française (TVA, Factur-X)\n• Partager un devis par lien public sécurisé (signature client par code OTP envoyé par email)\n• Accéder au service depuis tout appareil (smartphone, tablette, ordinateur)`,
   },
   {
     n: 4, title: "Inscription et accès au service",
@@ -72,7 +72,7 @@ Les brouillons de devis et factures, ainsi que les devis refusés, peuvent être
   },
   {
     n: 11, title: "Responsabilité",
-    body: `Zenbat s'engage à maintenir le service disponible au mieux mais ne peut garantir une disponibilité ininterrompue. La responsabilité de Zenbat ne saurait être engagée en cas de perte de données, de dysfonctionnement lié à un tiers (Supabase, Anthropic, Odoo, Stripe), ou d'utilisation non conforme du service par l'utilisateur. L'utilisateur est seul responsable de la conformité fiscale et légale de ses documents.`,
+    body: `Zenbat s'engage à maintenir le service disponible au mieux mais ne peut garantir une disponibilité ininterrompue. La responsabilité de Zenbat ne saurait être engagée en cas de perte de données, de dysfonctionnement lié à un tiers (Supabase, Anthropic, Stripe), ou d'utilisation non conforme du service par l'utilisateur. L'utilisateur est seul responsable de la conformité fiscale et légale de ses documents.`,
   },
   {
     n: 12, title: "Disponibilité et maintenance",

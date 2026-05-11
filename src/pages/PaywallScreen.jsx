@@ -11,9 +11,9 @@ const CHECK = <svg width="11" height="11" fill="none" stroke="currentColor" stro
 const FEATURES = [
   "Agent IA illimité (voix + texte)",
   "PDF brandé avec votre logo",
-  "Envoi Odoo Sign intégré",
+  "Signature électronique par OTP email",
   "Identification SIRET via Pappers",
-  "Signature électronique eIDAS",
+  "Export Factur-X (PDF/A-3 + XML CII)",
 ];
 
 const PLANS = {

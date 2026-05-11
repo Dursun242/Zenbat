@@ -10,14 +10,13 @@ const PAGE_READY_DELAY_MS   = 400
 const Ix = {
   pdf:  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><path d="M8 13h8M8 17h5"/></svg>,
   x:    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
-  odoo: <svg width="15" height="15" viewBox="0 0 24 24" fill="#714B67"><circle cx="12" cy="12" r="3"/><circle cx="4" cy="12" r="3"/><circle cx="20" cy="12" r="3"/></svg>,
 }
 
 function openPdfPreview(blob) {
   window.location.href = URL.createObjectURL(blob)
 }
 
-export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageReady, onSendOdoo, sending=false, sent=false, kind="devis", noDownload=false, inline=false, onMarkSent, onMarkSignature }) {
+export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageReady, kind="devis", noDownload=false, inline=false, onMarkSent, onMarkSignature }) {
   const isAvoir  = kind === "facture" && !!d?.avoir_of_invoice_id;
   const docLabel = isAvoir ? "FACTURE D'AVOIR" : kind === "facture" ? "FACTURE" : "DEVIS";
   const MM_TO_PX = 3.7795275591
@@ -275,7 +274,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
               {isSigned ? (
                 <div style={{height:40,display:"flex",flexDirection:"column",justifyContent:"center",borderBottom:"1px solid #16a34a"}}>
                   <div style={{fontSize:11,fontWeight:700,color:"#15803d",fontFamily:"cursive",letterSpacing:"0.5px"}}>{signerDisplay}</div>
-                  <div style={{fontSize:8,color:"#16a34a",marginTop:2}}>✓ Signé électroniquement via Odoo Sign</div>
+                  <div style={{fontSize:8,color:"#16a34a",marginTop:2}}>✓ Signé électroniquement</div>
                 </div>
               ) : (
                 <div style={{height:40,borderBottom:"1px solid #9ca3af"}}/>
@@ -478,21 +477,6 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
           </div>
         </div>
       </div>
-
-      {onSendOdoo && (
-        <div style={{flexShrink:0,padding:"12px 18px calc(12px + env(safe-area-inset-bottom))",background:"#1A1612",borderTop:"1px solid #2A231C",display:"flex",gap:10}}>
-          <button onClick={onClose} style={{background:"#2A231C",color:"#9A8E82",border:"none",borderRadius:12,padding:"12px 16px",fontSize:13,fontWeight:600,cursor:"pointer",flexShrink:0}}>← Retour</button>
-          <button onClick={sent ? undefined : onSendOdoo} disabled={sending||sent}
-            style={{flex:1,background:sent?"#166534":sending?"#4b3557":"#714B67",color:"white",border:"none",borderRadius:12,padding:"12px",fontSize:13,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:8,cursor:(sending||sent)?"default":"pointer",transition:"background .4s"}}>
-            {sent
-              ? <>✓ Envoyé !</>
-              : sending
-                ? <><span style={{display:"inline-block",width:14,height:14,border:"2px solid white",borderTopColor:"transparent",borderRadius:"50%",animation:"spin 1s linear infinite"}}/> Envoi en cours…</>
-                : <>{Ix.odoo} Envoyer en signature Odoo Sign</>
-            }
-          </button>
-        </div>
-      )}
 
       {/* Loader overlay pendant la génération du PDF */}
       {generatingPdf && (

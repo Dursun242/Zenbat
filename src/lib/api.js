@@ -1,5 +1,4 @@
 import { supabase } from './supabase'
-import { getToken } from './getToken'
 
 async function withRetry(fn, retries = 2, delay = 700) {
   try {
@@ -286,7 +285,7 @@ export async function updateDevis(id, patch) {
   // Fallback : colonne inexistante (migration 0007 pas appliquée). On retire
   // les champs optionnels ajoutés tardivement et on retente.
   if (error.code === '42703') {
-    const { signed_at, signed_by, odoo_sign_url, odoo_sign_id, ...safe } = patch
+    const { signed_at, signed_by, ...safe } = patch
     const { data: d2, error: e2 } = await supabase
       .from('devis').update(safe).eq('id', id).select().single()
     if (!e2) return d2
@@ -342,7 +341,7 @@ export async function deleteDevis(id) {
 }
 
 // =========================================================
-// INVOICES (factures électroniques B2Brouter)
+// INVOICES
 // =========================================================
 export async function listInvoices() {
   return withRetry(async () => {
@@ -494,30 +493,6 @@ export async function createAvoirFromInvoice(invoiceId) {
   const { data, error } = await supabase.rpc('create_avoir_from', { p_invoice_id: invoiceId })
   if (error) throw error
   return data // UUID du nouvel avoir
-}
-
-// Appelle le proxy /api/b2brouter avec l'access_token courant.
-async function callB2B(action, payload = {}) {
-  const token = await getToken()
-  if (!token) throw new Error('Session expirée — reconnectez-vous')
-  const res = await fetch('/api/b2brouter', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ action, payload }),
-  })
-  const data = await res.json().catch(() => null)
-  if (!res.ok) throw new Error(data?.error || `B2Brouter HTTP ${res.status}`)
-  return data
-}
-
-export const b2b = {
-  ensureAccount: (info) => callB2B('ensure_account', info),
-  sendInvoice:   (invoice_id) => callB2B('send_invoice', { invoice_id }),
-  getStatus:     (b2brouter_id) => callB2B('get_invoice_status', { b2brouter_id }),
-  listReceived:  () => callB2B('list_received'),
 }
 
 // =========================================================
