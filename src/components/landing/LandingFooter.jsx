@@ -24,7 +24,7 @@ const FOOTER_COLUMNS = [
     links: [
       { label: 'À propos', href: '#about'   },
       { label: 'Blog',     href: '#blog'    },
-      { label: 'Contact',  href: '#contact' },
+      { label: 'Contact',  href: '/contact' },
     ],
   },
   {
