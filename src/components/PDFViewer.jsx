@@ -7,22 +7,8 @@ const Ix = {
   odoo: <svg width="15" height="15" viewBox="0 0 24 24" fill="#714B67"><circle cx="12" cy="12" r="3"/><circle cx="4" cy="12" r="3"/><circle cx="20" cy="12" r="3"/></svg>,
 }
 
-async function sharePdf(blob, filename) {
-  const file = new File([blob], filename, { type: "application/pdf" })
-  if (navigator.share && navigator.canShare?.({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file], title: filename, url: window.location.origin })
-      return true
-    } catch (e) {
-      if (e?.name === "AbortError") return true
-    }
-  }
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement("a")
-  a.href = url; a.download = filename
-  document.body.appendChild(a); a.click(); document.body.removeChild(a)
-  setTimeout(() => URL.revokeObjectURL(url), 3000)
-  return true
+function openPdfPreview(blob) {
+  window.location.href = URL.createObjectURL(blob)
 }
 
 export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageReady, onSendOdoo, sending=false, sent=false, kind="devis", noDownload=false, inline=false, onMarkSent, onMarkSignature }) {
@@ -110,7 +96,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
   const baseDate = d.date_emission ? new Date(d.date_emission) : new Date()
   const validUntil = isNaN(baseDate.getTime()) ? new Date() : baseDate
   validUntil.setDate(validUntil.getDate() + (brand.validityDays || 30))
-  const clientName = cl?.raison_sociale || `${cl?.prenom||""} ${cl?.nom||""}`.trim() || "—"
+  const clientName = cl?.raison_sociale || `${cl?.prenom||""}  ${cl?.nom||""}`.trim() || "—"
 
   const clientLines = [
     cl?.adresse,
@@ -349,20 +335,6 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
   ) : null
 
   if (inline) {
-    const download = async () => {
-      setGeneratingPdf(true)
-      try {
-        const { renderDataToPdf } = await import("../lib/pdf.js")
-        const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename: `${d.numero}.pdf` })
-        await sharePdf(blob, `${d.numero}.pdf`)
-      } catch (e) {
-        if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
-          window.location.reload()
-        } else {
-          alert("Impossible de générer le PDF : " + (e.message || e))
-        }
-      } finally { setGeneratingPdf(false) }
-    }
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         {/* Toolbar inline */}
@@ -382,9 +354,24 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
               </button>
             )}
             {!noDownload && (
-              <button onClick={download} disabled={generatingPdf}
+              <button
+                onClick={async () => {
+                  setGeneratingPdf(true)
+                  try {
+                    const { renderDataToPdf } = await import("../lib/pdf.js")
+                    const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename: `${d.numero}.pdf` })
+                    openPdfPreview(blob)
+                  } catch (e) {
+                    if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
+                      window.location.reload()
+                    } else {
+                      alert("Impossible de générer le PDF : " + (e.message || e))
+                    }
+                  } finally { setGeneratingPdf(false) }
+                }}
+                disabled={generatingPdf}
                 style={{ background: "#22c55e", color: "white", border: "none", borderRadius: 8, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: generatingPdf ? "default" : "pointer" }}>
-                {generatingPdf ? "⏳" : "⬇ Télécharger"}
+                {generatingPdf ? "⏳" : "⬇ Aperçu PDF"}
               </button>
             )}
           </div>
@@ -457,9 +444,9 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
                 try {
                   const { renderDataToPdf } = await import("../lib/pdf.js")
                   const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename: `${d.numero}.pdf` })
-                  await sharePdf(blob, `${d.numero}.pdf`)
+                  openPdfPreview(blob)
                 } catch (e) {
-                  console.error("[pdf download]", e)
+                  console.error("[pdf preview]", e)
                   if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
                     window.location.reload()
                   } else {
@@ -468,7 +455,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
                 } finally { setGeneratingPdf(false) }
               }}
               disabled={generatingPdf}
-              title="Télécharger le PDF"
+              title="Aperçu PDF"
               style={{background:generatingPdf?"#9ca3af":"#22c55e",color:"white",border:"none",borderRadius:10,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:generatingPdf?"default":"pointer"}}>
               {generatingPdf ? "⏳" : "⬇"}
             </button>
