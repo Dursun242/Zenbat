@@ -14,11 +14,11 @@
     "api/claude.js":              { "maxDuration": 60 },
     "api/facturx.js":             { "maxDuration": 60 },
     "api/account.js":             { "maxDuration": 60 },
+    "api/admin-stats.js":         { "maxDuration": 60 },
+    "api/admin-user-detail.js":   { "maxDuration": 60 },
+    "api/admin-delete-user.js":   { "maxDuration": 60 },
     "api/stripe.js":              { "maxDuration": 30 },
     "api/devis-public.js":        { "maxDuration": 30 },
-    "api/admin-stats.js":         { "maxDuration": 30 },
-    "api/admin-user-detail.js":   { "maxDuration": 30 },
-    "api/admin-delete-user.js":   { "maxDuration": 30 },
     "api/contact.js":             { "maxDuration": 15 },
     "api/newsletter.js":          { "maxDuration": 15 }
   }
