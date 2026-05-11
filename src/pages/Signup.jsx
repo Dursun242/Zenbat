@@ -41,7 +41,7 @@ export default function Signup({ onSwitchToLogin, onBack }) {
   const [error,   setError]   = useState(null)
   const [sent,    setSent]    = useState(false)
 
-  // ── Étape 1 → 2 ────────────────────────────────────────
+  // ── Étape 1 → 2 ──────────────────────────────────────────
   const goToStep2 = (e) => {
     e.preventDefault()
     if (!cguAccepted) return
@@ -49,7 +49,7 @@ export default function Signup({ onSwitchToLogin, onBack }) {
     setStep(2)
   }
 
-  // ── Sélection métiers ──────────────────────────────────────
+  // ── Sélection métiers ─────────────────────────────────────
   const addTrade = (label) => {
     const t = label.trim()
     if (!t || trades.length >= 10) return
@@ -76,7 +76,7 @@ export default function Signup({ onSwitchToLogin, onBack }) {
     : []
   const showExact = tradeInput.trim() && !suggestions.some(x => normalize(x) === normalize(tradeInput.trim()))
 
-  // ── Création du compte ──────────────────────────────────────
+  // ── Création du compte ────────────────────────────────────
   const submit = async () => {
     setError(null); setLoading(true)
     try {
@@ -166,7 +166,7 @@ export default function Signup({ onSwitchToLogin, onBack }) {
                   J'accepte les{' '}
                   <a href="/cgu" target="_blank" rel="noopener noreferrer"
                     style={{color:'#2563eb',fontWeight:600,textDecoration:'underline'}}>
-                    Conditions Générales d'Utilisation
+                    Conditions Générales d'Utilisation et de Vente (CGU/CGV)
                   </a>
                 </span>
               </label>

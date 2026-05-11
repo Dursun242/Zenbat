@@ -30,10 +30,9 @@ const FOOTER_COLUMNS = [
   {
     heading: 'Légal',
     links: [
-      { label: 'CGU',              href: '#cgu'      },
-      { label: 'CGV',              href: '#cgv'      },
-      { label: 'RGPD',             href: '#rgpd'     },
-      { label: 'Mentions légales', href: '#mentions' },
+      { label: 'CGU / CGV',        href: '/cgu'    },
+      { label: 'RGPD',             href: '/cgu'    },
+      { label: 'Mentions légales', href: '/cgu'    },
     ],
   },
   {
