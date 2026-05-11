@@ -88,6 +88,7 @@ Helpers non déployés (préfixés `_`, importés par les endpoints) :
 - `_cors.js` — gestion CORS centralisée
 - `_email.js` — envoi email (Gmail SMTP via nodemailer, fallback Brevo)
 - `_withAuth.js` — middleware `authenticate(req, res, { adminOnly? })`
+- `_rateLimit.js` — rate-limiter in-memory par IP (utilisé sur `contact.js`, `newsletter.js`, `devis-public.js` action `request_otp`). Désactivé en env test (`VITEST`).
 
 | Fichier | Rôle |
 |---------|------|
