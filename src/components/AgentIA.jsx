@@ -15,6 +15,7 @@ import { loadUserCoherenceSettings } from "../lib/coherence/userOverrides.js";
 import { I } from "./ui/icons.jsx";
 import ClientPickerModal from "./ClientPickerModal.jsx";
 import CelebrateModal from "./agent/CelebrateModal.jsx";
+import ChatThread from "./agent/ChatThread.jsx";
 import CoherenceSettings from "./CoherenceSettings.jsx";
 
 export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, plan, quotaReached, onPaywall, setTab, onOpenDevisPDF, brand }) {
@@ -586,138 +587,19 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
 
         {/* Messages */}
-        <div ref={chatRef} style={{ flex: 1, overflowY: "auto", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
-          {historySummary && (
-            <div title="L'IA utilise vos devis passés pour proposer des tarifs cohérents avec votre historique"
-              style={{ alignSelf: "center", display: "flex", alignItems: "center", gap: 6, background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 20, padding: "4px 11px", fontSize: 10, fontWeight: 600, color: "#15803d", marginBottom: 4 }}>
-              <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-              Mémoire active · {historySummary.total} devis · {historySummary.topOuvrages.length} prestations référencées
-            </div>
-          )}
-          {msgs.map((m, i) => {
-            const fb = feedback[i] || {};
-            const REASON_TAGS = ["Trop de questions", "Mauvais métier", "Prix incorrects", "Trop générique", "Hors sujet"];
-            return (
-              <div key={i}>
-                <div style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start", alignItems: "flex-end", gap: 6 }}>
-                  {m.role === "assistant" && (
-                    <div style={{ width: 24, height: 24, borderRadius: "50%", background: ac + "22", border: `1px solid ${ac}44`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: ac, fontSize: 12 }}>✦</div>
-                  )}
-                  <div style={{
-                    maxWidth: "82%",
-                    borderRadius: m.role === "user" ? "16px 16px 3px 16px" : "16px 16px 16px 3px",
-                    padding: "9px 13px", fontSize: 12, lineHeight: 1.55,
-                    background: m.role === "user" ? "#1A1612" : "white",
-                    color: m.role === "user" ? "white" : "#2A231C",
-                    boxShadow: m.role === "assistant" ? "0 1px 4px rgba(0,0,0,.07)" : "none",
-                    border: m.role === "assistant" ? "1px solid #F0EBE3" : "none",
-                  }}>
-                    {m.content.split("\n").map((line, j, arr) => (
-                      <span key={j}>{line.replace(/\*([^*]+)\*/g, "$1")}{j < arr.length - 1 && <br/>}</span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Barre de vote — uniquement sur les messages IA avec devis, hors chargement */}
-                {m.hasDevis && !loading && (
-                  <div style={{ paddingLeft: 30, marginTop: 4 }}>
-                    {fb.saved ? (
-                      <span style={{ fontSize: 11, color: fb.vote === 1 ? "#16a34a" : "#9A8E82" }}>
-                        {fb.vote === 1 ? "✓ Merci !" : "✓ Noté"}
-                      </span>
-                    ) : fb.showReason ? (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6, maxWidth: 300 }}>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                          {REASON_TAGS.map(tag => (
-                            <button key={tag}
-                              onClick={() => setFeedback(prev => ({ ...prev, [i]: { ...prev[i], reason: prev[i]?.reason === tag ? "" : tag } }))}
-                              style={{ fontSize: 10, padding: "3px 8px", borderRadius: 20, border: `1px solid ${fb.reason === tag ? ac : "#e5e7eb"}`, background: fb.reason === tag ? ac + "18" : "white", color: fb.reason === tag ? ac : "#6B6358", cursor: "pointer", fontWeight: fb.reason === tag ? 700 : 400 }}>
-                              {tag}
-                            </button>
-                          ))}
-                        </div>
-                        <input
-                          placeholder="Autre raison… (optionnel)"
-                          value={fb.customReason || ""}
-                          onChange={e => setFeedback(prev => ({ ...prev, [i]: { ...prev[i], customReason: e.target.value } }))}
-                          style={{ fontSize: 11, padding: "5px 8px", borderRadius: 8, border: "1px solid #e5e7eb", outline: "none" }}
-                        />
-                        <button
-                          onClick={() => saveFeedback(i, -1, fb.customReason || fb.reason || null)}
-                          style={{ alignSelf: "flex-start", fontSize: 11, padding: "4px 12px", borderRadius: 8, border: "none", background: "#ef4444", color: "white", cursor: "pointer", fontWeight: 600 }}>
-                          Envoyer
-                        </button>
-                      </div>
-                    ) : (
-                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                        <span style={{ fontSize: 10, color: "#9A8E82" }}>Cette réponse était utile ?</span>
-                        <button
-                          onClick={() => { setFeedback(prev => ({ ...prev, [i]: { vote: 1 } })); saveFeedback(i, 1); }}
-                          style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 8, padding: "2px 8px", fontSize: 13, cursor: "pointer" }}>
-                          👍
-                        </button>
-                        <button
-                          onClick={() => setFeedback(prev => ({ ...prev, [i]: { vote: -1, showReason: true } }))}
-                          style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 8, padding: "2px 8px", fontSize: 13, cursor: "pointer" }}>
-                          👎
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          {/* Puces de démarrage rapide — visibles uniquement sur le chat vierge.
-              4 exemples typiques du métier, 1 clic = devis généré. Anti-page blanche
-              pour les utilisateurs non-tech. */}
-          {msgs.length === 1 && lignes.length === 0 && !loading && quickStarts.length > 0 && (
-            <div style={{ alignSelf: "flex-start", marginLeft: 30, marginTop: 4, maxWidth: "88%", animation: "fadeUp .25s ease both" }}>
-              <div style={{ fontSize: 11, color: ac, fontWeight: 700, letterSpacing: ".5px", textTransform: "uppercase", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}>
-                <span style={{ fontSize: 13 }}>✨</span>
-                <span>Démarrage rapide — cliquez pour essayer</span>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {quickStarts.map((q) => (
-                  <button key={q} onClick={() => send(q)}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 8,
-                      background: `linear-gradient(135deg, ${ac}18, ${ac}08)`,
-                      border: `1px solid ${ac}44`,
-                      color: "#1A1612",
-                      borderRadius: 12,
-                      padding: "11px 14px",
-                      fontSize: 13,
-                      fontWeight: 500,
-                      cursor: "pointer",
-                      textAlign: "left",
-                      lineHeight: 1.35,
-                      width: "100%",
-                      transition: "background .15s, transform .1s",
-                    }}
-                    onMouseOver={e => e.currentTarget.style.background = `linear-gradient(135deg, ${ac}28, ${ac}12)`}
-                    onMouseOut={e => e.currentTarget.style.background = `linear-gradient(135deg, ${ac}18, ${ac}08)`}>
-                    <div style={{ flex: 1, color: "#2A231C" }}>{q}</div>
-                    <span style={{ color: ac, fontSize: 16, flexShrink: 0, fontWeight: 700 }}>→</span>
-                  </button>
-                ))}
-              </div>
-              <div style={{ fontSize: 11, color: "#9A8E82", marginTop: 8, marginLeft: 4 }}>
-                Ou décrivez votre besoin ci-dessous (écrit ou vocal).
-              </div>
-            </div>
-          )}
-
-          {loading && msgs[msgs.length - 1]?.role !== "assistant" && (
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 6 }}>
-              <div style={{ width: 24, height: 24, borderRadius: "50%", background: ac + "22", border: `1px solid ${ac}44`, display: "flex", alignItems: "center", justifyContent: "center", color: ac, fontSize: 12 }}>✦</div>
-              <div style={{ background: "white", border: "1px solid #F0EBE3", borderRadius: "16px 16px 16px 3px", padding: "10px 14px", display: "flex", gap: 4, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
-                {[0, 140, 280].map(d => <div key={d} style={{ width: 6, height: 6, borderRadius: "50%", background: ac, animation: `bounce 1s ease ${d}ms infinite` }}/>)}
-              </div>
-            </div>
-          )}
-        </div>
+        <ChatThread
+          chatRef={chatRef}
+          msgs={msgs}
+          feedback={feedback}
+          setFeedback={setFeedback}
+          saveFeedback={saveFeedback}
+          loading={loading}
+          ac={ac}
+          historySummary={historySummary}
+          quickStarts={quickStarts}
+          lignes={lignes}
+          send={send}
+        />
 
         {/* Zone de saisie */}
         <div style={{ padding: "10px 14px 12px", background: "white", borderTop: "1px solid #F0EBE3", flexShrink: 0, position: "relative" }}>
