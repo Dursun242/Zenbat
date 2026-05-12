@@ -5,7 +5,7 @@ import { tradesLabels } from "../lib/trades.js";
 import { buildDevisHistorySummary } from "../lib/devisHistory.js";
 import { supabase } from "../lib/supabase.js";
 import { getToken } from "../lib/getToken.js";
-import { SR_LANGS, MIC_LANG_KEY, pickInitialLang } from "../lib/agentIA/speech.js";
+import { useSpeechRecognition } from "../hooks/useSpeechRecognition.js";
 import { buildAgentGreeting, quickStartsFor } from "../lib/agentIA/sectors.js";
 import { buildSystemPrompt } from "../lib/agentIA/prompt.js";
 import { processDevisFromRaw } from "../lib/agentIA/extractDevis.js";
@@ -42,9 +42,6 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   });
   const [visibleCount, setVisibleCount] = useState(0);
   const [pickingClient, setPickingClient] = useState(false);
-  const [listening,    setListening]    = useState(false);
-  const [micLang,      setMicLang]      = useState(() => pickInitialLang());
-  const [langMenu,     setLangMenu]     = useState(false);
   // Suggestions cliquables adaptées au 1er secteur — anti-syndrome page blanche.
   // 4 exemples de devis typiques du métier pour démarrer en 1 clic.
   const [quickStarts] = useState(() => quickStartsFor(brand));
@@ -52,15 +49,19 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   const [celebrate,    setCelebrate]    = useState(false);
   const celebrateStartRef = useRef(null);
   const celebrateSecondsRef = useRef(0);
-  const [micError,     setMicError]     = useState(null);
   const [editing,      setEditing]      = useState(null);   // { id, field }
   const [editingObjet, setEditingObjet] = useState(false);
   const [coherenceSettingsOpen, setCoherenceSettingsOpen] = useState(false);
   const userSettingsRef = useRef(null);
   const chatRef  = useRef(null);
   const inputRef = useRef(null);
-  const recRef   = useRef(null);
-  const accumRef = useRef("");
+
+  const {
+    listening, micSupported, micError, currentLang,
+    langMenu, setLangMenu,
+    toggleMic, pickLang, stopAndClear,
+    langs,
+  } = useSpeechRecognition({ input, setInput });
 
   const ac         = brand.color || "#22c55e";
   const fontFamily = brand.fontStyle === "elegant" ? "Playfair Display" : brand.fontStyle === "tech" ? "Space Grotesk" : "DM Sans";
@@ -133,16 +134,9 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     const newMsgs = [...msgs, userMsg];
     setMsgs(newMsgs);
 
-    // Stoppe la dictée vocale en cours et purge le buffer d'accumulation —
-    // sinon le prochain résultat SpeechRecognition ré-injecte l'ancien texte
-    // dans le champ et on risque les doublons d'envoi. On détache aussi
-    // onresult pour ignorer un éventuel tick final en vol après stop().
-    try {
-      const rec = recRef.current;
-      if (rec) { rec.onresult = null; rec.stop(); }
-    } catch {}
-    setListening(false);
-    accumRef.current = "";
+    // Stoppe la dictée vocale en cours et purge le buffer d'accumulation
+    // pour éviter qu'un futur démarrage ne ré-injecte l'ancien texte.
+    stopAndClear();
 
     setInput(""); setLoading(true);
 
@@ -342,76 +336,6 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     }
     setLoading(false);
   };
-
-  // ── Reconnaissance vocale (Web Speech API) ─────────────────
-  const SRClass = typeof window !== "undefined"
-    ? (window.SpeechRecognition || window.webkitSpeechRecognition)
-    : null;
-  const micSupported = !!SRClass;
-
-  useEffect(() => () => {
-    const rec = recRef.current;
-    if (rec) {
-      rec.onresult = null;
-      rec.onend    = null;
-      rec.onerror  = null;
-      try { rec.stop(); } catch {}
-    }
-  }, []);
-
-  const stopListening = () => {
-    try { recRef.current?.stop(); } catch {}
-    setListening(false);
-  };
-
-  const startListening = () => {
-    if (!SRClass) { setMicError("La reconnaissance vocale n'est pas disponible sur ce navigateur."); return; }
-    setMicError(null);
-    accumRef.current = input && !input.endsWith(" ") ? input + " " : input;
-    const rec = new SRClass();
-    rec.lang = micLang;
-    rec.continuous     = true;
-    rec.interimResults = true;
-    rec.onresult = (e) => {
-      let interim = "", final = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const t = e.results[i][0].transcript;
-        if (e.results[i].isFinal) final += t + " ";
-        else interim += t;
-      }
-      if (final) accumRef.current += final;
-      setInput(accumRef.current + interim);
-    };
-    rec.onerror = (ev) => {
-      setListening(false);
-      if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
-        setMicError("Microphone refusé. Autorisez-le dans les réglages du navigateur.");
-      } else if (ev.error === "no-speech") {
-        setMicError(null);
-      } else {
-        setMicError("Problème de reconnaissance vocale. Réessayez.");
-      }
-    };
-    rec.onend = () => setListening(false);
-    try {
-      rec.start();
-      recRef.current = rec;
-      setListening(true);
-    } catch {
-      setListening(false);
-    }
-  };
-
-  const toggleMic = () => (listening ? stopListening() : startListening());
-
-  const pickLang = (code) => {
-    setMicLang(code);
-    try { localStorage.setItem(MIC_LANG_KEY, code); } catch {}
-    setLangMenu(false);
-    if (listening) { stopListening(); setTimeout(startListening, 120); }
-  };
-
-  const currentLang = SR_LANGS.find(l => l.code === micLang) || SR_LANGS[0];
 
   const deleteLigne = id => setLignes(l => l.filter(x => x.id !== id));
 
@@ -860,12 +784,12 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
               <>
                 <div onClick={() => setLangMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }}/>
                 <div style={{ position: "absolute", bottom: "calc(100% + 6px)", left: 0, background: "white", border: "1px solid #E8E2D8", borderRadius: 12, boxShadow: "0 10px 28px rgba(15,23,42,.18)", padding: 4, zIndex: 41, maxHeight: 260, overflowY: "auto", minWidth: 180 }}>
-                  {SR_LANGS.map(l => (
+                  {langs.map(l => (
                     <button key={l.code} onClick={() => pickLang(l.code)}
-                      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: l.code === micLang ? "#f0fdf4" : "none", border: "none", padding: "8px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, color: "#1A1612", textAlign: "left" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: l.code === currentLang.code ? "#f0fdf4" : "none", border: "none", padding: "8px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, color: "#1A1612", textAlign: "left" }}>
                       <span style={{ fontSize: 14 }}>{l.flag}</span>
-                      <span style={{ fontWeight: l.code === micLang ? 700 : 500, flex: 1 }}>{l.label}</span>
-                      {l.code === micLang && <span style={{ color: ac, fontSize: 12 }}>✓</span>}
+                      <span style={{ fontWeight: l.code === currentLang.code ? 700 : 500, flex: 1 }}>{l.label}</span>
+                      {l.code === currentLang.code && <span style={{ color: ac, fontSize: 12 }}>✓</span>}
                     </button>
                   ))}
                 </div>
