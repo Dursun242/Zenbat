@@ -33,6 +33,10 @@ L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - Aucune migration en attente.
 - Prochaine migration à créer : préfixer avec `0041_`.
 
+**Pas d'historique fiable des migrations effectivement passées** : Supabase n'a pas de mécanisme natif (type `schema_migrations`) qui tracke ce que l'utilisateur a appliqué. Un trou est possible — exemple vécu : la migration `0007_signed_by.sql` avait été sautée alors que `0032`→`0040` étaient appliquées, ce qui faisait silencieusement échouer toute requête SQL qui sélectionnait `signed_by`.
+
+→ **Règle défensive pour le code serveur** : quand une requête lit ou écrit une colonne ajoutée par une migration ancienne, l'envelopper dans un fallback qui catch le code Postgres `42703` (column does not exist) et retente sans cette colonne. Le pattern existe déjà dans `src/lib/api.js` (`updateDevis`) et `api/devis-public.js` (GET `select` + action `accept`).
+
 ### position:fixed et animations CSS transform
 Tout composant React qui contient des enfants `position:fixed` (modales, drawers, toasts)
 **ne doit pas** avoir de `transform` CSS actif sur lui-même ou ses ancêtres directs.
@@ -69,16 +73,22 @@ src/
     constants.js    — CLAUDE_MODEL, STATUT, DEFAULT_BRAND, TX (i18n)
     trades.js       — ALL_TRADES, searchTrades(), TRADE_EXAMPLES
     brandCompleteness.js — score de complétion du profil
+    pdfBuilder.js   — générateur PDF côté navigateur (jsPDF). Polices DejaVu Sans + Caveat (cursive) embarquées via VFS pour conformité PDF/A-3 et tracé manuscrit du nom signataire dans le bloc "Bon pour accord".
   pages/
     Signup.jsx      — inscription 2 étapes (infos + métiers)
     Onboarding.jsx  — 6 étapes de configuration du profil
     AdminPanel.jsx  — panel admin (accès réservé à ADMIN_EMAIL)
+    DevisPublicPage.jsx — page publique de signature client. Phases : `loading` → `verify` (OTP) → `view` → `signing` (loader pendant génération + envoi PDF) → `accepted` / `refused`. Le PDF signé est généré côté navigateur (pdfBuilder) puis posté en base64 à `/api/devis-public` action `send_signed_pdf`.
   components/
     AgentIA.jsx     — agent IA de génération de devis (Claude API)
     Dashboard.jsx   — tableau de bord KPIs
     DevisDetail.jsx — détail + PDF d'un devis
     InvoiceDetail.jsx — détail + PDF d'une facture
 ```
+
+Polices embarquées dans `/public/fonts/` (servies en TTF) :
+- `DejaVuSans.ttf` + `DejaVuSans-Bold.ttf` — police principale du PDF (Latin étendu, requise pour PDF/A-3 Factur-X).
+- `Caveat-Regular.ttf` — police manuscrite (OFL) utilisée uniquement pour le tracé du nom dans le cartouche signature client. Auto-shrink 22pt → 14pt si le nom déborde. Servie aussi en `@font-face` dans `src/index.css` pour que l'aperçu HTML matche le PDF exporté.
 
 ### API Vercel (`/api`)
 Tous les endpoints vérifient le CORS via `ALLOWED_ORIGINS` et authentifient via `supabase.auth.getUser(token)`.
@@ -98,7 +108,7 @@ Helpers non déployés (préfixés `_`, importés par les endpoints) :
 | `admin-user-detail.js` | Données complètes d'un utilisateur (profil, devis, factures, clients, IA) |
 | `claude.js` | Proxy Claude API avec timeout 28s + AbortController |
 | `contact.js` | Formulaire de contact public — POST avec honeypot anti-bot, envoie un email à l'admin |
-| `devis-public.js` | Endpoint public pour signature client de devis — token + OTP 8 chiffres + audit, multi-routes par `action` |
+| `devis-public.js` | Endpoint public pour signature client de devis — token + OTP 8 chiffres + audit, multi-routes par `action` (`send`, `request_otp`, `verify_otp`, `accept`, `refuse`, `negotiate`, `artisan_respond`, `send_signed_pdf`). `send_signed_pdf` reçoit le PDF généré côté navigateur en base64 et l'email en pièce jointe au client + à l'artisan ; idempotence via audit log (`event = 'signed_pdf_sent'`). |
 | `facturx.js` | Génération PDF Factur-X (XML CII embarqué) |
 | `newsletter.js` | Inscription newsletter |
 | `stripe.js` | Stripe checkout/portal/info (POST authentifié) + webhook (détection par header `stripe-signature`) |
@@ -168,3 +178,4 @@ Pour changer de modèle : modifier la variable d'env `VITE_CLAUDE_MODEL` dans Ve
 - **Token périmé admin** : utiliser `getToken()` au lieu de `session?.access_token`. Corrigé dans `AdminPanel.jsx`.
 - **app bloquée si Supabase indisponible** : `getSession()` sans `.catch()` laissait `loading=true` à jamais. Corrigé dans `auth.jsx`.
 - **Factures émises qui repassent en brouillon à chaque session** : la migration `0022` avait ajouté `and not locked` au `WITH CHECK` de la policy `invoices_update_own`, ce qui rejetait l'UPDATE d'émission (le trigger `BEFORE UPDATE` posait `new.locked := true` avant l'évaluation du `WITH CHECK`, qui exigeait `not locked`). UPDATE rejeté silencieusement, DB inchangée, listInvoices() relisait le brouillon à la session suivante. Corrigé dans `0035_fix_rls_invoices_lock_transition.sql` — la sécurité reste assurée par le `USING` et le trigger.
+- **Page publique devis 404 "Lien introuvable" sur DB sans migration 0007** : le `GET /api/devis-public?token=...` sélectionnait la colonne `signed_by` (migration `0007_signed_by.sql`), absente de la DB de l'utilisateur alors que toutes les migrations 0032+ étaient appliquées. Postgres renvoyait `42703 column does not exist` → supabase-js renvoyait `error` truthy → handler retournait 404. Corrigé dans `api/devis-public.js` par un fallback `42703` qui retente le SELECT et l'UPDATE sans `signed_by` (et la signature manuscrite tombe en fallback sur `client_name`).
