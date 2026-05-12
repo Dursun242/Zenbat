@@ -87,18 +87,22 @@ export default function App() {
   // Compteur sticky : nombre de devis créés cette semaine ISO par
   // l'utilisateur sur cet appareil. Ne décrémente pas à la suppression
   // (anti-bypass). Source de vérité côté DB (RPC devis_week_count).
-  const [stickyDevisThisWeek, setStickyDevisThisWeek] = useState(() => readStickyDevisThisWeek());
+  // La clé localStorage est scopée par user.id pour qu'un nouvel inscrit
+  // n'hérite pas du compteur d'un autre compte sur le même navigateur.
+  const [stickyDevisThisWeek, setStickyDevisThisWeek] = useState(() => readStickyDevisThisWeek(user?.id));
   const [weekCount,           setWeekCount]           = useState(0);
 
   useEffect(() => {
     // Re-synchronise le compteur sticky local au changement de semaine
     // (toutes les minutes pour gérer le passage du dimanche au lundi
-    // pendant qu'une session est ouverte).
-    const tick = () => setStickyDevisThisWeek(readStickyDevisThisWeek());
+    // pendant qu'une session est ouverte) ET au changement d'utilisateur
+    // (pour basculer sur la clé scopée du nouvel user et éviter d'afficher
+    // un compteur hérité d'un autre compte).
+    const tick = () => setStickyDevisThisWeek(readStickyDevisThisWeek(user?.id));
     tick();
     const id = setInterval(tick, 60_000);
     return () => clearInterval(id);
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user) { setWeekCount(0); return; }
@@ -110,7 +114,7 @@ export default function App() {
   }, [user?.id]);
 
   const onDevisCreated = () => {
-    setStickyDevisThisWeek(bumpStickyDevisThisWeek());
+    setStickyDevisThisWeek(bumpStickyDevisThisWeek(user?.id));
     setWeekCount(c => c + 1);
   };
   const onQuotaReached = () => setScreen("paywall");
