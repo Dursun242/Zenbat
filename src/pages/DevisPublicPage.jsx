@@ -335,10 +335,44 @@ export default function DevisPublicPage({ token }) {
     } catch { setErr('Erreur réseau'); return false } finally { setBusy(false) }
   }
 
+  // Fire-and-forget : génère le PDF signé côté navigateur et le POST à l'API
+  // qui l'envoie en pièce jointe à l'artisan + au client. Un échec n'empêche
+  // pas l'acceptation (qui a déjà été enregistrée en DB côté serveur).
+  const sendSignedPdf = async (signerName, acceptedAt) => {
+    try {
+      const d = {
+        numero:               data.numero,
+        objet:                data.objet,
+        date_emission:        data.date_emission,
+        date_validite:        data.date_validite,
+        statut:               'accepte',
+        signed_at:            acceptedAt || new Date().toISOString(),
+        signed_by:            signerName,
+        tva_rate:             data.tva_rate,
+        auto_liquidation_btp: data.auto_liquidation_btp,
+        lignes:               data.lignes || [],
+      }
+      const cl = data.clientFull || {
+        raison_sociale: data.client?.name || '',
+        email:          data.client?.email || '',
+      }
+      const brand = data.artisan?.brand || {}
+      const { buildPdf } = await import('../lib/pdfBuilder.js')
+      const { base64 } = await buildPdf(d, cl, brand, 'devis', { filename: `devis-${d.numero}-signe.pdf` })
+      await post({ action: 'send_signed_pdf', pdf_base64: base64 })
+    } catch (e) {
+      if (import.meta.env.DEV) console.warn('[sendSignedPdf]', e)
+    }
+  }
+
   const handleAccept = async () => {
     if (!clientName.trim()) { setErr('Votre nom est requis'); return }
     const ok = await post({ action: 'accept', client_name: clientName })
-    if (ok) setPhase('accepted')
+    if (ok) {
+      setPhase('accepted')
+      // Pas de await : on ne bloque pas l'UI sur la génération + envoi email.
+      sendSignedPdf(clientName, ok.signed_at)
+    }
   }
 
   const handleRefuse = async () => {

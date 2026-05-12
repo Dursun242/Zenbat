@@ -237,7 +237,7 @@ export default async function handler(req, res) {
     if (!token) return res.status(400).json({ error: 'token manquant' })
 
     const { data: devis, error: de } = await admin.from('devis')
-      .select('id, numero, objet, montant_ht, statut, date_emission, date_validite, public_token, client_id, owner_id, client_accepted_at, client_refused_at, client_refusal_reason, lignes:lignes_devis(*)')
+      .select('id, numero, objet, montant_ht, statut, date_emission, date_validite, public_token, client_id, owner_id, client_accepted_at, client_refused_at, client_refusal_reason, signed_at, signed_by, tva_rate, auto_liquidation_btp, lignes:lignes_devis(*)')
       .eq('public_token', token)
       .maybeSingle()
     if (de || !devis) return res.status(404).json({ error: 'Devis introuvable' })
@@ -257,7 +257,7 @@ export default async function handler(req, res) {
     }
 
     const { data: client } = await admin.from('clients')
-      .select('raison_sociale, nom, prenom, email').eq('id', devis.client_id).maybeSingle()
+      .select('raison_sociale, nom, prenom, email, adresse, code_postal, ville, telephone').eq('id', devis.client_id).maybeSingle()
 
     const emailHint = client?.email
       ? client.email.replace(/^([\w.]{1,3})(.*)@/, (_, s) => s.length ? s + '***@' : s + '@')
@@ -297,7 +297,18 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ...preview,
       lignes:    (devis.lignes || []).sort((a, b) => (a.position || 0) - (b.position || 0)),
+      // Champs devis utilisés par pdfBuilder (côté navigateur) pour
+      // recalculer les totaux TVA et afficher la mention d'auto-liquidation.
+      tva_rate:             devis.tva_rate,
+      auto_liquidation_btp: devis.auto_liquidation_btp,
+      // Champs signature (déjà inclus en preview pour client_accepted_at,
+      // dupliqués ici pour cohérence avec ce que pdfBuilder attend).
+      signed_at:            devis.signed_at,
+      signed_by:            devis.signed_by,
+      // Vue résumée historique + vue complète (clientFull) pour le PDF
+      // signé généré côté navigateur sur la page publique.
       client:    { name: (`${client?.prenom || ''} ${client?.nom || ''}`).trim() || client?.raison_sociale || '', email: client?.email },
+      clientFull: client || null,
       docs:      docs || [],
       auditLog:  auditLog || [],
       negotiation,
@@ -526,24 +537,119 @@ export default async function handler(req, res) {
   if (!session) return res.status(401).json({ error: 'Session invalide ou expirée. Rafraîchissez la page.' })
 
   const { data: devis } = await admin.from('devis')
-    .select('id, numero, objet, statut, owner_id, client_id, montant_ht, lignes:lignes_devis(*)')
+    .select('id, numero, objet, statut, owner_id, client_id, montant_ht, signed_at, signed_by, lignes:lignes_devis(*)')
     .eq('public_token', token).maybeSingle()
   if (!devis) return res.status(404).json({ error: 'Devis introuvable' })
-  if (['accepte', 'refuse', 'remplace'].includes(devis.statut))
+  // send_signed_pdf est exempt : il n'a de sens qu'après acceptation.
+  if (action !== 'send_signed_pdf' && ['accepte', 'refuse', 'remplace'].includes(devis.statut))
     return res.status(400).json({ error: 'Ce devis est déjà clôturé' })
 
   const ip = req.headers['x-forwarded-for'] || null
+
+  // ── send_signed_pdf : email le PDF signé à l'artisan + au client ───────
+  // Appelé par DevisPublicPage juste après acceptation. Le PDF est généré
+  // côté navigateur (via src/lib/pdfBuilder.js) avec la signature manuscrite
+  // déjà incorporée — l'API ne fait que router le base64 vers les emails.
+  // Idempotence : si un événement 'signed_pdf_sent' existe déjà pour ce
+  // devis, on renvoie ok sans re-envoyer (protection contre les doubles
+  // clics ou les re-tentatives accidentelles).
+  if (action === 'send_signed_pdf') {
+    if (devis.statut !== 'accepte') return res.status(400).json({ error: 'Le devis doit être accepté avant envoi du PDF' })
+
+    const { pdf_base64 } = body
+    if (!pdf_base64 || typeof pdf_base64 !== 'string') return res.status(400).json({ error: 'PDF manquant' })
+    // Limite ~5 MB en base64 (≈3.75 MB binaire) — borne raisonnable pour
+    // un devis, évite qu'on accepte des payloads abusifs.
+    if (pdf_base64.length > 5 * 1024 * 1024) return res.status(413).json({ error: 'PDF trop volumineux' })
+
+    const { count: alreadySent } = await admin.from('devis_audit_log')
+      .select('id', { count: 'exact', head: true })
+      .eq('devis_id', devis.id).eq('event', 'signed_pdf_sent')
+    if (alreadySent && alreadySent > 0) return res.status(200).json({ ok: true, alreadySent: true })
+
+    const { data: client } = await admin.from('clients')
+      .select('raison_sociale, nom, prenom, email').eq('id', devis.client_id).maybeSingle()
+    const { data: profile } = await admin.from('profiles')
+      .select('company_name, brand_data').eq('id', devis.owner_id).maybeSingle()
+    const { data: ownerData } = await admin.auth.admin.getUserById(devis.owner_id)
+    const brand = (() => { const r = profile?.brand_data; if (!r) return {}; if (typeof r === 'string') { try { return JSON.parse(r) } catch { return {} } } return r })()
+    const company      = profile?.company_name || brand.companyName || ''
+    const artisanEmail = brand.email || ownerData?.user?.email || null
+    const clientName   = (`${client?.prenom || ''} ${client?.nom || ''}`).trim() || client?.raison_sociale || ''
+    const filename     = `devis-${devis.numero}-signe.pdf`
+
+    const attachments = [{ filename, content: pdf_base64, encoding: 'base64', contentType: 'application/pdf' }]
+
+    const emailHtml = (greeting, intro) => `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <div style="max-width:520px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden">
+    <div style="background:#22c55e;padding:24px;text-align:center">
+      <div style="font-size:30px;color:#fff">&#10003;</div>
+      <div style="color:#fff;font-size:18px;font-weight:700;margin-top:8px">Devis signé</div>
+    </div>
+    <div style="padding:32px">
+      <p style="color:#1A1612;font-size:14px;margin:0 0 16px">${greeting}</p>
+      <p style="color:#6B6358;font-size:14px;line-height:1.6;margin:0 0 16px">${intro}</p>
+      <p style="color:#6B6358;font-size:14px;line-height:1.6;margin:0">Vous trouverez le PDF signé en pièce jointe de cet email.</p>
+    </div>
+  </div></body></html>`
+
+    const errors = []
+    if (client?.email) {
+      try {
+        await sendEmail({
+          to: client.email,
+          fromName: company || 'Devis signé',
+          subject: `Votre devis ${devis.numero} signé`,
+          html: emailHtml(
+            `Bonjour ${clientName || ''},`,
+            `Votre signature électronique du devis <strong>${devis.numero}</strong>${devis.objet ? ` (${devis.objet})` : ''} a bien été enregistrée.`,
+          ),
+          attachments,
+        })
+      } catch (e) { errors.push(`client: ${e?.message || 'erreur'}`) }
+    }
+    if (artisanEmail) {
+      try {
+        await sendEmail({
+          to: artisanEmail,
+          fromName: 'Zenbat',
+          subject: `Devis ${devis.numero} signé par ${clientName || 'le client'}`,
+          html: emailHtml(
+            `Bonjour,`,
+            `Le devis <strong>${devis.numero}</strong>${devis.objet ? ` (${devis.objet})` : ''} a été signé électroniquement par <strong>${clientName || 'le client'}</strong>${client?.email ? ` (${client.email})` : ''}.`,
+          ),
+          attachments,
+        })
+      } catch (e) { errors.push(`artisan: ${e?.message || 'erreur'}`) }
+    }
+
+    await admin.from('devis_audit_log').insert({
+      devis_id: devis.id, event: 'signed_pdf_sent', from_party: 'system',
+      meta: { to_client: !!client?.email, to_artisan: !!artisanEmail, errors: errors.length ? errors : null, ip },
+    })
+    return res.status(200).json({ ok: true, sent: { client: !!client?.email && !errors.find(e => e.startsWith('client')), artisan: !!artisanEmail && !errors.find(e => e.startsWith('artisan')) }, errors: errors.length ? errors : undefined })
+  }
 
   // ── accept ─────────────────────────────────────────────────────────────
   if (action === 'accept') {
     const { client_name } = body
     if (!client_name?.trim()) return res.status(400).json({ error: 'Votre nom est requis pour accepter' })
 
-    await admin.from('devis').update({ statut: 'accepte', client_name: client_name.trim(), client_accepted_at: new Date().toISOString() }).eq('id', devis.id)
+    const clean      = client_name.trim()
+    const acceptedAt = new Date().toISOString()
+    await admin.from('devis').update({
+      statut:             'accepte',
+      client_name:        clean,
+      client_accepted_at: acceptedAt,
+      // Miroir vers les champs historiques utilisés par pdfBuilder pour
+      // afficher la signature manuscrite (cf. src/lib/pdfBuilder.js).
+      signed_by:          clean,
+      signed_at:          acceptedAt,
+    }).eq('id', devis.id)
     await admin.from('devis_negotiations').update({ status: 'superseded' }).eq('devis_id', devis.id).eq('status', 'pending')
-    await admin.from('devis_audit_log').insert({ devis_id: devis.id, event: 'accepted', from_party: 'client', meta: { client_name: client_name.trim(), ip } })
-    notifyTg('devis_accepted', { numero: devis.numero, objet: devis.objet, montant_ht: devis.montant_ht, client_name: client_name.trim() })
-    return res.status(200).json({ ok: true })
+    await admin.from('devis_audit_log').insert({ devis_id: devis.id, event: 'accepted', from_party: 'client', meta: { client_name: clean, ip } })
+    notifyTg('devis_accepted', { numero: devis.numero, objet: devis.objet, montant_ht: devis.montant_ht, client_name: clean })
+    return res.status(200).json({ ok: true, signed_at: acceptedAt, signed_by: clean })
   }
 
   // ── refuse ─────────────────────────────────────────────────────────────
