@@ -123,13 +123,13 @@ function PhaseEmail({ data, onVerified, onSessionId }) {
               </p>
               <input
                 type="text" inputMode="numeric" value={code}
-                onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                onKeyDown={e => e.key === 'Enter' && code.length === 8 && verifyOtp()}
-                placeholder="_ _ _ _ _ _ _ _" autoFocus maxLength={8}
-                style={{ width: '100%', padding: '14px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 28, fontWeight: 800, letterSpacing: 6, textAlign: 'center', outline: 'none', boxSizing: 'border-box', marginBottom: 12 }}
+                onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onKeyDown={e => e.key === 'Enter' && code.length === 6 && verifyOtp()}
+                placeholder="_ _ _ _ _ _" autoFocus maxLength={6}
+                style={{ width: '100%', padding: '14px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 32, fontWeight: 800, letterSpacing: 10, textAlign: 'center', outline: 'none', boxSizing: 'border-box', marginBottom: 12 }}
               />
-              <button onClick={verifyOtp} disabled={code.length !== 8 || busy}
-                style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: accent, color: 'white', fontWeight: 700, fontSize: 14, cursor: code.length !== 8 || busy ? 'default' : 'pointer', opacity: code.length !== 8 || busy ? 0.6 : 1 }}>
+              <button onClick={verifyOtp} disabled={code.length !== 6 || busy}
+                style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: accent, color: 'white', fontWeight: 700, fontSize: 14, cursor: code.length !== 6 || busy ? 'default' : 'pointer', opacity: code.length !== 6 || busy ? 0.6 : 1 }}>
                 {busy ? 'Vérification…' : 'Accéder au devis'}
               </button>
               <button onClick={() => { setSent(false); setCode(''); setErr(null) }}

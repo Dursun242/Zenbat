@@ -1,7 +1,7 @@
 // Page publique client — accès devis sans authentification Supabase
 // GET  ?token=xxx                 → aperçu (avant OTP) ou données complètes (après OTP)
 // POST {action:'send'}            → artisan envoie le devis par email (auth JWT requise)
-// POST {action:'request_otp'}     → envoie code 8 chiffres à l'email du client
+// POST {action:'request_otp'}     → envoie code 6 chiffres à l'email du client
 // POST {action:'verify_otp'}      → vérifie le code, ouvre la session 24h
 // POST {action:'accept'}          → client accepte (session OTP requise)
 // POST {action:'refuse'}          → client refuse avec raison (session OTP requise)
@@ -22,9 +22,10 @@ function makeAdmin() {
 }
 
 const hashStr = s => createHash('sha256').update(String(s)).digest('hex')
-// 8 chiffres via crypto.randomInt (CSPRNG) — 10⁸ combinaisons,
-// soit ~33 ans à brute-forcer même avec 10 essais/15 min.
-const genOtp  = () => randomInt(10_000_000, 100_000_000).toString()
+// 6 chiffres via crypto.randomInt (CSPRNG). 10⁶ combinaisons ;
+// le rate-limit IP (10 essais / 15 min) + la limite par session (3 essais)
+// ramènent l'attaque à ~10 ans par IP — équivalent aux OTP SMS standards.
+const genOtp  = () => randomInt(100_000, 1_000_000).toString()
 const fmtEur  = n => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n || 0)
 
 async function sendEmail({ to, subject, html, cc, fromName, attachments }) {
