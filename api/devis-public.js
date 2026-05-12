@@ -236,10 +236,21 @@ export default async function handler(req, res) {
     const { token, session_id } = req.query
     if (!token) return res.status(400).json({ error: 'token manquant' })
 
-    const { data: devis, error: de } = await admin.from('devis')
-      .select('id, numero, objet, montant_ht, statut, date_emission, date_validite, public_token, client_id, owner_id, client_accepted_at, client_refused_at, client_refusal_reason, signed_at, signed_by, tva_rate, auto_liquidation_btp, lignes:lignes_devis(*)')
+    // Fallback résilient si la migration 0007 (signed_by) n'a pas été
+    // appliquée sur la DB. Même pattern que src/lib/api.js updateDevis :
+    // on retente sans signed_by si Postgres répond 42703 (column not exist).
+    const FULL_DEVIS_SELECT = 'id, numero, objet, montant_ht, statut, date_emission, date_validite, public_token, client_id, owner_id, client_accepted_at, client_refused_at, client_refusal_reason, signed_at, signed_by, tva_rate, auto_liquidation_btp, lignes:lignes_devis(*)'
+    const SAFE_DEVIS_SELECT = 'id, numero, objet, montant_ht, statut, date_emission, date_validite, public_token, client_id, owner_id, client_accepted_at, client_refused_at, client_refusal_reason, signed_at, tva_rate, auto_liquidation_btp, lignes:lignes_devis(*)'
+    let { data: devis, error: de } = await admin.from('devis')
+      .select(FULL_DEVIS_SELECT)
       .eq('public_token', token)
       .maybeSingle()
+    if (de?.code === '42703') {
+      ({ data: devis, error: de } = await admin.from('devis')
+        .select(SAFE_DEVIS_SELECT)
+        .eq('public_token', token)
+        .maybeSingle())
+    }
     if (de || !devis) return res.status(404).json({ error: 'Devis introuvable' })
 
     const { data: profile } = await admin.from('profiles')
@@ -637,15 +648,21 @@ export default async function handler(req, res) {
 
     const clean      = client_name.trim()
     const acceptedAt = new Date().toISOString()
-    await admin.from('devis').update({
+    // Champs miroir vers signed_by/signed_at utilisés par pdfBuilder pour
+    // afficher la signature manuscrite. Fallback si la migration 0007 n'a
+    // pas été appliquée (colonne signed_by absente) : on retente sans.
+    const fullPatch = {
       statut:             'accepte',
       client_name:        clean,
       client_accepted_at: acceptedAt,
-      // Miroir vers les champs historiques utilisés par pdfBuilder pour
-      // afficher la signature manuscrite (cf. src/lib/pdfBuilder.js).
       signed_by:          clean,
       signed_at:          acceptedAt,
-    }).eq('id', devis.id)
+    }
+    let { error: ue } = await admin.from('devis').update(fullPatch).eq('id', devis.id)
+    if (ue?.code === '42703') {
+      const { signed_by, ...safe } = fullPatch
+      ;({ error: ue } = await admin.from('devis').update(safe).eq('id', devis.id))
+    }
     await admin.from('devis_negotiations').update({ status: 'superseded' }).eq('devis_id', devis.id).eq('status', 'pending')
     await admin.from('devis_audit_log').insert({ devis_id: devis.id, event: 'accepted', from_party: 'client', meta: { client_name: clean, ip } })
     notifyTg('devis_accepted', { numero: devis.numero, objet: devis.objet, montant_ht: devis.montant_ht, client_name: clean })
