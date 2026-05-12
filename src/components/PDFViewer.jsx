@@ -273,7 +273,16 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
               </div>
               {isSigned ? (
                 <div style={{height:40,display:"flex",flexDirection:"column",justifyContent:"center",borderBottom:"1px solid #16a34a"}}>
-                  <div style={{fontSize:11,fontWeight:700,color:"#15803d",fontFamily:"cursive",letterSpacing:"0.5px"}}>{signerDisplay}</div>
+                  <div style={{
+                    fontSize: 22,
+                    lineHeight: 1,
+                    fontWeight: 400,
+                    color: "#15803d",
+                    fontFamily: "'Caveat', cursive",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}>{signerDisplay}</div>
                   <div style={{fontSize:8,color:"#16a34a",marginTop:2}}>✓ Signé électroniquement</div>
                 </div>
               ) : (

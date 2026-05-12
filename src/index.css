@@ -1,5 +1,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@1,400;1,700&display=swap');
 
+/* Caveat — police manuscrite servie depuis /public/fonts pour que l'aperçu
+   HTML du devis utilise exactement la même police que le PDF généré côté
+   client par jsPDF (cf. src/lib/pdfBuilder.js). */
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/Caveat-Regular.ttf') format('truetype');
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
