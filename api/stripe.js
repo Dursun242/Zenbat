@@ -71,6 +71,28 @@ async function handleWebhook(req, res, rawBody) {
 
   const admin = createClient(supabaseUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
 
+  // Idempotence : Stripe retransmet le même event en cas de timeout réseau
+  // de notre côté. Sans cette garde, un `checkout.session.completed`
+  // retransmis double-met-à-jour le profil et envoie 2 notifs Telegram.
+  // On INSERT le event_id en clé primaire AVANT le traitement ; si conflit
+  // (23505) → déjà traité, on répond 200 sans rien refaire.
+  // Si la table n'existe pas (migration 0042 non appliquée), on log et on
+  // continue : la dédup est désactivée mais le webhook reste fonctionnel.
+  const { error: dedupErr } = await admin
+    .from('stripe_webhook_events')
+    .insert({ event_id: event.id, type: event.type })
+  if (dedupErr) {
+    if (dedupErr.code === '23505') {
+      console.log(`[stripe webhook] event ${event.id} déjà traité, skip`)
+      return res.status(200).json({ received: true, duplicate: true })
+    }
+    if (dedupErr.code !== '42P01') {
+      // Erreur DB autre que "table absente" → on loggue mais on continue
+      // pour ne pas perdre le webhook (mieux vaut un doublon qu'une perte).
+      console.warn('[stripe webhook] dedup insert failed:', dedupErr.message)
+    }
+  }
+
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object
     if (session.mode !== 'subscription') return res.status(200).json({ received: true })

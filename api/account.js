@@ -10,6 +10,31 @@ import { sendEmail } from "./_email.js"
 // Regex RFC 5322 simplifiée, alignée sur contact.js / newsletter.js
 const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/
 
+// Wrapper résilient pour l'export RGPD : si une migration n'est pas appliquée
+// sur l'env courant (table 42P01 absente, colonne 42703 inexistante) on
+// renvoie data=null plutôt que de faire 500 sur tout l'export. La
+// portabilité RGPD exige qu'on fournisse les données disponibles, pas
+// rien — un export partiel est préférable à un crash global.
+// On rend data=null (et pas []) pour rester compatible avec le `|| []`
+// ou `|| null` côté appelant selon que c'est une liste ou un maybeSingle.
+async function safe(q, label) {
+  try {
+    const r = await q
+    if (r.error) {
+      if (r.error.code === '42703' || r.error.code === '42P01') {
+        console.warn(`[account/export] ${label}: ${r.error.code} ${r.error.message} — exporting empty`)
+        return { data: null }
+      }
+      console.warn(`[account/export] ${label}:`, r.error?.message || r.error)
+      return { data: null }
+    }
+    return { data: r.data }
+  } catch (e) {
+    console.warn(`[account/export] ${label} throw:`, e?.message || e)
+    return { data: null }
+  }
+}
+
 export default async function handler(req, res) {
   cors(req, res, { methods: "GET, POST, OPTIONS" })
   if (req.method === 'OPTIONS') return res.status(204).end()
@@ -49,16 +74,16 @@ export default async function handler(req, res) {
       iaNegR,
       activityR,
     ] = await Promise.all([
-      admin.from('profiles').select('*').eq('id', owner_id).maybeSingle(),
-      admin.from('clients').select('*').eq('owner_id', owner_id),
-      admin.from('devis').select('*').eq('owner_id', owner_id),
-      admin.from('lignes_devis').select('*').eq('owner_id', owner_id),
-      admin.from('invoices').select('*').eq('owner_id', owner_id),
-      admin.from('lignes_invoices').select('*').eq('owner_id', owner_id),
-      admin.from('ia_conversations').select('*').eq('owner_id', owner_id),
-      admin.from('ia_error_logs').select('*').eq('owner_id', owner_id),
-      admin.from('ia_negative_logs').select('*').eq('owner_id', owner_id),
-      admin.from('activity_log').select('*').eq('owner_id', owner_id).order('created_at', { ascending: false }).limit(5000),
+      safe(admin.from('profiles').select('*').eq('id', owner_id).maybeSingle(), 'profiles'),
+      safe(admin.from('clients').select('*').eq('owner_id', owner_id), 'clients'),
+      safe(admin.from('devis').select('*').eq('owner_id', owner_id), 'devis'),
+      safe(admin.from('lignes_devis').select('*').eq('owner_id', owner_id), 'lignes_devis'),
+      safe(admin.from('invoices').select('*').eq('owner_id', owner_id), 'invoices'),
+      safe(admin.from('lignes_invoices').select('*').eq('owner_id', owner_id), 'lignes_invoices'),
+      safe(admin.from('ia_conversations').select('*').eq('owner_id', owner_id), 'ia_conversations'),
+      safe(admin.from('ia_error_logs').select('*').eq('owner_id', owner_id), 'ia_error_logs'),
+      safe(admin.from('ia_negative_logs').select('*').eq('owner_id', owner_id), 'ia_negative_logs'),
+      safe(admin.from('activity_log').select('*').eq('owner_id', owner_id).order('created_at', { ascending: false }).limit(5000), 'activity_log'),
     ])
 
     let pdfFiles = []

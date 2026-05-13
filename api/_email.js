@@ -52,11 +52,26 @@ export async function sendEmail({ to, subject, html, cc, fromName, attachments }
     }))
   }
 
-  const res = await fetch('https://api.resend.com/emails', {
-    method:  'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body:    JSON.stringify(payload),
-  })
+  // Timeout 8s : sans ça, si Resend est lent/down la fonction Vercel attend
+  // la limite plateforme (10s Hobby, 30s Pro) puis répond 504 sans message
+  // exploitable côté client. Avec un AbortController on récupère un throw
+  // explicite "Resend timeout" qu'on remonte au client.
+  const ac = new AbortController()
+  const timer = setTimeout(() => ac.abort(), 8000)
+  let res
+  try {
+    res = await fetch('https://api.resend.com/emails', {
+      method:  'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+      signal:  ac.signal,
+    })
+  } catch (e) {
+    if (e?.name === 'AbortError') throw new Error('Resend timeout (8s) — réessayez dans un instant')
+    throw e
+  } finally {
+    clearTimeout(timer)
+  }
   if (!res.ok) {
     const e = await res.json().catch(() => ({}))
     throw new Error(e.message || `Resend ${res.status}`)
