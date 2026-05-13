@@ -1,8 +1,44 @@
-import { useState, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../lib/auth.jsx'
 import { saveCguAcceptance } from '../lib/api.js'
 import { CGU_VERSION } from './CGU.jsx'
 import { searchTrades, TRADE_EXAMPLES } from '../lib/trades.js'
+
+// Persistance du brouillon d'inscription : sans ça, un reload accidentel
+// (notif push qui fait basculer l'app, batterie faible mobile, double-tap
+// sur le bouton retour iOS, etc.) entre l'étape 1 et 2 fait tout perdre.
+//
+// ⚠ On NE persiste PAS :
+//   - password : aucune raison de garder un mot de passe en clair dans
+//     le localStorage. L'utilisateur le retape, c'est mineur.
+//   - cguAccepted : à chaque session il faut re-cocher activement les
+//     CGU (obligation légale — pas de pré-cochage caché).
+//
+// TTL 1 heure : assez pour récupérer un reload accidentel, trop court
+// pour stocker durablement un email / une intention d'inscription.
+const SIGNUP_DRAFT_KEY = 'zenbat_signup_draft'
+const SIGNUP_DRAFT_TTL_MS = 60 * 60 * 1000
+
+function readSignupDraft() {
+  try {
+    const raw = localStorage.getItem(SIGNUP_DRAFT_KEY)
+    if (!raw) return null
+    const d = JSON.parse(raw)
+    if (!Number.isFinite(d?.savedAt) || Date.now() - d.savedAt > SIGNUP_DRAFT_TTL_MS) {
+      localStorage.removeItem(SIGNUP_DRAFT_KEY)
+      return null
+    }
+    return d
+  } catch { return null }
+}
+function writeSignupDraft(d) {
+  try {
+    localStorage.setItem(SIGNUP_DRAFT_KEY, JSON.stringify({ ...d, savedAt: Date.now() }))
+  } catch {}
+}
+function clearSignupDraft() {
+  try { localStorage.removeItem(SIGNUP_DRAFT_KEY) } catch {}
+}
 
 const s = {
   wrap:   { minHeight:'100vh', display:'grid', placeItems:'center', padding:24, background:'#FAF7F2', fontFamily:'Inter,system-ui,sans-serif' },
@@ -21,17 +57,21 @@ const normalize = t => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 export default function Signup({ onSwitchToLogin, onBack }) {
   const { signUpWithPassword } = useAuth()
 
+  // Lecture one-shot du brouillon : s'il existe et est récent, on
+  // pré-remplit les champs (sauf password + cguAccepted, cf en-tête).
+  const draft = readSignupDraft()
+
   // Étape 1 — informations
-  const [step,      setStep]      = useState(1)
-  const [firstName, setFirstName] = useState('')
-  const [lastName,  setLastName]  = useState('')
-  const [company,   setCompany]   = useState('')
-  const [email,     setEmail]     = useState('')
+  const [step,      setStep]      = useState(draft?.step      ?? 1)
+  const [firstName, setFirstName] = useState(draft?.firstName ?? '')
+  const [lastName,  setLastName]  = useState(draft?.lastName  ?? '')
+  const [company,   setCompany]   = useState(draft?.company   ?? '')
+  const [email,     setEmail]     = useState(draft?.email     ?? '')
   const [password,  setPassword]  = useState('')
   const [cguAccepted, setCguAccepted] = useState(false)
 
   // Étape 2 — métiers
-  const [trades,     setTrades]     = useState([])
+  const [trades,     setTrades]     = useState(draft?.trades ?? [])
   const [tradeInput, setTradeInput] = useState('')
   const [showDrop,   setShowDrop]   = useState(false)
   const inputRef = useRef(null)
@@ -40,6 +80,18 @@ export default function Signup({ onSwitchToLogin, onBack }) {
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState(null)
   const [sent,    setSent]    = useState(false)
+
+  // Persistance à chaque changement de champ. On debounce pas — le write
+  // est synchrone et léger.
+  useEffect(() => {
+    writeSignupDraft({ step, firstName, lastName, company, email, trades })
+  }, [step, firstName, lastName, company, email, trades])
+
+  // Nettoyage au succès (compte créé) — pas de raison de garder un
+  // brouillon une fois l'inscription effective.
+  useEffect(() => {
+    if (sent) clearSignupDraft()
+  }, [sent])
 
   // ── Étape 1 → 2 ──────────────────────────────────────────
   const goToStep2 = (e) => {

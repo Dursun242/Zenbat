@@ -1,5 +1,6 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { brandCompleteness } from "../lib/brandCompleteness.js"
+import { useAuth } from "../lib/auth.jsx"
 import { Logo, STEPS } from "../components/onboarding/shared.jsx"
 import BrandingStep    from "../components/onboarding/BrandingStep.jsx"
 import TradesStep      from "../components/onboarding/TradesStep.jsx"
@@ -8,17 +9,64 @@ import StyleStep       from "../components/onboarding/StyleStep.jsx"
 import LegalStep       from "../components/onboarding/LegalStep.jsx"
 import DataPrivacyStep from "../components/onboarding/DataPrivacyStep.jsx"
 
+// Persistance du brouillon d'onboarding : sans ça, un utilisateur qui
+// abandonne à l'étape 3 sur 6 perd tout et recommence de zéro. La clé est
+// scopée par user.id (cohérent avec appShell.js / AgentIA) et inclut un
+// TTL de 7 jours pour ne pas restaurer un vieux brouillon à un utilisateur
+// qui revient éditer son brand des mois plus tard.
+const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000
+const draftKey = (userId) => `zenbat_onboarding_draft_${userId || "anon"}`
+
+function readDraft(userId) {
+  try {
+    const raw = localStorage.getItem(draftKey(userId))
+    if (!raw) return null
+    const { step, local, savedAt } = JSON.parse(raw)
+    if (!Number.isFinite(savedAt) || Date.now() - savedAt > DRAFT_TTL_MS) {
+      localStorage.removeItem(draftKey(userId))
+      return null
+    }
+    return { step, local }
+  } catch { return null }
+}
+
+function writeDraft(userId, step, local) {
+  try {
+    localStorage.setItem(draftKey(userId), JSON.stringify({ step, local, savedAt: Date.now() }))
+  } catch {}
+}
+
+function clearDraft(userId) {
+  try { localStorage.removeItem(draftKey(userId)) } catch {}
+}
+
 export default function Onboarding({ brand, setBrand, onDone }) {
-  const [step,  setStep]  = useState(0)
-  const [local, setLocal] = useState({ ...brand })
+  const { user } = useAuth()
+  const userId = user?.id
+
+  // Au premier mount : si un brouillon récent existe, on le restaure
+  // (cas de l'utilisateur qui a abandonné à l'étape 3 et revient).
+  // Sinon on part du brand actuel comme avant.
+  const [step,  setStep]  = useState(() => readDraft(userId)?.step ?? 0)
+  const [local, setLocal] = useState(() => readDraft(userId)?.local ?? { ...brand })
   const [tryNext, setTryNext] = useState(false)
   const set = (k, v) => setLocal(b => ({ ...b, [k]: v }))
+
+  // Sauvegarde à chaque modification de step ou local.
+  useEffect(() => {
+    if (!userId) return
+    writeDraft(userId, step, local)
+  }, [userId, step, local])
 
   const quality = brandCompleteness(local)
   const step0Invalid = !local.companyName?.trim()
   const canGoNext = step === 0 ? !step0Invalid : true
 
-  const save = () => { setBrand(local); onDone() }
+  const save = () => {
+    setBrand(local)
+    clearDraft(userId)
+    onDone()
+  }
   const fontFamily = local.fontStyle==="elegant"?"Playfair Display":local.fontStyle==="tech"?"Space Grotesk":"DM Sans"
 
   return (
