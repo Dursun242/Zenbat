@@ -15,7 +15,11 @@ export default function BottomNav({ items, activeNav, onSelect, plan, quotaReach
         display: "flex", zIndex: 50,
         // safe-area-inset-bottom : iPhone à notch / Dynamic Island — sans
         // ça les boutons collent à la barre home et sont durs à toucher.
-        paddingBottom: "env(safe-area-inset-bottom)",
+        // Cap à 34px : sur certains états iOS standalone, env() renvoie
+        // une valeur gonflée à l'ouverture (gros vide noir sous la nav qui
+        // se "corrige" après navigation). 34px = hauteur typique de la
+        // zone home indicator, suffisant pour tous les iPhone modernes.
+        paddingBottom: "min(env(safe-area-inset-bottom, 0px), 34px)",
       }}>
       <style>{`
         @keyframes bn-nudge-bob   { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-5px); } }
