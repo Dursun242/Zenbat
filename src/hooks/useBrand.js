@@ -47,7 +47,10 @@ export function useBrand(user, setScreen) {
         hydrateFromMetadata(user, setBrand);
       });
     return () => { cancelled = true; };
-  }, [user?.id, setBrand]); // eslint-disable-line react-hooks/exhaustive-deps
+    // setBrand est créé une seule fois via useCallback([]), il est stable
+    // et n'a pas besoin d'être en dépendance — l'inclure faisait re-runner
+    // l'effet sans raison (audit P2 sur les fetches inutiles au login).
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => clearTimeout(brandSaveTimer.current), []);
 
