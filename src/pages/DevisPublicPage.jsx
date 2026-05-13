@@ -283,6 +283,10 @@ export default function DevisPublicPage({ token }) {
   const [busy,         setBusy]         = useState(false)
   const [err,          setErr]          = useState(null)
   const [pdfLoading,   setPdfLoading]   = useState(false)
+  // Statut d'envoi de l'email post-signature : null tant qu'on n'a pas
+  // tenté, { client: bool, artisan: bool } après la requête. Permet de
+  // nuancer le message sur l'écran 'accepted' si un destinataire a raté.
+  const [emailSent,    setEmailSent]    = useState(null)
 
   const accent = data?.artisan?.color || '#111111'
 
@@ -335,10 +339,51 @@ export default function DevisPublicPage({ token }) {
     } catch { setErr('Erreur réseau'); return false } finally { setBusy(false) }
   }
 
+  // Génère le PDF signé côté navigateur et le POST à l'API qui l'envoie
+  // en pièce jointe à l'artisan + au client. Retourne le résultat de
+  // l'envoi ({ ok, sent: {client, artisan}, errors }) ou null en cas
+  // d'échec local (génération PDF, réseau, etc.).
+  const sendSignedPdf = async (signerName, acceptedAt) => {
+    try {
+      const d = {
+        numero:               data.numero,
+        objet:                data.objet,
+        date_emission:        data.date_emission,
+        date_validite:        data.date_validite,
+        statut:               'accepte',
+        signed_at:            acceptedAt || new Date().toISOString(),
+        signed_by:            signerName,
+        tva_rate:             data.tva_rate,
+        auto_liquidation_btp: data.auto_liquidation_btp,
+        lignes:               data.lignes || [],
+      }
+      const cl = data.clientFull || {
+        raison_sociale: data.client?.name || '',
+        email:          data.client?.email || '',
+      }
+      const brand = data.artisan?.brand || {}
+      const { buildPdf } = await import('../lib/pdfBuilder.js')
+      const { base64 } = await buildPdf(d, cl, brand, 'devis', { filename: `devis-${d.numero}-signe.pdf` })
+      return await post({ action: 'send_signed_pdf', pdf_base64: base64 })
+    } catch (e) {
+      if (import.meta.env.DEV) console.warn('[sendSignedPdf]', e)
+      return null
+    }
+  }
+
+  // Acceptation en deux temps : on enregistre la signature en DB, puis on
+  // affiche un loader 'Signature en cours…' pendant la génération du PDF
+  // et l'envoi des emails. La phase 'accepted' n'est atteinte qu'une fois
+  // les emails partis (ou définitivement en échec) — c'est ce qui rassure
+  // l'utilisateur sur le fait que tout est bien parti.
   const handleAccept = async () => {
     if (!clientName.trim()) { setErr('Votre nom est requis'); return }
     const ok = await post({ action: 'accept', client_name: clientName })
-    if (ok) setPhase('accepted')
+    if (!ok) return
+    setPhase('signing')
+    const result = await sendSignedPdf(clientName, ok.signed_at)
+    setEmailSent(result?.sent || null)
+    setPhase('accepted')
   }
 
   const handleRefuse = async () => {
@@ -372,6 +417,31 @@ export default function DevisPublicPage({ token }) {
     )
   }
 
+  if (phase === 'signing') {
+    return (
+      <div style={{ minHeight: '100vh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+        <style>{`@keyframes dp-spin { to { transform: rotate(360deg) } }`}</style>
+        <Header artisan={data?.artisan} />
+        <div style={{ maxWidth: 480, margin: '48px auto', padding: '0 20px', textAlign: 'center' }}>
+          <div style={{ background: 'white', borderRadius: 12, padding: '48px 32px', border: '1px solid #e5e5e5' }}>
+            <div style={{
+              width: 48, height: 48, margin: '0 auto 24px',
+              border: `3px solid #e5e5e5`,
+              borderTopColor: accent,
+              borderRadius: '50%',
+              animation: 'dp-spin 0.9s linear infinite',
+            }} />
+            <h2 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 700, color: '#111' }}>Signature en cours…</h2>
+            <p style={{ color: '#777', fontSize: 14, lineHeight: 1.6, margin: 0 }}>
+              Nous préparons votre devis signé et l'envoyons par email.
+              Cela peut prendre quelques secondes — merci de ne pas fermer cette page.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (phase === 'accepted') {
     return (
       <div style={{ minHeight: '100vh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
@@ -384,6 +454,16 @@ export default function DevisPublicPage({ token }) {
               Votre accord pour le devis <strong style={{ color: '#111' }}>{data.numero}</strong> a bien été enregistré
               {data.client_accepted_at ? ` le ${fmtD(data.client_accepted_at)}` : ''}.
             </p>
+            {emailSent?.client && (
+              <p style={{ color: '#15803d', fontSize: 13, lineHeight: 1.6, margin: '0 0 16px', background: '#f0fdf4', borderRadius: 8, padding: '10px 14px' }}>
+                ✓ Le devis signé vous a été envoyé par email.
+              </p>
+            )}
+            {emailSent && !emailSent.client && (
+              <p style={{ color: '#92400e', fontSize: 13, lineHeight: 1.6, margin: '0 0 16px', background: '#fef9c3', borderRadius: 8, padding: '10px 14px' }}>
+                Votre signature est enregistrée, mais l'envoi du PDF par email a échoué. L'artisan vous le transmettra.
+              </p>
+            )}
             {data.artisan?.company && (
               <p style={{ color: '#555', fontSize: 14, margin: 0 }}>
                 L'équipe de <strong>{data.artisan.company}</strong> vous contactera prochainement.

@@ -2,15 +2,20 @@ import { jsPDF } from "jspdf";
 import { fmt, fmtD } from "./utils.js";
 import { notifyAdminPdf } from "./telegramNotify.js";
 
-// Polices DejaVu Sans embarquées dans jsPDF — indispensable pour la conformité
-// PDF/A-3 du Factur-X. Les fonts standard PDF "Helvetica" ne sont pas embarquées
-// (ISO 19005-3 § 6.2.11.4 rejette le PDF). On charge DejaVu depuis /public/fonts
-// et on l'enregistre dans le VFS de jsPDF, qui l'embarque alors comme TrueType
-// CIDFontType2 (Identity-H + ToUnicode + /W cohérent avec le programme TTF).
-let _dejaVuPromise = null;
-async function loadDejaVuFonts() {
-  if (_dejaVuPromise) return _dejaVuPromise;
-  _dejaVuPromise = (async () => {
+// Polices embarquées dans jsPDF — indispensable pour la conformité PDF/A-3 du
+// Factur-X. Les fonts standard PDF "Helvetica" ne sont pas embarquées (ISO
+// 19005-3 § 6.2.11.4 rejette le PDF). On charge les TTF depuis /public/fonts
+// et on les enregistre dans le VFS de jsPDF, qui les embarque alors comme
+// TrueType CIDFontType2 (Identity-H + ToUnicode + /W cohérent avec le TTF).
+// - DejaVu Sans (regular + bold) : police principale.
+// - Caveat (regular) : police manuscrite pour le rendu visuel du nom du
+//   signataire dans le bloc "Bon pour accord". La valeur légale de la
+//   signature repose sur l'OTP + audit trail (IP, user-agent, hash) — pas sur
+//   le tracé du nom, qui reste purement décoratif.
+let _fontsPromise = null;
+async function loadFonts() {
+  if (_fontsPromise) return _fontsPromise;
+  _fontsPromise = (async () => {
     const toBase64 = (ab) => {
       const bytes = new Uint8Array(ab);
       let bin = "";
@@ -20,23 +25,27 @@ async function loadDejaVuFonts() {
       }
       return btoa(bin);
     };
-    const [reg, bold] = await Promise.all([
+    const [reg, bold, sign] = await Promise.all([
       fetch("/fonts/DejaVuSans.ttf").then(r => r.arrayBuffer()),
       fetch("/fonts/DejaVuSans-Bold.ttf").then(r => r.arrayBuffer()),
+      fetch("/fonts/Caveat-Regular.ttf").then(r => r.arrayBuffer()),
     ]);
-    return { regular: toBase64(reg), bold: toBase64(bold) };
-  })().catch(err => { _dejaVuPromise = null; throw err; });
-  return _dejaVuPromise;
+    return { regular: toBase64(reg), bold: toBase64(bold), sign: toBase64(sign) };
+  })().catch(err => { _fontsPromise = null; throw err; });
+  return _fontsPromise;
 }
 
-function registerDejaVu(pdf, fonts) {
+function registerFonts(pdf, fonts) {
   pdf.addFileToVFS("DejaVuSans.ttf", fonts.regular);
   pdf.addFont("DejaVuSans.ttf", "DejaVuSans", "normal");
   pdf.addFileToVFS("DejaVuSans-Bold.ttf", fonts.bold);
   pdf.addFont("DejaVuSans-Bold.ttf", "DejaVuSans", "bold");
+  pdf.addFileToVFS("Caveat-Regular.ttf", fonts.sign);
+  pdf.addFont("Caveat-Regular.ttf", "Caveat", "normal");
 }
 
 const FONT = "DejaVuSans";
+const FONT_SIGN = "Caveat";
 
 const A4_W = 210, A4_H = 297, PAD = 10;
 const CW = A4_W - 2 * PAD; // 190mm
@@ -229,8 +238,8 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
   validDate.setDate(validDate.getDate() + (brand.validityDays || 30));
 
   const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-  const dejaVu = await loadDejaVuFonts();
-  registerDejaVu(pdf, dejaVu);
+  const fonts = await loadFonts();
+  registerFonts(pdf, fonts);
   pdf.setFont(FONT, "normal");
   let y = PAD;
 
@@ -471,7 +480,7 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
   // ── Signatures (devis only) ───────────────────────────────────────────────
   if (kind !== "facture") {
     const isSigned    = d.statut === "accepte" && d.signed_at;
-    const signerLabel = d.signed_by || clientName;
+    const signerLabel = s(d.signed_by || clientName);
     const sigColor    = isSigned ? GREEN : BORDER2;
 
     y = need(pdf, y, 28);
@@ -488,10 +497,24 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
     y += 8;
 
     if (isSigned) {
-      txt(pdf, signerLabel,                                X,   y + 5,  { size: 10, bold: true, color: GREEN });
-      txt(pdf, "✓ Signé électroniquement", X, y + 10, { size: 7, color: GREEN });
+      // Tracé "manuscrit" du nom en Caveat. Auto-shrink si trop long pour la
+      // largeur disponible (sigW - 2mm de marge), borné entre 14pt et 22pt.
+      const MAX_SIG_PT = 22, MIN_SIG_PT = 14;
+      const sigMaxW = sigW - 2;
+      pdf.setFont(FONT_SIGN, "normal");
+      let sigPt = MAX_SIG_PT;
+      pdf.setFontSize(sigPt);
+      while (sigPt > MIN_SIG_PT && pdf.getTextWidth(signerLabel) > sigMaxW) {
+        sigPt -= 0.5;
+        pdf.setFontSize(sigPt);
+      }
+      setTxt(pdf, GREEN);
+      pdf.text(signerLabel, X, y + 7);
+      // Restaurer la police principale pour la suite du document.
+      pdf.setFont(FONT, "normal");
+      txt(pdf, "✓ Signé électroniquement", X, y + 11, { size: 7, color: GREEN });
       hline(pdf, X, X + sigW, y + 13, GREEN);
-      txt(pdf, fmtD(d.signed_at), dtX, y + 5, { size: 10, bold: true, color: GREEN });
+      txt(pdf, fmtD(d.signed_at), dtX, y + 7, { size: 10, bold: true, color: GREEN });
       hline(pdf, dtX, dtX + dtW - 5, y + 13, GREEN);
     } else {
       hline(pdf, X, X + sigW, y + 12, MUTED);

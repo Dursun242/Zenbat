@@ -12,6 +12,7 @@ import AdminCoherenceStats from "./admin/AdminCoherenceStats.jsx"
 import AdminFeedback       from "./admin/AdminFeedback.jsx"
 import AdminAgentBenchmark from "./admin/AdminAgentBenchmark.jsx"
 import AdminQuotesSent    from "./admin/AdminQuotesSent.jsx"
+import Collapsible        from "./admin/Collapsible.jsx"
 import DeleteUserModal    from "./admin/DeleteUserModal.jsx"
 import UserDetailDrawer  from "./admin/UserDetailDrawer.jsx"
 
@@ -49,8 +50,9 @@ export default function AdminPanel({ onBack }) {
   const [detailLoading,setDetailLoading]= useState(false)
   const [detailError,  setDetailError]  = useState(null)
   const [detailTab,    setDetailTab]    = useState("overview")
+  const [planToggling, setPlanToggling] = useState(false)
 
-  useEffect(() => { if (session) { load(); loadLogs(); loadNegs(); loadConvs(); loadNewsletter(); loadCoherence(); loadFeedback(); loadQuotesSent() } }, [session?.access_token])
+  useEffect(() => { if (session) { load() } }, [session?.access_token])
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -154,6 +156,30 @@ export default function AdminPanel({ onBack }) {
   }
 
   const closeDetail = () => { setDetailUser(null); setDetailData(null); setDetailError(null) }
+
+  // Bascule manuelle du plan d'un user (override admin, indépendant de Stripe).
+  // Met à jour profile.plan en DB puis met à jour optimistiquement detailData
+  // pour que le drawer reflète immédiatement le nouveau plan (badge + libellé
+  // du bouton). La liste d'users est rafraîchie au prochain reload de stats.
+  const toggleUserPlan = async (newPlan) => {
+    if (!detailUser || planToggling) return
+    setPlanToggling(true)
+    try {
+      const token = await getToken()
+      const res   = await fetch("/api/admin-user-detail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: "set_plan", userId: detailUser.id, plan: newPlan }),
+      })
+      const data = await res.json()
+      if (!res.ok) { alert(data?.error || "Échec du changement de plan"); return }
+      setDetailData(prev => prev ? { ...prev, profile: { ...(prev.profile || {}), plan: data.plan } } : prev)
+    } catch (e) {
+      alert(e?.message || "Erreur réseau")
+    } finally {
+      setPlanToggling(false)
+    }
+  }
   const closeDelete = () => { if (deleting) return; setDeleteTarget(null); setConfirmInput(""); setDeleteError(null) }
 
   const confirmDelete = async () => {
@@ -201,15 +227,19 @@ export default function AdminPanel({ onBack }) {
 
   return (
     <div style={{ minHeight: "100%", background: "#FAF7F2", paddingBottom: 40 }}>
-      <div style={{ background: "#1A1612", padding: "14px 18px", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, zIndex: 10 }}>
-        <button onClick={onBack} style={{ background: "none", border: "none", color: "#9A8E82", cursor: "pointer", padding: 4 }}>
-          <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12,5 5,12 12,19"/></svg>
+      <div style={{ background: "#1A1612", padding: "16px 18px calc(14px + env(safe-area-inset-top, 0px))", paddingTop: "calc(14px + env(safe-area-inset-top, 0px))", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, zIndex: 10, boxShadow: "0 2px 12px rgba(26,22,18,.18)" }}>
+        <button onClick={onBack} aria-label="Retour"
+          style={{ background: "#2A231C", border: "none", color: "#9A8E82", cursor: "pointer", padding: 8, borderRadius: 8, display: "flex", alignItems: "center" }}>
+          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12,5 5,12 12,19"/></svg>
         </button>
-        <div style={{ flex: 1 }}>
-          <div style={{ color: "white", fontWeight: 700, fontSize: 16 }}>Panel Admin</div>
-          <div style={{ color: "#6B6358", fontSize: 10 }}>Vue globale Zenbat</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ color: "white", fontWeight: 700, fontSize: 16, letterSpacing: "-0.3px", fontFamily: "'Syne', sans-serif" }}>Panel Admin</div>
+          <div style={{ color: "#9A8E82", fontSize: 10, letterSpacing: "0.5px", textTransform: "uppercase", marginTop: 1 }}>Vue globale Zenbat</div>
         </div>
-        <button onClick={load} style={{ background: "#2A231C", border: "1px solid #3D3028", borderRadius: 8, padding: "5px 10px", color: "#9A8E82", fontSize: 11, cursor: "pointer" }}>↻ Actualiser</button>
+        <button onClick={load}
+          style={{ background: "#2A231C", border: "1px solid #3D3028", borderRadius: 8, padding: "6px 12px", color: "#C97B5C", fontSize: 11, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+          <span style={{ fontSize: 13 }}>↻</span> Actualiser
+        </button>
       </div>
 
       {loading && <div style={{ padding: 40, textAlign: "center", color: "#9A8E82", fontSize: 13 }}>Chargement…</div>}
@@ -221,14 +251,11 @@ export default function AdminPanel({ onBack }) {
 
       {stats && (
         <div style={{ padding: 16 }}>
+
+          {/* KPIs héros + détails repliés à l'intérieur — toujours visible */}
           <AdminKPIs stats={stats} />
-          <AdminQuotesSent data={quotesSent} loading={quotesSentLoading} onRefresh={loadQuotesSent} />
-          <AdminConversations
-            iaConvs={iaConvs}      loading={convsLoading}
-            convSearch={convSearch} setConvSearch={setConvSearch}
-            openConvUser={openConvUser} setOpenConvUser={setOpenConvUser}
-            onRefresh={loadConvs}
-          />
+
+          {/* Utilisateurs : avec recherche, c'est le coeur du travail admin */}
           <AdminUsersTable
             users={filteredUsers}
             userSearch={userSearch}    setUserSearch={setUserSearch}
@@ -236,22 +263,52 @@ export default function AdminPanel({ onBack }) {
             currentUserId={currentUser?.id}
             onOpenDetail={openDetail}  onOpenDelete={openDelete}
           />
-          <AdminErrorLogs    iaLogs={iaLogs}  loading={logsLoading}  onRefresh={loadLogs} />
-          <AdminNegativeLogs iaNegs={iaNegs}  loading={negsLoading}  negFilter={negFilter} setNegFilter={setNegFilter} onRefresh={loadNegs} />
-          <AdminNewsletter
-            subscribers={newsletter}  loading={newsletterLoading}
-            onRefresh={loadNewsletter}
-          />
-          <AdminCoherenceStats
-            data={coherence}  loading={coherenceLoading}
-            onRefresh={loadCoherence}
-          />
-          <AdminFeedback
-            data={feedback}  loading={feedbackLoading}
-            onRefresh={loadFeedback}
-          />
-          <AdminAgentBenchmark />
-          <div style={{ textAlign: "center", fontSize: 10, color: "#cbd5e1" }}>
+
+          {/* Sections secondaires repliables — chargées seulement à l'ouverture */}
+          <Collapsible title="Devis envoyés"   subtitle="Historique des envois email aux clients"
+            count={quotesSent?.length}        loaded={quotesSent !== null} onExpand={loadQuotesSent}>
+            <AdminQuotesSent data={quotesSent} loading={quotesSentLoading} onRefresh={loadQuotesSent} embedded />
+          </Collapsible>
+
+          <Collapsible title="Conversations IA" subtitle="Échanges utilisateurs ↔ agent"
+            count={iaConvs?.length}            loaded={iaConvs !== null}    onExpand={loadConvs}>
+            <AdminConversations
+              iaConvs={iaConvs}      loading={convsLoading}
+              convSearch={convSearch} setConvSearch={setConvSearch}
+              openConvUser={openConvUser} setOpenConvUser={setOpenConvUser}
+              onRefresh={loadConvs}            />
+          </Collapsible>
+
+          <Collapsible title="Erreurs IA"      subtitle="Appels Claude qui ont échoué"
+            count={iaLogs?.length}             loaded={iaLogs !== null}     onExpand={loadLogs}>
+            <AdminErrorLogs iaLogs={iaLogs} loading={logsLoading} onRefresh={loadLogs} embedded />
+          </Collapsible>
+
+          <Collapsible title="Retours négatifs" subtitle="Mauvais devis générés signalés par les users"
+            count={iaNegs?.length}             loaded={iaNegs !== null}     onExpand={loadNegs}>
+            <AdminNegativeLogs iaNegs={iaNegs} loading={negsLoading} negFilter={negFilter} setNegFilter={setNegFilter} onRefresh={loadNegs} embedded />
+          </Collapsible>
+
+          <Collapsible title="Newsletter"      subtitle="Inscrits depuis la landing page"
+            count={newsletter?.length}         loaded={newsletter !== null} onExpand={loadNewsletter}>
+            <AdminNewsletter subscribers={newsletter} loading={newsletterLoading} onRefresh={loadNewsletter} embedded />
+          </Collapsible>
+
+          <Collapsible title="Cohérence devis IA" subtitle="Détection automatique d'anomalies"
+            loaded={coherence !== null} onExpand={loadCoherence}>
+            <AdminCoherenceStats data={coherence} loading={coherenceLoading} onRefresh={loadCoherence} embedded />
+          </Collapsible>
+
+          <Collapsible title="Feedback utilisateurs" subtitle="Pouces ↑ / ↓ sur les réponses IA"
+            count={feedback?.length} loaded={feedback !== null} onExpand={loadFeedback}>
+            <AdminFeedback data={feedback} loading={feedbackLoading} onRefresh={loadFeedback} embedded />
+          </Collapsible>
+
+          <Collapsible title="Benchmark Agent IA" subtitle="Tests de prompts comparés">
+            <AdminAgentBenchmark embedded />
+          </Collapsible>
+
+          <div style={{ textAlign: "center", fontSize: 10, color: "#9A8E82", marginTop: 16 }}>
             Données du {fmtD(stats.generatedAt)} à {new Date(stats.generatedAt).toLocaleTimeString("fr-FR")}
           </div>
         </div>
@@ -264,6 +321,8 @@ export default function AdminPanel({ onBack }) {
           onClose={closeDetail}
           onRequestDelete={() => { closeDetail(); openDelete(detailUser); }}
           onRequestReset={() => { openReset(detailUser); }}
+          onTogglePlan={toggleUserPlan}
+          planToggling={planToggling}
           currentUserId={currentUser?.id}
         />
       )}

@@ -30,8 +30,12 @@ Les fichiers dans `/supabase/migrations/` ne s'appliquent **pas automatiquement*
 L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - Prévenir l'utilisateur à chaque nouvelle migration créée.
 - Dernière migration appliquée : `0040_drop_odoo_b2b.sql` (destructif — drop des colonnes et table héritées des intégrations Odoo Sign / B2Brouter retirées).
-- Aucune migration en attente.
-- Prochaine migration à créer : préfixer avec `0041_`.
+- **Migration en attente d'application** : `0041_fix_devis_week_count_null.sql` — fix critique qui empêche tout nouveau freemium de créer son tout premier devis (bug RLS sur la policy `devis_insert_freemium_weekly_limit`, cf. section Bugs connus).
+- Prochaine migration à créer : préfixer avec `0042_`.
+
+**Pas d'historique fiable des migrations effectivement passées** : Supabase n'a pas de mécanisme natif (type `schema_migrations`) qui tracke ce que l'utilisateur a appliqué. Un trou est possible — exemple vécu : la migration `0007_signed_by.sql` avait été sautée alors que `0032`→`0040` étaient appliquées, ce qui faisait silencieusement échouer toute requête SQL qui sélectionnait `signed_by`.
+
+→ **Règle défensive pour le code serveur** : quand une requête lit ou écrit une colonne ajoutée par une migration ancienne, l'envelopper dans un fallback qui catch le code Postgres `42703` (column does not exist) et retente sans cette colonne. Le pattern existe déjà dans `src/lib/api.js` (`updateDevis`) et `api/devis-public.js` (GET `select` + action `accept`).
 
 ### position:fixed et animations CSS transform
 Tout composant React qui contient des enfants `position:fixed` (modales, drawers, toasts)
@@ -69,16 +73,22 @@ src/
     constants.js    — CLAUDE_MODEL, STATUT, DEFAULT_BRAND, TX (i18n)
     trades.js       — ALL_TRADES, searchTrades(), TRADE_EXAMPLES
     brandCompleteness.js — score de complétion du profil
+    pdfBuilder.js   — générateur PDF côté navigateur (jsPDF). Polices DejaVu Sans + Caveat (cursive) embarquées via VFS pour conformité PDF/A-3 et tracé manuscrit du nom signataire dans le bloc "Bon pour accord".
   pages/
     Signup.jsx      — inscription 2 étapes (infos + métiers)
     Onboarding.jsx  — 6 étapes de configuration du profil
     AdminPanel.jsx  — panel admin (accès réservé à ADMIN_EMAIL)
+    DevisPublicPage.jsx — page publique de signature client. Phases : `loading` → `verify` (OTP) → `view` → `signing` (loader pendant génération + envoi PDF) → `accepted` / `refused`. Le PDF signé est généré côté navigateur (pdfBuilder) puis posté en base64 à `/api/devis-public` action `send_signed_pdf`.
   components/
     AgentIA.jsx     — agent IA de génération de devis (Claude API)
     Dashboard.jsx   — tableau de bord KPIs
     DevisDetail.jsx — détail + PDF d'un devis
     InvoiceDetail.jsx — détail + PDF d'une facture
 ```
+
+Polices embarquées dans `/public/fonts/` (servies en TTF) :
+- `DejaVuSans.ttf` + `DejaVuSans-Bold.ttf` — police principale du PDF (Latin étendu, requise pour PDF/A-3 Factur-X).
+- `Caveat-Regular.ttf` — police manuscrite (OFL) utilisée uniquement pour le tracé du nom dans le cartouche signature client. Auto-shrink 22pt → 14pt si le nom déborde. Servie aussi en `@font-face` dans `src/index.css` pour que l'aperçu HTML matche le PDF exporté.
 
 ### API Vercel (`/api`)
 Tous les endpoints vérifient le CORS via `ALLOWED_ORIGINS` et authentifient via `supabase.auth.getUser(token)`.
@@ -98,7 +108,7 @@ Helpers non déployés (préfixés `_`, importés par les endpoints) :
 | `admin-user-detail.js` | Données complètes d'un utilisateur (profil, devis, factures, clients, IA) |
 | `claude.js` | Proxy Claude API avec timeout 28s + AbortController |
 | `contact.js` | Formulaire de contact public — POST avec honeypot anti-bot, envoie un email à l'admin |
-| `devis-public.js` | Endpoint public pour signature client de devis — token + OTP 8 chiffres + audit, multi-routes par `action` |
+| `devis-public.js` | Endpoint public pour signature client de devis — token + OTP 8 chiffres + audit, multi-routes par `action` (`send`, `request_otp`, `verify_otp`, `accept`, `refuse`, `negotiate`, `artisan_respond`, `send_signed_pdf`). `send_signed_pdf` reçoit le PDF généré côté navigateur en base64 et l'email en pièce jointe au client + à l'artisan ; idempotence via audit log (`event = 'signed_pdf_sent'`). |
 | `facturx.js` | Génération PDF Factur-X (XML CII embarqué) |
 | `newsletter.js` | Inscription newsletter |
 | `stripe.js` | Stripe checkout/portal/info (POST authentifié) + webhook (détection par header `stripe-signature`) |
@@ -111,6 +121,7 @@ Le bot Telegram est volontairement éclaté en **deux fonctions Edge** distincte
 |----------|------|------|------|
 | `supabase/functions/notify-telegram/` | sortant | `verify_jwt: true` | Reçoit des événements (DB webhooks, API Vercel, front) et les pousse en HTML formaté vers le chat admin (`TELEGRAM_CHAT_ID`). |
 | `supabase/functions/telegram-bot/`    | entrant | `verify_jwt: false` + `TELEGRAM_WEBHOOK_SECRET` (header `X-Telegram-Bot-Api-Secret-Token`) | Reçoit le webhook Telegram et exécute les commandes admin : `/stats`, `/user`, `/tickets`, `/reply`. Validation à deux étages (secret + chat_id whitelisté). |
+| `supabase/functions/welcome-email/`   | sortant | `verify_jwt: true` | Déclenché par DB Webhook sur `INSERT INTO profiles`. Récupère l'email depuis `auth.users`, envoie l'email de bienvenue via Resend (template HTML : mini-tuto 4 étapes + mention conformité Factur-X 2026). |
 
 Pourquoi deux fonctions :
 - `notify-telegram` est appelée par des sources authentifiées Supabase (DB triggers, service_role keys) → JWT obligatoire pour la sécurité.
@@ -124,6 +135,17 @@ Variables d'env Edge Functions (Supabase Dashboard → Project Settings → Edge
 - `TELEGRAM_CHAT_ID` (chat_id admin via @userinfobot)
 - `TELEGRAM_WEBHOOK_SECRET` (à venir — secret aléatoire passé à `setWebhook`)
 - `TELEGRAM_ADMIN_CHAT_ID` (à venir — alias plus explicite si besoin de filtrer commandes admin)
+- `RESEND_API_KEY` (clé API Resend pour `welcome-email`)
+- `RESEND_FROM` (optionnel — expéditeur, ex. `"Zenbat <onboarding@zenbat.fr>"`, fallback `onboarding@resend.dev`)
+- `ZENBAT_APP_URL` (optionnel — URL du dashboard dans le CTA de l'email, fallback `https://zenbat.vercel.app`)
+
+**Setup DB Webhook pour `welcome-email`** (à faire une fois côté Supabase Dashboard) :
+1. Database → Webhooks → Create a new hook
+2. Table : `profiles`, Events : `INSERT`
+3. Type : HTTP Request, Method : POST
+4. URL : `https://<project-ref>.supabase.co/functions/v1/welcome-email`
+5. HTTP Headers : `Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>` (Supabase l'ajoute automatiquement si on coche "Use service role key")
+6. HTTP Params : laisser vide
 
 ### Base de données (Supabase)
 Tables principales : `profiles`, `clients`, `devis`, `lignes_devis`, `invoices`, `lignes_invoices`
@@ -168,3 +190,5 @@ Pour changer de modèle : modifier la variable d'env `VITE_CLAUDE_MODEL` dans Ve
 - **Token périmé admin** : utiliser `getToken()` au lieu de `session?.access_token`. Corrigé dans `AdminPanel.jsx`.
 - **app bloquée si Supabase indisponible** : `getSession()` sans `.catch()` laissait `loading=true` à jamais. Corrigé dans `auth.jsx`.
 - **Factures émises qui repassent en brouillon à chaque session** : la migration `0022` avait ajouté `and not locked` au `WITH CHECK` de la policy `invoices_update_own`, ce qui rejetait l'UPDATE d'émission (le trigger `BEFORE UPDATE` posait `new.locked := true` avant l'évaluation du `WITH CHECK`, qui exigeait `not locked`). UPDATE rejeté silencieusement, DB inchangée, listInvoices() relisait le brouillon à la session suivante. Corrigé dans `0035_fix_rls_invoices_lock_transition.sql` — la sécurité reste assurée par le `USING` et le trigger.
+- **Page publique devis 404 "Lien introuvable" sur DB sans migration 0007** : le `GET /api/devis-public?token=...` sélectionnait la colonne `signed_by` (migration `0007_signed_by.sql`), absente de la DB de l'utilisateur alors que toutes les migrations 0032+ étaient appliquées. Postgres renvoyait `42703 column does not exist` → supabase-js renvoyait `error` truthy → handler retournait 404. Corrigé dans `api/devis-public.js` par un fallback `42703` qui retente le SELECT et l'UPDATE sans `signed_by` (et la signature manuscrite tombe en fallback sur `client_name`).
+- **Nouvel inscrit freemium bloqué sur son 1er devis** : la fonction SQL `public.devis_week_count(uid)` créée par la migration `0039` faisait `SELECT coalesce(count, 0) FROM devis_weekly_counters WHERE owner_id = uid AND week_start = ...`. Pour un nouvel inscrit sans ligne dans cette table, le SELECT renvoyait 0 row → la fonction renvoyait NULL (pas 0). La policy RLS `devis_insert_freemium_weekly_limit` évaluait alors `(user_plan = 'pro' OR NULL < 5)` = `(false OR NULL)` = NULL, et WITH CHECK rejetait l'INSERT (NULL ≠ TRUE) avec le code Postgres 42501. Côté front, `useDevis.js` catchait ce code comme un quota dépassé et affichait le paywall. Chicken-and-egg : le trigger d'incrément `devis_incr_weekly_counter` ne tournait jamais (after insert, mais l'insert était bloqué), donc la ligne dans `devis_weekly_counters` n'était jamais créée → le bug se reproduisait à l'infini. Conséquence directe : impossible pour tout nouveau freemium de créer un devis depuis le déploiement de 0039. Bonus : un compteur localStorage sticky non-scopé par user.id faisait également hériter le compteur de l'utilisateur précédent (5/5 affiché pour un nouvel inscrit). Corrigé par : (1) migration `0041_fix_devis_week_count_null.sql` qui enveloppe le SELECT dans un COALESCE externe pour qu'absence de ligne = 0 ; (2) `src/lib/appShell.js` scope la clé localStorage par user.id.

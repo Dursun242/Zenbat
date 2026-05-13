@@ -26,29 +26,40 @@ export function countDevisThisWeek(devis) {
   }, 0);
 }
 
-// Compteur sticky par semaine stocké en localStorage. Ne décrémente jamais à
-// la suppression (résiste au bypass "créer 5, supprimer, recréer"). Reset
-// auto au changement de semaine.
+// Compteur sticky par semaine ET par utilisateur stocké en localStorage. Ne
+// décrémente jamais à la suppression (résiste au bypass "créer 5, supprimer,
+// recréer"). Reset auto au changement de semaine.
+//
+// IMPORTANT : la clé est scopée par `user.id` car le localStorage est partagé
+// entre toutes les sessions du navigateur. Sans ce scope, un nouvel inscrit
+// qui se connecte sur un navigateur où un autre compte a atteint 5 devis
+// hériterait de ce compteur et serait bloqué à 5/5 sans avoir créé un seul
+// devis. Le legacy key (sans userId) reste lu en fallback uniquement si
+// aucun userId n'est fourni — au cas où un appelant historique persiste.
 const STICKY_COUNTER_KEY = "zenbat_devis_weekly_counter";
+
+function storageKey(userId) {
+  return userId ? `${STICKY_COUNTER_KEY}_${userId}` : STICKY_COUNTER_KEY;
+}
 
 function weekKey() {
   const d = isoWeekStart();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function readStickyDevisThisWeek() {
+export function readStickyDevisThisWeek(userId) {
   try {
-    const raw = localStorage.getItem(STICKY_COUNTER_KEY);
+    const raw = localStorage.getItem(storageKey(userId));
     if (!raw) return 0;
     const parsed = JSON.parse(raw);
     return parsed?.week === weekKey() ? Number(parsed.count) || 0 : 0;
   } catch { return 0; }
 }
 
-export function bumpStickyDevisThisWeek() {
+export function bumpStickyDevisThisWeek(userId) {
   const week = weekKey();
-  const next = readStickyDevisThisWeek() + 1;
-  try { localStorage.setItem(STICKY_COUNTER_KEY, JSON.stringify({ week, count: next })); } catch {}
+  const next = readStickyDevisThisWeek(userId) + 1;
+  try { localStorage.setItem(storageKey(userId), JSON.stringify({ week, count: next })); } catch {}
   return next;
 }
 
