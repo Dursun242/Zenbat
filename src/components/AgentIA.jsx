@@ -406,9 +406,11 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     try { localStorage.removeItem(draftKey); } catch {}
     setLignes([]); setObjet("");
     setMsgs([{ role: "assistant", content: TX.quoteSaved }]);
-    // Ouvre directement la vue PDF du devis fraîchement enregistré
+    // Ouvre directement la vue PDF du devis fraîchement enregistré.
+    // Fallback : redirige rapidement vers la liste (800 ms — le temps que
+    // le message de confirmation s'affiche, sans figer l'écran 2.5 s).
     if (onOpenDevisPDF) onOpenDevisPDF(newId);
-    else setTimeout(() => setTab("devis"), 2500);
+    else setTimeout(() => setTab("devis"), 800);
   };
 
   const visibleLignes = lignes.slice(0, visibleCount);
