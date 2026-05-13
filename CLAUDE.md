@@ -121,6 +121,7 @@ Le bot Telegram est volontairement éclaté en **deux fonctions Edge** distincte
 |----------|------|------|------|
 | `supabase/functions/notify-telegram/` | sortant | `verify_jwt: true` | Reçoit des événements (DB webhooks, API Vercel, front) et les pousse en HTML formaté vers le chat admin (`TELEGRAM_CHAT_ID`). |
 | `supabase/functions/telegram-bot/`    | entrant | `verify_jwt: false` + `TELEGRAM_WEBHOOK_SECRET` (header `X-Telegram-Bot-Api-Secret-Token`) | Reçoit le webhook Telegram et exécute les commandes admin : `/stats`, `/user`, `/tickets`, `/reply`. Validation à deux étages (secret + chat_id whitelisté). |
+| `supabase/functions/welcome-email/`   | sortant | `verify_jwt: true` | Déclenché par DB Webhook sur `INSERT INTO profiles`. Récupère l'email depuis `auth.users`, envoie l'email de bienvenue via Resend (template HTML : mini-tuto 4 étapes + mention conformité Factur-X 2026). |
 
 Pourquoi deux fonctions :
 - `notify-telegram` est appelée par des sources authentifiées Supabase (DB triggers, service_role keys) → JWT obligatoire pour la sécurité.
@@ -134,6 +135,17 @@ Variables d'env Edge Functions (Supabase Dashboard → Project Settings → Edge
 - `TELEGRAM_CHAT_ID` (chat_id admin via @userinfobot)
 - `TELEGRAM_WEBHOOK_SECRET` (à venir — secret aléatoire passé à `setWebhook`)
 - `TELEGRAM_ADMIN_CHAT_ID` (à venir — alias plus explicite si besoin de filtrer commandes admin)
+- `RESEND_API_KEY` (clé API Resend pour `welcome-email`)
+- `RESEND_FROM` (optionnel — expéditeur, ex. `"Zenbat <onboarding@zenbat.fr>"`, fallback `onboarding@resend.dev`)
+- `ZENBAT_APP_URL` (optionnel — URL du dashboard dans le CTA de l'email, fallback `https://zenbat.vercel.app`)
+
+**Setup DB Webhook pour `welcome-email`** (à faire une fois côté Supabase Dashboard) :
+1. Database → Webhooks → Create a new hook
+2. Table : `profiles`, Events : `INSERT`
+3. Type : HTTP Request, Method : POST
+4. URL : `https://<project-ref>.supabase.co/functions/v1/welcome-email`
+5. HTTP Headers : `Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>` (Supabase l'ajoute automatiquement si on coche "Use service role key")
+6. HTTP Params : laisser vide
 
 ### Base de données (Supabase)
 Tables principales : `profiles`, `clients`, `devis`, `lignes_devis`, `invoices`, `lignes_invoices`
