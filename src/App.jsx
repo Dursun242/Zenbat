@@ -15,7 +15,7 @@ import Logo          from "./components/ui/Logo.jsx";
 import { I }         from "./components/ui/icons.jsx";
 import Toast         from "./components/app/Toast.jsx";
 import UpdateAvailableToast from "./components/app/UpdateAvailableToast.jsx";
-import NavFAB        from "./components/app/NavFAB.jsx";
+import TopTabs       from "./components/app/TopTabs.jsx";
 import SearchBar     from "./components/app/SearchBar.jsx";
 import SaveIndicator from "./components/app/SaveIndicator.jsx";
 import HeaderMenu    from "./components/app/HeaderMenu.jsx";
@@ -361,7 +361,7 @@ export default function App() {
   );
 
   return (
-    <div style={{ fontFamily: "Inter, system-ui, sans-serif", height: "100%", display: "flex", flexDirection: "column", background: "#FAF7F2", overflow: "hidden", position: "relative" }}>
+    <div style={{ fontFamily: "Inter, system-ui, sans-serif", height: "100%", display: "flex", flexDirection: "column", background: "#FAF7F2", overflow: "hidden" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,400;1,700&family=Space+Grotesk:wght@400;600;700&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
@@ -378,7 +378,7 @@ export default function App() {
         input,textarea,select{font-size:max(16px,1em) !important}
         @media (min-width:1024px){
           .app-sidebar{display:flex !important}
-          .app-bottom-nav{display:none !important}
+          .app-top-tabs{display:none !important}
           .app-toast{bottom:24px !important;left:auto !important;right:24px !important;max-width:380px}
         }
         @media (max-width:1023px){.app-sidebar{display:none !important}}
@@ -418,6 +418,9 @@ export default function App() {
             : `📝 ${devisThisWeekCount}/${FREEMIUM_WEEKLY_DEVIS_LIMIT} devis cette semaine — passer en Pro`}
         </button>
       )}
+
+      {/* Tabs principaux — mobile uniquement (sidebar gauche prend le relais sur desktop) */}
+      <TopTabs items={NAV} activeNav={activeNav} onSelect={setTab} plan={effectivePlan} quotaReached={freemiumQuotaReached} firstDevisNudge={!isAdmin && (devis?.length || 0) === 0 && activeNav !== "agent"}/>
 
       {/* Body */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
@@ -549,7 +552,6 @@ export default function App() {
       {comptableOpen && (
         <SendToComptableModal user={user} onClose={() => setComptableOpen(false)}/>
       )}
-      <NavFAB items={NAV} activeNav={activeNav} onSelect={setTab} plan={effectivePlan} quotaReached={freemiumQuotaReached} firstDevisNudge={!isAdmin && (devis?.length || 0) === 0 && activeNav !== "agent"}/>
     </div>
   );
 }
