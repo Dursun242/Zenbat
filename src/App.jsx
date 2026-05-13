@@ -11,11 +11,9 @@ import { useClients }   from "./hooks/useClients.js";
 import { useDevis }     from "./hooks/useDevis.js";
 import { useInvoices }  from "./hooks/useInvoices.js";
 
-import Logo          from "./components/ui/Logo.jsx";
 import { I }         from "./components/ui/icons.jsx";
 import Toast         from "./components/app/Toast.jsx";
 import UpdateAvailableToast from "./components/app/UpdateAvailableToast.jsx";
-import BottomNav     from "./components/app/BottomNav.jsx";
 import SearchBar     from "./components/app/SearchBar.jsx";
 import SaveIndicator from "./components/app/SaveIndicator.jsx";
 import HeaderMenu    from "./components/app/HeaderMenu.jsx";
@@ -372,13 +370,16 @@ export default function App() {
         @keyframes popIn{0%{opacity:0;transform:scale(.92) translateY(6px)}100%{opacity:1;transform:scale(1) translateY(0)}}
         @keyframes spin{to{transform:rotate(360deg)}}
         @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+        @keyframes topnav-nudge{0%{box-shadow:0 0 0 0 rgba(34,197,94,.55)}100%{box-shadow:0 0 0 8px rgba(34,197,94,0)}}
         .fu{animation:fadeUp .22s ease both}
         .pop{animation:popIn .28s cubic-bezier(.34,1.56,.64,1) both}
+        .app-top-nav button{-webkit-tap-highlight-color:transparent}
+        .app-top-nav button:active{opacity:.55}
         input,textarea,select,button{font-family:inherit}
         input,textarea,select{font-size:max(16px,1em) !important}
         @media (min-width:1024px){
           .app-sidebar{display:flex !important}
-          .app-bottom-nav{display:none !important}
+          .app-top-nav{display:none !important}
           .app-toast{bottom:24px !important;left:auto !important;right:24px !important;max-width:380px}
         }
         @media (max-width:1023px){.app-sidebar{display:none !important}}
@@ -388,7 +389,37 @@ export default function App() {
 
       {/* Header */}
       <header style={{ background: "#1A1612", padding: "calc(10px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 10px calc(18px + env(safe-area-inset-left))", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-        <Logo size={24} white/>
+        {/* Nav horizontale discrète intégrée dans la bande sombre du header (mobile).
+            Sur desktop, c'est la sidebar latérale qui prend le relais (cf. media query). */}
+        <nav className="app-top-nav" style={{ display: "flex", alignItems: "center", gap: 2 }}>
+          {NAV.map(({ id, label, icon }) => {
+            const active   = activeNav === id;
+            const showNudge = id === "agent" && !isAdmin && (devis?.length || 0) === 0 && activeNav !== "agent";
+            const showQuota = id === "agent" && isFreemium && freemiumQuotaReached;
+            return (
+              <button key={id} onClick={() => setTab(id)} aria-label={label} aria-current={active ? "page" : undefined}
+                style={{
+                  position: "relative",
+                  width: 36, height: 36, padding: 0,
+                  background: "transparent", border: "none", cursor: "pointer",
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  color: active ? "#22c55e" : "rgba(255,255,255,.42)",
+                  transition: "color .15s",
+                }}>
+                <span style={{ transform: "scale(0.92)", display: "inline-flex" }}>{icon}</span>
+                {active && (
+                  <span style={{ position: "absolute", bottom: 2, left: "50%", marginLeft: -8, width: 16, height: 2, borderRadius: 1, background: "#22c55e" }}/>
+                )}
+                {showNudge && (
+                  <span style={{ position: "absolute", top: 6, right: 6, width: 7, height: 7, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 0 0 rgba(34,197,94,.55)", animation: "topnav-nudge 1.6s ease-out infinite" }}/>
+                )}
+                {showQuota && (
+                  <span style={{ position: "absolute", top: 5, right: 5, width: 6, height: 6, borderRadius: "50%", background: "#ef4444" }}/>
+                )}
+              </button>
+            );
+          })}
+        </nav>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <SaveIndicator state={saveState}/>
           <HeaderMenu
@@ -549,7 +580,6 @@ export default function App() {
       {comptableOpen && (
         <SendToComptableModal user={user} onClose={() => setComptableOpen(false)}/>
       )}
-      <BottomNav items={NAV} activeNav={activeNav} onSelect={setTab} plan={effectivePlan} quotaReached={freemiumQuotaReached} firstDevisNudge={!isAdmin && (devis?.length || 0) === 0 && activeNav !== "agent"}/>
     </div>
   );
 }
