@@ -1,16 +1,26 @@
-// Floating bottom tab bar style iOS frosted glass.
+// Bottom tab bar style YouTube mobile.
 //
-// Position fixed, marges latérales + bas pour effet flottant.
-// Backdrop-filter blur 20px + saturate pour le rendu "vibrant glass".
-// Indicateur actif animé via Framer Motion layoutId — la pastille de
-// fond se déplace en spring entre les onglets.
+// Barre ancrée pleine largeur en bas de l'écran (pas flottante).
+// Fond sombre solide, fine bordure haute, padding-bottom safe-area iOS.
+// 5 onglets, labels toujours visibles sous l'icône.
+//
+// État actif : icône + label en blanc (avec léger gras).
+// État inactif : gris atténué (#8A8278).
+//
+// Indicateur actif : fine barre brand en haut de l'onglet sélectionné
+// (2px, animée en spring via Framer Motion layoutId).
 //
 // `firstDevisNudge` : tooltip "Essaye ton premier devis" au-dessus de
 // l'onglet "agent" pour les nouveaux inscrits (0 devis). Auto-masqué
 // dès qu'on est sur l'onglet agent ou qu'un devis existe.
+//
+// `quotaReached` + plan free : pastille rouge en haut à droite de l'icône agent.
 import { motion } from "framer-motion";
 
-const BRAND = "#22c55e"; // DEFAULT_BRAND.color
+const BRAND     = "#22c55e";
+const BG        = "#1A1612";
+const ACTIVE    = "#FFFFFF";
+const INACTIVE  = "#8A8278";
 
 export default function BottomNav({ items, activeNav, onSelect, plan, quotaReached, firstDevisNudge = false }) {
   return (
@@ -18,21 +28,15 @@ export default function BottomNav({ items, activeNav, onSelect, plan, quotaReach
       className="app-bottom-nav"
       style={{
         position: "fixed",
-        // Floating minimal : on colle au plus près de la barre système OS.
-        // Marge horizontale réduite (8px) + bottom à 6px + safe-area iOS
-        // (cappée à 20px pour éviter les valeurs gonflées en PWA).
-        left: 8,
-        right: 8,
-        bottom: "calc(6px + min(env(safe-area-inset-bottom, 0px), 20px))",
-        borderRadius: 20, // rounded-2xl ≈ 16, on monte à 20 pour un rendu plus iOS
-        // Frosted glass : fond clair semi-transparent + blur saturé
-        background: "rgba(255, 255, 255, 0.55)",
-        backdropFilter: "blur(20px) saturate(180%)",
-        WebkitBackdropFilter: "blur(20px) saturate(180%)",
-        border: "1px solid rgba(255, 255, 255, 0.6)",
-        boxShadow: "0 12px 32px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06)",
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: BG,
+        borderTop: "1px solid rgba(255, 255, 255, 0.06)",
         display: "flex",
-        padding: 6,
+        paddingTop: 6,
+        // Safe-area iOS cappée à 20px pour éviter les valeurs gonflées en PWA.
+        paddingBottom: "calc(4px + min(env(safe-area-inset-bottom, 0px), 20px))",
         zIndex: 50,
       }}>
       <style>{`
@@ -40,19 +44,13 @@ export default function BottomNav({ items, activeNav, onSelect, plan, quotaReach
         @keyframes bn-nudge-pulse { 0% { box-shadow: 0 0 0 0 rgba(34,197,94,.55); } 100% { box-shadow: 0 0 0 14px rgba(34,197,94,0); } }
         .app-bottom-nav button { -webkit-tap-highlight-color: transparent; transition: color .18s ease; }
         .app-bottom-nav button:active { opacity: .65; }
-        /* Mode sombre système : noir 20% + bord blanc atténué */
-        @media (prefers-color-scheme: dark) {
-          .app-bottom-nav {
-            background: rgba(20, 16, 12, 0.55) !important;
-            border-color: rgba(255, 255, 255, 0.12) !important;
-          }
-        }
       `}</style>
 
       {items.map(({ id, label, icon }) => {
         const active    = activeNav === id;
         const isAgent   = id === "agent";
         const showNudge = isAgent && firstDevisNudge;
+        const color     = active ? ACTIVE : INACTIVE;
 
         return (
           <button
@@ -66,31 +64,34 @@ export default function BottomNav({ items, activeNav, onSelect, plan, quotaReach
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              justifyContent: "center",
-              gap: 2,
-              padding: "8px 4px",
-              minHeight: 52,
+              justifyContent: "flex-start",
+              gap: 4,
+              padding: "8px 4px 4px",
+              minHeight: 56,
               background: "transparent",
               border: "none",
-              color: active ? BRAND : "#6B6358",
+              color,
               cursor: "pointer",
             }}>
-            {/* Indicateur actif animé — pastille de fond qui glisse entre onglets */}
+            {/* Indicateur actif : fine barre brand en haut de l'onglet, glisse en spring */}
             {active && (
               <motion.span
                 layoutId="bottom-nav-active"
                 style={{
                   position: "absolute",
-                  inset: 4,
-                  background: "rgba(34, 197, 94, 0.14)",
-                  borderRadius: 14,
-                  zIndex: 0,
+                  top: 0,
+                  left: "20%",
+                  right: "20%",
+                  height: 2,
+                  background: BRAND,
+                  borderRadius: 2,
+                  zIndex: 1,
                 }}
                 transition={{ type: "spring", stiffness: 380, damping: 32 }}
               />
             )}
 
-            <span style={{ position: "relative", zIndex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", transform: "scale(1.2)" }}>
+            <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", transform: "scale(1.15)" }}>
               {showNudge && (
                 <span style={{
                   position: "absolute", inset: -6, borderRadius: "50%",
@@ -99,28 +100,25 @@ export default function BottomNav({ items, activeNav, onSelect, plan, quotaReach
                 }}/>
               )}
               {icon}
+              {/* Pastille quota (agent) */}
               {isAgent && plan === "free" && quotaReached && (
                 <span style={{
-                  position: "absolute", top: -4, right: -10,
-                  background: "#ef4444", color: "white",
-                  fontSize: 8, fontWeight: 700,
-                  padding: "0 4px", height: 14, minWidth: 14, borderRadius: 7,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  transform: "scale(0.74)", transformOrigin: "center",
-                }}>!</span>
+                  position: "absolute", top: -3, right: -8,
+                  background: "#ef4444",
+                  width: 9, height: 9, borderRadius: "50%",
+                  border: `1.5px solid ${BG}`,
+                }}/>
               )}
             </span>
 
-            {/* Label visible uniquement quand actif */}
-            {active && (
-              <motion.span
-                initial={{ opacity: 0, y: 2 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.18 }}
-                style={{ position: "relative", zIndex: 1, fontSize: 10.5, fontWeight: 700, letterSpacing: 0.1 }}>
-                {label}
-              </motion.span>
-            )}
+            <span style={{
+              fontSize: 10.5,
+              fontWeight: active ? 600 : 500,
+              letterSpacing: 0.1,
+              lineHeight: 1.2,
+            }}>
+              {label}
+            </span>
 
             {showNudge && (
               <span style={{

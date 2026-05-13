@@ -444,7 +444,7 @@ export default function App() {
         </nav>
 
         {/* Contenu principal */}
-        <div ref={contentRef} className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "calc(96px + min(env(safe-area-inset-bottom, 0px), 34px))" }}>
+        <div ref={contentRef} className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "calc(72px + min(env(safe-area-inset-bottom, 0px), 20px))" }}>
           {tab === "dashboard"     && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}
                                          onOpenProfile={() => setScreen("onboarding")}
                                          onOpenPWAInstall={() => setScreen("pwa_install")}/>}

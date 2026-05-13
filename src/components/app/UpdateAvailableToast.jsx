@@ -40,9 +40,9 @@ export default function UpdateAvailableToast() {
       aria-live="polite"
       style={{
         position: "fixed",
-        // Au-dessus de la BottomNav flottante (~52px de bar + 24px mb-6
-        // + safe-area capped). Marge supplémentaire pour le confort tactile.
-        bottom: "calc(96px + min(env(safe-area-inset-bottom, 0px), 34px))",
+        // Au-dessus du BottomNav full-width style YouTube (~64px de bar
+        // + safe-area capped 20px). Marge supplémentaire pour le confort tactile.
+        bottom: "calc(76px + min(env(safe-area-inset-bottom, 0px), 20px))",
         left: 12, right: 12,
         zIndex: 200,
         background: "#1A1612",
