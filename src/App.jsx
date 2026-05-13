@@ -11,9 +11,11 @@ import { useClients }   from "./hooks/useClients.js";
 import { useDevis }     from "./hooks/useDevis.js";
 import { useInvoices }  from "./hooks/useInvoices.js";
 
+import Logo          from "./components/ui/Logo.jsx";
 import { I }         from "./components/ui/icons.jsx";
 import Toast         from "./components/app/Toast.jsx";
 import UpdateAvailableToast from "./components/app/UpdateAvailableToast.jsx";
+import BottomNav     from "./components/app/BottomNav.jsx";
 import SearchBar     from "./components/app/SearchBar.jsx";
 import SaveIndicator from "./components/app/SaveIndicator.jsx";
 import HeaderMenu    from "./components/app/HeaderMenu.jsx";
@@ -238,19 +240,16 @@ export default function App() {
   const scrollMapRef = useRef({});
   const skipNextScrollRef = useRef(false);
 
-  // Hauteur du shell pilotée par JS.
-  // Sur iOS PWA standalone, `visualViewport.height` peut être légèrement
-  // inférieur à la zone visible réelle (la zone du home indicator est
-  // parfois exclue) → on observait une bande sombre du body qui dépassait
-  // sous le shell. On prend désormais le MAX de visualViewport et de
-  // window.innerHeight pour s'assurer que le shell couvre toute la zone
-  // visible et que rien du body (#1A1612) ne transparaît au bas.
-  // iOS overlay le clavier par-dessus le layout viewport en mode standalone
-  // donc utiliser innerHeight quand le clavier est ouvert ne casse rien :
-  // l'input focus déclenche un auto-scroll système qui le ramène en vue.
+  // Hauteur du shell pilotée par JS via window.innerHeight / visualViewport.
+  // Sur iOS PWA standalone, ni 100vh, ni 100dvh, ni height:100% sur html/body
+  // ne donnent fiablement la hauteur du visual viewport — on observe une
+  // grosse bande noire sous la nav qui ne disparaît pas. La seule mesure
+  // stable est window.innerHeight (ou visualViewport.height quand dispo).
+  // On l'applique directement sur documentElement + body (et pas via un
+  // ref React, qui se ferait écraser par le re-render).
   useLayoutEffect(() => {
     const setH = () => {
-      const h = Math.max(window.visualViewport?.height || 0, window.innerHeight || 0);
+      const h = window.visualViewport?.height || window.innerHeight;
       document.documentElement.style.height = h + "px";
       document.body.style.height = h + "px";
     };
@@ -362,7 +361,7 @@ export default function App() {
   );
 
   return (
-    <div style={{ fontFamily: "Inter, system-ui, sans-serif", height: "100%", display: "flex", flexDirection: "column", background: "#FAF7F2", overflow: "hidden" }}>
+    <div style={{ fontFamily: "Inter, system-ui, sans-serif", height: "100%", display: "flex", flexDirection: "column", background: "#FAF7F2", overflow: "hidden", position: "relative" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,400;1,700&family=Space+Grotesk:wght@400;600;700&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
@@ -373,16 +372,14 @@ export default function App() {
         @keyframes popIn{0%{opacity:0;transform:scale(.92) translateY(6px)}100%{opacity:1;transform:scale(1) translateY(0)}}
         @keyframes spin{to{transform:rotate(360deg)}}
         @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
-        @keyframes topnav-nudge{0%{box-shadow:0 0 0 0 rgba(34,197,94,.55)}100%{box-shadow:0 0 0 8px rgba(34,197,94,0)}}
         .fu{animation:fadeUp .22s ease both}
         .pop{animation:popIn .28s cubic-bezier(.34,1.56,.64,1) both}
-        .app-top-nav button{-webkit-tap-highlight-color:transparent}
-        .app-top-nav button:active{opacity:.55}
         input,textarea,select,button{font-family:inherit}
         input,textarea,select{font-size:max(16px,1em) !important}
         @media (min-width:1024px){
           .app-sidebar{display:flex !important}
-          .app-top-nav{display:none !important}
+          .app-bottom-nav{display:none !important}
+          .app-content{padding-bottom:0 !important}
           .app-toast{bottom:24px !important;left:auto !important;right:24px !important;max-width:380px}
         }
         @media (max-width:1023px){.app-sidebar{display:none !important}}
@@ -391,37 +388,8 @@ export default function App() {
       `}</style>
 
       {/* Header */}
-      <header style={{ background: "#1A1612", padding: "calc(10px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) 10px calc(10px + env(safe-area-inset-left))", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, gap: 8 }}>
-        {/* Nav horizontale dans la bande sombre du header (mobile).
-            Sur desktop, c'est la sidebar latérale qui prend le relais (cf. media query). */}
-        <nav className="app-top-nav" style={{ display: "flex", alignItems: "center", gap: 2 }}>
-          {NAV.map(({ id, label, icon }) => {
-            const active   = activeNav === id;
-            const showNudge = id === "agent" && !isAdmin && (devis?.length || 0) === 0 && activeNav !== "agent";
-            const showQuota = id === "agent" && isFreemium && freemiumQuotaReached;
-            return (
-              <button key={id} onClick={() => setTab(id)} aria-label={label} aria-current={active ? "page" : undefined}
-                style={{
-                  position: "relative",
-                  width: 52, minHeight: 46, padding: "4px 0 3px",
-                  background: active ? "rgba(34,197,94,.14)" : "transparent",
-                  border: "none", borderRadius: 10, cursor: "pointer",
-                  display: "inline-flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
-                  color: active ? "#22c55e" : "rgba(255,255,255,.78)",
-                  transition: "background .15s, color .15s",
-                }}>
-                <span style={{ transform: "scale(0.98)", display: "inline-flex" }}>{icon}</span>
-                <span style={{ fontSize: 9.5, fontWeight: active ? 700 : 600, letterSpacing: 0.2, textTransform: "uppercase", lineHeight: 1, whiteSpace: "nowrap" }}>{label}</span>
-                {showNudge && (
-                  <span style={{ position: "absolute", top: 2, right: 4, width: 7, height: 7, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 0 0 rgba(34,197,94,.55)", animation: "topnav-nudge 1.6s ease-out infinite" }}/>
-                )}
-                {showQuota && (
-                  <span style={{ position: "absolute", top: 2, right: 3, width: 6, height: 6, borderRadius: "50%", background: "#ef4444" }}/>
-                )}
-              </button>
-            );
-          })}
-        </nav>
+      <header style={{ background: "#1A1612", padding: "calc(10px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 10px calc(18px + env(safe-area-inset-left))", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+        <Logo size={24} white/>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <SaveIndicator state={saveState}/>
           <HeaderMenu
@@ -476,7 +444,7 @@ export default function App() {
         </nav>
 
         {/* Contenu principal */}
-        <div ref={contentRef} className="app-content" style={{ flex: 1, overflowY: "auto" }}>
+        <div ref={contentRef} className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "calc(96px + min(env(safe-area-inset-bottom, 0px), 34px))" }}>
           {tab === "dashboard"     && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}
                                          onOpenProfile={() => setScreen("onboarding")}
                                          onOpenPWAInstall={() => setScreen("pwa_install")}/>}
@@ -582,6 +550,7 @@ export default function App() {
       {comptableOpen && (
         <SendToComptableModal user={user} onClose={() => setComptableOpen(false)}/>
       )}
+      <BottomNav items={NAV} activeNav={activeNav} onSelect={setTab} plan={effectivePlan} quotaReached={freemiumQuotaReached} firstDevisNudge={!isAdmin && (devis?.length || 0) === 0 && activeNav !== "agent"}/>
     </div>
   );
 }
