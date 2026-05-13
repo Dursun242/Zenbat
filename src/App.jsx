@@ -15,7 +15,7 @@ import Logo          from "./components/ui/Logo.jsx";
 import { I }         from "./components/ui/icons.jsx";
 import Toast         from "./components/app/Toast.jsx";
 import UpdateAvailableToast from "./components/app/UpdateAvailableToast.jsx";
-import BottomNav     from "./components/app/BottomNav.jsx";
+import NavFAB        from "./components/app/NavFAB.jsx";
 import SearchBar     from "./components/app/SearchBar.jsx";
 import SaveIndicator from "./components/app/SaveIndicator.jsx";
 import HeaderMenu    from "./components/app/HeaderMenu.jsx";
@@ -243,15 +243,15 @@ export default function App() {
   // Hauteur du shell pilotée par JS via window.innerHeight / visualViewport.
   // Sur iOS PWA standalone, ni 100vh, ni 100dvh, ni height:100% sur html/body
   // ne donnent fiablement la hauteur du visual viewport — on observe une
-  // grosse bande noire sous la BottomNav qui ne disparaît pas. La seule
-  // mesure stable est window.innerHeight (ou visualViewport.height quand
-  // disponible). On la pousse en CSS custom property pour que le shell
-  // s'y aligne.
-  const shellRef = useRef(null);
+  // grosse bande noire sous la nav qui ne disparaît pas. La seule mesure
+  // stable est window.innerHeight (ou visualViewport.height quand dispo).
+  // On l'applique directement sur documentElement + body (et pas via un
+  // ref React, qui se ferait écraser par le re-render).
   useLayoutEffect(() => {
     const setH = () => {
       const h = window.visualViewport?.height || window.innerHeight;
-      if (shellRef.current) shellRef.current.style.height = h + "px";
+      document.documentElement.style.height = h + "px";
+      document.body.style.height = h + "px";
     };
     setH();
     window.visualViewport?.addEventListener("resize", setH);
@@ -361,7 +361,7 @@ export default function App() {
   );
 
   return (
-    <div ref={shellRef} style={{ fontFamily: "Inter, system-ui, sans-serif", height: "100%", display: "flex", flexDirection: "column", background: "#FAF7F2", overflow: "hidden" }}>
+    <div style={{ fontFamily: "Inter, system-ui, sans-serif", height: "100%", display: "flex", flexDirection: "column", background: "#FAF7F2", overflow: "hidden", position: "relative" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,400;1,700&family=Space+Grotesk:wght@400;600;700&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
@@ -549,7 +549,7 @@ export default function App() {
       {comptableOpen && (
         <SendToComptableModal user={user} onClose={() => setComptableOpen(false)}/>
       )}
-      <BottomNav items={NAV} activeNav={activeNav} onSelect={setTab} plan={effectivePlan} quotaReached={freemiumQuotaReached} firstDevisNudge={!isAdmin && (devis?.length || 0) === 0 && activeNav !== "agent"}/>
+      <NavFAB items={NAV} activeNav={activeNav} onSelect={setTab} plan={effectivePlan} quotaReached={freemiumQuotaReached} firstDevisNudge={!isAdmin && (devis?.length || 0) === 0 && activeNav !== "agent"}/>
     </div>
   );
 }
