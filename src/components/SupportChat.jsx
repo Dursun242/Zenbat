@@ -108,8 +108,23 @@ export default function SupportChat({ accent = "#22c55e", open, onClose }) {
       setMessages(newMessages);
       setInput("");
 
-      // 3. Si en attente admin → on n'appelle pas Claude (l'admin va répondre via Telegram)
-      if (currentTicket.status === "awaiting_admin") {
+      // 3. Si en attente admin → on n'appelle pas Claude (l'admin va répondre via Telegram).
+      //
+      // Re-fetch du status avant l'appel Claude : si l'admin a pris la main
+      // entre l'ouverture du chat et l'envoi du message (depuis Telegram via
+      // /reply), la valeur locale `currentTicket.status` est obsolète et on
+      // déclencherait Claude par-dessus la réponse humaine. On préfère un
+      // aller-retour DB rapide à un message Claude parasite.
+      const { data: fresh } = await supabase
+        .from("support_tickets")
+        .select("status")
+        .eq("id", currentTicket.id)
+        .maybeSingle();
+      const liveStatus = fresh?.status ?? currentTicket.status;
+      if (liveStatus === "awaiting_admin") {
+        if (liveStatus !== currentTicket.status) {
+          setTicket({ ...currentTicket, status: liveStatus });
+        }
         setBusy(false);
         return;
       }
