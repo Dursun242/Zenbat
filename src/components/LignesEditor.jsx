@@ -97,9 +97,16 @@ export default function LignesEditor({ lignes, onChange, ac, vatRegime }) {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6 }}>
                 <div>
                   <div style={{ fontSize: 9, color: "#9A8E82", marginBottom: 2 }}>Qté</div>
-                  <input type="number" inputMode="decimal" step="0.01"
+                  <input type="number" inputMode="decimal" step="0.01" min="0"
                     value={l.quantite ?? 0}
-                    onChange={e => update(l.id, { quantite: Number(e.target.value) })}
+                    onChange={e => {
+                      const v = Number(e.target.value);
+                      // Refuse les valeurs négatives : un devis avec quantité -5
+                      // produit un montant négatif sur le PDF et empoisonne les
+                      // KPIs (CA, marge). Les remises se font via une ligne
+                      // dédiée, pas une quantité négative.
+                      update(l.id, { quantite: Number.isFinite(v) && v >= 0 ? v : 0 });
+                    }}
                     style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 8px", fontSize: 12, color: "#1A1612", boxSizing: "border-box" }}/>
                 </div>
                 <div>
@@ -116,9 +123,12 @@ export default function LignesEditor({ lignes, onChange, ac, vatRegime }) {
                 </div>
                 <div>
                   <div style={{ fontSize: 9, color: "#9A8E82", marginBottom: 2 }}>PU HT</div>
-                  <input type="number" inputMode="decimal" step="0.01"
+                  <input type="number" inputMode="decimal" step="0.01" min="0"
                     value={l.prix_unitaire ?? 0}
-                    onChange={e => update(l.id, { prix_unitaire: Number(e.target.value) })}
+                    onChange={e => {
+                      const v = Number(e.target.value);
+                      update(l.id, { prix_unitaire: Number.isFinite(v) && v >= 0 ? v : 0 });
+                    }}
                     style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 8px", fontSize: 12, color: "#1A1612", boxSizing: "border-box" }}/>
                 </div>
                 <div>

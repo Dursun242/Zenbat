@@ -6,6 +6,7 @@
 import { useState, useEffect, useRef } from "react"
 import { getToken } from "../../lib/getToken.js"
 import { supabase } from "../../lib/supabase.js"
+import { useModalGuard } from "../../hooks/useModalGuard.js"
 
 const PERIODS = [
   { id: 'last_month',   label: 'Mois dernier' },
@@ -25,6 +26,8 @@ export default function SendToComptableModal({ user, onClose }) {
   const [error, setError]     = useState('')
   const [result, setResult]   = useState(null)
   const emailRef = useRef(null)
+
+  useModalGuard(true, onClose)
 
   // Préremplir l'email comptable depuis profiles
   useEffect(() => {

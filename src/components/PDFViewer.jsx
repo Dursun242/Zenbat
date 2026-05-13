@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import { fmt, fmtD } from "../lib/utils.js"
+import { useModalGuard } from "../hooks/useModalGuard.js"
 
 // Délais pour stabiliser la mesure de hauteur après changement de scale ;
 // le 1er essai capture le 1er layout, le 2nd attrape les ajustements
@@ -46,6 +47,10 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
   const scale = hidden ? 1 : fitScale * userZoom
   const [pageH, setPageH] = useState(null)
   const [generatingPdf, setGeneratingPdf] = useState(false)
+
+  // Mode plein-écran uniquement : bouton retour navigateur / swipe back iOS
+  // ferme la modale, scroll body bloqué tant qu'elle est ouverte.
+  useModalGuard(!hidden && !inline, onClose);
 
   useEffect(() => {
     if (hidden || !wrapRef.current) return

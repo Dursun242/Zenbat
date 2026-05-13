@@ -38,9 +38,14 @@ export default async function handler(req, res) {
   }
 
   // Notification email via Brevo (optionnel — si BREVO_API_KEY est défini)
+  // Fire-and-forget volontaire (on ne veut pas bloquer la réponse au client
+  // si Brevo est lent), mais avec un timeout 5s pour ne pas laisser des
+  // requêtes en suspens occuper la fonction Vercel jusqu'à la limite plateforme.
   const brevoKey = process.env.BREVO_API_KEY
   const adminEmail = process.env.ADMIN_EMAIL
   if (brevoKey && adminEmail) {
+    const ac = new AbortController()
+    const timer = setTimeout(() => ac.abort(), 5000)
     fetch('https://api.brevo.com/v3/smtp/email', {
       method:  'POST',
       headers: { 'api-key': brevoKey, 'Content-Type': 'application/json' },
@@ -50,7 +55,10 @@ export default async function handler(req, res) {
         subject:     '📩 Nouvel abonné newsletter Zenbat',
         htmlContent: `<p>Nouveau compte inscrit à la newsletter :</p><p><strong>${email.toLowerCase().trim()}</strong></p><p>Source : landing page</p>`,
       }),
-    }).catch(() => {}) // silencieux si Brevo échoue
+      signal: ac.signal,
+    })
+      .catch(() => {}) // silencieux si Brevo échoue (timeout inclus)
+      .finally(() => clearTimeout(timer))
   }
 
   return res.status(200).json({ ok: true })

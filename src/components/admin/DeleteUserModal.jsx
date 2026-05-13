@@ -1,4 +1,5 @@
 import { fmtEur } from "../../lib/admin/format.js";
+import { useModalGuard } from "../../hooks/useModalGuard.js";
 
 // Modale de confirmation pour les actions destructives admin sur un compte :
 //   mode = 'delete'     → suppression complète du compte (cascade RGPD)
@@ -8,6 +9,7 @@ export default function DeleteUserModal({
   target, mode = "delete",
   confirmInput, setConfirmInput, deleting, error, onClose, onConfirm,
 }) {
+  useModalGuard(true, onClose);
   const isReset = mode === "reset_data";
   const canConfirm = !deleting && confirmInput.trim().toLowerCase() === (target.email || "").toLowerCase();
 

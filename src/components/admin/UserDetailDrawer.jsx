@@ -1,4 +1,5 @@
 import { fmtEur, fmtDT, relTime, SC, SL } from "../../lib/admin/format.js";
+import { useModalGuard } from "../../hooks/useModalGuard.js";
 
 // Drawer de détail d'un utilisateur dans le panel admin.
 // Présentation pure : reçoit data + callbacks, n'effectue aucun appel réseau.
@@ -7,6 +8,7 @@ export default function UserDetailDrawer({
   onRequestDelete, onRequestReset, currentUserId,
   onTogglePlan, planToggling = false,
 }) {
+  useModalGuard(true, onClose);
   const currentPlan = data?.profile?.plan || user.plan || "free";
   const isPro       = currentPlan === "pro";
   return (

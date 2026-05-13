@@ -6,6 +6,7 @@ import LignesEditor from "./LignesEditor.jsx";
 import PDFViewer from "./PDFViewer.jsx";
 import ClientPickerModal from "./app/ClientPickerModal.jsx";
 import DevisClientActions from "./DevisClientActions.jsx";
+import { useModalGuard } from "../hooks/useModalGuard.js";
 
 export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChange, onConvertToInvoice, onCreateAcompte, onDuplicate, onCreateIndice, groupVersions = [], goDevis, loading, autoOpenPDF, onAutoOpenPDFConsumed, isFreemium = false, onPaywall = () => {} }) {
   const [showPDF,        setShowPDF]        = useState(false);
@@ -14,6 +15,12 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
   const [acompteLoading, setAcompteLoading] = useState(false);
   const [clientPicker,   setClientPicker]   = useState(false);
   const [statutBusy,     setStatutBusy]     = useState(false);
+
+  // La modale acompte est rendue inline (pas un composant séparé) → on
+  // gère son scroll-lock + bouton retour depuis le parent. clientPicker
+  // est aussi piloté ici car ClientPickerModal n'est monté que quand le
+  // flag est true (l'utilisateur attend que le retour le ferme).
+  useModalGuard(acompteModal, () => setAcompteModal(false));
 
   // Ouvre automatiquement le PDF quand on arrive depuis l'Agent IA après save
   useEffect(() => {

@@ -273,9 +273,35 @@ function NegotiateMode({ lignes, token, sessionId, accent, onDone, onCancel }) {
 
 // ── Page principale ────────────────────────────────────────────────────────
 
+// Persiste sessionId par token : si le client recharge la page entre
+// l'envoi du code OTP et sa saisie (cas mobile fréquent — onglet basculé,
+// PWA mise en veille, etc.), on retrouve la session au lieu de
+// redemander un email.
+const SESSION_KEY = (token) => `zenbat_devis_pub_sid_${token}`
+const SESSION_TTL_MS = 30 * 60 * 1000 // 30 min — au-delà l'OTP expire côté serveur
+
+function readPersistedSessionId(token) {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY(token))
+    if (!raw) return null
+    const { sid, t } = JSON.parse(raw)
+    if (!sid || !t || Date.now() - t > SESSION_TTL_MS) {
+      sessionStorage.removeItem(SESSION_KEY(token))
+      return null
+    }
+    return sid
+  } catch { return null }
+}
+function writePersistedSessionId(token, sid) {
+  try { sessionStorage.setItem(SESSION_KEY(token), JSON.stringify({ sid, t: Date.now() })) } catch {}
+}
+function clearPersistedSessionId(token) {
+  try { sessionStorage.removeItem(SESSION_KEY(token)) } catch {}
+}
+
 export default function DevisPublicPage({ token }) {
   const [data,         setData]         = useState(null)
-  const [sessionId,    setSessionId]    = useState(null)
+  const [sessionId,    setSessionId]    = useState(() => readPersistedSessionId(token))
   const [phase,        setPhase]        = useState('loading')
   const [mode,         setMode]         = useState(null)
   const [clientName,   setClientName]   = useState('')
@@ -317,11 +343,16 @@ export default function DevisPublicPage({ token }) {
     const url = `/api/devis-public?token=${token}${id ? `&session_id=${id}` : ''}`
     const res  = await fetch(url)
     const json = await res.json()
-    if (!res.ok) { setPhase('error'); return }
+    if (!res.ok) {
+      // Session expirée / invalide : purge la session persistée pour ne pas
+      // boucler en erreur au reload suivant.
+      if (id) clearPersistedSessionId(token)
+      setPhase('error'); return
+    }
     json._token = token
     setData(json)
-    if (json.statut === 'accepte') setPhase('accepted')
-    else if (json.statut === 'refuse') setPhase('refused')
+    if (json.statut === 'accepte') { clearPersistedSessionId(token); setPhase('accepted') }
+    else if (json.statut === 'refuse') { clearPersistedSessionId(token); setPhase('refused') }
     else if (!json.verified) setPhase('verify')
     else setPhase('view')
   }, [token, sessionId])
@@ -377,16 +408,25 @@ export default function DevisPublicPage({ token }) {
   // les emails partis (ou définitivement en échec) — c'est ce qui rassure
   // l'utilisateur sur le fait que tout est bien parti.
   const handleAccept = async () => {
+    // Garde anti-double-submit : si on est déjà en train de signer ou
+    // si la phase finale est atteinte, on ne relance pas (sinon double
+    // signature, double email, audit log dupliqué).
+    if (busy || phase === 'signing' || phase === 'accepted') return
     if (!clientName.trim()) { setErr('Votre nom est requis'); return }
     const ok = await post({ action: 'accept', client_name: clientName })
     if (!ok) return
     setPhase('signing')
     const result = await sendSignedPdf(clientName, ok.signed_at)
-    setEmailSent(result?.sent || null)
+    // result === null → échec local (PDF non généré, réseau coupé) : on bascule
+    // quand même en 'accepted' (la signature est enregistrée côté serveur),
+    // mais on force emailSent.client=false pour afficher la bannière jaune
+    // qui prévient l'utilisateur que le PDF ne lui a pas été envoyé.
+    setEmailSent(result?.sent || { client: false, artisan: false })
     setPhase('accepted')
   }
 
   const handleRefuse = async () => {
+    if (busy || phase === 'refused') return
     if (!refuseReason.trim()) { setErr('La raison du refus est requise'); return }
     const ok = await post({ action: 'refuse', reason: refuseReason })
     if (ok) setPhase('refused')
@@ -412,7 +452,7 @@ export default function DevisPublicPage({ token }) {
     return (
       <div style={{ minHeight: '100vh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
         <Header artisan={data?.artisan} />
-        <PhaseEmail data={data} onVerified={() => load(sessionId)} onSessionId={id => { setSessionId(id); load(id) }} />
+        <PhaseEmail data={data} onVerified={() => load(sessionId)} onSessionId={id => { setSessionId(id); writePersistedSessionId(token, id); load(id) }} />
       </div>
     )
   }

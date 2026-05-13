@@ -1,20 +1,29 @@
+import { useMemo } from "react";
 import { fmtDT, relTime } from "../../lib/admin/format.js";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
 
 export default function AdminConversations({ iaConvs, loading, convSearch, setConvSearch, openConvUser, setOpenConvUser, onRefresh }) {
-  const byUser = new Map();
-  for (const c of (iaConvs || [])) {
-    const key = c.owner_id || "anon";
-    if (!byUser.has(key)) byUser.set(key, { owner_id: key, name: c.name, email: c.email, items: [] });
-    byUser.get(key).items.push(c);
-  }
-  const groups = Array.from(byUser.values())
-    .map(g => ({ ...g, items: [...g.items].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)) }))
-    .filter(g => {
-      if (!convSearch) return true;
-      const q = convSearch.toLowerCase();
-      return (g.name || "").toLowerCase().includes(q) || (g.email || "").toLowerCase().includes(q);
-    })
-    .sort((a, b) => new Date(b.items.at(-1)?.created_at || 0) - new Date(a.items.at(-1)?.created_at || 0));
+  // Debounce + memo : avec plusieurs milliers de messages stockés, le
+  // regroupement par utilisateur + tri + filtre tournait à chaque frappe
+  // dans la barre de recherche → lag visible. L'input reste contrôlé par
+  // le parent (immédiat), seul le filtre attend 200ms sans frappe.
+  const debouncedQ = useDebouncedValue(convSearch, 200);
+  const groups = useMemo(() => {
+    const byUser = new Map();
+    for (const c of (iaConvs || [])) {
+      const key = c.owner_id || "anon";
+      if (!byUser.has(key)) byUser.set(key, { owner_id: key, name: c.name, email: c.email, items: [] });
+      byUser.get(key).items.push(c);
+    }
+    const q = debouncedQ.toLowerCase();
+    return Array.from(byUser.values())
+      .map(g => ({ ...g, items: [...g.items].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)) }))
+      .filter(g => {
+        if (!q) return true;
+        return (g.name || "").toLowerCase().includes(q) || (g.email || "").toLowerCase().includes(q);
+      })
+      .sort((a, b) => new Date(b.items.at(-1)?.created_at || 0) - new Date(a.items.at(-1)?.created_at || 0));
+  }, [iaConvs, debouncedQ]);
   const totalMsg = (iaConvs || []).length;
 
   return (

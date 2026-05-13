@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useAuth } from "../lib/auth.jsx"
 import { getToken } from "../lib/getToken.js"
 import { fmtD } from "../lib/admin/format.js"
+import { useDebouncedValue } from "../hooks/useDebouncedValue.js"
 import AdminKPIs         from "./admin/AdminKPIs.jsx"
 import AdminUsersTable   from "./admin/AdminUsersTable.jsx"
 import AdminErrorLogs    from "./admin/AdminErrorLogs.jsx"
@@ -53,6 +54,31 @@ export default function AdminPanel({ onBack }) {
   const [planToggling, setPlanToggling] = useState(false)
 
   useEffect(() => { if (session) { load() } }, [session?.access_token])
+
+  // Belt-and-suspenders : si l'identité change pendant que le panel est
+  // monté (logout admin → login utilisateur normal sans démontage), on
+  // purge immédiatement toutes les données chargées pour éviter qu'un
+  // compte non-admin voie les stats de l'admin précédent. App.jsx gate
+  // déjà ce composant via isAdmin, mais on se prémunit contre un edge
+  // case de re-render asynchrone.
+  useEffect(() => {
+    setStats(null); setIaLogs(null); setIaNegs(null); setIaConvs(null)
+    setNewsletter(null); setCoherence(null); setFeedback(null); setQuotesSent(null)
+    setOpenConvUser(null); setDetailUser(null); setDetailData(null)
+  }, [currentUser?.id])
+
+  const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || "").trim().toLowerCase()
+  const callerEmail = (currentUser?.email || "").trim().toLowerCase()
+  if (adminEmail && callerEmail && callerEmail !== adminEmail) {
+    return (
+      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24, color: "#555" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Accès refusé</div>
+          <div style={{ fontSize: 14, color: "#888" }}>Cette section est réservée à l'administrateur.</div>
+        </div>
+      </div>
+    )
+  }
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -212,18 +238,29 @@ export default function AdminPanel({ onBack }) {
     }
   }
 
-  const filteredUsers = (stats?.usersDetail || [])
-    .filter(u => {
-      if (!userSearch) return true
-      const q = userSearch.toLowerCase()
-      return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.fullName || "").toLowerCase().includes(q)
-    })
-    .sort((a, b) => {
-      if (["joined", "lastSignIn", "lastDevis"].includes(sortBy)) return new Date(b[sortBy] || 0) - new Date(a[sortBy] || 0)
-      if (sortBy === "name") return (a.fullName || a.name || "").localeCompare(b.fullName || b.name || "", "fr")
-      if (sortBy === "accepte") return (b.byStatut?.accepte || 0) - (a.byStatut?.accepte || 0)
-      return (b[sortBy] || 0) - (a[sortBy] || 0)
-    })
+  // Debounce + memo : sur des comptes admin avec des centaines d'utilisateurs,
+  // filtrer + trier à chaque frappe générait un re-render visible comme du
+  // lag. On garde l'input réactif (le champ contrôlé met à jour userSearch)
+  // mais le filtre coûteux ne tourne qu'après 200ms sans frappe.
+  // (AdminConversations gère son propre debounce en interne pour rester
+  // autonome.)
+  const debouncedUserSearch = useDebouncedValue(userSearch, 200)
+
+  const filteredUsers = useMemo(() => {
+    const all = stats?.usersDetail || []
+    const q = debouncedUserSearch.toLowerCase()
+    return all
+      .filter(u => {
+        if (!q) return true
+        return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.fullName || "").toLowerCase().includes(q)
+      })
+      .sort((a, b) => {
+        if (["joined", "lastSignIn", "lastDevis"].includes(sortBy)) return new Date(b[sortBy] || 0) - new Date(a[sortBy] || 0)
+        if (sortBy === "name") return (a.fullName || a.name || "").localeCompare(b.fullName || b.name || "", "fr")
+        if (sortBy === "accepte") return (b.byStatut?.accepte || 0) - (a.byStatut?.accepte || 0)
+        return (b[sortBy] || 0) - (a[sortBy] || 0)
+      })
+  }, [stats?.usersDetail, debouncedUserSearch, sortBy])
 
   return (
     <div style={{ minHeight: "100%", background: "#FAF7F2", paddingBottom: 40 }}>

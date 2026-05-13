@@ -43,8 +43,16 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
         navigateFallbackDenylist: [/^\/api\//],
-        clientsClaim: true,
-        skipWaiting: true,
+        // ⚠ skipWaiting + clientsClaim désactivés volontairement.
+        // Avec ces deux flags + registerType:'autoUpdate', vite-plugin-pwa
+        // déclenche un window.location.reload() mid-session dès qu'un
+        // nouveau SW est déployé — l'utilisateur perd ce qu'il tape.
+        // Sans eux, le nouveau SW reste en "waiting" et s'active naturellement
+        // au prochain démarrage de l'app (fermeture/réouverture du PWA ou
+        // refresh manuel). La MAJ est appliquée silencieusement, jamais
+        // pendant qu'on est en train d'utiliser l'app.
+        // clientsClaim: true,
+        // skipWaiting: true,
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {

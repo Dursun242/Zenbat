@@ -6,7 +6,18 @@ import { AuthProvider } from './lib/auth.jsx'
 import Root from './Root.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 
-registerSW({ immediate: true })
+// ⚠ onNeedRefresh / onOfflineReady fournis = no-op : on supprime le reload
+// silencieux mid-session de vite-plugin-pwa en mode 'autoUpdate'. Sans ce
+// callback, le plugin déclenche window.location.reload() dès qu'un nouveau
+// SW est prêt, et l'utilisateur perd ce qu'il était en train de faire.
+// Avec un callback (même vide), on garde le contrôle : la MAJ est appliquée
+// au prochain démarrage naturel de l'app (le SW "waiting" prend la main
+// quand toutes les fenêtres sont fermées puis rouvertes).
+registerSW({
+  immediate: true,
+  onNeedRefresh() { /* no-op : MAJ silencieuse au prochain démarrage */ },
+  onOfflineReady() { /* no-op */ },
+})
 
 // Récupération auto après un redéploiement Vercel : quand le bundle principal
 // en cache référence un chunk qui n'existe plus (nouveaux hashes après build),

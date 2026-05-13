@@ -1,6 +1,9 @@
+import { useModalGuard } from "../../hooks/useModalGuard.js";
+
 // Modale festive affichée à la génération du TOUT PREMIER devis du compte.
 // One-shot : le flag est stocké dans localStorage pour ne jamais la remontrer.
 export default function CelebrateModal({ seconds, fontFamily, ac, onClose, onSave }) {
+  useModalGuard(true, onClose);
   return (
     <div onClick={onClose}
       style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.65)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 200, animation: "fadeUp .2s ease both" }}>
