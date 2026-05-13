@@ -240,6 +240,30 @@ export default function App() {
   const scrollMapRef = useRef({});
   const skipNextScrollRef = useRef(false);
 
+  // Hauteur du shell pilotée par JS via window.innerHeight / visualViewport.
+  // Sur iOS PWA standalone, ni 100vh, ni 100dvh, ni height:100% sur html/body
+  // ne donnent fiablement la hauteur du visual viewport — on observe une
+  // grosse bande noire sous la BottomNav qui ne disparaît pas. La seule
+  // mesure stable est window.innerHeight (ou visualViewport.height quand
+  // disponible). On la pousse en CSS custom property pour que le shell
+  // s'y aligne.
+  const shellRef = useRef(null);
+  useLayoutEffect(() => {
+    const setH = () => {
+      const h = window.visualViewport?.height || window.innerHeight;
+      if (shellRef.current) shellRef.current.style.height = h + "px";
+    };
+    setH();
+    window.visualViewport?.addEventListener("resize", setH);
+    window.addEventListener("resize", setH);
+    window.addEventListener("orientationchange", setH);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", setH);
+      window.removeEventListener("resize", setH);
+      window.removeEventListener("orientationchange", setH);
+    };
+  }, []);
+
   useEffect(() => {
     const el = contentRef.current;
     if (!el) return;
@@ -337,7 +361,7 @@ export default function App() {
   );
 
   return (
-    <div style={{ fontFamily: "Inter, system-ui, sans-serif", height: "100%", display: "flex", flexDirection: "column", background: "#FAF7F2", overflow: "hidden" }}>
+    <div ref={shellRef} style={{ fontFamily: "Inter, system-ui, sans-serif", height: "100%", display: "flex", flexDirection: "column", background: "#FAF7F2", overflow: "hidden" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,400;1,700&family=Space+Grotesk:wght@400;600;700&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
