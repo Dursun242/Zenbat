@@ -6,18 +6,27 @@ import { AuthProvider } from './lib/auth.jsx'
 import Root from './Root.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 
-// ⚠ onNeedRefresh / onOfflineReady fournis = no-op : on supprime le reload
-// silencieux mid-session de vite-plugin-pwa en mode 'autoUpdate'. Sans ce
-// callback, le plugin déclenche window.location.reload() dès qu'un nouveau
-// SW est prêt, et l'utilisateur perd ce qu'il était en train de faire.
-// Avec un callback (même vide), on garde le contrôle : la MAJ est appliquée
-// au prochain démarrage naturel de l'app (le SW "waiting" prend la main
-// quand toutes les fenêtres sont fermées puis rouvertes).
-registerSW({
+// onNeedRefresh fourni : on supprime le reload silencieux mid-session de
+// vite-plugin-pwa en mode 'autoUpdate'. Sans ce callback, le plugin
+// déclenche window.location.reload() dès qu'un nouveau SW est prêt, et
+// l'utilisateur perd ce qu'il était en train de faire.
+//
+// À la place, on émet un custom event 'zenbat:sw-needs-refresh' qu'un
+// composant React (UpdateAvailableToast) capte pour afficher un toast non
+// intrusif avec un bouton "Actualiser". L'utilisateur décide quand
+// appliquer la mise à jour.
+//
+// On stocke updateSW sur window pour que le toast puisse l'appeler avec
+// l'argument true (skipWaiting + reload propre via le plugin lui-même).
+const updateSW = registerSW({
   immediate: true,
-  onNeedRefresh() { /* no-op : MAJ silencieuse au prochain démarrage */ },
+  onNeedRefresh() {
+    window.__zenbatSWUpdateReady__ = true
+    window.dispatchEvent(new CustomEvent('zenbat:sw-needs-refresh'))
+  },
   onOfflineReady() { /* no-op */ },
 })
+window.__zenbatSWUpdate__ = updateSW
 
 // Récupération auto après un redéploiement Vercel : quand le bundle principal
 // en cache référence un chunk qui n'existe plus (nouveaux hashes après build),

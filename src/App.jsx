@@ -14,6 +14,7 @@ import { useInvoices }  from "./hooks/useInvoices.js";
 import Logo          from "./components/ui/Logo.jsx";
 import { I }         from "./components/ui/icons.jsx";
 import Toast         from "./components/app/Toast.jsx";
+import UpdateAvailableToast from "./components/app/UpdateAvailableToast.jsx";
 import BottomNav     from "./components/app/BottomNav.jsx";
 import SearchBar     from "./components/app/SearchBar.jsx";
 import SaveIndicator from "./components/app/SaveIndicator.jsx";
@@ -522,6 +523,7 @@ export default function App() {
       </div>
 
       <Toast toast={toast} onDismiss={dismissToast}/>
+      <UpdateAvailableToast />
       <SupportChat accent={brand?.color || "#22c55e"} open={supportOpen} onClose={() => setSupportOpen(false)}/>
       {comptableOpen && (
         <SendToComptableModal user={user} onClose={() => setComptableOpen(false)}/>
