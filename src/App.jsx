@@ -388,8 +388,8 @@ export default function App() {
       `}</style>
 
       {/* Header */}
-      <header style={{ background: "#1A1612", padding: "calc(10px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 10px calc(18px + env(safe-area-inset-left))", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-        {/* Nav horizontale discrète intégrée dans la bande sombre du header (mobile).
+      <header style={{ background: "#1A1612", padding: "calc(10px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) 10px calc(10px + env(safe-area-inset-left))", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, gap: 8 }}>
+        {/* Nav horizontale dans la bande sombre du header (mobile).
             Sur desktop, c'est la sidebar latérale qui prend le relais (cf. media query). */}
         <nav className="app-top-nav" style={{ display: "flex", alignItems: "center", gap: 2 }}>
           {NAV.map(({ id, label, icon }) => {
@@ -400,21 +400,20 @@ export default function App() {
               <button key={id} onClick={() => setTab(id)} aria-label={label} aria-current={active ? "page" : undefined}
                 style={{
                   position: "relative",
-                  width: 36, height: 36, padding: 0,
-                  background: "transparent", border: "none", cursor: "pointer",
-                  display: "inline-flex", alignItems: "center", justifyContent: "center",
-                  color: active ? "#22c55e" : "rgba(255,255,255,.42)",
-                  transition: "color .15s",
+                  width: 52, minHeight: 46, padding: "4px 0 3px",
+                  background: active ? "rgba(34,197,94,.14)" : "transparent",
+                  border: "none", borderRadius: 10, cursor: "pointer",
+                  display: "inline-flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
+                  color: active ? "#22c55e" : "rgba(255,255,255,.78)",
+                  transition: "background .15s, color .15s",
                 }}>
-                <span style={{ transform: "scale(0.92)", display: "inline-flex" }}>{icon}</span>
-                {active && (
-                  <span style={{ position: "absolute", bottom: 2, left: "50%", marginLeft: -8, width: 16, height: 2, borderRadius: 1, background: "#22c55e" }}/>
-                )}
+                <span style={{ transform: "scale(0.98)", display: "inline-flex" }}>{icon}</span>
+                <span style={{ fontSize: 9.5, fontWeight: active ? 700 : 600, letterSpacing: 0.2, textTransform: "uppercase", lineHeight: 1, whiteSpace: "nowrap" }}>{label}</span>
                 {showNudge && (
-                  <span style={{ position: "absolute", top: 6, right: 6, width: 7, height: 7, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 0 0 rgba(34,197,94,.55)", animation: "topnav-nudge 1.6s ease-out infinite" }}/>
+                  <span style={{ position: "absolute", top: 2, right: 4, width: 7, height: 7, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 0 0 rgba(34,197,94,.55)", animation: "topnav-nudge 1.6s ease-out infinite" }}/>
                 )}
                 {showQuota && (
-                  <span style={{ position: "absolute", top: 5, right: 5, width: 6, height: 6, borderRadius: "50%", background: "#ef4444" }}/>
+                  <span style={{ position: "absolute", top: 2, right: 3, width: 6, height: 6, borderRadius: "50%", background: "#ef4444" }}/>
                 )}
               </button>
             );
