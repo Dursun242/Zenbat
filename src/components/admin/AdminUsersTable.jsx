@@ -42,7 +42,7 @@ export default function AdminUsersTable({ users, userSearch, setUserSearch, sort
           <input
             value={userSearch}
             onChange={e => setUserSearch(e.target.value)}
-            placeholder="Rechercher par nom, prénom, société ou email…"
+            placeholder="Nom, société, email…"
             style={{
               width: "100%",
               boxSizing: "border-box",
@@ -74,14 +74,11 @@ export default function AdminUsersTable({ users, userSearch, setUserSearch, sort
           )}
         </div>
 
-        {/* Tri */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 11, color: "#9A8E82", fontWeight: 600, letterSpacing: "0.3px", textTransform: "uppercase" }}>Tri</span>
-          <select value={sortBy} onChange={e => setSortBy(e.target.value)}
-            style={{ flex: 1, border: "1px solid #E8E2D8", borderRadius: 8, padding: "6px 10px", fontSize: 12, color: "#3D3028", background: "white", fontFamily: "inherit", cursor: "pointer" }}>
-            {SORT_OPTS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
-          </select>
-        </div>
+        {/* Tri — label inline pour rester compact sans cramponner */}
+        <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+          style={{ width: "100%", boxSizing: "border-box", border: "1px solid #E8E2D8", borderRadius: 10, padding: "8px 12px", fontSize: 12, color: "#3D3028", background: "white", fontFamily: "inherit", cursor: "pointer" }}>
+          {SORT_OPTS.map(o => <option key={o.v} value={o.v}>{`Trier par : ${o.l}`}</option>)}
+        </select>
       </div>
 
       {users.length === 0 && (

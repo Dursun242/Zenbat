@@ -12,12 +12,14 @@ function Card({ label, value, sub, color = "#1A1612", small = false }) {
 }
 
 // Hero KPI : carte plus grande, pour les 4 indicateurs critiques affichés
-// systématiquement en haut du panel (pas cachables).
+// systématiquement en haut du panel (pas cachables). Les chiffres utilisent
+// la police Inter standard (lining numerals) — pas Syne, qui rend les
+// digits en old-style figures et donne un effet italique/manuscrit.
 function HeroCard({ label, value, sub, color = "#1A1612", accent = "#C97B5C" }) {
   return (
     <div style={{ background: "white", borderRadius: 14, padding: "16px 18px", boxShadow: "0 1px 4px rgba(0,0,0,.06)", borderTop: `3px solid ${accent}` }}>
       <div style={{ fontSize: 10, color: "#9A8E82", marginBottom: 6, letterSpacing: "0.5px", textTransform: "uppercase", fontWeight: 600 }}>{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 800, color, lineHeight: 1, letterSpacing: "-0.5px", fontFamily: "'Syne', sans-serif" }}>{value}</div>
+      <div style={{ fontSize: 26, fontWeight: 800, color, lineHeight: 1, letterSpacing: "-0.5px", fontVariantNumeric: "tabular-nums lining-nums" }}>{value}</div>
       {sub && <div style={{ fontSize: 10, color: "#9A8E82", marginTop: 6 }}>{sub}</div>}
     </div>
   );
