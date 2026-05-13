@@ -264,7 +264,7 @@ export default function AdminPanel({ onBack }) {
 
   return (
     <div style={{ minHeight: "100%", background: "#FAF7F2", paddingBottom: 40 }}>
-      <div style={{ background: "#1A1612", padding: "14px 18px 16px", paddingTop: "calc(14px + env(safe-area-inset-top, 0px))", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, zIndex: 10, boxShadow: "0 2px 12px rgba(26,22,18,.18)" }}>
+      <div style={{ background: "#1A1612", padding: "14px 18px 16px", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, zIndex: 10, boxShadow: "0 2px 12px rgba(26,22,18,.18)" }}>
         <button onClick={onBack} aria-label="Retour"
           style={{ background: "#2A231C", border: "none", color: "#9A8E82", cursor: "pointer", padding: 8, borderRadius: 8, display: "flex", alignItems: "center" }}>
           <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12,5 5,12 12,19"/></svg>

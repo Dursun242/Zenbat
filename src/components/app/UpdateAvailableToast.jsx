@@ -40,9 +40,9 @@ export default function UpdateAvailableToast() {
       aria-live="polite"
       style={{
         position: "fixed",
-        // Au-dessus de la BottomNav (54px de haut + safe-area-inset-bottom),
-        // sinon le toast colle au bord et est dur à toucher.
-        bottom: "calc(74px + env(safe-area-inset-bottom))",
+        // Nav passée en side dock vertical à droite → le toast peut
+        // redescendre en bas (avec safe-area pour le home indicator).
+        bottom: "calc(16px + min(env(safe-area-inset-bottom, 0px), 34px))",
         left: 12, right: 12,
         zIndex: 200,
         background: "#1A1612",
