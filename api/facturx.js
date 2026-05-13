@@ -340,10 +340,23 @@ function addSRGBOutputIntent(pdfDoc, iccBytes) {
   pdfDoc.catalog.set(PDFName.of("OutputIntents"), outputIntentsArray);
 }
 
+// Garde-fou taille payload : une facture Factur-X = PDF + XML + metadata.
+// Un PDF visuel typique pèse 200-800 ko, base64 = +33%, donc ~1 Mo. On
+// laisse une marge confortable à 8 Mo pour les factures avec logo
+// vectoriel lourd ou beaucoup de lignes, mais on rejette les payloads
+// extravagants (forge ou bug client) avant qu'ils n'occupent la fonction
+// Vercel et la mémoire à parser le JSON.
+const FACTURX_MAX_BYTES = 8 * 1024 * 1024;
+
 export default async function handler(req, res) {
   cors(req, res, { methods: "POST, OPTIONS" });
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  const contentLength = Number(req.headers["content-length"] || 0);
+  if (Number.isFinite(contentLength) && contentLength > FACTURX_MAX_BYTES) {
+    return res.status(413).json({ error: "Payload trop volumineux (max 8 Mo)" });
+  }
 
   // Authentification
   const auth = await authenticate(req, res);

@@ -94,14 +94,22 @@ export default function App() {
 
   useEffect(() => {
     // Re-synchronise le compteur sticky local au changement de semaine
-    // (toutes les minutes pour gérer le passage du dimanche au lundi
-    // pendant qu'une session est ouverte) ET au changement d'utilisateur
-    // (pour basculer sur la clé scopée du nouvel user et éviter d'afficher
-    // un compteur hérité d'un autre compte).
+    // (cas du dimanche → lundi pendant qu'une session est ouverte) ET au
+    // changement d'utilisateur (pour basculer sur la clé scopée du nouvel
+    // user et éviter d'afficher un compteur hérité d'un autre compte).
+    //
+    // On tick au mount, à chaque retour de focus (visibilitychange), et
+    // toutes les 5 min en filet de sécurité — vs un setInterval(60s) qui
+    // consommait du CPU/batterie pour rien quand l'app était en background.
     const tick = () => setStickyDevisThisWeek(readStickyDevisThisWeek(user?.id));
     tick();
-    const id = setInterval(tick, 60_000);
-    return () => clearInterval(id);
+    const onVis = () => { if (document.visibilityState === "visible") tick(); };
+    document.addEventListener("visibilitychange", onVis);
+    const id = setInterval(tick, 5 * 60_000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      clearInterval(id);
+    };
   }, [user?.id]);
 
   useEffect(() => {

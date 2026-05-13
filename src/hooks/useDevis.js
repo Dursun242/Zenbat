@@ -39,11 +39,28 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
         if (saveLignes) await replaceLignes(d.id, (dl || []).map(({ id, created_at, ...l }) => l));
         markSaved();
       } catch (err) { console.error("[save devis]", err); showErr("Impossible de sauvegarder le devis"); setSaveState("idle"); }
+      finally {
+        // Libère l'entrée du Map après run : sinon le Map grossit
+        // indéfiniment à mesure que l'utilisateur édite des devis
+        // différents (1 entrée par d.id, jamais nettoyée).
+        delete saveTimers.current[d.id];
+      }
     };
     if (immediate) { run(); return; }
     clearTimeout(saveTimers.current[d.id]);
     saveTimers.current[d.id] = setTimeout(run, 800);
   };
+
+  // Cleanup global : si le composant parent unmount (logout, refresh,
+  // navigation hors app), on annule tous les saves en attente. Sans ça
+  // un setState() pouvait être tenté sur un composant démonté → warning
+  // React + write parasite sur le state recréé au prochain mount.
+  useEffect(() => {
+    const timers = saveTimers.current;
+    return () => {
+      for (const t of Object.values(timers)) clearTimeout(t);
+    };
+  }, []);
 
   const onSaveDevis = (d, saveLignes = false) => {
     setDevis(prev => prev.map(x => x.id === d.id ? d : x));
