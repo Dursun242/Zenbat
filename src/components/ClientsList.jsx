@@ -1,8 +1,9 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { CLAUDE_MODEL } from "../lib/constants.js";
 import { uid, displayName, emptyClient } from "../lib/utils.js";
 import ContactEditor from "./ContactEditor.jsx";
 import { getToken } from "../lib/getToken.js";
+import { useDebouncedValue } from "../hooks/useDebouncedValue.js";
 
 const TYPE_STYLE = {
   particulier: { bg: "#eff6ff", color: "#1e40af", label: "Particulier", avatarBg: "#dbeafe", avatarColor: "#1d4ed8" },
@@ -25,12 +26,18 @@ export default function ClientsList({ clients, onSave, onDelete, onRestore, goCl
   const [openMenu,    setOpenMenu]    = useState(null);
   const fileRef = useRef(null);
 
-  const filtered = clients.filter(c => {
-    if (!query.trim()) return true;
-    const q = query.toLowerCase();
-    return [c.raison_sociale, c.nom, c.prenom, c.email, c.telephone, c.ville, c.siret, c.activite]
-      .filter(Boolean).some(v => String(v).toLowerCase().includes(q));
-  });
+  // Debounce + memo : sur un compte avec 500+ clients, filtrer sur 8 champs
+  // à chaque frappe produisait un lag perceptible. L'input reste réactif,
+  // seul le filtre coûteux attend l'arrêt de frappe.
+  const debouncedQuery = useDebouncedValue(query, 180);
+  const filtered = useMemo(() => {
+    const q = debouncedQuery.trim().toLowerCase();
+    if (!q) return clients;
+    return clients.filter(c =>
+      [c.raison_sociale, c.nom, c.prenom, c.email, c.telephone, c.ville, c.siret, c.activite]
+        .filter(Boolean).some(v => String(v).toLowerCase().includes(q))
+    );
+  }, [clients, debouncedQuery]);
 
   const onFile = async (e) => {
     const f = e.target.files?.[0];
