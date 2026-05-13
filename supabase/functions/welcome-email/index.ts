@@ -57,100 +57,91 @@ function escapeHtml(s: unknown): string {
     .replace(/"/g, "&quot;");
 }
 
-// Template HTML — palette chaude Zenbat (#1A1612 / #22c55e / #FAF7F2)
+// Template HTML — style aligné sur la landing page : palette cream/terra,
+// typo Syne pour les titres (avec fallback système si le client mail ne
+// charge pas Google Fonts), Playfair Display italic en accent décoratif,
+// numéros "01..04" en terra, maximum de whitespace, zéro carte/bordure.
 function welcomeHtml({ firstName, companyName }: { firstName: string; companyName: string }): string {
-  const greeting = firstName ? `Bonjour ${escapeHtml(firstName)},` : "Bonjour,";
-  const intro = companyName
-    ? `Bienvenue chez Zenbat — ravi de vous accompagner, vous et ${escapeHtml(companyName)}.`
-    : "Bienvenue chez Zenbat — ravi de vous accompagner sur la gestion de vos devis et factures.";
+  const greetingName = firstName ? `, ${escapeHtml(firstName)}` : "";
+  const introCompany = companyName
+    ? `Ravi de vous accompagner, vous et <strong style="color:#1A1612">${escapeHtml(companyName)}</strong>, sur la gestion de vos devis et factures.`
+    : "Ravi de vous accompagner sur la gestion de vos devis et factures.";
+
+  const steps = [
+    { n: "01", t: "Complétez votre profil", d: "SIRET, adresse, coordonnées bancaires. Ces informations sont obligatoires sur vos devis et factures (art. L441-9 du Code de commerce)." },
+    { n: "02", t: "Dictez votre premier devis", d: "Décrivez votre prestation à l'Agent IA, en français, anglais, espagnol… L'IA structure les lignes, calcule les totaux et applique la TVA." },
+    { n: "03", t: "Envoyez pour signature", d: "Votre client reçoit un lien sécurisé, signe en ligne avec un code reçu par email, et le PDF signé arrive automatiquement dans vos boîtes." },
+    { n: "04", t: "Convertissez en facture", d: "Une fois le devis accepté, générez la facture au format Factur-X (PDF/A-3 avec XML CII embarqué), conforme aux exigences fiscales françaises." },
+  ];
 
   return `<!DOCTYPE html>
 <html lang="fr">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#FAF7F2;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1A1612">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#FAF7F2;padding:32px 16px">
-<tr><td align="center">
-<table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.06)">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bienvenue sur Zenbat</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&family=Playfair+Display:ital,wght@1,400&display=swap" rel="stylesheet">
+</head>
+<body style="margin:0;padding:0;background:#FAF7F2;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;color:#1A1612;-webkit-font-smoothing:antialiased">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#FAF7F2">
+<tr><td align="center" style="padding:64px 24px">
+<table width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%">
 
-  <!-- Header -->
-  <tr><td style="background:#1A1612;padding:28px 32px;text-align:center">
-    <div style="font-size:26px;font-weight:800;letter-spacing:-1px">
-      <span style="color:#C97B5C">Zen</span><span style="color:#ffffff">bat</span>
+  <!-- Wordmark -->
+  <tr><td style="padding:0 0 56px">
+    <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.5px;color:#1A1612">
+      <span style="color:#C97B5C">Zen</span>bat
     </div>
-    <div style="color:#9A8E82;font-size:11px;margin-top:6px;letter-spacing:1.5px;text-transform:uppercase">Devis &amp; factures pour artisans</div>
   </td></tr>
 
-  <!-- Body -->
-  <tr><td style="padding:36px 36px 8px">
-    <p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#1A1612;line-height:1.3">${greeting}</p>
-    <p style="margin:0 0 24px;font-size:15px;color:#3D3028;line-height:1.6">${intro}</p>
+  <!-- Hero -->
+  <tr><td>
+    <h1 style="margin:0 0 18px;font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:40px;font-weight:400;line-height:1.15;letter-spacing:-0.8px;color:#1A1612">
+      <em style="font-family:'Playfair Display',Georgia,serif;font-style:italic;font-weight:400;color:#C97B5C">Bienvenue</em>${greetingName}.
+    </h1>
+    <p style="margin:0 0 56px;font-size:16px;line-height:1.65;color:#6B6358">
+      ${introCompany}
+    </p>
   </td></tr>
 
-  <!-- Mini-tutoriel -->
-  <tr><td style="padding:0 36px">
-    <div style="font-size:11px;font-weight:700;color:#9A8E82;letter-spacing:1.5px;margin-bottom:14px">DÉMARRAGE EN 4 ÉTAPES</div>
-
+  <!-- Steps -->
+  <tr><td style="padding:0 0 48px">
     <table width="100%" cellpadding="0" cellspacing="0">
-      ${[
-        { n: 1, t: "Complétez votre profil", d: "SIRET, adresse, coordonnées bancaires — ces informations sont obligatoires sur vos devis et factures (art. L441-9 du Code de commerce)." },
-        { n: 2, t: "Créez votre premier devis avec l'Agent IA", d: "Décrivez votre prestation en français courant. L'IA structure les lignes, calcule les totaux et applique la TVA. Vous gardez la main sur tout." },
-        { n: 3, t: "Envoyez-le pour signature électronique", d: "Votre client reçoit un lien sécurisé, signe en ligne avec OTP par email, et reçoit le PDF signé automatiquement." },
-        { n: 4, t: "Convertissez en facture en un clic", d: "Une fois le devis accepté, générez la facture au format Factur-X (PDF avec XML CII embarqué), conforme aux exigences fiscales françaises." },
-      ].map(s => `
-      <tr><td style="padding:0 0 14px">
-        <table width="100%" cellpadding="0" cellspacing="0">
-          <tr>
-            <td valign="top" width="36" style="padding-right:14px">
-              <div style="width:32px;height:32px;background:#22c55e;color:#ffffff;border-radius:50%;text-align:center;line-height:32px;font-weight:800;font-size:14px">${s.n}</div>
-            </td>
-            <td valign="top">
-              <div style="font-size:14px;font-weight:700;color:#1A1612;margin-bottom:3px">${s.t}</div>
-              <div style="font-size:13px;color:#6B6358;line-height:1.55">${s.d}</div>
-            </td>
-          </tr>
-        </table>
+      ${steps.map(s => `
+      <tr><td style="padding:0 0 36px">
+        <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:600;color:#C97B5C;letter-spacing:1.5px;margin-bottom:8px">${s.n}</div>
+        <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:20px;font-weight:400;color:#1A1612;letter-spacing:-0.3px;margin-bottom:8px;line-height:1.3">${s.t}</div>
+        <div style="font-size:15px;color:#6B6358;line-height:1.65">${s.d}</div>
       </td></tr>`).join("")}
     </table>
   </td></tr>
 
   <!-- CTA -->
-  <tr><td style="padding:14px 36px 28px;text-align:center">
-    <a href="${APP_URL}" style="display:inline-block;background:#22c55e;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:14px;font-weight:700;letter-spacing:-0.2px">
+  <tr><td style="padding:0 0 56px">
+    <a href="${APP_URL}" style="display:inline-block;background:#1A1612;color:#FAF7F2;text-decoration:none;padding:16px 28px;border-radius:4px;font-size:15px;font-weight:600;letter-spacing:-0.2px;font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif">
       Accéder à mon tableau de bord →
     </a>
   </td></tr>
 
-  <!-- Conformité légale -->
-  <tr><td style="padding:0 36px 28px">
-    <div style="background:#FAF7F2;border-left:3px solid #C97B5C;border-radius:6px;padding:16px 18px">
-      <div style="font-size:11px;font-weight:700;color:#C97B5C;letter-spacing:1.5px;margin-bottom:8px">CONFORMITÉ FACTURATION ÉLECTRONIQUE 2026</div>
-      <p style="margin:0;font-size:13px;color:#3D3028;line-height:1.6">
-        Zenbat génère vos devis et factures au format <strong>Factur-X</strong> (PDF/A-3 avec XML CII embarqué) — la norme française hybride homologuée pour la réforme de la facturation électronique B2B (échéances 2026-2027).
-        Vos documents sont donc d'ores et déjà <strong>structurés pour transiter</strong> via le futur portail public de facturation et les plateformes de dématérialisation partenaires (PDP).
-      </p>
-    </div>
+  <!-- Conformité -->
+  <tr><td style="padding:48px 0 0;border-top:1px solid #E8E2D8">
+    <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;font-weight:600;color:#9A8E82;letter-spacing:1.5px;margin-bottom:14px">CONFORMITÉ 2026</div>
+    <p style="margin:0;font-size:14px;line-height:1.7;color:#6B6358">
+      Zenbat génère vos devis et factures au format <em style="font-family:'Playfair Display',Georgia,serif;font-style:italic;color:#1A1612">Factur-X</em> — la norme française hybride PDF/A-3 homologuée pour la réforme de la facturation électronique B2B. Vos documents sont d'ores et déjà structurés pour transiter via le futur portail public et les plateformes de dématérialisation partenaires.
+    </p>
   </td></tr>
 
-  <!-- Support -->
-  <tr><td style="padding:0 36px 32px;border-top:1px solid #F0EBE3;padding-top:24px">
-    <p style="margin:0 0 6px;font-size:13px;color:#3D3028;line-height:1.55">
-      Une question ? Répondez simplement à cet email, nous lisons tout.
+  <!-- Footer -->
+  <tr><td style="padding:64px 0 0">
+    <p style="margin:0 0 4px;font-size:13px;color:#9A8E82;line-height:1.65">
+      Une question ? Répondez à cet email.
     </p>
-    <p style="margin:0;font-size:12px;color:#9A8E82;line-height:1.55">
-      Bonne route avec Zenbat 🍻
+    <p style="margin:0;font-size:12px;color:#C5BAA8;line-height:1.65">
+      Zenbat · SaaS de devis &amp; facturation pour artisans
     </p>
   </td></tr>
 
 </table>
-
-  <!-- Footer -->
-  <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%">
-    <tr><td style="padding:20px 0;text-align:center;font-size:11px;color:#9A8E82;line-height:1.6">
-      Zenbat · SaaS de devis et facturation pour artisans français<br>
-      Vous recevez cet email parce que vous venez de créer un compte sur <a href="${APP_URL}" style="color:#9A8E82;text-decoration:underline">zenbat.vercel.app</a>.
-    </td></tr>
-  </table>
-
 </td></tr>
 </table>
 </body>
@@ -168,7 +159,7 @@ async function sendWelcome(email: string, firstName: string, companyName: string
     body: JSON.stringify({
       from: RESEND_FROM,
       to: [email],
-      subject: "Bienvenue sur Zenbat 🎉",
+      subject: "Bienvenue chez Zenbat — voici par où commencer",
       html: welcomeHtml({ firstName, companyName }),
     }),
   });
