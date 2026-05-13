@@ -364,7 +364,7 @@ export default function App() {
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,400;1,700&family=Space+Grotesk:wght@400;600;700&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
         html,body,#root{height:100%;overflow:hidden}
-        html,body{background:#1A1612}
+        html,body{background:#FAF7F2}
         ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#E8E2D8;border-radius:2px}
         @keyframes fadeUp{from{opacity:0}to{opacity:1}}
         @keyframes popIn{0%{opacity:0;transform:scale(.92) translateY(6px)}100%{opacity:1;transform:scale(1) translateY(0)}}
