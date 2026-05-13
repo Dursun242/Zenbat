@@ -48,13 +48,28 @@ async function insertLignesRows(rows) {
 // =========================================================
 // PROFILES
 // =========================================================
+
+// Dédup d'une requête in-flight : au login, useBrand et App.jsx appellent
+// getMyProfile() en parallèle au mount, ce qui produisait 2 round-trips
+// Supabase pour exactement la même donnée. On partage la même Promise
+// pendant 200 ms (assez pour catcher les bursts au mount, trop court
+// pour servir une donnée vraiment stale ailleurs dans la session).
+let _profileInflight = null
 export async function getMyProfile() {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .single()
-  if (error) throw error
-  return data
+  if (_profileInflight) return _profileInflight
+  _profileInflight = (async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .single()
+      if (error) throw error
+      return data
+    } finally {
+      setTimeout(() => { _profileInflight = null }, 200)
+    }
+  })()
+  return _profileInflight
 }
 
 // Compteur sticky : nombre de devis créés cette semaine ISO par l'utilisateur
