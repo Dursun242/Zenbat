@@ -180,7 +180,11 @@ function welcomeHtml({ firstName, companyName }: { firstName: string; companyNam
 }
 
 async function sendWelcome(email: string, firstName: string, companyName: string): Promise<{ ok: boolean; error?: string }> {
-  if (!RESEND_API_KEY) return { ok: false, error: "RESEND_API_KEY missing" };
+  if (!RESEND_API_KEY) {
+    console.error("[welcome-email] RESEND_API_KEY missing in env");
+    return { ok: false, error: "RESEND_API_KEY missing" };
+  }
+  console.log(`[welcome-email] Sending to=${email} from=${RESEND_FROM}`);
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -196,8 +200,11 @@ async function sendWelcome(email: string, firstName: string, companyName: string
   });
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
-    return { ok: false, error: `Resend ${res.status}: ${txt.slice(0, 200)}` };
+    const err = `Resend ${res.status}: ${txt.slice(0, 500)}`;
+    console.error(`[welcome-email] ${err}`);
+    return { ok: false, error: err };
   }
+  console.log("[welcome-email] Resend accepted");
   return { ok: true };
 }
 
@@ -241,6 +248,7 @@ Deno.serve(async (req: Request) => {
 
   const auth = await getUserEmail(profileId);
   if (!auth?.email) {
+    console.error(`[welcome-email] User email not found for profile ${profileId}`);
     return new Response(JSON.stringify({ error: "User email not found" }), {
       status: 404,
       headers: { "Content-Type": "application/json" },
