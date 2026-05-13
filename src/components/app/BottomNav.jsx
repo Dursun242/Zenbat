@@ -38,10 +38,29 @@ export default function BottomNav({ items, activeNav, onSelect, plan, quotaReach
       return VALID_CORNERS.includes(v) ? v : "br";
     } catch { return "br"; }
   });
+  // Masquage automatique pendant la frappe : sur iOS, position:fixed reste
+  // ancré au layout viewport tandis que le clavier réduit le visual viewport.
+  // Conséquence : le dock vient flotter au-dessus de l'input et masque le
+  // contenu utile (cf. screenshot AgentIA + clavier ouvert). On utilise
+  // `visualViewport` pour détecter l'ouverture du clavier et faire glisser
+  // le dock hors écran le temps de la frappe.
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const dragControls = useDragControls();
 
   useEffect(() => { try { localStorage.setItem(STORAGE_COLLAPSED, collapsed ? "1" : "0"); } catch {} }, [collapsed]);
   useEffect(() => { try { localStorage.setItem(STORAGE_CORNER, corner); } catch {} }, [corner]);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      // Seuil prudent : 150px de delta = clavier (et pas juste la barre URL Safari).
+      setKeyboardOpen(window.innerHeight - vv.height > 150);
+    };
+    vv.addEventListener("resize", onResize);
+    onResize();
+    return () => vv.removeEventListener("resize", onResize);
+  }, []);
 
   const isRight = corner.endsWith("r");
   const isTop   = corner.startsWith("t");
@@ -83,7 +102,7 @@ export default function BottomNav({ items, activeNav, onSelect, plan, quotaReach
       `}</style>
 
       <AnimatePresence initial={false} mode="wait">
-        {collapsed ? (
+        {keyboardOpen ? null : collapsed ? (
           // -- Handle replié : fine pastille frosted collée au bord, du même côté que le coin courant.
           <motion.button
             key={`handle-${isRight ? "r" : "l"}`}
