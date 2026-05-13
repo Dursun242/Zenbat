@@ -25,15 +25,25 @@ newsletter.js          stripe.js
 
 L'ancienne URL externe (Stripe Dashboard `/api/stripe-checkout`, `/api/stripe-webhook`) est préservée via `vercel.json` rewrites.
 
-### Migrations Supabase : application manuelle
+### Migrations Supabase : application manuelle + tracking depuis 0043
 Les fichiers dans `/supabase/migrations/` ne s'appliquent **pas automatiquement**.
 L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - Prévenir l'utilisateur à chaque nouvelle migration créée.
-- Dernière migration appliquée : `0040_drop_odoo_b2b.sql` (destructif — drop des colonnes et table héritées des intégrations Odoo Sign / B2Brouter retirées).
-- **Migration en attente d'application** : `0041_fix_devis_week_count_null.sql` — fix critique qui empêche tout nouveau freemium de créer son tout premier devis (bug RLS sur la policy `devis_insert_freemium_weekly_limit`, cf. section Bugs connus).
-- Prochaine migration à créer : préfixer avec `0042_`.
+- Dernière migration appliquée connue : `0042_stripe_webhook_idempotency.sql`.
+- **Migrations en attente d'application** :
+  - `0041_fix_devis_week_count_null.sql` — fix critique qui empêche tout nouveau freemium de créer son tout premier devis (bug RLS sur la policy `devis_insert_freemium_weekly_limit`, cf. section Bugs connus).
+  - `0043_schema_migrations.sql` — crée la table de tracking (cf ci-dessous).
+- Prochaine migration à créer : préfixer avec `0044_`.
 
-**Pas d'historique fiable des migrations effectivement passées** : Supabase n'a pas de mécanisme natif (type `schema_migrations`) qui tracke ce que l'utilisateur a appliqué. Un trou est possible — exemple vécu : la migration `0007_signed_by.sql` avait été sautée alors que `0032`→`0040` étaient appliquées, ce qui faisait silencieusement échouer toute requête SQL qui sélectionnait `signed_by`.
+**Tracking depuis 0043** : la table `public.schema_migrations(version, label, applied_at)` est créée par la migration `0043`. À partir de là, chaque nouvelle migration **doit** se terminer par un INSERT idempotent qui s'auto-enregistre :
+```sql
+insert into public.schema_migrations (version, label, applied_at)
+values ('0044', 'libellé court', now())
+on conflict (version) do nothing;
+```
+Diagnostic à tout moment : `SELECT version, label, applied_at FROM public.schema_migrations ORDER BY version DESC LIMIT 20;`. Les migrations 0001-0042 ne sont pas rétro-marquées (on ne ment pas à la table) — l'utilisateur peut backfiller manuellement les versions qu'il a déjà appliquées s'il veut un historique complet (cf en-tête de `0043_schema_migrations.sql`).
+
+**Historique antérieur à 0043 non fiable** : Supabase n'a pas de mécanisme natif qui tracke ce que l'utilisateur a appliqué avant 0043. Un trou est possible — exemple vécu : la migration `0007_signed_by.sql` avait été sautée alors que `0032`→`0040` étaient appliquées, ce qui faisait silencieusement échouer toute requête SQL qui sélectionnait `signed_by`.
 
 → **Règle défensive pour le code serveur** : quand une requête lit ou écrit une colonne ajoutée par une migration ancienne, l'envelopper dans un fallback qui catch le code Postgres `42703` (column does not exist) et retente sans cette colonne. Le pattern existe déjà dans `src/lib/api.js` (`updateDevis`) et `api/devis-public.js` (GET `select` + action `accept`).
 

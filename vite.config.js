@@ -15,6 +15,17 @@ export default defineConfig({
         },
       },
     },
+    // Filtre du modulepreload injecté dans index.html :
+    // Vite preload par défaut TOUS les vendors, y compris les chunks lazy
+    // (vendor-pdf 788 kB / 296 kB gzippé, vendor-motion 136 kB / 45 kB). Sur
+    // mobile 4G ça mange 300+ kB de bande passante au boot pour des modules
+    // qui ne servent qu'à l'aperçu PDF ou aux animations différées.
+    // On garde le preload des vendors vraiment nécessaires au boot
+    // (vendor-react, vendor-supabase via auth.jsx).
+    modulePreload: {
+      resolveDependencies: (_filename, deps) =>
+        deps.filter(d => !d.includes('vendor-pdf') && !d.includes('vendor-motion')),
+    },
   },
   plugins: [
     react(),
