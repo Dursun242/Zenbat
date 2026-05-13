@@ -10,9 +10,9 @@ export default function BottomNav({ items, activeNav, onSelect, plan, quotaReach
     <nav
       className="app-bottom-nav"
       style={{
-        position: "fixed", bottom: 0, left: 0, right: 0,
+        flexShrink: 0,
         background: "#1A1612", borderTop: "1px solid rgba(255,255,255,.06)",
-        display: "flex", zIndex: 50,
+        display: "flex",
         // safe-area-inset-bottom : iPhone à notch / Dynamic Island — sans
         // ça les boutons collent à la barre home et sont durs à toucher.
         paddingBottom: "env(safe-area-inset-bottom)",
