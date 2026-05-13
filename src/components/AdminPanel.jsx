@@ -12,6 +12,7 @@ import AdminCoherenceStats from "./admin/AdminCoherenceStats.jsx"
 import AdminFeedback       from "./admin/AdminFeedback.jsx"
 import AdminAgentBenchmark from "./admin/AdminAgentBenchmark.jsx"
 import AdminQuotesSent    from "./admin/AdminQuotesSent.jsx"
+import Collapsible        from "./admin/Collapsible.jsx"
 import DeleteUserModal    from "./admin/DeleteUserModal.jsx"
 import UserDetailDrawer  from "./admin/UserDetailDrawer.jsx"
 
@@ -51,7 +52,7 @@ export default function AdminPanel({ onBack }) {
   const [detailTab,    setDetailTab]    = useState("overview")
   const [planToggling, setPlanToggling] = useState(false)
 
-  useEffect(() => { if (session) { load(); loadLogs(); loadNegs(); loadConvs(); loadNewsletter(); loadCoherence(); loadFeedback(); loadQuotesSent() } }, [session?.access_token])
+  useEffect(() => { if (session) { load() } }, [session?.access_token])
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -250,14 +251,11 @@ export default function AdminPanel({ onBack }) {
 
       {stats && (
         <div style={{ padding: 16 }}>
+
+          {/* KPIs héros + détails repliés à l'intérieur — toujours visible */}
           <AdminKPIs stats={stats} />
-          <AdminQuotesSent data={quotesSent} loading={quotesSentLoading} onRefresh={loadQuotesSent} />
-          <AdminConversations
-            iaConvs={iaConvs}      loading={convsLoading}
-            convSearch={convSearch} setConvSearch={setConvSearch}
-            openConvUser={openConvUser} setOpenConvUser={setOpenConvUser}
-            onRefresh={loadConvs}
-          />
+
+          {/* Utilisateurs : avec recherche, c'est le coeur du travail admin */}
           <AdminUsersTable
             users={filteredUsers}
             userSearch={userSearch}    setUserSearch={setUserSearch}
@@ -265,22 +263,52 @@ export default function AdminPanel({ onBack }) {
             currentUserId={currentUser?.id}
             onOpenDetail={openDetail}  onOpenDelete={openDelete}
           />
-          <AdminErrorLogs    iaLogs={iaLogs}  loading={logsLoading}  onRefresh={loadLogs} />
-          <AdminNegativeLogs iaNegs={iaNegs}  loading={negsLoading}  negFilter={negFilter} setNegFilter={setNegFilter} onRefresh={loadNegs} />
-          <AdminNewsletter
-            subscribers={newsletter}  loading={newsletterLoading}
-            onRefresh={loadNewsletter}
-          />
-          <AdminCoherenceStats
-            data={coherence}  loading={coherenceLoading}
-            onRefresh={loadCoherence}
-          />
-          <AdminFeedback
-            data={feedback}  loading={feedbackLoading}
-            onRefresh={loadFeedback}
-          />
-          <AdminAgentBenchmark />
-          <div style={{ textAlign: "center", fontSize: 10, color: "#cbd5e1" }}>
+
+          {/* Sections secondaires repliables — chargées seulement à l'ouverture */}
+          <Collapsible title="Devis envoyés"   subtitle="Historique des envois email aux clients"
+            count={quotesSent?.length}        loaded={quotesSent !== null} onExpand={loadQuotesSent}>
+            <AdminQuotesSent data={quotesSent} loading={quotesSentLoading} onRefresh={loadQuotesSent} embedded />
+          </Collapsible>
+
+          <Collapsible title="Conversations IA" subtitle="Échanges utilisateurs ↔ agent"
+            count={iaConvs?.length}            loaded={iaConvs !== null}    onExpand={loadConvs}>
+            <AdminConversations
+              iaConvs={iaConvs}      loading={convsLoading}
+              convSearch={convSearch} setConvSearch={setConvSearch}
+              openConvUser={openConvUser} setOpenConvUser={setOpenConvUser}
+              onRefresh={loadConvs}            />
+          </Collapsible>
+
+          <Collapsible title="Erreurs IA"      subtitle="Appels Claude qui ont échoué"
+            count={iaLogs?.length}             loaded={iaLogs !== null}     onExpand={loadLogs}>
+            <AdminErrorLogs iaLogs={iaLogs} loading={logsLoading} onRefresh={loadLogs} embedded />
+          </Collapsible>
+
+          <Collapsible title="Retours négatifs" subtitle="Mauvais devis générés signalés par les users"
+            count={iaNegs?.length}             loaded={iaNegs !== null}     onExpand={loadNegs}>
+            <AdminNegativeLogs iaNegs={iaNegs} loading={negsLoading} negFilter={negFilter} setNegFilter={setNegFilter} onRefresh={loadNegs} embedded />
+          </Collapsible>
+
+          <Collapsible title="Newsletter"      subtitle="Inscrits depuis la landing page"
+            count={newsletter?.length}         loaded={newsletter !== null} onExpand={loadNewsletter}>
+            <AdminNewsletter subscribers={newsletter} loading={newsletterLoading} onRefresh={loadNewsletter} embedded />
+          </Collapsible>
+
+          <Collapsible title="Cohérence devis IA" subtitle="Détection automatique d'anomalies"
+            loaded={coherence !== null} onExpand={loadCoherence}>
+            <AdminCoherenceStats data={coherence} loading={coherenceLoading} onRefresh={loadCoherence} embedded />
+          </Collapsible>
+
+          <Collapsible title="Feedback utilisateurs" subtitle="Pouces ↑ / ↓ sur les réponses IA"
+            count={feedback?.length} loaded={feedback !== null} onExpand={loadFeedback}>
+            <AdminFeedback data={feedback} loading={feedbackLoading} onRefresh={loadFeedback} embedded />
+          </Collapsible>
+
+          <Collapsible title="Benchmark Agent IA" subtitle="Tests de prompts comparés">
+            <AdminAgentBenchmark embedded />
+          </Collapsible>
+
+          <div style={{ textAlign: "center", fontSize: 10, color: "#9A8E82", marginTop: 16 }}>
             Données du {fmtD(stats.generatedAt)} à {new Date(stats.generatedAt).toLocaleTimeString("fr-FR")}
           </div>
         </div>
