@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, lazy, Suspense } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, lazy, Suspense } from "react";
 import { useAuth } from "./lib/auth.jsx";
 import { supabase } from "./lib/supabase.js";
 import { getMyProfile, getDevisWeekCount } from "./lib/api.js";
@@ -223,6 +223,36 @@ export default function App() {
 
   const activeNav = NAV.find(n => tab.startsWith(n.id))?.id || "dashboard";
 
+  // Préserve la position de scroll de chaque tab : quand on revient sur
+  // un tab visité, on retombe là où on s'était arrêté plutôt que tout
+  // en haut. Indispensable sur DevisList / FacturesList qui peuvent
+  // contenir 50+ entrées.
+  const contentRef = useRef(null);
+  const scrollMapRef = useRef({});
+  const skipNextScrollRef = useRef(false);
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      // Ignore le scroll programmatique déclenché par la restauration.
+      if (skipNextScrollRef.current) { skipNextScrollRef.current = false; return; }
+      scrollMapRef.current[tab] = el.scrollTop;
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [tab]);
+
+  useLayoutEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    skipNextScrollRef.current = true;
+    el.scrollTop = scrollMapRef.current[tab] || 0;
+    // Filet : si la valeur cible est la même que l'actuelle, aucun
+    // scroll event n'est émis et le flag resterait coincé à true.
+    requestAnimationFrame(() => { skipNextScrollRef.current = false; });
+  }, [tab]);
+
   if (checkoutPending) {
     return (
       <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#FAF7F2", fontFamily: "Inter, system-ui, sans-serif", padding: 24 }}>
@@ -383,7 +413,7 @@ export default function App() {
         </nav>
 
         {/* Contenu principal */}
-        <div className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "80px" }}>
+        <div ref={contentRef} className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "80px" }}>
           {tab === "dashboard"     && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}
                                          onOpenProfile={() => setScreen("onboarding")}
                                          onOpenPWAInstall={() => setScreen("pwa_install")}/>}
