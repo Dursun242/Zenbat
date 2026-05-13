@@ -238,16 +238,19 @@ export default function App() {
   const scrollMapRef = useRef({});
   const skipNextScrollRef = useRef(false);
 
-  // Hauteur du shell pilotée par JS via window.innerHeight / visualViewport.
-  // Sur iOS PWA standalone, ni 100vh, ni 100dvh, ni height:100% sur html/body
-  // ne donnent fiablement la hauteur du visual viewport — on observe une
-  // grosse bande noire sous la nav qui ne disparaît pas. La seule mesure
-  // stable est window.innerHeight (ou visualViewport.height quand dispo).
-  // On l'applique directement sur documentElement + body (et pas via un
-  // ref React, qui se ferait écraser par le re-render).
+  // Hauteur du shell pilotée par JS.
+  // Sur iOS PWA standalone, `visualViewport.height` peut être légèrement
+  // inférieur à la zone visible réelle (la zone du home indicator est
+  // parfois exclue) → on observait une bande sombre du body qui dépassait
+  // sous le shell. On prend désormais le MAX de visualViewport et de
+  // window.innerHeight pour s'assurer que le shell couvre toute la zone
+  // visible et que rien du body (#1A1612) ne transparaît au bas.
+  // iOS overlay le clavier par-dessus le layout viewport en mode standalone
+  // donc utiliser innerHeight quand le clavier est ouvert ne casse rien :
+  // l'input focus déclenche un auto-scroll système qui le ramène en vue.
   useLayoutEffect(() => {
     const setH = () => {
-      const h = window.visualViewport?.height || window.innerHeight;
+      const h = Math.max(window.visualViewport?.height || 0, window.innerHeight || 0);
       document.documentElement.style.height = h + "px";
       document.body.style.height = h + "px";
     };
@@ -364,7 +367,7 @@ export default function App() {
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,400;1,700&family=Space+Grotesk:wght@400;600;700&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
         html,body,#root{height:100%;overflow:hidden}
-        html,body{background:#FAF7F2}
+        html,body{background:#1A1612}
         ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#E8E2D8;border-radius:2px}
         @keyframes fadeUp{from{opacity:0}to{opacity:1}}
         @keyframes popIn{0%{opacity:0;transform:scale(.92) translateY(6px)}100%{opacity:1;transform:scale(1) translateY(0)}}
