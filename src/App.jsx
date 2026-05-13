@@ -352,7 +352,7 @@ export default function App() {
         input,textarea,select,button{font-family:inherit}
         input,textarea,select{font-size:max(16px,1em) !important}
         @media (display-mode: standalone){
-          .app-content{padding-bottom:80px !important}
+          .app-content{padding-bottom:calc(72px + env(safe-area-inset-bottom)) !important}
         }
         @media (min-width:1024px){
           .app-sidebar{display:flex !important}
@@ -422,7 +422,7 @@ export default function App() {
         </nav>
 
         {/* Contenu principal */}
-        <div ref={contentRef} className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "80px" }}>
+        <div ref={contentRef} className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "calc(72px + env(safe-area-inset-bottom))" }}>
           {tab === "dashboard"     && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}
                                          onOpenProfile={() => setScreen("onboarding")}
                                          onOpenPWAInstall={() => setScreen("pwa_install")}/>}
