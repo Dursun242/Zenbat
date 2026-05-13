@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useModalGuard } from "../../hooks/useModalGuard.js";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
 
 function clientLabel(c) {
   return c?.raison_sociale || `${c?.prenom || ""} ${c?.nom || ""}`.trim() || "—";
@@ -7,20 +8,25 @@ function clientLabel(c) {
 
 export default function ClientPickerModal({ clients = [], current, onSelect, onClose, requireEmail = false }) {
   const [q, setQ] = useState("");
+  const debouncedQ = useDebouncedValue(q, 180);
   const inputRef  = useRef(null);
 
   useModalGuard(true, onClose);
   useEffect(() => { inputRef.current?.focus(); }, []);
 
-  const filtered = q.trim().length === 0
-    ? clients
-    : clients.filter(c => {
-        const s = q.toLowerCase();
-        return clientLabel(c).toLowerCase().includes(s)
-          || (c.email      || "").toLowerCase().includes(s)
-          || (c.telephone  || "").toLowerCase().includes(s)
-          || (c.ville      || "").toLowerCase().includes(s);
-      });
+  // Filtre memoizé sur la valeur debounced : la liste ne se recalcule pas
+  // à chaque frappe (visible côté UX comme un lag sur les comptes ayant
+  // beaucoup de clients).
+  const filtered = useMemo(() => {
+    if (debouncedQ.trim().length === 0) return clients;
+    const s = debouncedQ.toLowerCase();
+    return clients.filter(c =>
+      clientLabel(c).toLowerCase().includes(s)
+      || (c.email      || "").toLowerCase().includes(s)
+      || (c.telephone  || "").toLowerCase().includes(s)
+      || (c.ville      || "").toLowerCase().includes(s)
+    );
+  }, [clients, debouncedQ]);
 
   return (
     <div
@@ -61,9 +67,9 @@ export default function ClientPickerModal({ clients = [], current, onSelect, onC
             <span style={{ fontSize: 13, color: "#6B6358", fontStyle: "italic" }}>Sans client</span>
           </button>
 
-          {filtered.length === 0 && q.trim() && (
+          {filtered.length === 0 && debouncedQ.trim() && (
             <div style={{ padding: "20px 18px", fontSize: 13, color: "#9A8E82", textAlign: "center" }}>
-              Aucun client trouvé pour « {q} »
+              Aucun client trouvé pour « {debouncedQ} »
             </div>
           )}
 

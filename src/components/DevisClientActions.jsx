@@ -32,15 +32,25 @@ export default function DevisClientActions({ devis, client, onChange }) {
 
   const baseUrl = `${window.location.origin}/d/${devis.public_token}`
 
-  // Charge l'audit log et la négociation en cours depuis Supabase (RLS artisan)
+  // Charge l'audit log et la négociation en cours depuis Supabase (RLS artisan).
+  // try/catch englobant : si une des deux requêtes throw (réseau coupé, RLS
+  // refusée, etc.), on log + on retombe sur des états par défaut au lieu
+  // de laisser les anciennes valeurs en place — l'utilisateur ne voit pas
+  // un audit obsolète après un changement de statut.
   const loadAudit = useCallback(async () => {
     if (!devis.id) return
-    const [{ data: logs }, { data: negs }] = await Promise.all([
-      supabase.from('devis_audit_log').select('event, from_party, meta, created_at').eq('devis_id', devis.id).order('created_at'),
-      supabase.from('devis_negotiations').select('*').eq('devis_id', devis.id).eq('status', 'pending').order('created_at', { ascending: false }).limit(1),
-    ])
-    setAuditLog(logs || [])
-    setNeg(negs?.[0] || null)
+    try {
+      const [{ data: logs }, { data: negs }] = await Promise.all([
+        supabase.from('devis_audit_log').select('event, from_party, meta, created_at').eq('devis_id', devis.id).order('created_at'),
+        supabase.from('devis_negotiations').select('*').eq('devis_id', devis.id).eq('status', 'pending').order('created_at', { ascending: false }).limit(1),
+      ])
+      setAuditLog(logs || [])
+      setNeg(negs?.[0] || null)
+    } catch (e) {
+      if (import.meta.env.DEV) console.warn('[loadAudit]', e?.message || e)
+      setAuditLog([])
+      setNeg(null)
+    }
   }, [devis.id])
 
   useEffect(() => { loadAudit() }, [loadAudit])
@@ -64,8 +74,19 @@ export default function DevisClientActions({ devis, client, onChange }) {
     } catch { setSendErr('Erreur réseau') } finally { setSending(false) }
   }
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(publicUrl || baseUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
+  const copyLink = async () => {
+    // navigator.clipboard peut rejeter : permission refusée, contexte non
+    // sécurisé (http://), navigateur ancien, etc. Sans catch, l'utilisateur
+    // croyait que la copie avait marché et collait du contenu obsolète
+    // ailleurs.
+    try {
+      await navigator.clipboard.writeText(publicUrl || baseUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (e) {
+      setSendErr("Copie indisponible — sélectionnez et copiez le lien à la main.")
+      if (import.meta.env.DEV) console.warn('[copyLink]', e?.message || e)
+    }
   }
 
   // ── Répondre à une négociation ─────────────────────────────────────────
