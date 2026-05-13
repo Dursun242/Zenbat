@@ -1,28 +1,78 @@
-// Dock vertical flottant à droite, repliable.
+// Side dock vertical, flottant, frosted glass, déplaçable aux 4 coins.
 //
-// Format : pilule verticale ancrée à droite, centrée verticalement.
-// 5 onglets empilés. Bouton chevron en haut pour replier le dock
-// (slide à droite, seul un handle reste visible). Tap sur le handle
-// pour redéployer. État persisté en localStorage.
+// Format : pilule verticale ancrée à un coin de l'écran (haut/bas × droite/gauche).
+// 5 onglets empilés, indicateur actif animé via Framer Motion layoutId.
 //
-// L'indicateur actif glisse en spring via Framer Motion layoutId.
+// Gestes :
+// - Tap sur le chevron du header  → replie le dock (ne reste qu'un mince
+//   handle au bord, du même côté que le coin courant).
+// - Drag sur le chevron du header → déplace le dock ; au relâchement, snap
+//   au coin le plus proche (parmi top-left, top-right, bottom-left, bottom-right).
+//
+// État (collapsed + corner) persisté en localStorage.
+//
+// Visuel : verre dépoli sombre — `rgba(20,16,12,.55)` + `backdrop-filter: blur(28px) saturate(180%)`.
+// Le fond cream de l'app reste légèrement perceptible derrière, donnant
+// la sensation de profondeur sans le rendu boueux du frosted clair sur cream.
 //
 // Le composant garde son nom historique (BottomNav.jsx) pour ne pas
-// casser les imports, mais il s'agit maintenant d'un side dock.
+// casser les imports.
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useDragControls } from "framer-motion";
 
-const BRAND = "#22c55e"; // DEFAULT_BRAND.color
-const STORAGE_KEY = "zenbat:sideDock:collapsed";
+const BRAND = "#22c55e";
+const STORAGE_COLLAPSED = "zenbat:sideDock:collapsed";
+const STORAGE_CORNER    = "zenbat:sideDock:corner";
+const VALID_CORNERS     = ["tl", "tr", "bl", "br"];
+
+const FROST_BG     = "rgba(20, 16, 12, 0.55)";
+const FROST_FILTER = "blur(28px) saturate(180%)";
 
 export default function BottomNav({ items, activeNav, onSelect, plan, quotaReached, firstDevisNudge = false }) {
   const [collapsed, setCollapsed] = useState(() => {
-    try { return localStorage.getItem(STORAGE_KEY) === "1"; } catch { return false; }
+    try { return localStorage.getItem(STORAGE_COLLAPSED) === "1"; } catch { return false; }
   });
+  const [corner, setCorner] = useState(() => {
+    try {
+      const v = localStorage.getItem(STORAGE_CORNER);
+      return VALID_CORNERS.includes(v) ? v : "br";
+    } catch { return "br"; }
+  });
+  const dragControls = useDragControls();
 
-  useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, collapsed ? "1" : "0"); } catch {}
-  }, [collapsed]);
+  useEffect(() => { try { localStorage.setItem(STORAGE_COLLAPSED, collapsed ? "1" : "0"); } catch {} }, [collapsed]);
+  useEffect(() => { try { localStorage.setItem(STORAGE_CORNER, corner); } catch {} }, [corner]);
+
+  const isRight = corner.endsWith("r");
+  const isTop   = corner.startsWith("t");
+
+  const dockAnchor = {
+    ...(isTop   ? { top: 16 }    : { bottom: 16 }),
+    ...(isRight ? { right: 10 }  : { left: 10 }),
+  };
+  const handleAnchor = {
+    ...(isTop   ? { top: "calc(50% - 32px)" } : { bottom: "calc(50% - 32px)" }),
+    // Pour le handle replié, on préfère rester centré verticalement
+    // peu importe le coin choisi → handle facile à attraper.
+    ...(isRight ? { right: 0 } : { left: 0 }),
+  };
+
+  function snapToNearestCorner(_, info) {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const { x, y } = info.point;
+    const side = x < w / 2 ? "l" : "r";
+    const vert = y < h / 2 ? "t" : "b";
+    setCorner(`${vert}${side}`);
+  }
+
+  // Chevron : ‹ ou › selon qu'on replie vers la droite ou vers la gauche.
+  const collapseChevron = isRight
+    ? <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+    : <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>;
+  const expandChevron = isRight
+    ? <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+    : <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>;
 
   return (
     <>
@@ -34,28 +84,28 @@ export default function BottomNav({ items, activeNav, onSelect, plan, quotaReach
 
       <AnimatePresence initial={false} mode="wait">
         {collapsed ? (
-          // Handle replié — fine pastille verticale collée à droite
+          // -- Handle replié : fine pastille frosted collée au bord, du même côté que le coin courant.
           <motion.button
-            key="handle"
-            initial={{ opacity: 0, x: 30 }}
+            key={`handle-${isRight ? "r" : "l"}`}
+            initial={{ opacity: 0, x: isRight ? 30 : -30 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 30 }}
+            exit   ={{ opacity: 0, x: isRight ? 30 : -30 }}
             transition={{ type: "spring", stiffness: 380, damping: 32 }}
             onClick={() => setCollapsed(false)}
             aria-label="Déployer le menu"
             className="app-bottom-nav"
             style={{
               position: "fixed",
-              right: 0,
-              top: "50%",
-              transform: "translateY(-50%)",
+              ...handleAnchor,
               width: 18,
               height: 64,
-              borderRadius: "12px 0 0 12px",
-              background: "#1A1612",
-              border: "1px solid rgba(255,255,255,.08)",
-              borderRight: "none",
-              boxShadow: "-4px 6px 18px rgba(0,0,0,.18)",
+              borderRadius: isRight ? "12px 0 0 12px" : "0 12px 12px 0",
+              background: FROST_BG,
+              backdropFilter: FROST_FILTER,
+              WebkitBackdropFilter: FROST_FILTER,
+              border: "1px solid rgba(255,255,255,.10)",
+              ...(isRight ? { borderRight: "none" } : { borderLeft: "none" }),
+              boxShadow: isRight ? "-4px 6px 18px rgba(0,0,0,.18)" : "4px 6px 18px rgba(0,0,0,.18)",
               color: "#E8E2D8",
               display: "flex",
               alignItems: "center",
@@ -63,52 +113,69 @@ export default function BottomNav({ items, activeNav, onSelect, plan, quotaReach
               cursor: "pointer",
               zIndex: 50,
             }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-              <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">{expandChevron}</svg>
           </motion.button>
         ) : (
           <motion.nav
-            key="dock"
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 30 }}
+            // key sur corner → re-mount à la nouvelle position après dragEnd ;
+            // évite que le transform de drag persiste au-dessus du nouveau top/right.
+            key={`dock-${corner}`}
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit   ={{ opacity: 0, scale: 0.96 }}
             transition={{ type: "spring", stiffness: 380, damping: 32 }}
+            drag
+            dragMomentum={false}
+            dragElastic={0.18}
+            dragListener={false}
+            dragControls={dragControls}
+            onDragEnd={snapToNearestCorner}
+            whileDrag={{ scale: 1.05, boxShadow: "0 22px 60px rgba(0,0,0,.32)" }}
             className="app-bottom-nav"
             style={{
               position: "fixed",
-              right: 10,
-              top: "50%",
-              transform: "translateY(-50%)",
+              ...dockAnchor,
               width: 60,
               borderRadius: 22,
-              background: "#1A1612",
-              border: "1px solid rgba(255,255,255,.08)",
-              boxShadow: "0 12px 32px rgba(0,0,0,.22), 0 2px 6px rgba(0,0,0,.12)",
+              background: FROST_BG,
+              backdropFilter: FROST_FILTER,
+              WebkitBackdropFilter: FROST_FILTER,
+              border: "1px solid rgba(255,255,255,.10)",
+              boxShadow: "0 14px 36px rgba(0,0,0,.24), 0 2px 6px rgba(0,0,0,.12)",
               padding: 6,
               display: "flex",
               flexDirection: "column",
               gap: 4,
               zIndex: 50,
+              touchAction: "none", // évite le scroll de la page pendant un drag
             }}>
-            {/* Bouton repli en haut du dock */}
+            {/* Header = handle de drag + bouton repli (même cible). */}
             <button
+              onPointerDown={(e) => dragControls.start(e)}
               onClick={() => setCollapsed(true)}
-              aria-label="Replier le menu"
+              aria-label="Replier le menu (glisser pour déplacer)"
+              title="Glisser pour déplacer"
               style={{
                 background: "transparent",
                 border: "none",
-                color: "#6B6358",
-                padding: "4px 0",
+                color: "#A89F94",
+                padding: "4px 0 2px",
                 marginBottom: 2,
-                cursor: "pointer",
+                cursor: "grab",
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
+                gap: 2,
+                touchAction: "none",
               }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              {/* Petit grip pour signifier la zone de drag */}
+              <span style={{ display: "flex", gap: 2, opacity: 0.5 }}>
+                <span style={{ width: 3, height: 3, borderRadius: "50%", background: "currentColor" }}/>
+                <span style={{ width: 3, height: 3, borderRadius: "50%", background: "currentColor" }}/>
+                <span style={{ width: 3, height: 3, borderRadius: "50%", background: "currentColor" }}/>
+              </span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">{collapseChevron}</svg>
             </button>
 
             {items.map(({ id, label, icon }) => {
@@ -128,7 +195,7 @@ export default function BottomNav({ items, activeNav, onSelect, plan, quotaReach
                     minHeight: 48,
                     background: "transparent",
                     border: "none",
-                    color: active ? BRAND : "#9A8E82",
+                    color: active ? BRAND : "#C9C0B5",
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
@@ -143,7 +210,7 @@ export default function BottomNav({ items, activeNav, onSelect, plan, quotaReach
                       style={{
                         position: "absolute",
                         inset: 0,
-                        background: "rgba(34, 197, 94, 0.14)",
+                        background: "rgba(34, 197, 94, 0.18)",
                         borderRadius: 14,
                         zIndex: 0,
                       }}
@@ -193,7 +260,8 @@ export default function BottomNav({ items, activeNav, onSelect, plan, quotaReach
                   {showNudge && (
                     <span style={{
                       position: "absolute",
-                      right: "calc(100% + 10px)",
+                      // tooltip du côté opposé au bord d'ancrage du dock
+                      ...(isRight ? { right: "calc(100% + 10px)" } : { left: "calc(100% + 10px)" }),
                       top: "50%",
                       transform: "translateY(-50%)",
                       background: BRAND, color: "white",
@@ -208,11 +276,12 @@ export default function BottomNav({ items, activeNav, onSelect, plan, quotaReach
                       ✨ Essaye ton premier devis
                       <span style={{
                         position: "absolute",
-                        left: "100%",
+                        ...(isRight
+                          ? { left: "100%", borderLeft: `6px solid ${BRAND}` }
+                          : { right: "100%", borderRight: `6px solid ${BRAND}` }),
                         top: "50%",
                         marginTop: -6,
                         width: 0, height: 0,
-                        borderLeft: `6px solid ${BRAND}`,
                         borderTop: "6px solid transparent",
                         borderBottom: "6px solid transparent",
                       }}/>
