@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
 
 const ICONS = {
   client:  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>,
@@ -32,32 +33,41 @@ export default function SearchBar({ devis = [], clients = [], invoices = [], goD
     if (e.key === "Escape") { setOpen(false); setQ(""); }
   }, []);
 
-  const query = q.trim().toLowerCase();
+  // Debounce + memo : le filtre tournait sur 3 listes à chaque frappe.
+  // Sur une grosse base (1000+ devis, 500+ clients, 200+ factures), c'est
+  // du CPU visible comme du lag. L'input reste réactif (q changeant à
+  // chaque frappe) mais la recherche n'est exécutée qu'après 180 ms sans
+  // frappe.
+  const debouncedQ = useDebouncedValue(q, 180);
+  const query = debouncedQ.trim().toLowerCase();
 
-  const results = query.length < 2 ? [] : [
-    ...clients
-      .filter(c => clientName(c).toLowerCase().includes(query) || (c.email || "").toLowerCase().includes(query))
-      .slice(0, 3)
-      .map(c => ({ type: "client", id: c.id, label: clientName(c), sub: c.email || c.telephone || "" })),
+  const results = useMemo(() => {
+    if (query.length < 2) return [];
+    return [
+      ...clients
+        .filter(c => clientName(c).toLowerCase().includes(query) || (c.email || "").toLowerCase().includes(query))
+        .slice(0, 3)
+        .map(c => ({ type: "client", id: c.id, label: clientName(c), sub: c.email || c.telephone || "" })),
 
-    ...devis
-      .filter(d => {
-        const cl = clients.find(c => c.id === d.client_id);
-        return (d.numero || "").toLowerCase().includes(query)
-          || (d.objet  || "").toLowerCase().includes(query)
-          || clientName(cl).toLowerCase().includes(query);
-      })
-      .slice(0, 4)
-      .map(d => {
-        const cl = clients.find(c => c.id === d.client_id);
-        return { type: "devis", id: d.id, label: d.numero, sub: d.objet || clientName(cl) };
-      }),
+      ...devis
+        .filter(d => {
+          const cl = clients.find(c => c.id === d.client_id);
+          return (d.numero || "").toLowerCase().includes(query)
+            || (d.objet  || "").toLowerCase().includes(query)
+            || clientName(cl).toLowerCase().includes(query);
+        })
+        .slice(0, 4)
+        .map(d => {
+          const cl = clients.find(c => c.id === d.client_id);
+          return { type: "devis", id: d.id, label: d.numero, sub: d.objet || clientName(cl) };
+        }),
 
-    ...invoices
-      .filter(inv => (inv.numero || "").toLowerCase().includes(query) || (inv.objet || "").toLowerCase().includes(query))
-      .slice(0, 3)
-      .map(inv => ({ type: "facture", id: inv.id, label: inv.numero, sub: inv.objet || "" })),
-  ];
+      ...invoices
+        .filter(inv => (inv.numero || "").toLowerCase().includes(query) || (inv.objet || "").toLowerCase().includes(query))
+        .slice(0, 3)
+        .map(inv => ({ type: "facture", id: inv.id, label: inv.numero, sub: inv.objet || "" })),
+    ];
+  }, [query, clients, devis, invoices]);
 
   const navigate = (r) => {
     if (r.type === "client")  goClient(r.id);
