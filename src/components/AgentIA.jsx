@@ -5,6 +5,7 @@ import { tradesLabels } from "../lib/trades.js";
 import { buildDevisHistorySummary } from "../lib/devisHistory.js";
 import { supabase } from "../lib/supabase.js";
 import { getToken } from "../lib/getToken.js";
+import { useAuth } from "../lib/auth.jsx";
 import { useSpeechRecognition } from "../hooks/useSpeechRecognition.js";
 import { buildAgentGreeting, quickStartsFor } from "../lib/agentIA/sectors.js";
 import { buildSystemPrompt } from "../lib/agentIA/prompt.js";
@@ -18,7 +19,30 @@ import CelebrateModal from "./agent/CelebrateModal.jsx";
 import ChatThread from "./agent/ChatThread.jsx";
 import CoherenceSettings from "./CoherenceSettings.jsx";
 
+// Clé localStorage du brouillon IA, scopée par user.id pour éviter qu'un
+// brouillon abandonné par l'utilisateur A "fuite" vers l'utilisateur B sur
+// un même navigateur (cas démo / poste partagé). Fallback "anon" si user.id
+// non encore disponible. La clé legacy non-scopée est lue en migration
+// douce à la première lecture et supprimée au premier save.
+const LEGACY_IA_DRAFT_KEY = "zenbat_ia_draft";
+function iaDraftKey(userId) { return `${LEGACY_IA_DRAFT_KEY}_${userId || "anon"}`; }
+function readIaDraft(userId) {
+  try {
+    const scoped = localStorage.getItem(iaDraftKey(userId));
+    if (scoped) return JSON.parse(scoped) || {};
+    if (userId) {
+      const legacy = localStorage.getItem(LEGACY_IA_DRAFT_KEY);
+      if (legacy) return JSON.parse(legacy) || {};
+    }
+    return {};
+  } catch { return {}; }
+}
+
 export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, plan, quotaReached, onPaywall, setTab, onOpenDevisPDF, brand }) {
+  const { user } = useAuth();
+  const userId = user?.id;
+  const draftKey = useMemo(() => iaDraftKey(userId), [userId]);
+
   const [msgs,         setMsgs]         = useState(() => [{ role: "assistant", content: buildAgentGreeting(brand) }]);
   const [input,        setInput]        = useState("");
   const [loading,      setLoading]      = useState(false);
@@ -36,10 +60,12 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     setFeedback(prev => ({ ...prev, [msgIdx]: { ...prev[msgIdx], saved: true } }));
   };
   const [lignes, setLignes] = useState(() => {
-    try { const d = JSON.parse(localStorage.getItem("zenbat_ia_draft") || "{}"); return Array.isArray(d.lignes) ? d.lignes : []; } catch { return []; }
+    const d = readIaDraft(userId);
+    return Array.isArray(d.lignes) ? d.lignes : [];
   });
   const [objet, setObjet] = useState(() => {
-    try { const d = JSON.parse(localStorage.getItem("zenbat_ia_draft") || "{}"); return typeof d.objet === "string" ? d.objet : ""; } catch { return ""; }
+    const d = readIaDraft(userId);
+    return typeof d.objet === "string" ? d.objet : "";
   });
   const [visibleCount, setVisibleCount] = useState(0);
   const [pickingClient, setPickingClient] = useState(false);
@@ -88,12 +114,22 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     ta.scrollLeft = ta.scrollWidth;
   }, [input]);
 
+  // Re-charge le brouillon quand l'identité change (cas logout → login
+  // d'un autre compte sans démontage). Évite que B voie le brouillon de A.
+  useEffect(() => {
+    const d = readIaDraft(userId);
+    setLignes(Array.isArray(d.lignes) ? d.lignes : []);
+    setObjet(typeof d.objet === "string" ? d.objet : "");
+  }, [userId]);
+
   useEffect(() => {
     try {
-      if (!lignes.length && !objet) localStorage.removeItem("zenbat_ia_draft");
-      else localStorage.setItem("zenbat_ia_draft", JSON.stringify({ lignes, objet }));
+      if (!lignes.length && !objet) localStorage.removeItem(draftKey);
+      else localStorage.setItem(draftKey, JSON.stringify({ lignes, objet }));
+      // Migration douce : on purge la clé legacy non-scopée dès qu'on a un user.id.
+      if (userId) localStorage.removeItem(LEGACY_IA_DRAFT_KEY);
     } catch {}
-  }, [lignes, objet]);
+  }, [lignes, objet, draftKey, userId]);
 
   useEffect(() => {
     if (!lignes.length) return;
@@ -367,7 +403,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     });
     setPickingClient(false);
     if (!ok) return;
-    try { localStorage.removeItem("zenbat_ia_draft"); } catch {}
+    try { localStorage.removeItem(draftKey); } catch {}
     setLignes([]); setObjet("");
     setMsgs([{ role: "assistant", content: TX.quoteSaved }]);
     // Ouvre directement la vue PDF du devis fraîchement enregistré
@@ -571,7 +607,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
         {/* Boutons Enregistrer / Effacer */}
         {lignes.length > 0 && visibleCount >= lignes.length && (
           <div style={{ padding: "10px 14px", borderTop: "1px solid #F0EBE3", display: "flex", gap: 8, flexShrink: 0, animation: "fadeUp .3s ease both" }}>
-            <button onClick={() => { try { localStorage.removeItem("zenbat_ia_draft"); } catch {} setLignes([]); setObjet(""); }}
+            <button onClick={() => { try { localStorage.removeItem(draftKey); } catch {} setLignes([]); setObjet(""); }}
               style={{ flex: 1, background: "none", border: "1px solid #E8E2D8", borderRadius: 10, padding: 9, fontSize: 12, color: "#6B6358", cursor: "pointer", fontWeight: 500 }}>
               {TX.clearQuote}
             </button>

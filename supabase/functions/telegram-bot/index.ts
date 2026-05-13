@@ -32,11 +32,16 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // ─── Configuration ────────────────────────────────────────────────────────
 
-const TELEGRAM_BOT_TOKEN      = Deno.env.get("TELEGRAM_BOT_TOKEN") ?? "";
-const TELEGRAM_CHAT_ID        = Deno.env.get("TELEGRAM_CHAT_ID")   ?? "";
-const TELEGRAM_WEBHOOK_SECRET = Deno.env.get("TELEGRAM_WEBHOOK_SECRET") ?? "";
-const SUPABASE_URL            = Deno.env.get("SUPABASE_URL") ?? "";
-const SUPABASE_SERVICE_KEY    = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const TELEGRAM_BOT_TOKEN      = (Deno.env.get("TELEGRAM_BOT_TOKEN") ?? "").trim();
+const TELEGRAM_CHAT_ID        = (Deno.env.get("TELEGRAM_CHAT_ID")   ?? "").trim();
+const TELEGRAM_WEBHOOK_SECRET = (Deno.env.get("TELEGRAM_WEBHOOK_SECRET") ?? "").trim();
+const SUPABASE_URL            = (Deno.env.get("SUPABASE_URL") ?? "").trim();
+const SUPABASE_SERVICE_KEY    = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
+
+// Le chat_id Telegram est un entier (positif pour user, négatif pour group).
+// On valide strictement le format pour éviter qu'une valeur tronquée ou
+// composée d'espaces ne soit interprétée comme "tout chat_id accepté".
+const TELEGRAM_CHAT_ID_VALID = /^-?\d+$/.test(TELEGRAM_CHAT_ID);
 
 const TG_API = (method: string) =>
   `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${method}`;
@@ -240,20 +245,29 @@ Deno.serve(async (req: Request) => {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  // Auth 1 : secret token Telegram.
-  const provided = req.headers.get("x-telegram-bot-api-secret-token") ?? "";
-  if (!TELEGRAM_WEBHOOK_SECRET || provided !== TELEGRAM_WEBHOOK_SECRET) {
-    console.warn("[telegram-bot] secret token invalide");
-    return new Response("forbidden", { status: 403 });
-  }
-
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-    console.error("[telegram-bot] env Telegram manquante");
+  // Fail-fast si une variable d'env critique est absente OU mal formée.
+  // On répond 200 pour que Telegram n'enchaîne pas les retries (le webhook
+  // reste enregistré côté Telegram, mais on ignore le payload).
+  // ⚠ On valide AVANT toute autre logique pour qu'aucune comparaison ne
+  // puisse retomber sur des chaînes vides ("" === "" = true).
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID_VALID) {
+    console.error("[telegram-bot] env Telegram manquante ou invalide (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID)");
     return new Response("misconfigured", { status: 200 });
   }
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
     console.error("[telegram-bot] env Supabase manquante");
     return new Response("misconfigured", { status: 200 });
+  }
+  if (!TELEGRAM_WEBHOOK_SECRET) {
+    console.error("[telegram-bot] TELEGRAM_WEBHOOK_SECRET manquant — webhook non sécurisé");
+    return new Response("misconfigured", { status: 200 });
+  }
+
+  // Auth 1 : secret token Telegram (comparaison stricte, secret non-vide garanti ci-dessus).
+  const provided = req.headers.get("x-telegram-bot-api-secret-token") ?? "";
+  if (provided !== TELEGRAM_WEBHOOK_SECRET) {
+    console.warn("[telegram-bot] secret token invalide");
+    return new Response("forbidden", { status: 403 });
   }
 
   // Parse update.
@@ -274,8 +288,10 @@ Deno.serve(async (req: Request) => {
   }
 
   // Auth 2 : chat_id admin uniquement (le bot ne discute avec personne d'autre).
+  // chatId vide → reject (évite "" === "" si TELEGRAM_CHAT_ID l'était aussi,
+  // bien que la validation au boot l'interdise déjà).
   const chatId = String(message.chat?.id ?? "");
-  if (chatId !== String(TELEGRAM_CHAT_ID)) {
+  if (!chatId || chatId !== TELEGRAM_CHAT_ID) {
     console.warn("[telegram-bot] chat_id non autorisé:", chatId);
     // On répond quand même 200 pour que Telegram n'enchaîne pas les retries.
     return new Response(JSON.stringify({ ok: true, ignored: "chat_id" }), {

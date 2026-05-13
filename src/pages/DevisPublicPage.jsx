@@ -377,16 +377,25 @@ export default function DevisPublicPage({ token }) {
   // les emails partis (ou définitivement en échec) — c'est ce qui rassure
   // l'utilisateur sur le fait que tout est bien parti.
   const handleAccept = async () => {
+    // Garde anti-double-submit : si on est déjà en train de signer ou
+    // si la phase finale est atteinte, on ne relance pas (sinon double
+    // signature, double email, audit log dupliqué).
+    if (busy || phase === 'signing' || phase === 'accepted') return
     if (!clientName.trim()) { setErr('Votre nom est requis'); return }
     const ok = await post({ action: 'accept', client_name: clientName })
     if (!ok) return
     setPhase('signing')
     const result = await sendSignedPdf(clientName, ok.signed_at)
-    setEmailSent(result?.sent || null)
+    // result === null → échec local (PDF non généré, réseau coupé) : on bascule
+    // quand même en 'accepted' (la signature est enregistrée côté serveur),
+    // mais on force emailSent.client=false pour afficher la bannière jaune
+    // qui prévient l'utilisateur que le PDF ne lui a pas été envoyé.
+    setEmailSent(result?.sent || { client: false, artisan: false })
     setPhase('accepted')
   }
 
   const handleRefuse = async () => {
+    if (busy || phase === 'refused') return
     if (!refuseReason.trim()) { setErr('La raison du refus est requise'); return }
     const ok = await post({ action: 'refuse', reason: refuseReason })
     if (ok) setPhase('refused')
