@@ -1,19 +1,11 @@
-// Menu hamburger affiché dans le header. Forme : side drawer qui slide
-// depuis la droite, full hauteur. Regroupe la navigation principale
-// (Accueil, Clients, Devis, Factures, Agent IA) + l'accès profil,
-// abonnement, support, admin, déconnexion.
+// Menu hamburger affiché dans le header. Regroupe : statut abonnement, accès profil,
+// admin (si admin), déconnexion. Évite l'encombrement du bandeau supérieur sur mobile.
 //
-// Pourquoi un side drawer plutôt qu'une bottom nav fixée :
-// - Sur iPhone PWA standalone, position:fixed bottom:0 souffre d'un bug
-//   où l'élément ne s'ancre pas au visual viewport bottom (grosse bande
-//   noire persistante en dessous). Le side drawer n'est pas concerné car
-//   il s'ancre top:0 right:0 bottom:0, qu'iOS gère correctement.
-// - Daily UX : le pouce reste à portée du bouton hamburger top-right,
-//   un tap ouvre le drawer, un tap sélectionne la section, c'est 2 taps
-//   max pour aller n'importe où — comparable à une bottom nav (1 tap)
-//   mais sans le bug bottom.
+// Implémentation : panneau en position:fixed (le header n'a pas de transform parent —
+// voir CLAUDE.md sur les containing blocks). Backdrop transparent qui capture
+// le clic pour fermer.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { I } from "../ui/icons.jsx";
 import { getToken } from "../../lib/getToken.js";
 
@@ -43,9 +35,6 @@ export default function HeaderMenu({
   billingCycle,
   weekCount = 0,
   weekLimit = 5,
-  navItems = [],
-  activeNav,
-  onSelectNav,
   onOpenAdmin,
   onOpenProfile,
   onOpenSubscription,
@@ -54,9 +43,10 @@ export default function HeaderMenu({
   onOpenComptable,
   onSignOut,
 }) {
-  const [open,         setOpen]         = useState(false);
-  const [tokenData,    setTokenData]    = useState(null);
+  const [open,       setOpen]       = useState(false);
+  const [tokenData,  setTokenData]  = useState(null);
   const [tokenLoading, setTokenLoading] = useState(false);
+  const btnRef = useRef(null);
 
   useEffect(() => {
     if (!open) return;
@@ -84,11 +74,10 @@ export default function HeaderMenu({
   const isBiannual     = isPro && billingCycle === "biannual";
   const quotaReached   = !isPro && weekCount >= weekLimit;
   const quotaWarning   = !isPro && weekCount >= weekLimit - 1 && weekCount < weekLimit;
-  const showNavBadge   = quotaReached || quotaWarning;
 
-  const settingsItem = {
+  const itemBase = {
     display: "flex", alignItems: "center", gap: 10,
-    width: "100%", padding: "12px 16px",
+    width: "100%", padding: "11px 14px",
     background: "transparent", border: "none",
     color: "#1A1612", fontSize: 14, fontWeight: 500,
     cursor: "pointer", textAlign: "left",
@@ -96,19 +85,11 @@ export default function HeaderMenu({
 
   return (
     <>
-      <style>{`
-        @keyframes hm-fade  { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes hm-slide { from { transform: translateX(100%); } to { transform: translateX(0); } }
-        .hm-drawer-item { -webkit-tap-highlight-color: transparent; transition: background .12s ease; }
-        .hm-drawer-item:active { background: rgba(34,197,94,.10) !important; }
-        .hm-settings-item { -webkit-tap-highlight-color: transparent; transition: background .12s ease; }
-        .hm-settings-item:active { background: #FAF7F2 !important; }
-      `}</style>
-
       <button
+        ref={btnRef}
         onClick={() => setOpen(o => !o)}
         title="Menu"
-        aria-label="Ouvrir le menu"
+        aria-label="Menu"
         aria-expanded={open}
         style={{
           position: "relative",
@@ -117,7 +98,7 @@ export default function HeaderMenu({
           color: "#E8E2D8", cursor: "pointer",
         }}>
         {I.menu}
-        {showNavBadge && (
+        {(quotaReached || quotaWarning) && (
           <span style={{
             position: "absolute", top: -3, right: -3,
             width: 8, height: 8, borderRadius: "50%",
@@ -129,126 +110,76 @@ export default function HeaderMenu({
 
       {open && (
         <>
-          {/* Backdrop */}
+          {/* Backdrop : capture clic à l'extérieur */}
           <div
             onClick={close}
             style={{
               position: "fixed", inset: 0,
-              background: "rgba(0,0,0,.45)", zIndex: 90,
-              animation: "hm-fade .18s ease both",
+              background: "transparent", zIndex: 90,
             }}
           />
-          {/* Panneau drawer */}
+          {/* Panneau */}
           <div
             role="menu"
-            aria-label="Menu principal"
             style={{
               position: "fixed",
-              top: 0, right: 0, bottom: 0,
-              width: "min(85vw, 340px)",
+              top: "calc(50px + env(safe-area-inset-top))",
+              right: "calc(14px + env(safe-area-inset-right))",
+              width: 260, maxWidth: "calc(100vw - 28px)",
               background: "#fff",
-              boxShadow: "-10px 0 30px rgba(0,0,0,.18)",
+              border: "1px solid #E8E2D8",
+              borderRadius: 14,
+              boxShadow: "0 12px 32px rgba(0,0,0,.18)",
               zIndex: 100,
-              display: "flex", flexDirection: "column",
-              animation: "hm-slide .22s cubic-bezier(.34,1.3,.64,1) both",
-              paddingTop: "calc(14px + env(safe-area-inset-top))",
-              paddingBottom: "calc(14px + env(safe-area-inset-bottom))",
-              overflowY: "auto",
+              overflow: "hidden",
+              animation: "popIn .18s ease both",
             }}>
-
-            {/* Header du drawer : email + bouton fermer */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px 12px", borderBottom: "1px solid #F1ECE3", marginBottom: 8 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                {user?.email && (
-                  <div style={{ fontSize: 12, color: "#6B6358", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {user.email}
-                  </div>
-                )}
-                <button
-                  onClick={() => { close(); isPro ? onOpenSubscription() : onOpenPaywall(); }}
-                  style={{
-                    display: "inline-flex", alignItems: "center", gap: 6, marginTop: 6,
-                    background: isPro ? "rgba(34,197,94,.12)" : (quotaReached ? "rgba(239,68,68,.12)" : (quotaWarning ? "rgba(249,115,22,.12)" : "#F5F0E8")),
-                    color:      isPro ? "#16a34a"            : (quotaReached ? "#b91c1c"             : (quotaWarning ? "#c2410c"             : "#6B6358")),
-                    border:     `1px solid ${isPro ? "rgba(34,197,94,.25)" : (quotaReached ? "rgba(239,68,68,.25)" : (quotaWarning ? "rgba(249,115,22,.25)" : "#E8E2D8"))}`,
-                    fontSize: 11, fontWeight: 700,
-                    padding: "4px 10px", borderRadius: 20,
-                    cursor: "pointer",
-                  }}>
-                  {isPro
-                    ? <>{I.crown} {isBiannual ? "PRO · 6 mois · gérer" : "PRO · gérer"}</>
-                    : quotaReached
-                      ? <>{weekCount}/{weekLimit} · passer Pro</>
-                      : <>Freemium · {weekCount}/{weekLimit} · passer Pro</>}
-                </button>
-              </div>
-              <button onClick={close} aria-label="Fermer"
-                style={{ background: "none", border: "none", color: "#6B6358", padding: 6, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", marginLeft: 8, flexShrink: 0 }}>
-                <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            {/* Identité + statut abonnement */}
+            <div style={{ padding: "14px 14px 12px", borderBottom: "1px solid #F1ECE3" }}>
+              {user?.email && (
+                <div style={{ fontSize: 12, color: "#6B6358", marginBottom: 8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {user.email}
+                </div>
+              )}
+              <button
+                onClick={() => { close(); isPro ? onOpenSubscription() : onOpenPaywall(); }}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  background: isPro ? "rgba(34,197,94,.12)" : (quotaReached ? "rgba(239,68,68,.12)" : (quotaWarning ? "rgba(249,115,22,.12)" : "#F5F0E8")),
+                  color:      isPro ? "#16a34a"            : (quotaReached ? "#b91c1c"             : (quotaWarning ? "#c2410c"             : "#6B6358")),
+                  border:     `1px solid ${isPro ? "rgba(34,197,94,.25)" : (quotaReached ? "rgba(239,68,68,.25)" : (quotaWarning ? "rgba(249,115,22,.25)" : "#E8E2D8"))}`,
+                  fontSize: 11, fontWeight: 700,
+                  padding: "4px 10px", borderRadius: 20,
+                  cursor: "pointer",
+                }}>
+                {isPro
+                  ? <>{I.crown} {isBiannual ? "PRO · 6 mois · gérer" : "PRO · gérer"}</>
+                  : quotaReached
+                    ? <>{weekCount}/{weekLimit} · passer Pro</>
+                    : <>Freemium · {weekCount}/{weekLimit} · passer Pro</>}
               </button>
             </div>
 
-            {/* Navigation principale */}
-            {navItems.length > 0 && onSelectNav && (
-              <div style={{ padding: "4px 8px" }}>
-                {navItems.map(({ id, label, icon }) => {
-                  const active = activeNav === id;
-                  const isAgent = id === "agent";
-                  const itemBadge = isAgent && quotaReached;
-                  return (
-                    <button
-                      key={id}
-                      role="menuitem"
-                      className="hm-drawer-item"
-                      onClick={() => { close(); onSelectNav(id); }}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 14,
-                        width: "100%",
-                        padding: "13px 14px",
-                        border: "none",
-                        background: active ? "rgba(34,197,94,.10)" : "transparent",
-                        color: active ? "#22c55e" : "#3D3028",
-                        borderRadius: 10,
-                        cursor: "pointer",
-                        fontSize: 15,
-                        fontWeight: active ? 700 : 500,
-                        textAlign: "left",
-                        marginBottom: 2,
-                      }}>
-                      <div style={{ width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", color: active ? "#22c55e" : "#6B6358" }}>
-                        {icon}
-                      </div>
-                      <span style={{ flex: 1 }}>{label}</span>
-                      {itemBadge && (
-                        <span style={{ background: "#ef4444", color: "white", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>Quota</span>
-                      )}
-                      {active && (
-                        <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Séparateur entre nav et settings */}
-            {navItems.length > 0 && <div style={{ height: 1, background: "#F1ECE3", margin: "10px 12px 4px" }}/>}
-
-            {/* Section profil / réglages */}
-            <button role="menuitem" className="hm-settings-item" onClick={() => { close(); onOpenProfile(); }} style={settingsItem}>
+            <button role="menuitem" onClick={() => { close(); onOpenProfile(); }} style={itemBase}
+              onMouseEnter={e => e.currentTarget.style.background = "#FAF7F2"}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
               <span style={{ color: "#6B6358", display: "inline-flex" }}>{I.paint}</span>
               Mon profil
             </button>
 
             {onOpenComptable && (
-              <button role="menuitem" className="hm-settings-item" onClick={() => { close(); onOpenComptable(); }} style={settingsItem}>
+              <button role="menuitem" onClick={() => { close(); onOpenComptable(); }} style={itemBase}
+                onMouseEnter={e => e.currentTarget.style.background = "#FAF7F2"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                 <span style={{ color: "#C97B5C", display: "inline-flex" }}>{I.file}</span>
                 Envoyer au comptable
               </button>
             )}
 
             {onOpenSupport && (
-              <button role="menuitem" className="hm-settings-item" onClick={() => { close(); onOpenSupport(); }} style={settingsItem}>
+              <button role="menuitem" onClick={() => { close(); onOpenSupport(); }} style={itemBase}
+                onMouseEnter={e => e.currentTarget.style.background = "#FAF7F2"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                 <span style={{ color: "#22c55e", display: "inline-flex" }}>{I.chat}</span>
                 Support
               </button>
@@ -256,7 +187,7 @@ export default function HeaderMenu({
 
             {isAdmin && (
               <>
-                <div style={{ padding: "10px 16px 8px", borderTop: "1px solid #F1ECE3", marginTop: 6 }}>
+                <div style={{ padding: "10px 14px 8px", borderTop: "1px solid #F1ECE3" }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: "#9A8E82", letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     Coûts IA
                     <button
@@ -274,7 +205,9 @@ export default function HeaderMenu({
                     </>
                   )}
                 </div>
-                <button role="menuitem" className="hm-settings-item" onClick={() => { close(); onOpenAdmin(); }} style={settingsItem}>
+                <button role="menuitem" onClick={() => { close(); onOpenAdmin(); }} style={itemBase}
+                  onMouseEnter={e => e.currentTarget.style.background = "#FAF7F2"}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                   <span style={{ color: "#f59e0b", display: "inline-flex" }}>{I.cog}</span>
                   Panel admin
                 </button>
@@ -283,10 +216,11 @@ export default function HeaderMenu({
 
             {user && (
               <>
-                <div style={{ flex: 1 }}/>
-                <div style={{ height: 1, background: "#F1ECE3", margin: "4px 0" }}/>
-                <button role="menuitem" className="hm-settings-item" onClick={() => { close(); onSignOut(); }}
-                  style={{ ...settingsItem, color: "#dc2626" }}>
+                <div style={{ height: 1, background: "#F1ECE3" }}/>
+                <button role="menuitem" onClick={() => { close(); onSignOut(); }}
+                  style={{ ...itemBase, color: "#dc2626" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#FEF2F2"}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                   <span style={{ display: "inline-flex" }}>{I.logout}</span>
                   Se déconnecter
                 </button>

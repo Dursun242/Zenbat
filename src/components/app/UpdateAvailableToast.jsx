@@ -40,10 +40,9 @@ export default function UpdateAvailableToast() {
       aria-live="polite"
       style={{
         position: "fixed",
-        // Plus de BottomNav (nav passée en TopTabs sticky sous le header pour
-        // éviter le bug iOS PWA standalone). On garde un peu de marge bottom
-        // pour le home indicator et le confort tactile.
-        bottom: "calc(16px + env(safe-area-inset-bottom))",
+        // Au-dessus de la BottomNav (~70px + safe-area-inset-bottom capped),
+        // sinon le toast colle au bord et est dur à toucher.
+        bottom: "calc(80px + min(env(safe-area-inset-bottom, 0px), 34px))",
         left: 12, right: 12,
         zIndex: 200,
         background: "#1A1612",

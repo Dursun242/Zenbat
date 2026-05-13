@@ -15,6 +15,7 @@ import Logo          from "./components/ui/Logo.jsx";
 import { I }         from "./components/ui/icons.jsx";
 import Toast         from "./components/app/Toast.jsx";
 import UpdateAvailableToast from "./components/app/UpdateAvailableToast.jsx";
+import BottomNav     from "./components/app/BottomNav.jsx";
 import SearchBar     from "./components/app/SearchBar.jsx";
 import SaveIndicator from "./components/app/SaveIndicator.jsx";
 import HeaderMenu    from "./components/app/HeaderMenu.jsx";
@@ -360,7 +361,7 @@ export default function App() {
   );
 
   return (
-    <div style={{ fontFamily: "Inter, system-ui, sans-serif", height: "100%", display: "flex", flexDirection: "column", background: "#FAF7F2", overflow: "hidden" }}>
+    <div style={{ fontFamily: "Inter, system-ui, sans-serif", height: "100%", display: "flex", flexDirection: "column", background: "#FAF7F2", overflow: "hidden", position: "relative" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,400;1,700&family=Space+Grotesk:wght@400;600;700&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
@@ -377,6 +378,8 @@ export default function App() {
         input,textarea,select{font-size:max(16px,1em) !important}
         @media (min-width:1024px){
           .app-sidebar{display:flex !important}
+          .app-bottom-nav{display:none !important}
+          .app-content{padding-bottom:0 !important}
           .app-toast{bottom:24px !important;left:auto !important;right:24px !important;max-width:380px}
         }
         @media (max-width:1023px){.app-sidebar{display:none !important}}
@@ -396,9 +399,6 @@ export default function App() {
             billingCycle={billingCycle}
             weekCount={devisThisWeekCount}
             weekLimit={FREEMIUM_WEEKLY_DEVIS_LIMIT}
-            navItems={NAV}
-            activeNav={activeNav}
-            onSelectNav={setTab}
             onOpenAdmin={() => setTab("admin")}
             onOpenProfile={() => setScreen("onboarding")}
             onOpenSubscription={() => setScreen("subscription")}
@@ -444,7 +444,7 @@ export default function App() {
         </nav>
 
         {/* Contenu principal */}
-        <div ref={contentRef} className="app-content" style={{ flex: 1, overflowY: "auto" }}>
+        <div ref={contentRef} className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "calc(70px + min(env(safe-area-inset-bottom, 0px), 34px))" }}>
           {tab === "dashboard"     && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}
                                          onOpenProfile={() => setScreen("onboarding")}
                                          onOpenPWAInstall={() => setScreen("pwa_install")}/>}
@@ -550,6 +550,7 @@ export default function App() {
       {comptableOpen && (
         <SendToComptableModal user={user} onClose={() => setComptableOpen(false)}/>
       )}
+      <BottomNav items={NAV} activeNav={activeNav} onSelect={setTab} plan={effectivePlan} quotaReached={freemiumQuotaReached} firstDevisNudge={!isAdmin && (devis?.length || 0) === 0 && activeNav !== "agent"}/>
     </div>
   );
 }
