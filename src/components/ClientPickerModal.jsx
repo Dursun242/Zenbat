@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { TX } from "../lib/constants.js";
 import { uid, displayName } from "../lib/utils.js";
+import { useModalGuard } from "../hooks/useModalGuard.js";
 
 export default function ClientPickerModal({ clients, ac, fontFamily, onSaveClient, onPick, onClose }) {
   const [q,        setQ]        = useState("");
   const [creating, setCreating] = useState(false);
   const [newC,     setNewC]     = useState({ nom: "", email: "", telephone: "" });
+  useModalGuard(true, onClose);
 
   const filtered = clients.filter(c => {
     if (!q.trim()) return true;

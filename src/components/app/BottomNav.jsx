@@ -7,10 +7,24 @@
 // est déjà sur l'onglet agent.
 export default function BottomNav({ items, activeNav, onSelect, plan, quotaReached, firstDevisNudge = false }) {
   return (
-    <nav className="app-bottom-nav" style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#1A1612", borderTop: "1px solid rgba(255,255,255,.06)", display: "flex", zIndex: 50 }}>
+    <nav
+      className="app-bottom-nav"
+      style={{
+        position: "fixed", bottom: 0, left: 0, right: 0,
+        background: "#1A1612", borderTop: "1px solid rgba(255,255,255,.06)",
+        display: "flex", zIndex: 50,
+        // safe-area-inset-bottom : iPhone à notch / Dynamic Island — sans
+        // ça les boutons collent à la barre home et sont durs à toucher.
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}>
       <style>{`
         @keyframes bn-nudge-bob   { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-5px); } }
         @keyframes bn-nudge-pulse { 0% { box-shadow: 0 0 0 0 rgba(34,197,94,.55); } 100% { box-shadow: 0 0 0 14px rgba(34,197,94,0); } }
+        /* Feedback tactile immédiat au tap : l'utilisateur sait que son
+           appui a été pris en compte même si le setState async n'a pas
+           encore mis à jour l'écran. */
+        .app-bottom-nav button { -webkit-tap-highlight-color: transparent; transition: opacity .12s ease; }
+        .app-bottom-nav button:active { opacity: .55; }
       `}</style>
       {items.map(({ id, label, icon }) => {
         const active     = activeNav === id;

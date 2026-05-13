@@ -18,6 +18,7 @@ import { supabase } from "../lib/supabase.js";
 import { getToken } from "../lib/getToken.js";
 import { CLAUDE_MODEL } from "../lib/constants.js";
 import { SUPPORT_SYSTEM_PROMPT } from "../lib/supportPrompts.js";
+import { useModalGuard } from "../hooks/useModalGuard.js";
 
 const MAX_INPUT_CHARS = 2000;
 
@@ -29,6 +30,8 @@ export default function SupportChat({ accent = "#22c55e", open, onClose }) {
   const [busy,     setBusy]     = useState(false);
   const [error,    setError]    = useState(null);
   const scrollRef = useRef(null);
+
+  useModalGuard(open, onClose);
 
   // Charge ou réinitialise quand on ouvre
   useEffect(() => {

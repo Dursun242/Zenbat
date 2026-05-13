@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useModalGuard } from "../../hooks/useModalGuard.js";
 
 function clientLabel(c) {
   return c?.raison_sociale || `${c?.prenom || ""} ${c?.nom || ""}`.trim() || "—";
@@ -8,6 +9,7 @@ export default function ClientPickerModal({ clients = [], current, onSelect, onC
   const [q, setQ] = useState("");
   const inputRef  = useRef(null);
 
+  useModalGuard(true, onClose);
   useEffect(() => { inputRef.current?.focus(); }, []);
 
   const filtered = q.trim().length === 0
