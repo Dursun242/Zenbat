@@ -57,21 +57,39 @@ function escapeHtml(s: unknown): string {
     .replace(/"/g, "&quot;");
 }
 
-// Template HTML — style aligné sur la landing page : palette cream/terra,
-// typo Syne pour les titres (avec fallback système si le client mail ne
-// charge pas Google Fonts), Playfair Display italic en accent décoratif,
-// numéros "01..04" en terra, maximum de whitespace, zéro carte/bordure.
+// Template HTML — fond blanc, accent sur la proposition de valeur (IA,
+// temps, compétitivité, conformité, confiance client) via une grille
+// 2×2 en table HTML. Typo Syne + Playfair Display via Google Fonts CDN
+// avec fallbacks système pour les clients mail qui ne chargent pas les
+// webfonts (Outlook desktop, mobile basique).
 function welcomeHtml({ firstName, companyName }: { firstName: string; companyName: string }): string {
   const greetingName = firstName ? `, ${escapeHtml(firstName)}` : "";
   const introCompany = companyName
-    ? `Ravi de vous accompagner, vous et <strong style="color:#1A1612">${escapeHtml(companyName)}</strong>, sur la gestion de vos devis et factures.`
-    : "Ravi de vous accompagner sur la gestion de vos devis et factures.";
+    ? `Ravi de vous accompagner, vous et <strong style="color:#1A1612">${escapeHtml(companyName)}</strong>.`
+    : "Ravi de vous accompagner.";
 
-  const steps = [
-    { n: "01", t: "Complétez votre profil", d: "SIRET, adresse, coordonnées bancaires. Ces informations sont obligatoires sur vos devis et factures (art. L441-9 du Code de commerce)." },
-    { n: "02", t: "Dictez votre premier devis", d: "Décrivez votre prestation à l'Agent IA, en français, anglais, espagnol… L'IA structure les lignes, calcule les totaux et applique la TVA." },
-    { n: "03", t: "Envoyez pour signature", d: "Votre client reçoit un lien sécurisé, signe en ligne avec un code reçu par email, et le PDF signé arrive automatiquement dans vos boîtes." },
-    { n: "04", t: "Convertissez en facture", d: "Une fois le devis accepté, générez la facture au format Factur-X (PDF/A-3 avec XML CII embarqué), conforme aux exigences fiscales françaises." },
+  // 4 piliers présentés en grille 2×2.
+  const pillars = [
+    {
+      mark: "IA",
+      title: "L'agent IA qui structure",
+      desc:  "Dictez votre prestation en français. L'IA assemble le devis (lignes, unités, TVA, totaux) en quelques secondes — vous gardez la main sur tout.",
+    },
+    {
+      mark: "→",
+      title: "Gain de temps, compétitivité",
+      desc:  "Ce qui prenait 30 minutes prend 2 minutes. Vous répondez aux appels d'offres plus vite, vous remportez plus de chantiers.",
+    },
+    {
+      mark: "✓",
+      title: "Conformité 2026",
+      desc:  "Factur-X PDF/A-3 prêt pour la réforme de la facturation électronique B2B. Vos documents transiteront sans friction via le portail public et les PDP.",
+    },
+    {
+      mark: "✦",
+      title: "Confiance client",
+      desc:  "Signature électronique avec code OTP, audit trail légal (IP, horodatage, hash). Vos devis ont la valeur juridique d'un engagement signé.",
+    },
   ];
 
   return `<!DOCTYPE html>
@@ -82,10 +100,10 @@ function welcomeHtml({ firstName, companyName }: { firstName: string; companyNam
 <title>Bienvenue sur Zenbat</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&family=Playfair+Display:ital,wght@1,400&display=swap" rel="stylesheet">
 </head>
-<body style="margin:0;padding:0;background:#FAF7F2;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;color:#1A1612;-webkit-font-smoothing:antialiased">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#FAF7F2">
+<body style="margin:0;padding:0;background:#ffffff;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;color:#1A1612;-webkit-font-smoothing:antialiased">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff">
 <tr><td align="center" style="padding:64px 24px">
-<table width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%">
+<table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%">
 
   <!-- Wordmark -->
   <tr><td style="padding:0 0 56px">
@@ -95,49 +113,62 @@ function welcomeHtml({ firstName, companyName }: { firstName: string; companyNam
   </td></tr>
 
   <!-- Hero -->
-  <tr><td>
-    <h1 style="margin:0 0 18px;font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:40px;font-weight:400;line-height:1.15;letter-spacing:-0.8px;color:#1A1612">
+  <tr><td style="padding:0 0 18px">
+    <h1 style="margin:0;font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:40px;font-weight:400;line-height:1.15;letter-spacing:-0.8px;color:#1A1612">
       <em style="font-family:'Playfair Display',Georgia,serif;font-style:italic;font-weight:400;color:#C97B5C">Bienvenue</em>${greetingName}.
     </h1>
-    <p style="margin:0 0 56px;font-size:16px;line-height:1.65;color:#6B6358">
-      ${introCompany}
+  </td></tr>
+
+  <tr><td style="padding:0 0 48px">
+    <p style="margin:0;font-size:17px;line-height:1.6;color:#3D3028">
+      ${introCompany} Zenbat met l'IA au service de vos devis — pour que vous gagniez du <em style="font-family:'Playfair Display',Georgia,serif;font-style:italic;color:#C97B5C">temps</em>, des <em style="font-family:'Playfair Display',Georgia,serif;font-style:italic;color:#C97B5C">chantiers</em> et la <em style="font-family:'Playfair Display',Georgia,serif;font-style:italic;color:#C97B5C">confiance</em> de vos clients.
     </p>
   </td></tr>
 
-  <!-- Steps -->
+  <!-- Grille 2×2 des piliers de valeur -->
   <tr><td style="padding:0 0 48px">
-    <table width="100%" cellpadding="0" cellspacing="0">
-      ${steps.map(s => `
-      <tr><td style="padding:0 0 36px">
-        <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:600;color:#C97B5C;letter-spacing:1.5px;margin-bottom:8px">${s.n}</div>
-        <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:20px;font-weight:400;color:#1A1612;letter-spacing:-0.3px;margin-bottom:8px;line-height:1.3">${s.t}</div>
-        <div style="font-size:15px;color:#6B6358;line-height:1.65">${s.d}</div>
-      </td></tr>`).join("")}
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
+      <tr>
+        <td width="50%" valign="top" style="border:1px solid #E8E2D8;padding:24px 22px">
+          <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;color:#C97B5C;letter-spacing:1.5px;margin-bottom:10px">${pillars[0].mark}</div>
+          <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:17px;font-weight:600;color:#1A1612;letter-spacing:-0.3px;margin-bottom:8px;line-height:1.3">${pillars[0].title}</div>
+          <div style="font-size:13.5px;color:#6B6358;line-height:1.6">${pillars[0].desc}</div>
+        </td>
+        <td width="50%" valign="top" style="border:1px solid #E8E2D8;border-left:none;padding:24px 22px">
+          <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;color:#C97B5C;letter-spacing:1.5px;margin-bottom:10px">${pillars[1].mark}</div>
+          <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:17px;font-weight:600;color:#1A1612;letter-spacing:-0.3px;margin-bottom:8px;line-height:1.3">${pillars[1].title}</div>
+          <div style="font-size:13.5px;color:#6B6358;line-height:1.6">${pillars[1].desc}</div>
+        </td>
+      </tr>
+      <tr>
+        <td width="50%" valign="top" style="border:1px solid #E8E2D8;border-top:none;padding:24px 22px">
+          <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;color:#C97B5C;letter-spacing:1.5px;margin-bottom:10px">${pillars[2].mark}</div>
+          <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:17px;font-weight:600;color:#1A1612;letter-spacing:-0.3px;margin-bottom:8px;line-height:1.3">${pillars[2].title}</div>
+          <div style="font-size:13.5px;color:#6B6358;line-height:1.6">${pillars[2].desc}</div>
+        </td>
+        <td width="50%" valign="top" style="border:1px solid #E8E2D8;border-top:none;border-left:none;padding:24px 22px">
+          <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;color:#C97B5C;letter-spacing:1.5px;margin-bottom:10px">${pillars[3].mark}</div>
+          <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:17px;font-weight:600;color:#1A1612;letter-spacing:-0.3px;margin-bottom:8px;line-height:1.3">${pillars[3].title}</div>
+          <div style="font-size:13.5px;color:#6B6358;line-height:1.6">${pillars[3].desc}</div>
+        </td>
+      </tr>
     </table>
   </td></tr>
 
   <!-- CTA -->
   <tr><td style="padding:0 0 56px">
-    <a href="${APP_URL}" style="display:inline-block;background:#1A1612;color:#FAF7F2;text-decoration:none;padding:16px 28px;border-radius:4px;font-size:15px;font-weight:600;letter-spacing:-0.2px;font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif">
-      Accéder à mon tableau de bord →
+    <a href="${APP_URL}" style="display:inline-block;background:#1A1612;color:#ffffff;text-decoration:none;padding:16px 30px;border-radius:4px;font-size:15px;font-weight:600;letter-spacing:-0.2px;font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif">
+      Créer mon premier devis →
     </a>
   </td></tr>
 
-  <!-- Conformité -->
-  <tr><td style="padding:48px 0 0;border-top:1px solid #E8E2D8">
-    <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;font-weight:600;color:#9A8E82;letter-spacing:1.5px;margin-bottom:14px">CONFORMITÉ 2026</div>
-    <p style="margin:0;font-size:14px;line-height:1.7;color:#6B6358">
-      Zenbat génère vos devis et factures au format <em style="font-family:'Playfair Display',Georgia,serif;font-style:italic;color:#1A1612">Factur-X</em> — la norme française hybride PDF/A-3 homologuée pour la réforme de la facturation électronique B2B. Vos documents sont d'ores et déjà structurés pour transiter via le futur portail public et les plateformes de dématérialisation partenaires.
-    </p>
-  </td></tr>
-
   <!-- Footer -->
-  <tr><td style="padding:64px 0 0">
-    <p style="margin:0 0 4px;font-size:13px;color:#9A8E82;line-height:1.65">
-      Une question ? Répondez à cet email.
+  <tr><td style="padding:48px 0 0;border-top:1px solid #E8E2D8">
+    <p style="margin:0 0 4px;font-size:13px;color:#6B6358;line-height:1.65">
+      Une question ? Répondez à cet email — nous lisons tout.
     </p>
-    <p style="margin:0;font-size:12px;color:#C5BAA8;line-height:1.65">
-      Zenbat · SaaS de devis &amp; facturation pour artisans
+    <p style="margin:0;font-size:12px;color:#9A8E82;line-height:1.65">
+      Zenbat · SaaS de devis &amp; facturation pour artisans français.
     </p>
   </td></tr>
 
