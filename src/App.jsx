@@ -15,7 +15,6 @@ import Logo          from "./components/ui/Logo.jsx";
 import { I }         from "./components/ui/icons.jsx";
 import Toast         from "./components/app/Toast.jsx";
 import UpdateAvailableToast from "./components/app/UpdateAvailableToast.jsx";
-import TopTabs       from "./components/app/TopTabs.jsx";
 import SearchBar     from "./components/app/SearchBar.jsx";
 import SaveIndicator from "./components/app/SaveIndicator.jsx";
 import HeaderMenu    from "./components/app/HeaderMenu.jsx";
@@ -378,7 +377,6 @@ export default function App() {
         input,textarea,select{font-size:max(16px,1em) !important}
         @media (min-width:1024px){
           .app-sidebar{display:flex !important}
-          .app-top-tabs{display:none !important}
           .app-toast{bottom:24px !important;left:auto !important;right:24px !important;max-width:380px}
         }
         @media (max-width:1023px){.app-sidebar{display:none !important}}
@@ -398,6 +396,9 @@ export default function App() {
             billingCycle={billingCycle}
             weekCount={devisThisWeekCount}
             weekLimit={FREEMIUM_WEEKLY_DEVIS_LIMIT}
+            navItems={NAV}
+            activeNav={activeNav}
+            onSelectNav={setTab}
             onOpenAdmin={() => setTab("admin")}
             onOpenProfile={() => setScreen("onboarding")}
             onOpenSubscription={() => setScreen("subscription")}
@@ -418,9 +419,6 @@ export default function App() {
             : `📝 ${devisThisWeekCount}/${FREEMIUM_WEEKLY_DEVIS_LIMIT} devis cette semaine — passer en Pro`}
         </button>
       )}
-
-      {/* Tabs principaux — mobile uniquement (sidebar gauche prend le relais sur desktop) */}
-      <TopTabs items={NAV} activeNav={activeNav} onSelect={setTab} plan={effectivePlan} quotaReached={freemiumQuotaReached} firstDevisNudge={!isAdmin && (devis?.length || 0) === 0 && activeNav !== "agent"}/>
 
       {/* Body */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
