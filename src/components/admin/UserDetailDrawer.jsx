@@ -5,7 +5,10 @@ import { fmtEur, fmtDT, relTime, SC, SL } from "../../lib/admin/format.js";
 export default function UserDetailDrawer({
   user, data, loading, error, tab, onTabChange, onClose,
   onRequestDelete, onRequestReset, currentUserId,
+  onTogglePlan, planToggling = false,
 }) {
+  const currentPlan = data?.profile?.plan || user.plan || "free";
+  const isPro       = currentPlan === "pro";
   return (
     <div onClick={onClose}
       style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.65)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 90, animation: "fadeUp .15s ease both" }}>
@@ -23,8 +26,8 @@ export default function UserDetailDrawer({
             </div>
             <div style={{ color: "#6B6358", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</div>
           </div>
-          <span style={{ fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: user.plan === "pro" ? "rgba(34,197,94,.18)" : "rgba(148,163,184,.18)", color: user.plan === "pro" ? "#4ade80" : "#9A8E82", flexShrink: 0 }}>
-            {user.plan === "pro" ? "PRO" : "FREE"}
+          <span style={{ fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: isPro ? "rgba(34,197,94,.18)" : "rgba(148,163,184,.18)", color: isPro ? "#4ade80" : "#9A8E82", flexShrink: 0 }}>
+            {isPro ? "PRO" : "FREE"}
           </span>
         </div>
 
@@ -86,6 +89,27 @@ export default function UserDetailDrawer({
                 {data.profile?.brand_data?.city && <div><strong style={{ color: "#1A1612" }}>Ville :</strong> {data.profile.brand_data.city}</div>}
                 {data.profile?.brand_data?.phone && <div><strong style={{ color: "#1A1612" }}>Téléphone :</strong> {data.profile.brand_data.phone}</div>}
               </div>
+              {onTogglePlan && (
+                <button onClick={() => onTogglePlan(isPro ? "free" : "pro")}
+                  disabled={planToggling}
+                  style={{
+                    background:   isPro ? "#f1f5f9" : "rgba(34,197,94,.10)",
+                    border:       `1px solid ${isPro ? "#cbd5e1" : "rgba(34,197,94,.35)"}`,
+                    color:        isPro ? "#475569" : "#15803d",
+                    borderRadius: 10,
+                    padding:      "10px",
+                    fontSize:     12,
+                    fontWeight:   700,
+                    cursor:       planToggling ? "default" : "pointer",
+                    opacity:      planToggling ? 0.6 : 1,
+                  }}>
+                  {planToggling
+                    ? "…"
+                    : isPro
+                      ? "↓ Repasser ce compte en Free"
+                      : "↑ Passer ce compte en Pro"}
+                </button>
+              )}
               {onRequestReset && (data.stats.devisTotal > 0 || data.stats.invoicesTotal > 0) && (
                 <button onClick={onRequestReset}
                   style={{ background: "#fffbeb", border: "1px solid #fde68a", color: "#92400e", borderRadius: 10, padding: "10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>

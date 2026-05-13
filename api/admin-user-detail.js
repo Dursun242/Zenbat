@@ -22,8 +22,43 @@ async function safe(q) {
 }
 
 export default async function handler(req, res) {
-  cors(req, res, { methods: "GET, OPTIONS" })
+  cors(req, res, { methods: "GET, POST, OPTIONS" })
   if (req.method === 'OPTIONS') return res.status(204).end()
+
+  // ── POST : actions admin sur un utilisateur (override plan, etc.) ───
+  // Convention multi-routes : champ `action` dans le body (cf. CLAUDE.md
+  // "Convention de fusion" pour rester sous la limite 12 slots Vercel).
+  if (req.method === 'POST') {
+    const auth = await authenticate(req, res, { adminOnly: true })
+    if (!auth) return
+    const { admin } = auth
+
+    const body   = req.body || {}
+    const action = body.action
+    const userId = (body.userId || '').toString().trim()
+    if (!userId) return res.status(400).json({ error: 'userId manquant' })
+
+    if (action === 'set_plan') {
+      const plan = body.plan
+      if (plan !== 'free' && plan !== 'pro')
+        return res.status(400).json({ error: "plan doit valoir 'free' ou 'pro'" })
+
+      const { data, error } = await admin
+        .from('profiles')
+        .update({ plan })
+        .eq('id', userId)
+        .select('id, plan')
+        .maybeSingle()
+      if (error)  return res.status(500).json({ error: error.message || String(error) })
+      if (!data)  return res.status(404).json({ error: 'Profil introuvable' })
+
+      console.log(`[admin-user-detail] set_plan: user ${userId} → ${plan} (by admin ${auth.user.email})`)
+      return res.status(200).json({ ok: true, plan: data.plan })
+    }
+
+    return res.status(400).json({ error: `action inconnue: ${action}` })
+  }
+
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   try {

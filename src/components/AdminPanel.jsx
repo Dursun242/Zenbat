@@ -49,6 +49,7 @@ export default function AdminPanel({ onBack }) {
   const [detailLoading,setDetailLoading]= useState(false)
   const [detailError,  setDetailError]  = useState(null)
   const [detailTab,    setDetailTab]    = useState("overview")
+  const [planToggling, setPlanToggling] = useState(false)
 
   useEffect(() => { if (session) { load(); loadLogs(); loadNegs(); loadConvs(); loadNewsletter(); loadCoherence(); loadFeedback(); loadQuotesSent() } }, [session?.access_token])
 
@@ -154,6 +155,30 @@ export default function AdminPanel({ onBack }) {
   }
 
   const closeDetail = () => { setDetailUser(null); setDetailData(null); setDetailError(null) }
+
+  // Bascule manuelle du plan d'un user (override admin, indépendant de Stripe).
+  // Met à jour profile.plan en DB puis met à jour optimistiquement detailData
+  // pour que le drawer reflète immédiatement le nouveau plan (badge + libellé
+  // du bouton). La liste d'users est rafraîchie au prochain reload de stats.
+  const toggleUserPlan = async (newPlan) => {
+    if (!detailUser || planToggling) return
+    setPlanToggling(true)
+    try {
+      const token = await getToken()
+      const res   = await fetch("/api/admin-user-detail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: "set_plan", userId: detailUser.id, plan: newPlan }),
+      })
+      const data = await res.json()
+      if (!res.ok) { alert(data?.error || "Échec du changement de plan"); return }
+      setDetailData(prev => prev ? { ...prev, profile: { ...(prev.profile || {}), plan: data.plan } } : prev)
+    } catch (e) {
+      alert(e?.message || "Erreur réseau")
+    } finally {
+      setPlanToggling(false)
+    }
+  }
   const closeDelete = () => { if (deleting) return; setDeleteTarget(null); setConfirmInput(""); setDeleteError(null) }
 
   const confirmDelete = async () => {
@@ -264,6 +289,8 @@ export default function AdminPanel({ onBack }) {
           onClose={closeDetail}
           onRequestDelete={() => { closeDetail(); openDelete(detailUser); }}
           onRequestReset={() => { openReset(detailUser); }}
+          onTogglePlan={toggleUserPlan}
+          planToggling={planToggling}
           currentUserId={currentUser?.id}
         />
       )}
