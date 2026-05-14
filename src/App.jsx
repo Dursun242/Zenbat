@@ -291,6 +291,12 @@ export default function App() {
     }
   }, [keyboardOpen]);
   useLayoutEffect(() => {
+    // Transition CSS sur la hauteur html/body : permet une animation
+    // fluide quand le clavier soft s'ouvre/ferme (le body shrink/grow
+    // est progressif au lieu de snap, en sync avec l'animation native
+    // du clavier iOS ~220ms).
+    document.documentElement.style.transition = "height .22s ease";
+    document.body.style.transition = "height .22s ease";
     recomputeShellHeight();
     window.visualViewport?.addEventListener("resize", recomputeShellHeight);
     window.addEventListener("resize", recomputeShellHeight);
