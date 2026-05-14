@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT      = join(__dirname, '..')
 const PUBLIC    = join(ROOT, 'public')
+const DIST      = join(ROOT, 'dist')
 
 const SITE_URL = process.env.SITE_URL || 'https://zenbat.vercel.app'
 
@@ -47,7 +48,17 @@ const xml =
   `\n</urlset>\n`
 
 if (!existsSync(PUBLIC)) mkdirSync(PUBLIC, { recursive: true })
-const target = join(PUBLIC, 'sitemap.xml')
-writeFileSync(target, xml, 'utf8')
+const publicTarget = join(PUBLIC, 'sitemap.xml')
+writeFileSync(publicTarget, xml, 'utf8')
 
-console.log(`[sitemap] ${allUrls.length} URLs → public/sitemap.xml`)
+const outputs = ['public/sitemap.xml']
+
+// On écrit AUSSI dans dist/ si présent. Sans ça, le sitemap déployé par
+// Vercel correspond à la version git de public/sitemap.xml (copiée par
+// vite build) et pas à celle régénérée par ce script après le build.
+if (existsSync(DIST)) {
+  writeFileSync(join(DIST, 'sitemap.xml'), xml, 'utf8')
+  outputs.push('dist/sitemap.xml')
+}
+
+console.log(`[sitemap] ${allUrls.length} URLs → ${outputs.join(' + ')}`)
