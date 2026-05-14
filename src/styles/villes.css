@@ -256,7 +256,8 @@
 .vp-region-block {
   margin-top: 40px;
 }
-.vp-region-block h2 {
+.vp-region-block h2,
+.vp-region-block h3 {
   font-family: 'Syne', system-ui, sans-serif;
   font-size: 22px;
   font-weight: 500;
@@ -296,6 +297,69 @@
   font-weight: 400;
 }
 
+/* ───────── Steps (HowTo) ───────── */
+.vp-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.vp-steps li {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  background: var(--vp-creamlight);
+  border: 1px solid var(--vp-border);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+.vp-step-num {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--vp-terra);
+  color: white;
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+}
+.vp-steps h3 {
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: var(--vp-ink);
+}
+.vp-steps p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--vp-muted);
+}
+
+/* ───────── Tags (quartiers) ───────── */
+.vp-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.vp-tag {
+  display: inline-block;
+  padding: 6px 12px;
+  background: var(--vp-soft);
+  border: 1px solid var(--vp-border);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--vp-ink);
+}
+
 @media (max-width: 640px) {
   .vp-container, .vp-container-narrow {
     padding: 32px 18px 64px;
@@ -303,4 +367,6 @@
   .vp-nav-inner { padding: 0 18px; }
   .vp-section { margin-top: 40px; }
   .vp-cta-block { padding: 32px 22px; }
+  .vp-steps li { padding: 14px 16px; }
+  .vp-step-num { width: 28px; height: 28px; font-size: 13px; }
 }
