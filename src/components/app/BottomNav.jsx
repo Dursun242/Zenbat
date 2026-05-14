@@ -27,9 +27,10 @@ import { useKeyboardOpen } from "../../hooks/useKeyboardOpen.js";
 
 // Hauteur de la nav HORS safe-area iOS (icône + label + paddings internes).
 const NAV_CORE_HEIGHT = 64;
-// Cap du safe-area-inset-bottom : au-delà, on observe un gros vide en PWA
-// standalone (home indicator parfois sur-estimé par iOS).
-const NAV_SAFE_AREA_CAP = 20;
+// Cap du safe-area-inset-bottom : 34px couvre la zone home indicator des
+// iPhones avec Dynamic Island (≈ 34px de safe-area). En dessous on
+// laisserait apparaître une bande #1A1612 sous le fond de la nav.
+const NAV_SAFE_AREA_CAP = 34;
 
 // Expression CSS à utiliser dans le `paddingBottom` du conteneur de contenu
 // pour réserver EXACTEMENT la hauteur visible de la nav (= zéro gap).
