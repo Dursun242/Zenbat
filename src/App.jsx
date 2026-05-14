@@ -273,12 +273,17 @@ export default function App() {
       // indicator) occupe 46-50 % du viewport selon l'iPhone. 48 %
       // garantit 2-4 % de marge sous l'input, jamais d'overlap.
       h = Math.max(240, Math.round(iwh * 0.48));
-    } else if (vvh && iwh && vvh < iwh - 100) {
-      // Pas de clavier soft mais viewport rétréci (ex. clavier numérique
-      // d'un input number, picker natif iOS, etc.) → utiliser vvh.
-      h = vvh;
     } else {
-      h = vvh || iwh;
+      // Clavier fermé : MAX(vvh, iwh) pour couvrir tout le viewport.
+      //
+      // Sur iPhone Dynamic Island en PWA standalone, `visualViewport.height`
+      // peut être nettement inférieur à `innerHeight` (zone home indicator
+      // / parties exclues par iOS). Si on s'aligne sur vvh seul, un gros
+      // bandeau de fond html (#1A1612) reste visible sous la nav.
+      // Math.max garantit que le body couvre la totalité du layout viewport,
+      // y compris la zone home indicator (déjà gérée par le safe-area-inset
+      // du BottomNav lui-même).
+      h = Math.max(vvh || 0, iwh || 0) || iwh || vvh;
     }
     document.documentElement.style.height = h + "px";
     document.body.style.height = h + "px";
