@@ -256,6 +256,13 @@ export default function App() {
     const h = window.visualViewport?.height || window.innerHeight;
     document.documentElement.style.height = h + "px";
     document.body.style.height = h + "px";
+    // iOS PWA : si iOS a auto-scrollé la window pour amener un input
+    // dans la vue (focus textarea), on annule — body est désormais
+    // dimensionné pile au viewport visible, l'input est naturellement
+    // au-dessus du clavier sans scroll.
+    if (window.scrollY !== 0 || window.scrollX !== 0) {
+      window.scrollTo(0, 0);
+    }
   }, []);
   useLayoutEffect(() => {
     recomputeShellHeight();
@@ -384,6 +391,13 @@ export default function App() {
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,400;1,700&family=Space+Grotesk:wght@400;600;700&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
         html,body,#root{height:100%;overflow:hidden}
+        /* iOS PWA standalone : sans position:fixed, iOS scrolle la
+           window pour amener l'input focused dans la vue → l'input
+           remonte tout en haut et le fond #1A1612 transparaît dans
+           la zone que la window scroll a fait dépasser. Ancrer
+           body+#root au viewport supprime totalement la scroll de
+           document, et notre setH gère la hauteur dynamiquement. */
+        body,#root{position:fixed;inset:0}
         html,body{background:#1A1612}
         ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#E8E2D8;border-radius:2px}
         @keyframes fadeUp{from{opacity:0}to{opacity:1}}
