@@ -16,7 +16,7 @@ import Logo          from "./components/ui/Logo.jsx";
 import { I }         from "./components/ui/icons.jsx";
 import Toast         from "./components/app/Toast.jsx";
 import UpdateAvailableToast from "./components/app/UpdateAvailableToast.jsx";
-import BottomNav     from "./components/app/BottomNav.jsx";
+import BottomNav, { NAV_RESERVED_CSS }    from "./components/app/BottomNav.jsx";
 import SearchBar     from "./components/app/SearchBar.jsx";
 import SaveIndicator from "./components/app/SaveIndicator.jsx";
 import HeaderMenu    from "./components/app/HeaderMenu.jsx";
@@ -462,7 +462,7 @@ export default function App() {
         </nav>
 
         {/* Contenu principal */}
-        <div ref={contentRef} className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: keyboardOpen ? 0 : "calc(72px + min(env(safe-area-inset-bottom, 0px), 20px))" }}>
+        <div ref={contentRef} className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: keyboardOpen ? 0 : NAV_RESERVED_CSS }}>
           {tab === "dashboard"     && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}
                                          onOpenProfile={() => setScreen("onboarding")}
                                          onOpenPWAInstall={() => setScreen("pwa_install")}/>}
