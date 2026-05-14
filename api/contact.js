@@ -26,17 +26,18 @@ export default async function handler(req, res) {
   const slotStr    = typeof slot    === 'string' ? slot.trim()    : ''
   const isCallback = type === 'callback'
 
-  if (!nameStr || nameStr.length > 100)
-    return res.status(400).json({ error: 'Nom invalide' })
-
   if (isCallback) {
-    // Rappel téléphone : phone obligatoire, email optionnel.
+    // Rappel téléphone : seul le téléphone est obligatoire.
     if (!phoneStr || phoneStr.length > 30 || !PHONE_FR_RE.test(phoneStr))
       return res.status(400).json({ error: 'Numéro de téléphone invalide' })
+    if (nameStr && nameStr.length > 100)
+      return res.status(400).json({ error: 'Nom invalide' })
     if (emailStr && (emailStr.length > 254 || !EMAIL_RE.test(emailStr)))
       return res.status(400).json({ error: 'Email invalide' })
   } else {
-    // Contact classique : email + message obligatoires.
+    // Contact classique : name + email + message obligatoires.
+    if (!nameStr || nameStr.length > 100)
+      return res.status(400).json({ error: 'Nom invalide' })
     if (!emailStr || emailStr.length > 254 || !EMAIL_RE.test(emailStr))
       return res.status(400).json({ error: 'Email invalide' })
     if (!messageStr || messageStr.length > 2000)
@@ -49,14 +50,14 @@ export default async function handler(req, res) {
   const esc = s => String(s).replace(/</g, '&lt;')
 
   const subject = isCallback
-    ? `📞 Demande de rappel démo — ${nameStr}`
+    ? `📞 Demande de rappel démo — ${phoneStr}`
     : `📬 Nouveau message de contact — ${nameStr}`
 
   const rows = [
-    ['Nom', esc(nameStr)],
     isCallback && phoneStr ? ['Téléphone', `<a href="tel:${esc(phoneStr.replace(/\s+/g, ''))}">${esc(phoneStr)}</a>`] : null,
-    emailStr ? ['Email', `<a href="mailto:${esc(emailStr)}">${esc(emailStr)}</a>`] : null,
     isCallback && slotStr ? ['Créneau préféré', esc(slotStr)] : null,
+    nameStr ? ['Nom', esc(nameStr)] : null,
+    emailStr ? ['Email', `<a href="mailto:${esc(emailStr)}">${esc(emailStr)}</a>`] : null,
   ].filter(Boolean)
 
   const html = `

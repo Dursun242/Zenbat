@@ -22,21 +22,19 @@ const SLOTS = [
 ]
 
 export default function DemoCallbackModal({ open, onClose }) {
-  const [name,  setName]  = useState('')
   const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
   const [slot,  setSlot]  = useState('')
   const [website, setWebsite] = useState('') // honeypot
   const [status, setStatus] = useState('idle') // idle | submitting | success | error
   const [errMsg, setErrMsg] = useState('')
-  const nameRef = useRef(null)
+  const phoneRef = useRef(null)
 
   // Focus + ESC + scroll lock
   useEffect(() => {
     if (!open) return
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    setTimeout(() => nameRef.current?.focus(), 80)
+    setTimeout(() => phoneRef.current?.focus(), 80)
     const onKey = e => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
     return () => {
@@ -49,8 +47,8 @@ export default function DemoCallbackModal({ open, onClose }) {
   useEffect(() => {
     if (open) return
     const t = setTimeout(() => {
-      setName(''); setPhone(''); setEmail(''); setSlot('')
-      setWebsite(''); setStatus('idle'); setErrMsg('')
+      setPhone(''); setSlot(''); setWebsite('')
+      setStatus('idle'); setErrMsg('')
     }, 300)
     return () => clearTimeout(t)
   }, [open])
@@ -58,19 +56,18 @@ export default function DemoCallbackModal({ open, onClose }) {
   async function onSubmit(e) {
     e.preventDefault()
     setErrMsg('')
-    if (!name.trim()) return setErrMsg('Merci de renseigner votre nom.')
-    if (!PHONE_FR_RE.test(phone.trim())) return setErrMsg('Numéro de téléphone invalide (format français).')
+    if (!PHONE_FR_RE.test(phone.trim())) {
+      return setErrMsg('Numéro invalide (format français : 06 12 34 56 78).')
+    }
     setStatus('submitting')
     try {
       const r = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type:    'callback',
-          name:    name.trim(),
-          phone:   phone.trim(),
-          email:   email.trim() || undefined,
-          slot:    slot ? SLOTS.find(s => s.id === slot)?.label : undefined,
+          type:  'callback',
+          phone: phone.trim(),
+          slot:  slot ? SLOTS.find(s => s.id === slot)?.label : undefined,
           website, // honeypot
         }),
       })
@@ -115,15 +112,16 @@ export default function DemoCallbackModal({ open, onClose }) {
             style={{
               background: C.creamlight,
               borderRadius: 16,
-              width: '100%', maxWidth: 460,
+              width: '100%', maxWidth: 420,
               boxShadow: '0 24px 60px rgba(26,22,18,.30)',
               border: `1px solid ${C.border}`,
               overflow: 'hidden',
+              position: 'relative',
               maxHeight: 'calc(100vh - 40px)',
               display: 'flex', flexDirection: 'column',
             }}
           >
-            {/* Close button */}
+            {/* Close */}
             <button
               type="button"
               onClick={onClose}
@@ -151,8 +149,7 @@ export default function DemoCallbackModal({ open, onClose }) {
                   color: C.ink, margin: '0 0 8px',
                 }}>Demande reçue !</h2>
                 <p style={{ fontSize: 14, color: C.muted, lineHeight: 1.6, margin: '0 0 24px' }}>
-                  Un conseiller Zenbat va vous rappeler dans les meilleurs délais.
-                  En attendant, vous pouvez tester gratuitement.
+                  Un conseiller Zenbat va vous rappeler{slot ? <> sur le créneau choisi</> : <> rapidement</>}.
                 </p>
                 <button
                   type="button"
@@ -172,14 +169,14 @@ export default function DemoCallbackModal({ open, onClose }) {
                     letterSpacing: '.12em', textTransform: 'uppercase',
                     color: C.terra, background: 'rgba(201,123,92,.10)',
                     padding: '5px 10px', borderRadius: 999, marginBottom: 12,
-                  }}>Démo personnalisée</span>
+                  }}>Démo gratuite</span>
                   <h2 id="demo-modal-title" style={{
-                    fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 500,
+                    fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 500,
                     color: C.ink, margin: '0 0 8px', lineHeight: 1.2,
-                  }}>Un conseiller expert vous rappelle</h2>
+                  }}>On vous rappelle</h2>
                   <p style={{ fontSize: 14, color: C.muted, lineHeight: 1.55, margin: 0 }}>
-                    Laissez votre numéro — on vous explique en 15 min comment Zenbat
-                    s'intègre à votre activité d'artisan. Sans engagement.
+                    Laissez votre numéro — un conseiller expert vous appelle pour
+                    une démo de 15 min. Sans engagement.
                   </p>
                 </div>
 
@@ -194,32 +191,20 @@ export default function DemoCallbackModal({ open, onClose }) {
 
                   <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: C.ink }}>
-                      Votre nom <span style={{ color: C.terra }}>*</span>
-                    </span>
-                    <input
-                      ref={nameRef}
-                      type="text" required maxLength={100}
-                      value={name} onChange={e => setName(e.target.value)}
-                      autoComplete="name"
-                      placeholder="Jean Dupont"
-                      style={inputStyle}
-                    />
-                  </label>
-
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: C.ink }}>
                       Votre numéro <span style={{ color: C.terra }}>*</span>
                     </span>
                     <input
+                      ref={phoneRef}
                       type="tel" required maxLength={20}
                       value={phone} onChange={e => setPhone(e.target.value)}
                       autoComplete="tel"
+                      inputMode="tel"
                       placeholder="06 12 34 56 78"
                       style={inputStyle}
                     />
                   </label>
 
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: C.ink }}>
                       Créneau préféré <span style={{ color: C.muted, fontWeight: 400 }}>(optionnel)</span>
                     </span>
@@ -239,20 +224,7 @@ export default function DemoCallbackModal({ open, onClose }) {
                         >{s.label}</button>
                       ))}
                     </div>
-                  </label>
-
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: C.ink }}>
-                      Email <span style={{ color: C.muted, fontWeight: 400 }}>(optionnel, si pas joignable)</span>
-                    </span>
-                    <input
-                      type="email" maxLength={254}
-                      value={email} onChange={e => setEmail(e.target.value)}
-                      autoComplete="email"
-                      placeholder="jean.dupont@exemple.fr"
-                      style={inputStyle}
-                    />
-                  </label>
+                  </div>
 
                   {errMsg && (
                     <p style={{ margin: 0, fontSize: 13, color: '#dc2626', background: 'rgba(220,38,38,.06)', padding: '8px 12px', borderRadius: 8 }}>
@@ -272,11 +244,10 @@ export default function DemoCallbackModal({ open, onClose }) {
                       transition: 'background .18s',
                     }}
                   >
-                    {status === 'submitting' ? 'Envoi…' : 'Demander un rappel'}
+                    {status === 'submitting' ? 'Envoi…' : 'Être rappelé'}
                   </button>
                   <p style={{ margin: 0, fontSize: 11, color: C.muted, textAlign: 'center', lineHeight: 1.45 }}>
-                    En envoyant, vous acceptez d'être contacté par Zenbat à propos
-                    d'une démo. Vos données ne sont pas revendues.
+                    Vos données ne sont pas revendues.
                   </p>
                 </div>
               </form>
@@ -289,11 +260,11 @@ export default function DemoCallbackModal({ open, onClose }) {
 }
 
 const inputStyle = {
-  padding: '10px 14px',
+  padding: '11px 14px',
   borderRadius: 8,
   border: `1.5px solid ${C.border}`,
   background: 'white',
-  fontSize: 14,
+  fontSize: 15,
   fontFamily: 'inherit',
   color: C.ink,
   outline: 'none',
