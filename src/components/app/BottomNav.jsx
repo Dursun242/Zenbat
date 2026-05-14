@@ -27,15 +27,14 @@ import { useKeyboardOpen } from "../../hooks/useKeyboardOpen.js";
 
 // Hauteur de la nav HORS safe-area iOS (icône + label + paddings internes).
 const NAV_CORE_HEIGHT = 64;
-// Cap du safe-area-inset-bottom : 34px couvre la zone home indicator des
-// iPhones avec Dynamic Island (≈ 34px de safe-area). En dessous on
-// laisserait apparaître une bande #1A1612 sous le fond de la nav.
-const NAV_SAFE_AREA_CAP = 34;
 
 // Expression CSS à utiliser dans le `paddingBottom` du conteneur de contenu
 // pour réserver EXACTEMENT la hauteur visible de la nav (= zéro gap).
+// Pas de cap sur env(safe-area-inset-bottom) : la nav doit couvrir TOUTE
+// la zone home indicator iOS, sinon un bandeau de fond html (#1A1612)
+// reste visible entre la nav et le bord de l'écran.
 export const NAV_RESERVED_CSS =
-  `calc(${NAV_CORE_HEIGHT}px + min(env(safe-area-inset-bottom, 0px), ${NAV_SAFE_AREA_CAP}px))`;
+  `calc(${NAV_CORE_HEIGHT}px + env(safe-area-inset-bottom, 0px))`;
 
 const BRAND     = "#22c55e";
 const BG        = "#1A1612";
@@ -252,7 +251,7 @@ export default function BottomNav({
         left: 0, right: 0, bottom: 0,
         boxSizing: "border-box",
         height: NAV_RESERVED_CSS,
-        paddingBottom: `min(env(safe-area-inset-bottom, 0px), ${NAV_SAFE_AREA_CAP}px)`,
+        paddingBottom: `env(safe-area-inset-bottom, 0px)`,
         background: BG,
         borderTop: "1px solid rgba(255,255,255,.06)",
         display: "flex",
