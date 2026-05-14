@@ -253,7 +253,31 @@ export default function App() {
   // On l'applique directement sur documentElement + body (et pas via un
   // ref React, qui se ferait écraser par le re-render).
   const recomputeShellHeight = useCallback(() => {
-    const h = window.visualViewport?.height || window.innerHeight;
+    const vvh = window.visualViewport?.height || 0;
+    const iwh = window.innerHeight || 0;
+    // iOS PWA standalone : `visualViewport.height` et `window.innerHeight`
+    // restent souvent au plein écran quand le clavier s'ouvre (le meta
+    // `interactive-widget=resizes-content` n'est honoré que partiellement).
+    // Détection directe : si un input texte est focused, on assume clavier
+    // ouvert et on estime la hauteur visible.
+    const ae = document.activeElement;
+    const isTextField = !!ae && (
+      ae.tagName === "TEXTAREA" ||
+      (ae.tagName === "INPUT" && !["checkbox","radio","submit","button","reset","file","color","range","image","hidden"].includes((ae.type || "text").toLowerCase())) ||
+      ae.isContentEditable === true
+    );
+    let h;
+    if (vvh && iwh && vvh < iwh - 100) {
+      // visualViewport a tracké le clavier → c'est la vraie hauteur.
+      h = vvh;
+    } else if (isTextField && iwh) {
+      // Clavier détecté par focus mais viewport non rétréci → heuristique.
+      // Le clavier iOS prend ~38-45 % du viewport en portrait. On laisse
+      // 58 % de marge pour le contenu (plancher 240 px).
+      h = Math.max(240, Math.round(iwh * 0.58));
+    } else {
+      h = vvh || iwh;
+    }
     document.documentElement.style.height = h + "px";
     document.body.style.height = h + "px";
     // iOS PWA : si iOS a auto-scrollé la window pour amener un input
