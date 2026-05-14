@@ -17,6 +17,7 @@ import { I }         from "./components/ui/icons.jsx";
 import Toast         from "./components/app/Toast.jsx";
 import UpdateAvailableToast from "./components/app/UpdateAvailableToast.jsx";
 import BottomNav, { NAV_RESERVED_CSS }    from "./components/app/BottomNav.jsx";
+import BottomNavActionSheet from "./components/app/BottomNavActionSheet.jsx";
 import SearchBar     from "./components/app/SearchBar.jsx";
 import SaveIndicator from "./components/app/SaveIndicator.jsx";
 import HeaderMenu    from "./components/app/HeaderMenu.jsx";
@@ -236,6 +237,40 @@ export default function App() {
   };
 
   const activeNav = NAV.find(n => tab.startsWith(n.id))?.id || "dashboard";
+
+  // Compteurs pour les pastilles des onglets de la BottomNav.
+  // - Devis : en attente de signature (action requise côté client).
+  // - Factures : envoyées non payées.
+  const navBadges = {
+    devis:    devis.filter(d => d.statut === "en_signature").length,
+    factures: invoices.filter(i => i.statut === "envoyee").length,
+  };
+
+  // Sheet d'actions rapides déclenchée par appui long sur le CTA Agent IA.
+  const [agentSheetOpen, setAgentSheetOpen] = useState(false);
+  const agentSheetActions = [
+    {
+      id: "voice",
+      label: "Démarrage vocal",
+      hint: "Dictez votre devis, l'IA le rédige",
+      icon: I.spark,
+      onClick: () => { setTab("agent"); try { localStorage.setItem("agentIA_autoStartMic", "1"); } catch {} },
+    },
+    {
+      id: "blank",
+      label: "Nouveau devis",
+      hint: "Repartir d'un brouillon vierge",
+      icon: I.file,
+      onClick: () => { setTab("agent"); try { localStorage.setItem("agentIA_resetDraft", "1"); } catch {} },
+    },
+    {
+      id: "list",
+      label: "Voir mes devis",
+      hint: `${devis?.length || 0} devis enregistré${(devis?.length || 0) > 1 ? "s" : ""}`,
+      icon: I.users,
+      onClick: () => setTab("devis"),
+    },
+  ];
 
   // Préserve la position de scroll de chaque tab : quand on revient sur
   // un tab visité, on retombe là où on s'était arrêté plutôt que tout
@@ -577,7 +612,21 @@ export default function App() {
       {comptableOpen && (
         <SendToComptableModal user={user} onClose={() => setComptableOpen(false)}/>
       )}
-      <BottomNav items={NAV} activeNav={activeNav} onSelect={setTab} plan={effectivePlan} quotaReached={freemiumQuotaReached} firstDevisNudge={!isAdmin && (devis?.length || 0) === 0 && activeNav !== "agent"}/>
+      <BottomNav
+        items={NAV}
+        activeNav={activeNav}
+        onSelect={setTab}
+        plan={effectivePlan}
+        quotaReached={freemiumQuotaReached}
+        firstDevisNudge={!isAdmin && (devis?.length || 0) === 0 && activeNav !== "agent"}
+        badges={navBadges}
+        onAgentLongPress={() => setAgentSheetOpen(true)}
+      />
+      <BottomNavActionSheet
+        open={agentSheetOpen}
+        onClose={() => setAgentSheetOpen(false)}
+        actions={agentSheetActions}
+      />
     </div>
   );
 }
