@@ -1,0 +1,306 @@
+/* Pages SEO villes — design system Zenbat (terra / cream / ink).
+   Pas de @tailwind ici : on reste sur les classes utilisées par VillePage
+   et VillesIndex pour garder ces écrans isolés du reste de l'app. */
+
+.vp-root {
+  --vp-terra:      #C97B5C;
+  --vp-darkterra:  #A55F44;
+  --vp-cream:      #FAF7F2;
+  --vp-creamlight: #FFFCF7;
+  --vp-ink:        #1A1612;
+  --vp-muted:      #6B6358;
+  --vp-border:     #E8E2D8;
+  --vp-soft:       #F3EDE3;
+
+  min-height: 100vh;
+  background: var(--vp-cream);
+  color: var(--vp-ink);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  line-height: 1.55;
+}
+
+.vp-nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(250, 247, 242, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--vp-border);
+}
+.vp-nav-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  height: 64px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.vp-logo {
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: -0.5px;
+  line-height: 1;
+  text-decoration: none;
+}
+.vp-logo-terra { color: var(--vp-terra); }
+.vp-logo-ink   { color: var(--vp-ink); }
+.vp-nav-cta {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 18px;
+  border-radius: 10px;
+  background: var(--vp-terra);
+  color: white;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 0.16s, transform 0.16s;
+}
+.vp-nav-cta:hover {
+  background: var(--vp-darkterra);
+  transform: translateY(-1px);
+}
+
+.vp-container {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+}
+.vp-container-narrow {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+}
+
+.vp-breadcrumb {
+  font-size: 13px;
+  color: var(--vp-muted);
+  margin-bottom: 20px;
+}
+.vp-breadcrumb a {
+  color: var(--vp-muted);
+  text-decoration: none;
+  border-bottom: 1px dotted transparent;
+}
+.vp-breadcrumb a:hover {
+  color: var(--vp-terra);
+  border-bottom-color: var(--vp-terra);
+}
+.vp-breadcrumb-sep {
+  margin: 0 8px;
+  opacity: 0.5;
+}
+
+.vp-eyebrow {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--vp-terra);
+  background: rgba(201, 123, 92, 0.10);
+  padding: 6px 12px;
+  border-radius: 999px;
+  margin-bottom: 16px;
+}
+
+.vp-h1 {
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: clamp(34px, 5vw, 52px);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  margin: 0 0 16px;
+  color: var(--vp-ink);
+}
+.vp-h1 .vp-h1-accent {
+  color: var(--vp-terra);
+}
+
+.vp-lead {
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--vp-muted);
+  margin: 0 0 32px;
+  max-width: 720px;
+}
+
+.vp-section {
+  margin-top: 56px;
+}
+.vp-section h2 {
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1.2;
+  margin: 0 0 20px;
+  color: var(--vp-ink);
+}
+.vp-section p {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--vp-ink);
+  margin: 0 0 12px;
+}
+
+.vp-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+.vp-card {
+  background: var(--vp-creamlight);
+  border: 1px solid var(--vp-border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--vp-ink);
+  transition: border-color 0.18s, background 0.18s, transform 0.16s;
+}
+.vp-card:hover {
+  border-color: var(--vp-terra);
+  background: white;
+  transform: translateY(-1px);
+}
+
+.vp-faq {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+.vp-faq details {
+  background: var(--vp-creamlight);
+  border: 1px solid var(--vp-border);
+  border-radius: 12px;
+  padding: 14px 18px;
+  transition: border-color 0.18s;
+}
+.vp-faq details[open] {
+  border-color: var(--vp-terra);
+}
+.vp-faq summary {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--vp-ink);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.vp-faq summary::-webkit-details-marker { display: none; }
+.vp-faq summary::after {
+  content: '+';
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--vp-terra);
+  line-height: 1;
+  transition: transform 0.2s;
+}
+.vp-faq details[open] summary::after {
+  content: '−';
+}
+.vp-faq p {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--vp-muted);
+}
+
+.vp-cta-block {
+  margin-top: 64px;
+  padding: 40px 32px;
+  background: var(--vp-ink);
+  color: var(--vp-creamlight);
+  border-radius: 16px;
+  text-align: center;
+}
+.vp-cta-block h3 {
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1.2;
+  margin: 0 0 8px;
+  color: white;
+}
+.vp-cta-block p {
+  font-size: 14px;
+  color: rgba(255, 252, 247, 0.72);
+  margin: 0 0 22px;
+}
+.vp-cta-block a {
+  display: inline-block;
+  padding: 13px 30px;
+  background: var(--vp-terra);
+  color: white;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 15px;
+  text-decoration: none;
+  transition: background 0.16s, transform 0.16s;
+}
+.vp-cta-block a:hover {
+  background: var(--vp-darkterra);
+  transform: translateY(-1px);
+}
+
+/* ───────── Index /villes ───────── */
+.vp-region-block {
+  margin-top: 40px;
+}
+.vp-region-block h2 {
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: 22px;
+  font-weight: 500;
+  margin: 0 0 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--vp-border);
+  color: var(--vp-ink);
+}
+.vp-ville-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+.vp-ville-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--vp-creamlight);
+  border: 1px solid var(--vp-border);
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--vp-ink);
+  font-size: 14px;
+  font-weight: 500;
+  transition: border-color 0.16s, background 0.16s, color 0.16s, transform 0.16s;
+}
+.vp-ville-link:hover {
+  border-color: var(--vp-terra);
+  background: white;
+  color: var(--vp-terra);
+  transform: translateY(-1px);
+}
+.vp-ville-link span {
+  font-size: 12px;
+  color: var(--vp-muted);
+  font-weight: 400;
+}
+
+@media (max-width: 640px) {
+  .vp-container, .vp-container-narrow {
+    padding: 32px 18px 64px;
+  }
+  .vp-nav-inner { padding: 0 18px; }
+  .vp-section { margin-top: 40px; }
+  .vp-cta-block { padding: 32px 22px; }
+}
