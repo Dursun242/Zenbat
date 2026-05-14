@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mic, CheckCircle2 } from 'lucide-react'
+import DemoCallbackModal from './DemoCallbackModal'
 
 const TYPEWRITER_TEXT = 'Cuisine 25m², carrelage sol et murs, peinture plafond, livraison 15 jours'
 const DEVIS_LINES = [
@@ -178,6 +179,7 @@ function HeroVisual() {
 
 export default function LandingHero({ onSignup }) {
   const [mobile, setMobile] = useState(window.innerWidth < 768)
+  const [demoOpen, setDemoOpen] = useState(false)
   useEffect(() => {
     const fn = () => setMobile(window.innerWidth < 768)
     window.addEventListener('resize', fn)
@@ -248,9 +250,14 @@ export default function LandingHero({ onSignup }) {
               style={{ padding: '13px 26px', borderRadius: 10, border: 'none', background: '#C97B5C', color: '#fff', fontSize: 15, fontWeight: 600, cursor: 'pointer', transition: 'background .2s' }}>
               Tester gratuitement
             </motion.button>
-            <a href="#features" style={{ padding: '13px 26px', borderRadius: 10, border: '1.5px solid #E8E2D8', background: 'transparent', color: '#6B6358', fontSize: 15, fontWeight: 500, cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
-              Voir une démo
-            </a>
+            <button
+              type="button"
+              onClick={() => setDemoOpen(true)}
+              style={{ padding: '13px 26px', borderRadius: 10, border: '1.5px solid #E8E2D8', background: 'transparent', color: '#6B6358', fontSize: 15, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 8, transition: 'border-color .15s, color .15s' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = '#C97B5C'; e.currentTarget.style.color = '#C97B5C' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = '#E8E2D8'; e.currentTarget.style.color = '#6B6358' }}>
+              <span aria-hidden="true">📞</span> Voir une démo
+            </button>
           </motion.div>
 
           <motion.p
@@ -283,6 +290,8 @@ export default function LandingHero({ onSignup }) {
           </motion.div>
         )}
       </div>
+
+      <DemoCallbackModal open={demoOpen} onClose={() => setDemoOpen(false)} />
     </section>
   )
 }
