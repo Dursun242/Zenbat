@@ -22,9 +22,10 @@ const FOOTER_COLUMNS = [
   {
     heading: 'Entreprise',
     links: [
-      { label: 'À propos', href: '#about'   },
-      { label: 'Blog',     href: '#blog'    },
-      { label: 'Contact',  href: '/contact' },
+      { label: 'À propos',      href: '#about'   },
+      { label: 'Blog',          href: '#blog'    },
+      { label: 'Artisans locaux', href: '/villes' },
+      { label: 'Contact',       href: '/contact' },
     ],
   },
   {

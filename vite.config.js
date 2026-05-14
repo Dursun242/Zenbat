@@ -1,6 +1,12 @@
 import { defineConfig } from 'vite'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { vitePrerenderPlugin } from 'vite-prerender-plugin'
+import { VILLES } from './src/data/villes.js'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
   build: {
@@ -29,6 +35,19 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    // Prérendu statique des pages SEO villes au build.
+    // Génère dist/villes/index.html et dist/villes/<slug>/index.html avec
+    // <title>, <meta description>, og: et canonical baked-in pour les crawlers.
+    // À l'exécution navigateur, React reprend la main et remplace le contenu
+    // (pas d'hydratation — createRoot, pas hydrateRoot).
+    vitePrerenderPlugin({
+      renderTarget: '#root',
+      prerenderScript: path.join(__dirname, 'src/prerender.jsx'),
+      additionalPrerenderRoutes: [
+        '/villes',
+        ...VILLES.map(v => `/villes/${v.slug}`),
+      ],
+    }),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon-180x180.png', 'icon.svg'],
