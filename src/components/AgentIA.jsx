@@ -656,7 +656,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
           quickStarts={quickStarts}
           lignes={lignes}
           send={send}
-          bottomPad={inputAreaHeight + 8}
+          bottomPad={inputAreaHeight + keyboardInset + 8}
         />
       </div>
 
