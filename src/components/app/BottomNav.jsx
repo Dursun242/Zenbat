@@ -21,6 +21,7 @@
 //
 // `quotaReached` + plan free : pastille rouge en haut à droite du cercle agent.
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 
 const BRAND     = "#22c55e";
 const BG        = "#1A1612";
@@ -28,6 +29,24 @@ const ACTIVE    = "#FFFFFF";
 const INACTIVE  = "#8A8278";
 
 export default function BottomNav({ items, activeNav, onSelect, plan, quotaReached, firstDevisNudge = false }) {
+  // Masquage automatique pendant la frappe : sur iOS / Chrome mobile,
+  // position:fixed bottom:0 reste collé sous le clavier (au bas du layout
+  // viewport), occupant inutilement de la place. On glisse la nav hors
+  // écran tant que le clavier est ouvert.
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      // Seuil 150px : delta significatif = clavier (et pas la barre URL
+      // Safari ou un autre changement mineur de viewport).
+      setKeyboardOpen(window.innerHeight - vv.height > 150);
+    };
+    vv.addEventListener("resize", onResize);
+    onResize();
+    return () => vv.removeEventListener("resize", onResize);
+  }, []);
+
   return (
     <nav
       className="app-bottom-nav"
@@ -43,6 +62,9 @@ export default function BottomNav({ items, activeNav, onSelect, plan, quotaReach
         // Safe-area iOS cappée à 20px pour éviter les valeurs gonflées en PWA.
         paddingBottom: "calc(4px + min(env(safe-area-inset-bottom, 0px), 20px))",
         zIndex: 50,
+        transform: keyboardOpen ? "translateY(110%)" : "translateY(0)",
+        transition: "transform .22s ease",
+        pointerEvents: keyboardOpen ? "none" : "auto",
       }}>
       <style>{`
         @keyframes bn-nudge-bob   { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-5px); } }
