@@ -7,6 +7,8 @@ import { supabase } from "../lib/supabase.js";
 import { getToken } from "../lib/getToken.js";
 import { useAuth } from "../lib/auth.jsx";
 import { useSpeechRecognition } from "../hooks/useSpeechRecognition.js";
+import { useKeyboardInset } from "../hooks/useKeyboardInset.js";
+import { NAV_RESERVED_CSS } from "./app/BottomNav.jsx";
 import { buildAgentGreeting, quickStartsFor } from "../lib/agentIA/sectors.js";
 import { buildSystemPrompt } from "../lib/agentIA/prompt.js";
 import { processDevisFromRaw } from "../lib/agentIA/extractDevis.js";
@@ -42,6 +44,10 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   const { user } = useAuth();
   const userId = user?.id;
   const draftKey = useMemo(() => iaDraftKey(userId), [userId]);
+  // Hauteur en px occupée par le clavier soft. 0 quand fermé. Utilisé
+  // pour positionner la barre de saisie en `position: fixed` juste
+  // au-dessus du clavier (modèle WhatsApp / Claude / Telegram).
+  const keyboardInset = useKeyboardInset();
 
   const [msgs,         setMsgs]         = useState(() => [{ role: "assistant", content: buildAgentGreeting(brand) }]);
   const [input,        setInput]        = useState("");
@@ -82,6 +88,19 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   const userSettingsRef = useRef(null);
   const chatRef  = useRef(null);
   const inputRef = useRef(null);
+  // Mesure dynamique de la hauteur de la barre de saisie fixe pour
+  // calculer le padding-bottom du ChatThread (= permet de scroller le
+  // dernier message au-dessus de la barre).
+  const inputAreaRef = useRef(null);
+  const [inputAreaHeight, setInputAreaHeight] = useState(140);
+  useEffect(() => {
+    if (!inputAreaRef.current || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(entries => {
+      for (const e of entries) setInputAreaHeight(e.contentRect.height);
+    });
+    ro.observe(inputAreaRef.current);
+    return () => ro.disconnect();
+  }, []);
 
   const {
     listening, micSupported, micError, currentLang,
@@ -637,14 +656,26 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
           quickStarts={quickStarts}
           lignes={lignes}
           send={send}
+          bottomPad={inputAreaHeight + 8}
         />
+      </div>
 
-        {/* Zone de saisie */}
-        <div style={{ padding: "10px 14px 12px", background: "white", borderTop: "1px solid #F0EBE3", flexShrink: 0, position: "relative" }}>
-          <style>{`
-            @keyframes micPulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,.55),0 6px 18px rgba(239,68,68,.45)}70%{box-shadow:0 0 0 16px rgba(239,68,68,0),0 6px 18px rgba(239,68,68,.45)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0),0 6px 18px rgba(239,68,68,.45)}}
-            @keyframes micWave{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
-          `}</style>
+      {/* Zone de saisie — `position: fixed` ancrée au-dessus du clavier
+          ou au-dessus du BottomNav. Modèle chat (WhatsApp / Claude). */}
+      <div ref={inputAreaRef} style={{
+        position: "fixed",
+        left: 0, right: 0,
+        bottom: keyboardInset > 0 ? `${keyboardInset}px` : NAV_RESERVED_CSS,
+        padding: "10px 14px 12px",
+        background: "white",
+        borderTop: "1px solid #F0EBE3",
+        transition: "bottom .22s ease",
+        zIndex: 30,
+      }}>
+        <style>{`
+          @keyframes micPulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,.55),0 6px 18px rgba(239,68,68,.45)}70%{box-shadow:0 0 0 16px rgba(239,68,68,0),0 6px 18px rgba(239,68,68,.45)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0),0 6px 18px rgba(239,68,68,.45)}}
+          @keyframes micWave{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
+        `}</style>
 
           {/* Champ texte + envoyer */}
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: "#FAF7F2", borderRadius: 14, border: `1.5px solid ${listening ? "#ef4444" : (input.trim() ? ac : "#E8E2D8")}`, padding: "8px 10px", transition: "border-color .2s" }}>
@@ -717,12 +748,11 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
             )}
           </div>
 
-          {micError && (
-            <div style={{ fontSize: 11, color: "#991b1b", background: "#fef2f2", border: "1px solid #fecaca", padding: "5px 10px", borderRadius: 8, marginTop: 6, textAlign: "center" }}>
-              {micError}
-            </div>
-          )}
-        </div>
+        {micError && (
+          <div style={{ fontSize: 11, color: "#991b1b", background: "#fef2f2", border: "1px solid #fecaca", padding: "5px 10px", borderRadius: 8, marginTop: 6, textAlign: "center" }}>
+            {micError}
+          </div>
+        )}
       </div>
 
       {pickingClient && (

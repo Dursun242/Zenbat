@@ -139,12 +139,13 @@ export default function ChatThread({
   chatRef, msgs, feedback, setFeedback, saveFeedback,
   loading, ac, historySummary,
   quickStarts, lignes, send,
+  bottomPad = 12,
 }) {
   const showQuickStarts = msgs.length === 1 && lignes.length === 0 && !loading && quickStarts.length > 0
   const showTyping      = loading && msgs[msgs.length - 1]?.role !== "assistant"
 
   return (
-    <div ref={chatRef} style={{ flex: 1, overflowY: "auto", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+    <div ref={chatRef} style={{ flex: 1, overflowY: "auto", paddingTop: 12, paddingLeft: 14, paddingRight: 14, paddingBottom: bottomPad, display: "flex", flexDirection: "column", gap: 8 }}>
       {historySummary && (
         <div title="L'IA utilise vos devis passés pour proposer des tarifs cohérents avec votre historique"
           style={{ alignSelf: "center", display: "flex", alignItems: "center", gap: 6, background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 20, padding: "4px 11px", fontSize: 10, fontWeight: 600, color: "#15803d", marginBottom: 4 }}>
