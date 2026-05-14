@@ -48,9 +48,9 @@ const ScreenLoader = () => (
 const NAV = [
   { id: "dashboard", label: "Accueil",  icon: I.trend },
   { id: "clients",   label: "Clients",  icon: I.users },
+  { id: "agent",     label: "Agent IA", icon: I.spark },
   { id: "devis",     label: "Devis",    icon: I.file  },
   { id: "factures",  label: "Factures", icon: I.file  },
-  { id: "agent",     label: "Agent IA", icon: I.spark },
 ];
 
 export default function App() {
