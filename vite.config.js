@@ -72,7 +72,16 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
-        navigateFallbackDenylist: [/^\/api\//],
+        // Pas de fallback SPA pour : /api/, /sitemap.xml, /robots.txt,
+        // /google*.html (vérification GSC). Sans ça, le Service Worker
+        // intercepte ces requêtes et renvoie /index.html, ce qui casse
+        // Googlebot et la navigation directe vers ces fichiers.
+        navigateFallbackDenylist: [
+          /^\/api\//,
+          /^\/sitemap\.xml$/,
+          /^\/robots\.txt$/,
+          /^\/google[a-z0-9]+\.html$/,
+        ],
         // ⚠ skipWaiting + clientsClaim désactivés volontairement.
         // Avec ces deux flags + registerType:'autoUpdate', vite-plugin-pwa
         // déclenche un window.location.reload() mid-session dès qu'un
