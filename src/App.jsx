@@ -255,53 +255,25 @@ export default function App() {
   const recomputeShellHeight = useCallback(() => {
     const vvh = window.visualViewport?.height || 0;
     const iwh = window.innerHeight || 0;
-    // iOS PWA standalone : `visualViewport.height` et `window.innerHeight`
-    // restent souvent au plein écran quand le clavier s'ouvre (le meta
-    // `interactive-widget=resizes-content` n'est honoré que partiellement),
-    // et même quand vvh shrink, il compte la barre de suggestion comme
-    // partie du "viewport" → vvh sur-estime la zone visible.
-    //
-    // Source de vérité : le state `keyboardOpen` (hook focusin/focusout)
-    // est instantané et garanti à jour quand recomputeShellHeight est
-    // appelé via le useEffect [keyboardOpen]. Plus fiable que de relire
-    // `document.activeElement`, qui peut être stale ou pas encore mis
-    // à jour selon le timing iOS.
-    let h;
-    if (keyboardOpen && iwh) {
-      // Heuristique : body = max(240, 48 % de innerHeight).
-      // Le clavier iOS portrait (AZERTY + suggestions + dock home
-      // indicator) occupe 46-50 % du viewport selon l'iPhone. 48 %
-      // garantit 2-4 % de marge sous l'input, jamais d'overlap.
-      h = Math.max(240, Math.round(iwh * 0.48));
-    } else {
-      // Clavier fermé : MAX(vvh, iwh) pour couvrir tout le viewport.
-      //
-      // Sur iPhone Dynamic Island en PWA standalone, `visualViewport.height`
-      // peut être nettement inférieur à `innerHeight` (zone home indicator
-      // / parties exclues par iOS). Si on s'aligne sur vvh seul, un gros
-      // bandeau de fond html (#1A1612) reste visible sous la nav.
-      // Math.max garantit que le body couvre la totalité du layout viewport,
-      // y compris la zone home indicator (déjà gérée par le safe-area-inset
-      // du BottomNav lui-même).
-      h = Math.max(vvh || 0, iwh || 0) || iwh || vvh;
-    }
+    // Body toujours dimensionné au MAX(visualViewport, innerHeight) :
+    // - Sur iPhone Dynamic Island en PWA standalone, vvh peut être
+    //   inférieur à iwh même clavier fermé (zone home indicator) →
+    //   Math.max garantit que le body couvre la totalité du viewport.
+    // - On ne shrink PLUS le body à l'ouverture du clavier : la zone
+    //   de saisie d'AgentIA est désormais `position: fixed` au-dessus
+    //   du clavier via le hook `useKeyboardInset` (pas besoin de
+    //   réduire toute la page).
+    const h = Math.max(vvh, iwh) || iwh || vvh;
     document.documentElement.style.height = h + "px";
     document.body.style.height = h + "px";
-    // iOS PWA : si iOS a auto-scrollé la window pour amener un input
-    // dans la vue (focus textarea), on annule — body est désormais
-    // dimensionné pile au viewport visible, l'input est naturellement
-    // au-dessus du clavier sans scroll.
+    // iOS PWA : annule tout auto-scroll de la window que iOS aurait
+    // déclenché pour amener un input dans la vue (inutile maintenant
+    // que la zone de saisie suit le clavier en position fixed).
     if (window.scrollY !== 0 || window.scrollX !== 0) {
       window.scrollTo(0, 0);
     }
-  }, [keyboardOpen]);
+  }, []);
   useLayoutEffect(() => {
-    // Transition CSS sur la hauteur html/body : permet une animation
-    // fluide quand le clavier soft s'ouvre/ferme (le body shrink/grow
-    // est progressif au lieu de snap, en sync avec l'animation native
-    // du clavier iOS ~220ms).
-    document.documentElement.style.transition = "height .22s ease";
-    document.body.style.transition = "height .22s ease";
     recomputeShellHeight();
     window.visualViewport?.addEventListener("resize", recomputeShellHeight);
     window.addEventListener("resize", recomputeShellHeight);
@@ -312,20 +284,6 @@ export default function App() {
       window.removeEventListener("orientationchange", recomputeShellHeight);
     };
   }, [recomputeShellHeight]);
-  // Sur Android Chrome et certains Safari iOS, le `resize` du visualViewport
-  // n'arrive pas instantanément quand le clavier soft s'ouvre : html/body
-  // restent à la hauteur d'avant-clavier et le shell dépasse derrière le
-  // clavier, laissant transparaître le fond #1A1612 entre l'input et le
-  // clavier (gros espace vide noir). On force un recalcul à chaque
-  // changement d'état clavier et à quelques frames de distance pour
-  // rattraper l'animation d'ouverture.
-  useEffect(() => {
-    recomputeShellHeight();
-    const t1 = setTimeout(recomputeShellHeight, 120);
-    const t2 = setTimeout(recomputeShellHeight, 360);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, [keyboardOpen, recomputeShellHeight]);
-
   useEffect(() => {
     const el = contentRef.current;
     if (!el) return;
