@@ -4,9 +4,10 @@ import { supabase } from "./lib/supabase.js";
 import { getMyProfile, getDevisWeekCount } from "./lib/api.js";
 import { FREEMIUM_WEEKLY_DEVIS_LIMIT, countDevisThisWeek, readStickyDevisThisWeek, bumpStickyDevisThisWeek } from "./lib/appShell.js";
 
-import { useSaveState } from "./hooks/useSaveState.js";
-import { useToast }     from "./hooks/useToast.js";
-import { useBrand }     from "./hooks/useBrand.js";
+import { useSaveState }   from "./hooks/useSaveState.js";
+import { useToast }       from "./hooks/useToast.js";
+import { useBrand }       from "./hooks/useBrand.js";
+import { useKeyboardOpen } from "./hooks/useKeyboardOpen.js";
 import { useClients }   from "./hooks/useClients.js";
 import { useDevis }     from "./hooks/useDevis.js";
 import { useInvoices }  from "./hooks/useInvoices.js";
@@ -72,6 +73,10 @@ export default function App() {
   const { user, signOut } = useAuth();
   const { saveState, setSaveState, markSaving, markSaved } = useSaveState();
   const { toast, showUndo, showErr, dismissToast } = useToast();
+  // Mobile soft keyboard ouvert : on collapse le paddingBottom réservé
+  // au BottomNav (qui est aussi caché) pour éliminer le vide visible
+  // entre le contenu (ex. textarea AgentIA) et le clavier.
+  const keyboardOpen = useKeyboardOpen();
   const saveCallbacks = { markSaving, markSaved, setSaveState, showErr };
 
   const [serverIsAdmin, setServerIsAdmin] = useState(false);
@@ -444,7 +449,7 @@ export default function App() {
         </nav>
 
         {/* Contenu principal */}
-        <div ref={contentRef} className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: "calc(72px + min(env(safe-area-inset-bottom, 0px), 20px))" }}>
+        <div ref={contentRef} className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: keyboardOpen ? 0 : "calc(72px + min(env(safe-area-inset-bottom, 0px), 20px))" }}>
           {tab === "dashboard"     && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}
                                          onOpenProfile={() => setScreen("onboarding")}
                                          onOpenPWAInstall={() => setScreen("pwa_install")}/>}
