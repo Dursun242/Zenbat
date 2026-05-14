@@ -90,6 +90,18 @@ describe("buildSystemPrompt", () => {
     expect(result).toContain("suggestions");
   });
 
+  it("interdit la demande de confirmation sur une demande mixte in-scope / out-of-scope", () => {
+    const result = buildSystemPrompt({
+      brand: { trades: ["maconnerie"] },
+      historySummary: null,
+    });
+    expect(result).toContain("DEMANDE MIXTE in-scope / out-of-scope");
+    expect(result).toMatch(/GÉNÈRES IMMÉDIATEMENT le <DEVIS>/);
+    expect(result).toMatch(/NE DEMANDES JAMAIS confirmation/);
+    expect(result).toMatch(/devis partiel/);
+    expect(result).toMatch(/Clôture jardin grillage/);
+  });
+
   it("inclut la règle anti-débordement : prestation nommée = TYPE 2 strict, tous secteurs", () => {
     const result = buildSystemPrompt({ brand: {}, historySummary: null });
     // La règle générique qui empêche le débordement de périmètre
