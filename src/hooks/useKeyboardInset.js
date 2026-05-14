@@ -31,7 +31,12 @@ export function useKeyboardInset() {
         ? Math.max(0, iwh - (vv.height + vv.offsetTop))
         : 0;
 
-      if (isInput) {
+      // Heuristique réservée aux cas où visualViewport a effectivement
+      // shrink (= clavier soft confirmé). Sur desktop, vv.height === iwh
+      // et l'utilisateur tape sur un clavier physique → keyboardInset = 0.
+      const softKeyboardOpen = vv && (iwh - vv.height) > 100;
+
+      if (isInput && softKeyboardOpen) {
         const heuristic = Math.round(iwh * 0.48);
         setInset(Math.max(measured, heuristic));
       } else {

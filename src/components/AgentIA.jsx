@@ -662,7 +662,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
 
       {/* Zone de saisie — `position: fixed` ancrée au-dessus du clavier
           ou au-dessus du BottomNav. Modèle chat (WhatsApp / Claude). */}
-      <div ref={inputAreaRef} style={{
+      <div ref={inputAreaRef} className="agent-input-bar" style={{
         position: "fixed",
         left: 0, right: 0,
         bottom: keyboardInset > 0 ? `${keyboardInset}px` : NAV_RESERVED_CSS,

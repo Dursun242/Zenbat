@@ -443,6 +443,11 @@ export default function App() {
           .app-bottom-nav{display:none !important}
           .app-content{padding-bottom:0 !important}
           .app-toast{bottom:24px !important;left:auto !important;right:24px !important;max-width:380px}
+          /* La barre de saisie AgentIA est position:fixed left:0 right:0 pour
+             couvrir tout le viewport mobile. Sur desktop, la sidebar (220px)
+             occupe la gauche → on décale la barre pour ne pas déborder sous
+             la sidebar. Bottom recalé à 0 car le BottomNav est caché en desktop. */
+          .agent-input-bar{left:220px !important;bottom:0 !important}
         }
         @media (max-width:1023px){.app-sidebar{display:none !important}}
         .app-sidebar button:hover{background:rgba(255,255,255,.05) !important;color:#9A8E82 !important}
