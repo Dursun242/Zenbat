@@ -119,15 +119,21 @@ function BreadcrumbJsonLd({ ville }) {
   return <JsonLdScript data={data} />
 }
 
-function LocalBusinessJsonLd({ ville }) {
+// SoftwareApplication : périmètre NATIONAL (areaServed = France).
+// On ne déclare PAS d'établissement par ville pour éviter le signal "local
+// SEO spam" : Zenbat est un SaaS, pas un commerce avec une agence dans
+// chaque ville. Le seul vrai établissement est à Le Havre (cf footer
+// "Édité par ID Maîtrise · Le Havre, France") — ce dernier est déclaré
+// séparément via LocalBusinessLeHavreJsonLd, uniquement sur la page Le Havre.
+function SoftwareAppJsonLd({ ville }) {
   const data = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
-    name: `Zenbat à ${ville.nom}`,
+    name: 'Zenbat',
     applicationCategory: 'BusinessApplication',
     applicationSubCategory: 'Devis et facturation',
     operatingSystem: 'Web, iOS, Android (PWA)',
-    description: `Solution de devis et facturation pour artisans à ${ville.nom} (${ville.region}). Création de devis assistée par IA, signature électronique par OTP, factures Factur-X conformes 2026.`,
+    description: "Solution nationale de devis et facturation pour artisans, TPE et indépendants en France. Création de devis assistée par IA, signature électronique par OTP, factures Factur-X conformes 2026.",
     url: `${SITE_URL}/villes/${ville.slug}`,
     inLanguage: 'fr-FR',
     offers: [
@@ -153,15 +159,38 @@ function LocalBusinessJsonLd({ ville }) {
       }
     ],
     areaServed: {
-      '@type': 'City',
-      name: ville.nom,
-      addressRegion: ville.region,
-      addressCountry: 'FR',
-      geo: ville.lat && ville.lon ? {
-        '@type': 'GeoCoordinates',
-        latitude: ville.lat,
-        longitude: ville.lon
-      } : undefined
+      '@type': 'Country',
+      name: 'France'
+    }
+  }
+  return <JsonLdScript data={data} />
+}
+
+// LocalBusiness : UNIQUEMENT sur la page Le Havre (vrai siège social).
+// Reproduit l'information du footer ("Édité par ID Maîtrise · Le Havre").
+function LocalBusinessLeHavreJsonLd() {
+  const data = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'Zenbat',
+    legalName: 'ID Maîtrise',
+    url: SITE_URL,
+    description: "Éditeur de Zenbat, logiciel de devis et facturation pour artisans français.",
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: 'Le Havre',
+      postalCode: '76600',
+      addressRegion: 'Normandie',
+      addressCountry: 'FR'
+    },
+    areaServed: {
+      '@type': 'Country',
+      name: 'France'
+    },
+    geo: {
+      '@type': 'GeoCoordinates',
+      latitude: 49.4944,
+      longitude: 0.1079
     }
   }
   return <JsonLdScript data={data} />
@@ -172,7 +201,7 @@ function ServiceJsonLd({ ville }) {
     '@context': 'https://schema.org',
     '@type': 'Service',
     serviceType: 'Logiciel de devis et facturation pour artisans',
-    name: `Zenbat — devis et facturation à ${ville.nom}`,
+    name: 'Zenbat — devis et facturation',
     provider: {
       '@type': 'Organization',
       name: 'Zenbat',
@@ -180,10 +209,8 @@ function ServiceJsonLd({ ville }) {
       sameAs: ['https://zenbat.vercel.app']
     },
     areaServed: {
-      '@type': 'City',
-      name: ville.nom,
-      addressRegion: ville.region,
-      addressCountry: 'FR'
+      '@type': 'Country',
+      name: 'France'
     },
     audience: {
       '@type': 'BusinessAudience',
@@ -249,8 +276,11 @@ export default function VillePage({ slug }) {
       <FaqJsonLd faq={faq} />
       <HowToJsonLd ville={ville} steps={steps} />
       <BreadcrumbJsonLd ville={ville} />
-      <LocalBusinessJsonLd ville={ville} />
+      <SoftwareAppJsonLd ville={ville} />
       <ServiceJsonLd ville={ville} />
+      {/* LocalBusiness : uniquement sur Le Havre (siège réel) — éviter
+          le signal "local SEO spam" sur les autres villes. */}
+      {ville.slug === 'le-havre' && <LocalBusinessLeHavreJsonLd />}
 
       <nav className="vp-nav" aria-label="Navigation principale">
         <div className="vp-nav-inner">
