@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect, lazy, Suspense } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, lazy, Suspense } from "react";
 import { useAuth } from "./lib/auth.jsx";
 import { supabase } from "./lib/supabase.js";
 import { getMyProfile, getDevisWeekCount } from "./lib/api.js";
@@ -252,22 +252,35 @@ export default function App() {
   // stable est window.innerHeight (ou visualViewport.height quand dispo).
   // On l'applique directement sur documentElement + body (et pas via un
   // ref React, qui se ferait écraser par le re-render).
-  useLayoutEffect(() => {
-    const setH = () => {
-      const h = window.visualViewport?.height || window.innerHeight;
-      document.documentElement.style.height = h + "px";
-      document.body.style.height = h + "px";
-    };
-    setH();
-    window.visualViewport?.addEventListener("resize", setH);
-    window.addEventListener("resize", setH);
-    window.addEventListener("orientationchange", setH);
-    return () => {
-      window.visualViewport?.removeEventListener("resize", setH);
-      window.removeEventListener("resize", setH);
-      window.removeEventListener("orientationchange", setH);
-    };
+  const recomputeShellHeight = useCallback(() => {
+    const h = window.visualViewport?.height || window.innerHeight;
+    document.documentElement.style.height = h + "px";
+    document.body.style.height = h + "px";
   }, []);
+  useLayoutEffect(() => {
+    recomputeShellHeight();
+    window.visualViewport?.addEventListener("resize", recomputeShellHeight);
+    window.addEventListener("resize", recomputeShellHeight);
+    window.addEventListener("orientationchange", recomputeShellHeight);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", recomputeShellHeight);
+      window.removeEventListener("resize", recomputeShellHeight);
+      window.removeEventListener("orientationchange", recomputeShellHeight);
+    };
+  }, [recomputeShellHeight]);
+  // Sur Android Chrome et certains Safari iOS, le `resize` du visualViewport
+  // n'arrive pas instantanément quand le clavier soft s'ouvre : html/body
+  // restent à la hauteur d'avant-clavier et le shell dépasse derrière le
+  // clavier, laissant transparaître le fond #1A1612 entre l'input et le
+  // clavier (gros espace vide noir). On force un recalcul à chaque
+  // changement d'état clavier et à quelques frames de distance pour
+  // rattraper l'animation d'ouverture.
+  useEffect(() => {
+    recomputeShellHeight();
+    const t1 = setTimeout(recomputeShellHeight, 120);
+    const t2 = setTimeout(recomputeShellHeight, 360);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [keyboardOpen, recomputeShellHeight]);
 
   useEffect(() => {
     const el = contentRef.current;
