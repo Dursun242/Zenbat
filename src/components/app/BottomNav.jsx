@@ -32,19 +32,39 @@ export default function BottomNav({ items, activeNav, onSelect, plan, quotaReach
   // Masquage automatique pendant la frappe : sur iOS / Chrome mobile,
   // position:fixed bottom:0 reste collé sous le clavier (au bas du layout
   // viewport), occupant inutilement de la place. On glisse la nav hors
-  // écran tant que le clavier est ouvert.
+  // écran tant qu'un input texte / textarea est focus.
+  //
+  // Approche par focus (et pas par delta visualViewport) car sur iOS 16+
+  // le layout viewport rétrécit AVEC le visual viewport quand le clavier
+  // s'ouvre — `innerHeight - vv.height ≈ 0`, le seuil n'est jamais
+  // atteint, et la nav reste collée au-dessus du clavier.
+  //
+  // Le focus est un signal fiable et synchrone : tap input → focusin →
+  // hide ; submit/blur → focusout → show. Couvre Safari, Chrome, Firefox.
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const onResize = () => {
-      // Seuil 150px : delta significatif = clavier (et pas la barre URL
-      // Safari ou un autre changement mineur de viewport).
-      setKeyboardOpen(window.innerHeight - vv.height > 150);
+    const isTextInput = (el) => {
+      if (!el || !el.tagName) return false;
+      const tag = el.tagName.toLowerCase();
+      if (tag === "textarea") return true;
+      if (tag === "input") {
+        const type = (el.type || "text").toLowerCase();
+        // Inputs sans clavier soft (boutons, pickers, etc.)
+        return !["checkbox","radio","submit","button","reset","file","color","range","image","hidden"].includes(type);
+      }
+      return el.isContentEditable === true;
     };
-    vv.addEventListener("resize", onResize);
-    onResize();
-    return () => vv.removeEventListener("resize", onResize);
+    const onFocusIn  = (e) => { if (isTextInput(e.target)) setKeyboardOpen(true);  };
+    const onFocusOut = (e) => { if (isTextInput(e.target)) setKeyboardOpen(false); };
+    document.addEventListener("focusin",  onFocusIn);
+    document.addEventListener("focusout", onFocusOut);
+    // État initial : si un input est déjà focus au mount (rare, mais possible
+    // si on revient sur l'app avec le clavier qui se rouvre).
+    if (isTextInput(document.activeElement)) setKeyboardOpen(true);
+    return () => {
+      document.removeEventListener("focusin",  onFocusIn);
+      document.removeEventListener("focusout", onFocusOut);
+    };
   }, []);
 
   return (
