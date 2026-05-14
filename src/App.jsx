@@ -257,30 +257,24 @@ export default function App() {
     const iwh = window.innerHeight || 0;
     // iOS PWA standalone : `visualViewport.height` et `window.innerHeight`
     // restent souvent au plein écran quand le clavier s'ouvre (le meta
-    // `interactive-widget=resizes-content` n'est honoré que partiellement).
-    // Détection directe : si un input texte est focused, on assume clavier
-    // ouvert et on estime la hauteur visible.
-    const ae = document.activeElement;
-    const isTextField = !!ae && (
-      ae.tagName === "TEXTAREA" ||
-      (ae.tagName === "INPUT" && !["checkbox","radio","submit","button","reset","file","color","range","image","hidden"].includes((ae.type || "text").toLowerCase())) ||
-      ae.isContentEditable === true
-    );
+    // `interactive-widget=resizes-content` n'est honoré que partiellement),
+    // et même quand vvh shrink, il compte la barre de suggestion comme
+    // partie du "viewport" → vvh sur-estime la zone visible.
+    //
+    // Source de vérité : le state `keyboardOpen` (hook focusin/focusout)
+    // est instantané et garanti à jour quand recomputeShellHeight est
+    // appelé via le useEffect [keyboardOpen]. Plus fiable que de relire
+    // `document.activeElement`, qui peut être stale ou pas encore mis
+    // à jour selon le timing iOS.
     let h;
-    if (isTextField && iwh) {
-      // Clavier soft ouvert. On ignore `visualViewport.height` qui sur
-      // iOS PWA standalone est peu fiable : il compte souvent la barre
-      // de suggestion "Je/Tu/C'est" comme partie du "viewport" plutôt
-      // que comme partie du "clavier" → vvh sur-estime la zone visible
-      // et l'input se retrouve caché derrière la barre.
-      //
-      // Heuristique : body = max(240, 50 % de innerHeight).
-      // Le clavier iOS portrait (AZERTY + suggestions + dock) occupe
-      // 46-50 % du viewport selon l'iPhone. 50 % laisse au pire 4 %
-      // de marge sous l'input, jamais d'overlap.
-      h = Math.max(240, Math.round(iwh * 0.50));
+    if (keyboardOpen && iwh) {
+      // Heuristique : body = max(240, 48 % de innerHeight).
+      // Le clavier iOS portrait (AZERTY + suggestions + dock home
+      // indicator) occupe 46-50 % du viewport selon l'iPhone. 48 %
+      // garantit 2-4 % de marge sous l'input, jamais d'overlap.
+      h = Math.max(240, Math.round(iwh * 0.48));
     } else if (vvh && iwh && vvh < iwh - 100) {
-      // Pas d'input texte mais viewport rétréci (ex. clavier numérique
+      // Pas de clavier soft mais viewport rétréci (ex. clavier numérique
       // d'un input number, picker natif iOS, etc.) → utiliser vvh.
       h = vvh;
     } else {
@@ -295,7 +289,7 @@ export default function App() {
     if (window.scrollY !== 0 || window.scrollX !== 0) {
       window.scrollTo(0, 0);
     }
-  }, []);
+  }, [keyboardOpen]);
   useLayoutEffect(() => {
     recomputeShellHeight();
     window.visualViewport?.addEventListener("resize", recomputeShellHeight);
