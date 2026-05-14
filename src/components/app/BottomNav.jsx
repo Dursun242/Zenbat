@@ -2,17 +2,22 @@
 //
 // 5 onglets pleine largeur sur fond sombre, l'onglet central "Agent IA" est
 // un CTA cercle vert surélevé (effet floating action button).
-// Indicateur actif : fine barre brand 2px en haut, glissée en spring via
-// Framer Motion (layoutId partagé).
+//
+// Indicateur actif : barre brand 2px UNIQUE en haut, qui slide d'un onglet
+// à l'autre via transition CSS (left + width). Plus de Framer Motion ici
+// → moins de surface à bugs, pas de race condition sur layoutId.
+//
+// Badges : chaque onglet peut afficher une pastille rouge avec un compteur
+// (ex. "3" devis en attente de signature). Passé via prop `badges`.
+//
+// Long-press CTA : appui long ≥ 450ms sur le bouton Agent IA déclenche
+// `onAgentLongPress()` (au lieu de la navigation normale) + vibration
+// haptique courte si supportée. Permet à l'app de montrer un menu
+// d'actions rapides (ex. nouveau devis vocal, etc.).
+//
 // Masquage auto à l'ouverture du clavier soft (translateY).
 //
-// — Hauteur exacte exposée via `NAV_RESERVED_CSS`, à utiliser dans le
-//   `paddingBottom` du conteneur de contenu (App.jsx) pour qu'il n'y ait
-//   AUCUN gap résiduel entre le contenu et la nav.
-// — Réapparition après clavier gated sur le retour effectif du
-//   visualViewport à sa hauteur max (sinon la nav flotterait en plein
-//   milieu pendant l'animation de fermeture du clavier, car
-//   `position:fixed; bottom:0` ancre au bas du viewport rétréci).
+// Hauteur exacte exposée via `NAV_RESERVED_CSS`.
 //
 // Props :
 //   items            — [{ id, label, icon }]
@@ -21,18 +26,15 @@
 //   plan             — "free" | "pro" | "trial" ... (affichage pastille quota)
 //   quotaReached     — bool, affiche pastille rouge sur le CTA si plan=free
 //   firstDevisNudge  — bool, affiche bulle "Essaye ton premier devis"
+//   badges           — { devis?: number, factures?: number, clients?: number, ... }
+//   onAgentLongPress — () => void, callback appui long sur le CTA central
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { useKeyboardOpen } from "../../hooks/useKeyboardOpen.js";
 
-// Hauteur de la nav HORS safe-area iOS (icône + label + paddings internes).
 const NAV_CORE_HEIGHT = 64;
 
-// Expression CSS à utiliser dans le `paddingBottom` du conteneur de contenu
-// pour réserver EXACTEMENT la hauteur visible de la nav (= zéro gap).
 // Pas de cap sur env(safe-area-inset-bottom) : la nav doit couvrir TOUTE
-// la zone home indicator iOS, sinon un bandeau de fond html (#1A1612)
-// reste visible entre la nav et le bord de l'écran.
+// la zone home indicator iOS.
 export const NAV_RESERVED_CSS =
   `calc(${NAV_CORE_HEIGHT}px + env(safe-area-inset-bottom, 0px))`;
 
@@ -41,8 +43,12 @@ const BG        = "#1A1612";
 const ACTIVE    = "#FFFFFF";
 const INACTIVE  = "#8A8278";
 
-// Détermine si la nav doit être visible : clavier fermé ET visualViewport
-// revenu à sa hauteur max connue.
+// Délai à partir duquel un touch sur le CTA est considéré comme long-press.
+// 450ms = standard iOS / Material.
+const LONG_PRESS_MS = 450;
+
+// Hook : nav visible seulement quand le clavier est fermé ET que le
+// visualViewport est revenu à sa hauteur max connue.
 function useNavVisible() {
   const keyboardOpen = useKeyboardOpen();
   const [visible, setVisible] = useState(!keyboardOpen);
@@ -52,14 +58,8 @@ function useNavVisible() {
     const getH = () => window.visualViewport?.height || window.innerHeight || 0;
     if (getH() > maxVvhRef.current) maxVvhRef.current = getH();
 
-    if (keyboardOpen) {
-      setVisible(false);
-      return;
-    }
+    if (keyboardOpen) { setVisible(false); return; }
 
-    // Clavier fermé : on attend que le viewport soit revenu à sa hauteur max
-    // avant de réafficher la nav, sinon `position:fixed; bottom:0` la ferait
-    // apparaître au bas du viewport encore rétréci (= en plein milieu).
     const evaluate = () => {
       const vvh = getH();
       if (vvh > maxVvhRef.current) maxVvhRef.current = vvh;
@@ -75,8 +75,6 @@ function useNavVisible() {
     const onResize = () => evaluate();
     window.visualViewport?.addEventListener("resize", onResize);
     window.addEventListener("resize", onResize);
-    // Failsafe : si aucun resize n'arrive dans les 600ms (clavier resté
-    // ouvert puis fermé sans event), on affiche quand même.
     const failsafe = setTimeout(() => setVisible(true), 600);
 
     return () => {
@@ -89,7 +87,38 @@ function useNavVisible() {
   return visible;
 }
 
-function StandardTab({ id, label, icon, active, onClick }) {
+// Pastille rouge avec compteur. count > 9 → "9+". count ≤ 0 / falsy → rien.
+function Badge({ count }) {
+  if (!count || count <= 0) return null;
+  const display = count > 9 ? "9+" : String(count);
+  const wide = count > 9;
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        position: "absolute",
+        top: -3,
+        right: wide ? -10 : -6,
+        minWidth: 16,
+        height: 16,
+        padding: wide ? "0 4px" : 0,
+        borderRadius: 8,
+        background: "#ef4444",
+        color: "white",
+        fontSize: 9,
+        fontWeight: 700,
+        lineHeight: "16px",
+        textAlign: "center",
+        border: `2px solid ${BG}`,
+        boxSizing: "content-box",
+        pointerEvents: "none",
+      }}>
+      {display}
+    </span>
+  );
+}
+
+function StandardTab({ label, icon, active, onClick, badge }) {
   const color = active ? ACTIVE : INACTIVE;
   return (
     <button
@@ -110,27 +139,18 @@ function StandardTab({ id, label, icon, active, onClick }) {
         color,
         cursor: "pointer",
         WebkitTapHighlightColor: "transparent",
+        transition: "color .15s ease",
       }}>
-      {active && (
-        <motion.span
-          layoutId="bottom-nav-active"
-          style={{
-            position: "absolute",
-            top: 0,
-            left: "20%", right: "20%",
-            height: 2,
-            background: BRAND,
-            borderRadius: 2,
-          }}
-          transition={{ type: "spring", stiffness: 380, damping: 32 }}
-        />
-      )}
       <span style={{
+        position: "relative",
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
         transform: "scale(1.15)",
-      }}>{icon}</span>
+      }}>
+        {icon}
+        <Badge count={badge}/>
+      </span>
       <span style={{
         fontSize: 10.5,
         fontWeight: active ? 600 : 500,
@@ -141,10 +161,53 @@ function StandardTab({ id, label, icon, active, onClick }) {
   );
 }
 
-function AgentCtaTab({ id, label, icon, active, onClick, plan, quotaReached, showNudge }) {
+function AgentCtaTab({ label, icon, active, onClick, plan, quotaReached, showNudge, onLongPress }) {
+  const timerRef = useRef(null);
+  const longPressedRef = useRef(false);
+
+  const cancelTimer = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const onPointerDown = () => {
+    longPressedRef.current = false;
+    cancelTimer();
+    timerRef.current = setTimeout(() => {
+      longPressedRef.current = true;
+      if (typeof navigator.vibrate === "function") {
+        try { navigator.vibrate(20); } catch { /* ignore */ }
+      }
+      onLongPress?.();
+    }, LONG_PRESS_MS);
+  };
+
+  const onPointerCancel = () => {
+    cancelTimer();
+    longPressedRef.current = false;
+  };
+
+  const handleClick = (e) => {
+    if (longPressedRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      longPressedRef.current = false;
+      return;
+    }
+    onClick();
+  };
+
+  useEffect(() => () => cancelTimer(), []);
+
   return (
     <button
-      onClick={onClick}
+      onClick={handleClick}
+      onPointerDown={onPointerDown}
+      onPointerUp={cancelTimer}
+      onPointerLeave={onPointerCancel}
+      onPointerCancel={onPointerCancel}
       aria-label={label}
       aria-current={active ? "page" : undefined}
       style={{
@@ -160,6 +223,8 @@ function AgentCtaTab({ id, label, icon, active, onClick, plan, quotaReached, sho
         border: "none",
         cursor: "pointer",
         WebkitTapHighlightColor: "transparent",
+        WebkitTouchCallout: "none",
+        userSelect: "none",
       }}>
       <span
         className="bn-cta-circle"
@@ -175,7 +240,7 @@ function AgentCtaTab({ id, label, icon, active, onClick, plan, quotaReached, sho
           boxShadow: active
             ? "0 8px 22px rgba(34,197,94,.55), 0 0 0 3px rgba(34,197,94,.28)"
             : "0 4px 14px rgba(34,197,94,.4)",
-          transition: "box-shadow .18s ease",
+          transition: "box-shadow .18s ease, transform .15s ease",
         }}>
         {showNudge && (
           <span style={{
@@ -239,8 +304,15 @@ export default function BottomNav({
   plan,
   quotaReached,
   firstDevisNudge = false,
+  badges = {},
+  onAgentLongPress,
 }) {
   const visible = useNavVisible();
+  const activeIndex = Math.max(0, items.findIndex(it => it.id === activeNav));
+  // Indicateur centré dans l'onglet actif, 60 % de sa largeur.
+  const tabPct = 100 / items.length;
+  const indicatorWidthPct = tabPct * 0.6;
+  const indicatorLeftPct  = activeIndex * tabPct + (tabPct - indicatorWidthPct) / 2;
 
   return (
     <nav
@@ -268,28 +340,47 @@ export default function BottomNav({
         .app-bottom-nav button:active .bn-cta-circle { transform: translateY(-12px) scale(1.16) !important; }
       `}</style>
 
+      {/* Indicateur actif unique — slide entre les onglets via transition CSS */}
+      <span
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          top: 0,
+          height: 2,
+          background: BRAND,
+          borderRadius: 2,
+          width: `${indicatorWidthPct}%`,
+          left: `${indicatorLeftPct}%`,
+          transition: "left .28s cubic-bezier(.34, 1.56, .64, 1), width .28s ease",
+          // Onglet central (Agent IA) : on cache l'indicateur, le CTA cercle
+          // est déjà très visible et a son propre highlight.
+          opacity: items[activeIndex]?.id === "agent" ? 0 : 1,
+        }}
+      />
+
       {items.map(({ id, label, icon }) => {
         const active = activeNav === id;
-        const isAgent = id === "agent";
-        if (isAgent) {
+        if (id === "agent") {
           return (
             <AgentCtaTab
               key={id}
-              id={id} label={label} icon={icon}
+              label={label} icon={icon}
               active={active}
               onClick={() => onSelect(id)}
               plan={plan}
               quotaReached={quotaReached}
               showNudge={firstDevisNudge}
+              onLongPress={onAgentLongPress}
             />
           );
         }
         return (
           <StandardTab
             key={id}
-            id={id} label={label} icon={icon}
+            label={label} icon={icon}
             active={active}
             onClick={() => onSelect(id)}
+            badge={badges[id]}
           />
         );
       })}
