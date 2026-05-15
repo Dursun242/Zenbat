@@ -92,7 +92,7 @@ export default function VillesIndex() {
             <span className="vp-logo-terra">Zen</span>
             <span className="vp-logo-ink">bat</span>
           </a>
-          <a href="/" className="vp-nav-cta">Tester gratuitement</a>
+          <a href="/signup" className="vp-nav-cta">Tester gratuitement</a>
         </div>
       </nav>
 
@@ -189,7 +189,7 @@ export default function VillesIndex() {
         <div className="vp-cta-block">
           <h3>Votre ville n'est pas listée ?</h3>
           <p>Zenbat fonctionne partout en France. Créez votre compte et commencez gratuitement.</p>
-          <a href="/">Démarrer gratuitement</a>
+          <a href="/signup">Démarrer gratuitement</a>
         </div>
       </main>
     </div>

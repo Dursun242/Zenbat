@@ -62,6 +62,13 @@ export default function Root() {
     return <App />
   }
 
+  if (path === '/signup' || path === '/signup/') {
+    return <Signup onSwitchToLogin={() => { window.location.href = '/login' }} onBack={() => { window.location.href = '/' }} />
+  }
+  if (path === '/login' || path === '/login/') {
+    return <Login onSwitchToSignup={() => { window.location.href = '/signup' }} onBack={() => { window.location.href = '/' }} />
+  }
+
   if (mode === 'signup') return <Signup onSwitchToLogin={() => setMode('login')} onBack={() => setMode(null)} />
   if (mode === 'login')  return <Login  onSwitchToSignup={() => setMode('signup')} onBack={() => setMode(null)} />
 

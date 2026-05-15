@@ -288,7 +288,7 @@ export default function VillePage({ slug }) {
             <span className="vp-logo-terra">Zen</span>
             <span className="vp-logo-ink">bat</span>
           </a>
-          <a href="/" className="vp-nav-cta">Tester gratuitement</a>
+          <a href="/signup" className="vp-nav-cta">Tester gratuitement</a>
         </div>
       </nav>
 
@@ -424,7 +424,7 @@ export default function VillePage({ slug }) {
         <div className="vp-cta-block">
           <h3>Prêt à tester Zenbat à {ville.nom} ?</h3>
           <p>Plan gratuit à vie, sans carte bancaire, sans engagement.</p>
-          <a href="/">Démarrer maintenant</a>
+          <a href="/signup">Démarrer maintenant</a>
         </div>
 
         <nav aria-label="Retour à la liste" className="vp-breadcrumb" style={{ marginTop: 40 }}>
