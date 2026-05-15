@@ -184,6 +184,28 @@ RLS activé sur toutes les tables — les endpoints admin contournent via `SUPAB
 
 ---
 
+## Travail en attente — intégration Super PDP (réforme facturation B2B 2026/2027)
+
+**État : code écrit, testé en sandbox, jamais mergé sur `main`.**
+
+L'intégration **Super PDP** (Plateforme Agréée DGFiP) a été développée lors d'une grosse séance et validée en preview Vercel (envoi de factures sandbox fonctionnel). Elle vit aujourd'hui sur 3 branches non-mergées du remote :
+
+| Branche origin | Rôle |
+|---|---|
+| `claude/audit-einvoicing-integration-awnev` | Audit faisabilité 850 lignes (`audit-einvoicing.md`) |
+| `claude/add-dpd-integration-x5GRw` | 1ʳᵉ itération + fixes Peppol BT-34/BT-49 |
+| `claude/integrate-superdpd-ZpSGG` | **Version la plus avancée** : superpdp.js (361 lignes) + tests (159 lignes, 13 cas) + migration `0039_pdp_accounts.sql` + bouton UI |
+
+**Plan de reprise complet** : voir [`docs/superpdp/REPRISE.md`](docs/superpdp/REPRISE.md). Il contient :
+- spec API SuperPDP confirmée (OAuth 2.1, `POST /v1.beta/invoices` binaire, polling `/v1.beta/invoice_events`, mapping AFNOR `fr:2xx` → statuts Zenbat)
+- variables d'env à poser (`PDP_CLIENT_ID`, `PDP_CLIENT_SECRET`, `PDP_API_BASE`, `PDP_SANDBOX_RECEIVER_PEPPOL`, `CRON_SECRET`)
+- conflits à résoudre au rebase (migrations à renuméroter `0039`→`0044` et `0040`→`0045`, `InvoiceDetail.jsx` à fusionner avec PRs #28/#60/#61/#69, `vercel.json` cron + maxDuration)
+- plan d'exécution en 10 étapes
+
+→ **Ne pas relancer cette intégration sans relire `docs/superpdp/REPRISE.md` d'abord.** Et confirmer avec l'utilisateur que les credentials sandbox Super PDP sont toujours valides.
+
+---
+
 ## Modèle IA
 Défini dans `src/lib/constants.js` :
 ```js
