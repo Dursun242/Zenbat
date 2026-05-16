@@ -13,6 +13,7 @@ import EmailVerificationGate from './components/EmailVerificationGate.jsx'
 
 const VillesIndex = lazy(() => import('./pages/VillesIndex.jsx'))
 const VillePage   = lazy(() => import('./pages/VillePage.jsx'))
+const CRM         = lazy(() => import('./pages/CRM.jsx'))
 
 const loader = {
   wrap: { minHeight:'100vh', display:'grid', placeItems:'center', background:'#FAF7F2', color:'#6B6358', fontFamily:'system-ui,sans-serif' },
@@ -26,6 +27,11 @@ export default function Root() {
 
   const path = typeof window !== 'undefined' ? window.location.pathname : '/'
 
+  if (path === '/crm') return (
+    <Suspense fallback={<div style={loader.wrap}>Chargement…</div>}>
+      <CRM />
+    </Suspense>
+  )
   if (path === '/auth/callback') return <AuthCallback />
   if (path === '/reset-password' || recovery) return <ResetPassword />
   if (path === '/cgu')     return <CGU />
