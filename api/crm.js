@@ -1,16 +1,47 @@
-// CRM de prospection admin — CRUD prospects + envoi email personnalisé
+// CRM de prospection admin — CRUD prospects + envoi email personnalisé + recherche Google Places
 // Admin-only. Routage par method + action dans le body/query.
 //
-// GET  ?action=list              → liste tous les prospects
-// GET  ?action=get&id=xxx        → prospect + historique emails
-// POST {action:'create', ...}    → créer un prospect
-// POST {action:'update', id, ...}→ modifier un prospect
-// POST {action:'delete', id}     → supprimer un prospect
-// POST {action:'send_email', id, sujet, corps} → envoyer + logger
+// GET  ?action=list                        → liste tous les prospects
+// GET  ?action=get&id=xxx                  → prospect + historique emails
+// GET  ?action=search_places&q=xxx         → recherche Google Places
+// GET  ?action=place_details&place_id=xxx  → détails d'un lieu (tel, site, url Maps)
+// POST {action:'create', ...}              → créer un prospect
+// POST {action:'update', id, ...}          → modifier un prospect
+// POST {action:'delete', id}               → supprimer un prospect
+// POST {action:'send_email', ...}          → envoyer + logger
 
 import { cors }         from './_cors.js'
 import { authenticate } from './_withAuth.js'
 import { sendEmail }    from './_email.js'
+
+const GOOGLE_TYPES_TO_SECTEUR = {
+  plumber: 'Plomberie', electrician: 'Électricité', painter: 'Peinture',
+  general_contractor: 'Maçonnerie', roofing_contractor: 'Toiture',
+  carpenter: 'Menuiserie', locksmith: 'Serrurerie', flooring_contractor: 'Carrelage',
+  insulation_contractor: 'Isolation', heating_contractor: 'Chauffage',
+}
+
+function extractCity(address = '') {
+  // "12 Rue X, 76600 Le Havre, France" → "Le Havre"
+  const m = address.match(/\d{5}\s+([^,]+)/)
+  return m ? m[1].trim() : ''
+}
+
+function googleTypesToSecteur(types = []) {
+  for (const t of types) {
+    if (GOOGLE_TYPES_TO_SECTEUR[t]) return GOOGLE_TYPES_TO_SECTEUR[t]
+  }
+  return ''
+}
+
+async function fetchGoogle(url) {
+  const r = await fetch(url)
+  if (!r.ok) throw new Error(`Google Places HTTP ${r.status}`)
+  const d = await r.json()
+  if (d.status !== 'OK' && d.status !== 'ZERO_RESULTS')
+    throw new Error(`Google Places: ${d.status} — ${d.error_message || ''}`)
+  return d
+}
 
 export default async function handler(req, res) {
   cors(req, res, { methods: 'GET, POST, OPTIONS' })
@@ -19,6 +50,8 @@ export default async function handler(req, res) {
   const auth = await authenticate(req, res, { adminOnly: true })
   if (!auth) return
   const { admin } = auth
+
+  const key = process.env.GOOGLE_PLACES_API_KEY
 
   try {
     if (req.method === 'GET') {
@@ -43,6 +76,40 @@ export default async function handler(req, res) {
         if (pe) throw pe
         if (ee) throw ee
         return res.status(200).json({ prospect: p, emails: emails || [] })
+      }
+
+      if (action === 'search_places') {
+        if (!key) return res.status(503).json({ error: 'GOOGLE_PLACES_API_KEY non configurée sur Vercel' })
+        const q = (req.query.q || '').toString().trim()
+        if (!q) return res.status(400).json({ error: 'q requis' })
+        const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(q)}&language=fr&key=${key}`
+        const data = await fetchGoogle(url)
+        const results = (data.results || []).slice(0, 20).map(p => ({
+          place_id:   p.place_id,
+          nom:        p.name,
+          adresse:    p.formatted_address,
+          ville:      extractCity(p.formatted_address),
+          secteur:    googleTypesToSecteur(p.types || []),
+          rating:     p.rating,
+          nb_avis:    p.user_ratings_total,
+          maps_url:   `https://www.google.com/maps/place/?q=place_id:${p.place_id}`,
+        }))
+        return res.status(200).json({ results })
+      }
+
+      if (action === 'place_details') {
+        if (!key) return res.status(503).json({ error: 'GOOGLE_PLACES_API_KEY non configurée sur Vercel' })
+        const place_id = (req.query.place_id || '').toString().trim()
+        if (!place_id) return res.status(400).json({ error: 'place_id requis' })
+        const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(place_id)}&fields=name,formatted_phone_number,website,url,types,formatted_address&language=fr&key=${key}`
+        const data = await fetchGoogle(url)
+        const r = data.result || {}
+        return res.status(200).json({
+          telephone: r.formatted_phone_number || '',
+          website:   r.website || '',
+          maps_url:  r.url || `https://www.google.com/maps/place/?q=place_id:${place_id}`,
+          secteur:   googleTypesToSecteur(r.types || []),
+        })
       }
 
       return res.status(400).json({ error: 'action inconnue' })
