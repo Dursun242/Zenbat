@@ -274,6 +274,7 @@ function ProspectModal({ prospect, onSave, onClose }) {
     email: prospect?.email || '', telephone: prospect?.telephone || '',
     ville: prospect?.ville || '', secteur: prospect?.secteur || '',
     statut: prospect?.statut || 'a_contacter', notes: prospect?.notes || '',
+    google_business_url: prospect?.google_business_url || '',
   })
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
@@ -347,6 +348,11 @@ function ProspectModal({ prospect, onSave, onClose }) {
             <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.statut} onChange={set('statut')}>
               {STATUTS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
+          </div>
+          <div style={{ gridColumn: '1/-1' }}>
+            <label style={labelStyle}>Lien Google Business</label>
+            <input style={inputStyle} value={form.google_business_url} onChange={set('google_business_url')}
+              placeholder="https://maps.google.com/..." />
           </div>
           <div style={{ gridColumn: '1/-1' }}>
             <label style={labelStyle}>Notes</label>
@@ -458,11 +464,20 @@ function ProspectDetail({ prospectId, onUpdate, onDelete }) {
               {prospect.entreprise && <span style={{ fontSize: 13, color: '#6B6358' }}>{prospect.entreprise}</span>}
               <Badge statut={prospect.statut} />
             </div>
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
               <a href={`mailto:${prospect.email}`} style={{ fontSize: 12, color: '#2563eb', textDecoration: 'none' }}>{prospect.email}</a>
               {prospect.telephone && <span style={{ fontSize: 12, color: '#6B6358' }}>{prospect.telephone}</span>}
               {prospect.ville && <span style={{ fontSize: 12, color: '#6B6358' }}>📍 {prospect.ville}</span>}
               {prospect.secteur && <span style={{ fontSize: 12, color: '#6B6358' }}>🔨 {prospect.secteur}</span>}
+              {prospect.google_business_url && (
+                <a href={prospect.google_business_url} target="_blank" rel="noopener noreferrer"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12,
+                    color: '#fff', background: '#4285F4', padding: '3px 10px', borderRadius: 6,
+                    textDecoration: 'none', fontWeight: 600 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                  Google Business
+                </a>
+              )}
             </div>
             {prospect.notes && <p style={{ fontSize: 12, color: '#6B6358', marginTop: 6, fontStyle: 'italic' }}>{prospect.notes}</p>}
           </div>

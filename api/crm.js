@@ -27,7 +27,7 @@ export default async function handler(req, res) {
       if (action === 'list') {
         const { data, error } = await admin
           .from('prospects')
-          .select('id, nom, entreprise, email, telephone, ville, secteur, statut, notes, created_at, updated_at')
+          .select('id, nom, entreprise, email, telephone, ville, secteur, statut, notes, google_business_url, created_at, updated_at')
           .order('created_at', { ascending: false })
         if (error) throw error
         return res.status(200).json({ prospects: data })
@@ -53,12 +53,12 @@ export default async function handler(req, res) {
       const action = (body.action || '').toString()
 
       if (action === 'create') {
-        const { nom, entreprise, email, telephone, ville, secteur, statut, notes } = body
+        const { nom, entreprise, email, telephone, ville, secteur, statut, notes, google_business_url } = body
         if (!nom?.trim() || !email?.trim()) return res.status(400).json({ error: 'nom et email requis' })
         const { data, error } = await admin
           .from('prospects')
           .insert({ nom: nom.trim(), entreprise, email: email.trim(), telephone, ville, secteur,
-                    statut: statut || 'a_contacter', notes })
+                    statut: statut || 'a_contacter', notes, google_business_url: google_business_url || null })
           .select()
           .single()
         if (error) throw error
@@ -66,17 +66,18 @@ export default async function handler(req, res) {
       }
 
       if (action === 'update') {
-        const { id, nom, entreprise, email, telephone, ville, secteur, statut, notes } = body
+        const { id, nom, entreprise, email, telephone, ville, secteur, statut, notes, google_business_url } = body
         if (!id) return res.status(400).json({ error: 'id requis' })
         const updates = { updated_at: new Date().toISOString() }
-        if (nom         !== undefined) updates.nom         = nom?.trim() || null
-        if (entreprise  !== undefined) updates.entreprise  = entreprise || null
-        if (email       !== undefined) updates.email       = email?.trim() || null
-        if (telephone   !== undefined) updates.telephone   = telephone || null
-        if (ville       !== undefined) updates.ville       = ville || null
-        if (secteur     !== undefined) updates.secteur     = secteur || null
-        if (statut      !== undefined) updates.statut      = statut
-        if (notes       !== undefined) updates.notes       = notes || null
+        if (nom                 !== undefined) updates.nom                 = nom?.trim() || null
+        if (entreprise          !== undefined) updates.entreprise          = entreprise || null
+        if (email               !== undefined) updates.email               = email?.trim() || null
+        if (telephone           !== undefined) updates.telephone           = telephone || null
+        if (ville               !== undefined) updates.ville               = ville || null
+        if (secteur             !== undefined) updates.secteur             = secteur || null
+        if (statut              !== undefined) updates.statut              = statut
+        if (notes               !== undefined) updates.notes               = notes || null
+        if (google_business_url !== undefined) updates.google_business_url = google_business_url || null
         const { data, error } = await admin
           .from('prospects')
           .update(updates)
