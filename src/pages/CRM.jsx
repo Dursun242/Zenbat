@@ -38,7 +38,7 @@ const SECTEURS = [
   'Serrurerie', 'Plâtrerie', 'Jardinage', 'Nettoyage', 'Autre',
 ]
 
-const DEFAULT_SUJET = 'Un outil made in Normandie pour arrêter de perdre du temps sur vos devis'
+const DEFAULT_SUJET = 'Ce que vous faisiez en 2h, Zenbat le fait en 5 minutes'
 
 function buildTemplate(prospect) {
   const prenom = (prospect.nom || '').split(' ')[0] || prospect.nom || ''
