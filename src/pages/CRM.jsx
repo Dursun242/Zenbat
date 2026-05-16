@@ -111,14 +111,14 @@ function buildHtmlEmail(prospect, textBody) {
   <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;width:100%;">
 
     <!-- HEADER -->
-    <tr><td style="background:#1A1612;border-radius:16px 16px 0 0;padding:22px 36px;">
+    <tr><td style="background:#FAF7F2;border-radius:16px 16px 0 0;padding:22px 36px;border-bottom:1px solid #E8E2D8;">
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
         <tr>
           <td>
-            <span style="font-family:Arial,Helvetica,sans-serif;font-size:24px;font-weight:800;color:#FFFFFF;letter-spacing:-0.5px;">Zenbat</span>
+            <span style="font-family:Arial,Helvetica,sans-serif;font-size:26px;font-weight:800;color:#1A1612;letter-spacing:-1px;">Zen<span style="color:#C97B5C;">bat</span></span>
           </td>
           <td align="right" style="vertical-align:middle;">
-            <span style="font-size:10px;color:#6B6358;letter-spacing:1px;text-transform:uppercase;font-weight:600;">Devis &amp; Facturation IA</span>
+            <span style="font-size:10px;color:#9A9088;letter-spacing:1px;text-transform:uppercase;font-weight:600;">Devis &amp; Facturation IA</span>
           </td>
         </tr>
       </table>
