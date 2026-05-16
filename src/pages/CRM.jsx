@@ -56,12 +56,7 @@ Lancé début 2026, il compte déjà plus de 250 utilisateurs actifs — et je v
 
 L'offre : **1 mois gratuit sans limite** — toutes les fonctionnalités débloquées, sans carte bancaire, sans engagement.
 
-Trois façons de démarrer, c'est vous qui choisissez :
-• Tester directement en autonomie sur zenbat.vercel.app — accès immédiat
-• Demander une démonstration gratuite — je vous montre en direct en 20 min
-• Convenir d'un rendez-vous de présentation — en visio ou au Havre
-
-Répondez simplement à ce mail avec votre préférence, je m'adapte.
+Répondez simplement à ce mail, je m'adapte à votre préférence.
 
 À bientôt,
 Dursun
