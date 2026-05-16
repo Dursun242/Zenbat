@@ -52,18 +52,20 @@ Avant de coder, j'ai passé des années à travailler avec des artisans${metier}
 
 Alors j'ai construit **Zenbat** — un logiciel de devis et facturation conçu spécifiquement pour les artisans et indépendants français.
 
+Lancé début 2026, Zenbat compte déjà plus de 500 utilisateurs actifs. Je vous écris depuis Le Havre, et je veux que les entreprises${ville} fassent partie des premiers à en bénéficier — avant tout le monde.
+
 Ce que ça fait, concrètement :
-• Devis en quelques clics, PDF professionnel envoyé directement au client
+• Devis en 2 minutes grâce à l'IA — vous parlez, elle structure
 • Signature électronique du client depuis son téléphone
-• Facturation conforme Factur-X (norme 2026 obligatoire pour la facturation B2B)
-• Un assistant IA qui rédige les lignes de devis à votre place
+• Facturation conforme Factur-X (norme B2B obligatoire dès 2026)
+• Suivi en temps réel : devis acceptés, factures, CA du mois
 
-Pourquoi je vous écris :
-Je lance Zenbat en Baie de Seine en premier. Je veux que les premiers utilisateurs soient des entreprises${ville}, pas de Paris. Retours directs, échanges humains, et si quelque chose ne va pas — vous m'appelez, je corrige.
+Trois façons de démarrer, c'est vous qui choisissez :
+• Tester directement en autonomie sur zenbat.vercel.app — gratuit, sans carte
+• Demander une démonstration gratuite — je vous montre en direct en 20 min
+• Convenir d'un rendez-vous de présentation — en visio ou au Havre
 
-L'offre : Accès gratuit et complet pendant 3 mois, sans carte bancaire, sans engagement.
-
-Si ça vous intéresse, répondez simplement à ce mail.
+Répondez simplement à ce mail avec votre préférence, je m'adapte.
 
 À bientôt,
 Dursun
@@ -120,8 +122,34 @@ function buildHtmlEmail(prospect, textBody) {
       </table>
     </td></tr>
 
+    <!-- SOCIAL PROOF BAND -->
+    <tr><td style="background:#1A1612;padding:0;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td style="padding:12px 36px;border-top:1px solid rgba(255,255,255,0.07);">
+            <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto;">
+              <tr>
+                <td style="padding:0 16px;text-align:center;border-right:1px solid rgba(255,255,255,0.12);">
+                  <p style="margin:0;font-size:20px;font-weight:800;color:#C97B5C;">500+</p>
+                  <p style="margin:0;font-size:10px;color:#6B6358;letter-spacing:0.6px;text-transform:uppercase;">Utilisateurs actifs</p>
+                </td>
+                <td style="padding:0 16px;text-align:center;border-right:1px solid rgba(255,255,255,0.12);">
+                  <p style="margin:0;font-size:20px;font-weight:800;color:#22c55e;">T1 2026</p>
+                  <p style="margin:0;font-size:10px;color:#6B6358;letter-spacing:0.6px;text-transform:uppercase;">Lancé début 2026</p>
+                </td>
+                <td style="padding:0 16px;text-align:center;">
+                  <p style="margin:0;font-size:20px;font-weight:800;color:#FFFFFF;">🇫🇷</p>
+                  <p style="margin:0;font-size:10px;color:#6B6358;letter-spacing:0.6px;text-transform:uppercase;">100% français</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+
     <!-- HERO BAND -->
-    <tr><td style="background:#C97B5C;padding:14px 36px;">
+    <tr><td style="background:#C97B5C;padding:13px 36px;">
       <p style="margin:0;font-size:12px;color:#fff;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;">
         🎁&nbsp; Offre Baie de Seine · 3 mois gratuits &nbsp;·&nbsp; Sans carte bancaire
       </p>
@@ -138,10 +166,10 @@ function buildHtmlEmail(prospect, textBody) {
           <p style="margin:0;font-size:11px;font-weight:700;color:#6B6358;letter-spacing:1px;text-transform:uppercase;">En pratique, Zenbat c'est</p>
         </td></tr>
         ${[
-          ['⚡', 'Devis en 2 minutes', 'L\'IA rédige les lignes à votre place. Vous parlez, elle structure.'],
+          ['⚡', 'Devis en 2 minutes', "L'IA rédige les lignes à votre place. Vous parlez, elle structure."],
           ['✍️', 'Signature électronique', 'Votre client signe depuis son téléphone. Fini les allers-retours.'],
           ['📄', 'Facturation Factur-X', 'Conforme à la norme obligatoire B2B dès 2026. Déjà prêt.'],
-          ['📊', 'Suivi en temps réel', 'Devis acceptés, factures en attente, CA du mois — tout en un coup d\'œil.'],
+          ['📊', 'Suivi en temps réel', "Devis acceptés, factures en attente, CA du mois — tout en un coup d'œil."],
         ].map(([icon, title, desc]) => `
         <tr><td style="padding:14px 20px;border-bottom:1px solid #F0ECE4;">
           <table cellpadding="0" cellspacing="0" role="presentation">
@@ -156,15 +184,28 @@ function buildHtmlEmail(prospect, textBody) {
         </td></tr>`).join('')}
       </table>
 
-      <!-- CTA -->
-      <table cellpadding="0" cellspacing="0" role="presentation" style="margin:32px auto 8px;text-align:center;width:100%;">
-        <tr><td align="center">
-          <a href="https://zenbat.vercel.app" style="display:inline-block;background:#C97B5C;color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;padding:15px 36px;border-radius:10px;letter-spacing:0.2px;">
-            Tester gratuitement →
-          </a>
+      <!-- 3 CTAs -->
+      <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;margin:32px 0 8px;">
+        <tr><td align="center" style="padding-bottom:10px;">
+          <p style="margin:0 0 18px;font-size:14px;font-weight:600;color:#1A1612;">Trois façons de démarrer — c'est vous qui choisissez :</p>
         </td></tr>
-        <tr><td align="center" style="padding-top:10px;">
-          <p style="margin:0;font-size:12px;color:#9A9088;">Sans carte bancaire &nbsp;·&nbsp; Sans engagement &nbsp;·&nbsp; Résiliation en 1 clic</p>
+        <tr><td align="center" style="padding-bottom:10px;">
+          <a href="https://zenbat.vercel.app" style="display:inline-block;background:#C97B5C;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 32px;border-radius:10px;width:280px;text-align:center;">
+            🚀 Tester en autonomie →
+          </a>
+          <p style="margin:6px 0 0;font-size:11px;color:#9A9088;">Accès immédiat · Sans carte bancaire</p>
+        </td></tr>
+        <tr><td align="center" style="padding-bottom:10px;">
+          <a href="mailto:dursun@zenbat.fr?subject=Demande de démo Zenbat" style="display:inline-block;background:#1A1612;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 32px;border-radius:10px;width:280px;text-align:center;">
+            🎥 Demander une démo gratuite →
+          </a>
+          <p style="margin:6px 0 0;font-size:11px;color:#9A9088;">En visio · 20 minutes · Je montre tout en direct</p>
+        </td></tr>
+        <tr><td align="center">
+          <a href="mailto:dursun@zenbat.fr?subject=RDV présentation Zenbat" style="display:inline-block;background:#FAF7F2;color:#1A1612;text-decoration:none;font-size:15px;font-weight:700;padding:14px 32px;border-radius:10px;border:1.5px solid #E8E2D8;width:280px;text-align:center;">
+            📅 Prendre un rendez-vous →
+          </a>
+          <p style="margin:6px 0 0;font-size:11px;color:#9A9088;">Visio ou au Havre · Je m'adapte à votre agenda</p>
         </td></tr>
       </table>
 
