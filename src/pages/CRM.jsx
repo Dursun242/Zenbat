@@ -60,8 +60,10 @@ Ce que ça fait, concrètement :
 • Facturation conforme Factur-X (norme B2B obligatoire dès 2026)
 • Suivi en temps réel : devis acceptés, factures, CA du mois
 
+L'offre : **1 mois gratuit sans limite** — toutes les fonctionnalités débloquées, sans carte bancaire, sans engagement.
+
 Trois façons de démarrer, c'est vous qui choisissez :
-• Tester directement en autonomie sur zenbat.vercel.app — gratuit, sans carte
+• Tester directement en autonomie sur zenbat.vercel.app — accès immédiat
 • Demander une démonstration gratuite — je vous montre en direct en 20 min
 • Convenir d'un rendez-vous de présentation — en visio ou au Havre
 
@@ -145,7 +147,7 @@ function buildHtmlEmail(prospect, textBody) {
     <!-- HERO BAND -->
     <tr><td style="background:#C97B5C;padding:13px 36px;">
       <p style="margin:0;font-size:12px;color:#fff;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;">
-        🎁&nbsp; Offre Baie de Seine · 3 mois gratuits &nbsp;·&nbsp; Sans carte bancaire
+        🎁&nbsp; Offre Baie de Seine · 1 mois gratuit sans limite &nbsp;·&nbsp; Sans carte bancaire
       </p>
     </td></tr>
 
@@ -187,7 +189,7 @@ function buildHtmlEmail(prospect, textBody) {
           <a href="https://zenbat.vercel.app" style="display:inline-block;background:#C97B5C;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 32px;border-radius:10px;width:280px;text-align:center;">
             🚀 Tester en autonomie →
           </a>
-          <p style="margin:6px 0 0;font-size:11px;color:#9A9088;">Accès immédiat · Sans carte bancaire</p>
+          <p style="margin:6px 0 0;font-size:11px;color:#9A9088;">1 mois gratuit sans limite · Sans carte bancaire</p>
         </td></tr>
         <tr><td align="center" style="padding-bottom:10px;">
           <a href="mailto:dursun@zenbat.fr?subject=Demande de démo Zenbat" style="display:inline-block;background:#1A1612;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 32px;border-radius:10px;width:280px;text-align:center;">
