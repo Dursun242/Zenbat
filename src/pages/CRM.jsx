@@ -46,21 +46,13 @@ function buildTemplate(prospect) {
   const metier = prospect.secteur ? ` (${prospect.secteur.toLowerCase()})` : ''
   return `Bonjour ${prenom},
 
-Je m'appelle Dursun, développeur indépendant havrais.
+Je m'appelle Dursun. Maître d'œuvre basé au Havre, j'ai travaillé pendant des années aux côtés d'artisans et d'entreprises du bâtiment${ville}.
 
-En tant que maître d'œuvre, j'ai travaillé pendant des années aux côtés d'artisans et d'entreprises du bâtiment. Et j'ai vu la même réalité partout : des professionnels excellents sur le chantier, mais qui perdaient un temps fou sur la paperasse — devis refaits à la main, factures en retard, relances oubliées, CA qui s'échappe.
+Et j'ai vu la même réalité partout : des professionnels excellents sur le chantier, mais qui perdaient un temps fou sur la paperasse — devis refaits à la main, factures en retard, relances oubliées, CA qui s'échappe.
 
-Avec l'arrivée de l'IA, j'ai décidé de construire l'outil que j'aurais voulu leur donner bien plus tôt. **Zenbat**, c'est conçu pour que vous passiez moins de temps derrière un écran et plus de temps à faire ce qui vous rapporte vraiment.
+Avec l'arrivée de l'IA, j'ai décidé de construire l'outil que j'aurais voulu leur donner bien plus tôt. **Zenbat**, c'est un logiciel de devis et facturation conçu pour que vous passiez moins de temps derrière un écran et plus de temps à faire ce qui vous rapporte vraiment.
 
-Alors j'ai construit **Zenbat** — un logiciel de devis et facturation conçu spécifiquement pour les artisans et indépendants français.
-
-Lancé début 2026, Zenbat compte déjà plus de 500 utilisateurs actifs. Je vous écris depuis Le Havre, et je veux que les entreprises${ville} fassent partie des premiers à en bénéficier — avant tout le monde.
-
-Ce que ça fait, concrètement :
-• Devis en 2 minutes grâce à l'IA — vous parlez, elle structure
-• Signature électronique du client depuis son téléphone
-• Facturation conforme Factur-X (norme B2B obligatoire dès 2026)
-• Suivi en temps réel : devis acceptés, factures, CA du mois
+Lancé début 2026, il compte déjà plus de 250 utilisateurs actifs — et je veux que les entreprises${ville} fassent partie des premiers à en bénéficier.
 
 L'offre : **1 mois gratuit sans limite** — toutes les fonctionnalités débloquées, sans carte bancaire, sans engagement.
 
