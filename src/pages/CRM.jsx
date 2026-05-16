@@ -63,6 +63,12 @@ Dursun
 Créateur de Zenbat · Le Havre`
 }
 
+const ZENBAT_LINK = `<a href="https://zenbat.vercel.app" style="color:#C97B5C;text-decoration:none;font-weight:700;">Zenbat</a>`
+
+function linkifyZenbat(html) {
+  return html.replace(/Zenbat/g, ZENBAT_LINK)
+}
+
 // Convertit le texte plat (paragraphes, • listes, **gras**) en blocs HTML email
 function textToHtmlBlocks(text) {
   const paragraphs = text.split(/\n\n+/)
@@ -85,7 +91,7 @@ function textToHtmlBlocks(text) {
 }
 
 function buildHtmlEmail(prospect, textBody) {
-  const bodyHtml = textToHtmlBlocks(textBody)
+  const bodyHtml = linkifyZenbat(textToHtmlBlocks(textBody))
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -148,7 +154,7 @@ function buildHtmlEmail(prospect, textBody) {
       <!-- FEATURES -->
       <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;margin:28px 0;border-radius:12px;overflow:hidden;border:1px solid #E8E2D8;">
         <tr><td style="background:#FAF7F2;padding:16px 20px;border-bottom:1px solid #E8E2D8;">
-          <p style="margin:0;font-size:11px;font-weight:700;color:#6B6358;letter-spacing:1px;text-transform:uppercase;">En pratique, Zenbat c'est</p>
+          <p style="margin:0;font-size:11px;font-weight:700;color:#6B6358;letter-spacing:1px;text-transform:uppercase;">En pratique, ${ZENBAT_LINK} c'est</p>
         </td></tr>
         ${[
           ['⚡', 'Devis en 2 minutes', "L'IA rédige les lignes à votre place. Vous parlez, elle structure."],
@@ -201,7 +207,7 @@ function buildHtmlEmail(prospect, textBody) {
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
         <tr>
           <td>
-            <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#3D3832;">Dursun — Créateur de Zenbat</p>
+            <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#3D3832;">Dursun — Créateur de ${ZENBAT_LINK}</p>
             <p style="margin:0;font-size:12px;color:#9A9088;">Le Havre &nbsp;·&nbsp; <a href="https://zenbat.vercel.app" style="color:#C97B5C;text-decoration:none;">zenbat.vercel.app</a></p>
           </td>
           <td align="right" style="vertical-align:top;">
