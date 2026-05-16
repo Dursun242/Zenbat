@@ -96,7 +96,7 @@ export default async function handler(req, res) {
       }
 
       if (action === 'send_email') {
-        const { id, sujet, corps } = body
+        const { id, sujet, corps, corps_html } = body
         if (!id || !sujet?.trim() || !corps?.trim())
           return res.status(400).json({ error: 'id, sujet et corps requis' })
 
@@ -107,9 +107,8 @@ export default async function handler(req, res) {
           .single()
         if (pe) throw pe
 
-        const html = corps
-          .replace(/\n/g, '<br>')
-          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        // Utilise le HTML complet généré côté client si dispo, sinon fallback texte basique
+        const html = corps_html || corps.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
 
         await sendEmail({
           to:      prospect.email,

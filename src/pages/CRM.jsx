@@ -67,8 +67,143 @@ Si ça vous intéresse, répondez simplement à ce mail.
 
 À bientôt,
 Dursun
-Créateur de Zenbat · Le Havre
-zenbat.fr`
+Créateur de Zenbat · Le Havre`
+}
+
+// Convertit le texte plat (paragraphes, • listes, **gras**) en blocs HTML email
+function textToHtmlBlocks(text) {
+  const paragraphs = text.split(/\n\n+/)
+  return paragraphs.map(para => {
+    const lines = para.split('\n')
+    const isList = lines.every(l => l.trim().startsWith('•') || l.trim() === '')
+    if (isList) {
+      const items = lines.filter(l => l.trim().startsWith('•')).map(l => {
+        const content = l.replace(/^•\s*/, '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        return `<tr>
+          <td style="padding:4px 0;vertical-align:top;color:#C97B5C;font-size:16px;padding-right:10px;">•</td>
+          <td style="padding:4px 0;font-size:15px;color:#3D3832;line-height:1.65;">${content}</td>
+        </tr>`
+      }).join('')
+      return `<table cellpadding="0" cellspacing="0" style="margin:0 0 4px 0;">${items}</table>`
+    }
+    const html = para.replace(/\*\*(.*?)\*\*/g, '<strong style="color:#1A1612;">$1</strong>')
+    return `<p style="margin:0 0 18px 0;font-size:15px;color:#3D3832;line-height:1.75;">${html.replace(/\n/g, '<br>')}</p>`
+  }).join('')
+}
+
+function buildHtmlEmail(prospect, textBody) {
+  const bodyHtml = textToHtmlBlocks(textBody)
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Zenbat</title>
+</head>
+<body style="margin:0;padding:0;background:#F0ECE4;font-family:Inter,Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#F0ECE4;">
+<tr><td align="center" style="padding:40px 16px;">
+
+  <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;width:100%;">
+
+    <!-- HEADER -->
+    <tr><td style="background:#1A1612;border-radius:16px 16px 0 0;padding:22px 36px;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td>
+            <span style="font-family:Arial,Helvetica,sans-serif;font-size:24px;font-weight:800;color:#FFFFFF;letter-spacing:-0.5px;">Zenbat</span>
+          </td>
+          <td align="right" style="vertical-align:middle;">
+            <span style="font-size:10px;color:#6B6358;letter-spacing:1px;text-transform:uppercase;font-weight:600;">Devis &amp; Facturation IA</span>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+
+    <!-- HERO BAND -->
+    <tr><td style="background:#C97B5C;padding:14px 36px;">
+      <p style="margin:0;font-size:12px;color:#fff;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;">
+        🎁&nbsp; Offre Baie de Seine · 3 mois gratuits &nbsp;·&nbsp; Sans carte bancaire
+      </p>
+    </td></tr>
+
+    <!-- BODY -->
+    <tr><td style="background:#FFFCF7;padding:40px 36px 32px;">
+
+      ${bodyHtml}
+
+      <!-- FEATURES -->
+      <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;margin:28px 0;border-radius:12px;overflow:hidden;border:1px solid #E8E2D8;">
+        <tr><td style="background:#FAF7F2;padding:16px 20px;border-bottom:1px solid #E8E2D8;">
+          <p style="margin:0;font-size:11px;font-weight:700;color:#6B6358;letter-spacing:1px;text-transform:uppercase;">En pratique, Zenbat c'est</p>
+        </td></tr>
+        ${[
+          ['⚡', 'Devis en 2 minutes', 'L\'IA rédige les lignes à votre place. Vous parlez, elle structure.'],
+          ['✍️', 'Signature électronique', 'Votre client signe depuis son téléphone. Fini les allers-retours.'],
+          ['📄', 'Facturation Factur-X', 'Conforme à la norme obligatoire B2B dès 2026. Déjà prêt.'],
+          ['📊', 'Suivi en temps réel', 'Devis acceptés, factures en attente, CA du mois — tout en un coup d\'œil.'],
+        ].map(([icon, title, desc]) => `
+        <tr><td style="padding:14px 20px;border-bottom:1px solid #F0ECE4;">
+          <table cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td style="font-size:22px;padding-right:14px;vertical-align:top;">${icon}</td>
+              <td>
+                <p style="margin:0 0 2px;font-size:14px;font-weight:700;color:#1A1612;">${title}</p>
+                <p style="margin:0;font-size:13px;color:#6B6358;line-height:1.5;">${desc}</p>
+              </td>
+            </tr>
+          </table>
+        </td></tr>`).join('')}
+      </table>
+
+      <!-- CTA -->
+      <table cellpadding="0" cellspacing="0" role="presentation" style="margin:32px auto 8px;text-align:center;width:100%;">
+        <tr><td align="center">
+          <a href="https://zenbat.vercel.app" style="display:inline-block;background:#C97B5C;color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;padding:15px 36px;border-radius:10px;letter-spacing:0.2px;">
+            Tester gratuitement →
+          </a>
+        </td></tr>
+        <tr><td align="center" style="padding-top:10px;">
+          <p style="margin:0;font-size:12px;color:#9A9088;">Sans carte bancaire &nbsp;·&nbsp; Sans engagement &nbsp;·&nbsp; Résiliation en 1 clic</p>
+        </td></tr>
+      </table>
+
+    </td></tr>
+
+    <!-- FOOTER -->
+    <tr><td style="background:#F0ECE4;border-radius:0 0 16px 16px;padding:22px 36px;border-top:1px solid #E8E2D8;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td>
+            <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#3D3832;">Dursun — Créateur de Zenbat</p>
+            <p style="margin:0;font-size:12px;color:#9A9088;">Le Havre &nbsp;·&nbsp; <a href="https://zenbat.vercel.app" style="color:#C97B5C;text-decoration:none;">zenbat.vercel.app</a></p>
+          </td>
+          <td align="right" style="vertical-align:top;">
+            <table cellpadding="0" cellspacing="0" role="presentation">
+              <tr>
+                <td style="padding-right:6px;">
+                  <div style="background:#1A1612;border-radius:4px;padding:4px 8px;">
+                    <span style="font-size:11px;font-weight:800;color:#fff;">Z</span>
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr><td colspan="2" style="padding-top:14px;">
+          <p style="margin:0;font-size:11px;color:#B0A898;line-height:1.6;">
+            Vous recevez cet email car vous avez été contacté personnellement par Dursun.<br>
+            Pour ne plus recevoir de messages, répondez simplement « Non merci » à cet email.
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+
+  </table>
+</td></tr>
+</table>
+</body>
+</html>`
 }
 
 // ── Composants UI légers ───────────────────────────────────────────────────
@@ -203,15 +338,17 @@ function ProspectModal({ prospect, onSave, onClose }) {
 // ── Panneau de détail prospect ─────────────────────────────────────────────
 
 function ProspectDetail({ prospectId, onUpdate, onDelete }) {
-  const [data, setData]         = useState(null)
-  const [tab, setTab]           = useState('emails') // 'emails' | 'composer'
-  const [loading, setLoading]   = useState(true)
-  const [sujet, setSujet]       = useState('')
-  const [corps, setCorps]       = useState('')
-  const [sending, setSending]   = useState(false)
-  const [sendErr, setSendErr]   = useState('')
-  const [sendOk, setSendOk]     = useState(false)
+  const [data, setData]           = useState(null)
+  const [tab, setTab]             = useState('emails') // 'emails' | 'composer'
+  const [composerView, setComposerView] = useState('edit') // 'edit' | 'preview'
+  const [loading, setLoading]     = useState(true)
+  const [sujet, setSujet]         = useState('')
+  const [corps, setCorps]         = useState('')
+  const [sending, setSending]     = useState(false)
+  const [sendErr, setSendErr]     = useState('')
+  const [sendOk, setSendOk]       = useState(false)
   const [editModal, setEditModal] = useState(false)
+  const iframeRef = useRef(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -237,7 +374,8 @@ function ProspectDetail({ prospectId, onUpdate, onDelete }) {
     if (!sujet.trim() || !corps.trim()) { setSendErr('Sujet et corps requis.'); return }
     setSending(true); setSendErr(''); setSendOk(false)
     try {
-      await api('POST', { action: 'send_email', id: prospectId, sujet, corps })
+      const corps_html = buildHtmlEmail(data.prospect, corps)
+      await api('POST', { action: 'send_email', id: prospectId, sujet, corps, corps_html })
       setSendOk(true)
       // Rafraîchir l'historique + statut
       const d = await api('GET', { action: 'get', id: prospectId })
@@ -360,13 +498,15 @@ function ProspectDetail({ prospectId, onUpdate, onDelete }) {
         )}
 
         {tab === 'composer' && (
-          <div style={{ maxWidth: 640 }}>
+          <div style={{ maxWidth: 700 }}>
             {sendOk && (
               <div style={{ background: '#dcfce7', border: '1px solid #86efac', borderRadius: 8,
                 padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#16a34a' }}>
                 ✓ Mail envoyé avec succès et enregistré dans l'historique.
               </div>
             )}
+
+            {/* Objet */}
             <div style={{ marginBottom: 12 }}>
               <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6358',
                 marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Objet</label>
@@ -377,34 +517,77 @@ function ProspectDetail({ prospectId, onUpdate, onDelete }) {
                   fontSize: 13, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', background: '#FAF7F2' }}
               />
             </div>
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6358',
-                marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Corps du mail</label>
-              <textarea
-                value={corps}
-                onChange={e => setCorps(e.target.value)}
-                rows={20}
-                style={{ width: '100%', padding: '10px 12px', border: '1px solid #E8E2D8', borderRadius: 8,
-                  fontSize: 13, fontFamily: 'inherit', lineHeight: 1.7, outline: 'none',
-                  resize: 'vertical', boxSizing: 'border-box', background: '#FAF7F2' }}
-              />
+
+            {/* Sous-onglets Éditer / Prévisualiser */}
+            <div style={{ display: 'flex', gap: 0, marginBottom: 12, border: '1px solid #E8E2D8', borderRadius: 8, overflow: 'hidden' }}>
+              {[{ id: 'edit', label: '✏ Éditer' }, { id: 'preview', label: '👁 Prévisualiser' }].map(v => (
+                <button key={v.id} onClick={() => setComposerView(v.id)}
+                  style={{ flex: 1, padding: '8px 0', border: 'none', fontSize: 13,
+                    background: composerView === v.id ? '#1A1612' : '#FAF7F2',
+                    color: composerView === v.id ? '#fff' : '#6B6358',
+                    fontWeight: composerView === v.id ? 600 : 400,
+                    cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}>
+                  {v.label}
+                </button>
+              ))}
             </div>
+
+            {/* Éditeur texte */}
+            {composerView === 'edit' && (
+              <div style={{ marginBottom: 16 }}>
+                <textarea
+                  value={corps}
+                  onChange={e => setCorps(e.target.value)}
+                  rows={22}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #E8E2D8', borderRadius: 8,
+                    fontSize: 13, fontFamily: 'Inter, system-ui, monospace', lineHeight: 1.75, outline: 'none',
+                    resize: 'vertical', boxSizing: 'border-box', background: '#FAF7F2' }}
+                />
+                <p style={{ fontSize: 11, color: '#A8A09A', marginTop: 4 }}>
+                  Utilisez <code style={{ background: '#E8E2D8', padding: '1px 4px', borderRadius: 3 }}>**texte**</code> pour le gras,
+                  &nbsp;<code style={{ background: '#E8E2D8', padding: '1px 4px', borderRadius: 3 }}>•</code> pour les listes.
+                </p>
+              </div>
+            )}
+
+            {/* Preview iframe de l'email HTML */}
+            {composerView === 'preview' && (
+              <div style={{ border: '1px solid #E8E2D8', borderRadius: 12, overflow: 'hidden', marginBottom: 16,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.07)' }}>
+                <div style={{ background: '#F0ECE4', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 6,
+                  borderBottom: '1px solid #E8E2D8' }}>
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#fecaca' }} />
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#fef9c3' }} />
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#dcfce7' }} />
+                  <span style={{ fontSize: 11, color: '#9A9088', marginLeft: 6 }}>Aperçu email — tel que reçu par {prospect.nom}</span>
+                </div>
+                <iframe
+                  ref={iframeRef}
+                  style={{ width: '100%', height: 680, border: 'none', display: 'block' }}
+                  title="preview"
+                  srcDoc={buildHtmlEmail(prospect, corps)}
+                  sandbox="allow-same-origin"
+                />
+              </div>
+            )}
+
             {sendErr && <p style={{ color: '#dc2626', fontSize: 12, marginBottom: 12 }}>{sendErr}</p>}
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <button onClick={handleSend} disabled={sending}
-                style={{ padding: '10px 20px', border: 'none', borderRadius: 8, background: '#1A1612',
-                  color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-                  opacity: sending ? 0.6 : 1 }}>
-                {sending ? 'Envoi en cours…' : `Envoyer à ${prospect.email}`}
+                style={{ padding: '11px 22px', border: 'none', borderRadius: 8, background: '#C97B5C',
+                  color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                  opacity: sending ? 0.6 : 1, letterSpacing: '0.1px' }}>
+                {sending ? 'Envoi en cours…' : `Envoyer à ${prospect.email} →`}
               </button>
-              <button onClick={() => setCorps(buildTemplate(prospect))}
-                style={{ padding: '10px 16px', border: '1px solid #E8E2D8', borderRadius: 8,
+              <button onClick={() => { setCorps(buildTemplate(prospect)); setComposerView('edit') }}
+                style={{ padding: '11px 16px', border: '1px solid #E8E2D8', borderRadius: 8,
                   background: '#FAF7F2', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', color: '#6B6358' }}>
-                Réinitialiser le template
+                Réinitialiser
               </button>
             </div>
-            <p style={{ fontSize: 11, color: '#6B6358', marginTop: 8 }}>
-              Le mail est envoyé depuis votre adresse Gmail configurée sur Vercel.
+            <p style={{ fontSize: 11, color: '#A8A09A', marginTop: 8 }}>
+              Mail envoyé depuis Gmail · Apparaît dans Historique après envoi
             </p>
           </div>
         )}
