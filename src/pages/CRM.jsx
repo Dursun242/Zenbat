@@ -131,7 +131,7 @@ function buildHtmlEmail(prospect, textBody) {
       <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto;">
         <tr>
           <td style="padding:0 20px;text-align:center;border-right:1px solid #E8E2D8;">
-            <p style="margin:0;font-size:20px;font-weight:800;color:#C97B5C;">500+</p>
+            <p style="margin:0;font-size:20px;font-weight:800;color:#C97B5C;">250+</p>
             <p style="margin:0;font-size:10px;color:#6B6358;letter-spacing:0.6px;text-transform:uppercase;">Utilisateurs actifs</p>
           </td>
           <td style="padding:0 20px;text-align:center;border-right:1px solid #E8E2D8;">
