@@ -48,7 +48,7 @@ function buildTemplate(prospect) {
 
 Je m'appelle Dursun, développeur indépendant havrais.
 
-Avant de coder, j'ai passé des années à travailler avec des artisans${metier} de la région — et j'ai vu la même scène se répéter : des soirées entières à taper des devis sur Word, des factures qui partent en retard, des relances oubliées. Des gens excellents dans leur métier, ralentis par la paperasse.
+En tant que maître d'œuvre, j'ai toujours eu du mal avec la partie administrative — pas le chantier, ça je maîtrise. Mais les devis tapés à la main, les factures qui s'accumulent, les relances oubliées… Des heures perdues chaque semaine sur des tâches qui n'ont rien à voir avec mon métier.
 
 Alors j'ai construit **Zenbat** — un logiciel de devis et facturation conçu spécifiquement pour les artisans et indépendants français.
 
