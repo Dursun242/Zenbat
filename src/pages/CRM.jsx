@@ -192,13 +192,13 @@ function buildHtmlEmail(prospect, textBody) {
           <p style="margin:6px 0 0;font-size:11px;color:#9A9088;">1 mois gratuit sans limite · Sans carte bancaire</p>
         </td></tr>
         <tr><td align="center" style="padding-bottom:10px;">
-          <a href="mailto:dursun@zenbat.fr?subject=Demande de démo Zenbat" style="display:inline-block;background:#1A1612;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 32px;border-radius:10px;width:280px;text-align:center;">
+          <a href="mailto:zenbat76@gmail.com?subject=Demande de démo Zenbat" style="display:inline-block;background:#1A1612;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 32px;border-radius:10px;width:280px;text-align:center;">
             🎥 Demander une démo gratuite →
           </a>
           <p style="margin:6px 0 0;font-size:11px;color:#9A9088;">En visio · 20 minutes · Je montre tout en direct</p>
         </td></tr>
         <tr><td align="center">
-          <a href="mailto:dursun@zenbat.fr?subject=RDV présentation Zenbat" style="display:inline-block;background:#FAF7F2;color:#1A1612;text-decoration:none;font-size:15px;font-weight:700;padding:14px 32px;border-radius:10px;border:1.5px solid #E8E2D8;width:280px;text-align:center;">
+          <a href="mailto:zenbat76@gmail.com?subject=RDV présentation Zenbat" style="display:inline-block;background:#FAF7F2;color:#1A1612;text-decoration:none;font-size:15px;font-weight:700;padding:14px 32px;border-radius:10px;border:1.5px solid #E8E2D8;width:280px;text-align:center;">
             📅 Prendre un rendez-vous →
           </a>
           <p style="margin:6px 0 0;font-size:11px;color:#9A9088;">Visio ou au Havre · Je m'adapte à votre agenda</p>
