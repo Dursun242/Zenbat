@@ -123,26 +123,20 @@ function buildHtmlEmail(prospect, textBody) {
     </td></tr>
 
     <!-- SOCIAL PROOF BAND -->
-    <tr><td style="background:#1A1612;padding:0;">
-      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+    <tr><td style="background:#FAF7F2;padding:14px 36px;border-bottom:1px solid #E8E2D8;">
+      <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto;">
         <tr>
-          <td style="padding:12px 36px;border-top:1px solid rgba(255,255,255,0.07);">
-            <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto;">
-              <tr>
-                <td style="padding:0 16px;text-align:center;border-right:1px solid rgba(255,255,255,0.12);">
-                  <p style="margin:0;font-size:20px;font-weight:800;color:#C97B5C;">500+</p>
-                  <p style="margin:0;font-size:10px;color:#6B6358;letter-spacing:0.6px;text-transform:uppercase;">Utilisateurs actifs</p>
-                </td>
-                <td style="padding:0 16px;text-align:center;border-right:1px solid rgba(255,255,255,0.12);">
-                  <p style="margin:0;font-size:20px;font-weight:800;color:#22c55e;">T1 2026</p>
-                  <p style="margin:0;font-size:10px;color:#6B6358;letter-spacing:0.6px;text-transform:uppercase;">Lancé début 2026</p>
-                </td>
-                <td style="padding:0 16px;text-align:center;">
-                  <p style="margin:0;font-size:20px;font-weight:800;color:#FFFFFF;">🇫🇷</p>
-                  <p style="margin:0;font-size:10px;color:#6B6358;letter-spacing:0.6px;text-transform:uppercase;">100% français</p>
-                </td>
-              </tr>
-            </table>
+          <td style="padding:0 20px;text-align:center;border-right:1px solid #E8E2D8;">
+            <p style="margin:0;font-size:20px;font-weight:800;color:#C97B5C;">500+</p>
+            <p style="margin:0;font-size:10px;color:#6B6358;letter-spacing:0.6px;text-transform:uppercase;">Utilisateurs actifs</p>
+          </td>
+          <td style="padding:0 20px;text-align:center;border-right:1px solid #E8E2D8;">
+            <p style="margin:0;font-size:20px;font-weight:800;color:#1A1612;">T1 2026</p>
+            <p style="margin:0;font-size:10px;color:#6B6358;letter-spacing:0.6px;text-transform:uppercase;">Lancé début 2026</p>
+          </td>
+          <td style="padding:0 20px;text-align:center;">
+            <p style="margin:0;font-size:20px;font-weight:800;color:#1A1612;">🇫🇷</p>
+            <p style="margin:0;font-size:10px;color:#6B6358;letter-spacing:0.6px;text-transform:uppercase;">100% français</p>
           </td>
         </tr>
       </table>
