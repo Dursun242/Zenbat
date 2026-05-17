@@ -1159,6 +1159,175 @@ function CsvImporter({ onImported, onClose }) {
   )
 }
 
+// ── Suppression des doublons ──────────────────────────────────────────────
+
+function findDuplicateGroups(prospects) {
+  const byEmail = {}
+  const byName  = {}
+
+  prospects.forEach(p => {
+    const email = (p.email || '').toLowerCase().trim()
+    if (email) {
+      if (!byEmail[email]) byEmail[email] = []
+      byEmail[email].push(p)
+    }
+    const name = (p.nom || '').toLowerCase().trim()
+    if (name) {
+      if (!byName[name]) byName[name] = []
+      byName[name].push(p)
+    }
+  })
+
+  const groups  = []
+  const usedIds = new Set()
+
+  Object.entries(byEmail).forEach(([email, members]) => {
+    if (members.length < 2) return
+    const sorted = [...members].sort((a, b) =>
+      new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at)
+    )
+    groups.push({ label: `Email : ${email}`, keep: sorted[0], toDelete: sorted.slice(1) })
+    members.forEach(m => usedIds.add(m.id))
+  })
+
+  Object.entries(byName).forEach(([, members]) => {
+    if (members.length < 2) return
+    const fresh = members.filter(m => !usedIds.has(m.id))
+    if (fresh.length < 2) return
+    const sorted = [...fresh].sort((a, b) =>
+      new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at)
+    )
+    groups.push({ label: `Nom : ${members[0].nom}`, keep: sorted[0], toDelete: sorted.slice(1) })
+    fresh.forEach(m => usedIds.add(m.id))
+  })
+
+  return groups
+}
+
+function DedupModal({ prospects, onDeleted, onClose }) {
+  const groups   = findDuplicateGroups(prospects)
+  const totalDel = groups.reduce((s, g) => s + g.toDelete.length, 0)
+  const [deleting, setDeleting] = useState(false)
+  const [done, setDone]         = useState(false)
+  const [deleted, setDeleted]   = useState(0)
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    let count = 0
+    for (const g of groups) {
+      for (const p of g.toDelete) {
+        try { await api('POST', { action: 'delete', id: p.id }); count++ } catch {}
+      }
+    }
+    setDeleted(count)
+    setDeleting(false)
+    setDone(true)
+    onDeleted()
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(26,22,18,0.6)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 580,
+        maxHeight: '85vh', display: 'flex', flexDirection: 'column',
+        boxShadow: '0 24px 80px rgba(0,0,0,0.25)' }}>
+
+        <div style={{ padding: '18px 24px', background: '#1A1612', borderRadius: '16px 16px 0 0',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>🧹 Doublons</div>
+            <div style={{ fontSize: 11, color: '#6B6358', marginTop: 2 }}>
+              {groups.length === 0
+                ? 'Aucun doublon détecté'
+                : `${groups.length} groupe${groups.length > 1 ? 's' : ''} · ${totalDel} à supprimer`}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6B6358', fontSize: 22, cursor: 'pointer' }}>×</button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+          {done ? (
+            <div style={{ textAlign: 'center', padding: '32px 0' }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#1A1612' }}>
+                {deleted} doublon{deleted > 1 ? 's' : ''} supprimé{deleted > 1 ? 's' : ''}
+              </div>
+            </div>
+          ) : groups.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: '#6B6358' }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>✨</div>
+              <div style={{ fontSize: 14 }}>Pas de doublons — votre CRM est propre !</div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <p style={{ fontSize: 13, color: '#6B6358', marginBottom: 4 }}>
+                Le prospect le plus récent est conservé. Les autres seront supprimés définitivement.
+              </p>
+              {groups.map((g, i) => (
+                <div key={i} style={{ border: '1px solid #E8E2D8', borderRadius: 10, overflow: 'hidden' }}>
+                  <div style={{ background: '#FAF7F2', padding: '8px 14px', fontSize: 11, fontWeight: 700,
+                    color: '#6B6358', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {g.label}
+                  </div>
+                  <div style={{ padding: '10px 14px', borderBottom: '1px solid #F0ECE4',
+                    display: 'flex', alignItems: 'center', gap: 10, background: '#f0fdf4' }}>
+                    <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 700, flexShrink: 0, width: 60 }}>✓ Gardé</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1612' }}>{g.keep.nom}</div>
+                      <div style={{ fontSize: 11, color: '#9A9088' }}>
+                        {[g.keep.email, g.keep.ville, g.keep.secteur].filter(Boolean).join(' · ')}
+                      </div>
+                    </div>
+                    <Badge statut={g.keep.statut} />
+                  </div>
+                  {g.toDelete.map((p, j) => (
+                    <div key={j} style={{ padding: '10px 14px',
+                      borderBottom: j < g.toDelete.length - 1 ? '1px solid #F0ECE4' : 'none',
+                      display: 'flex', alignItems: 'center', gap: 10, background: '#fff5f5' }}>
+                      <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 700, flexShrink: 0, width: 60 }}>✗ Supprimé</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, color: '#6B6358' }}>{p.nom}</div>
+                        <div style={{ fontSize: 11, color: '#9A9088' }}>
+                          {[p.email, p.ville, p.secteur].filter(Boolean).join(' · ')}
+                        </div>
+                      </div>
+                      <Badge statut={p.statut} />
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: '14px 24px', borderTop: '1px solid #E8E2D8', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          {done || groups.length === 0 ? (
+            <button onClick={onClose}
+              style={{ padding: '10px 24px', background: '#1A1612', border: 'none', borderRadius: 8,
+                color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              Fermer
+            </button>
+          ) : (
+            <>
+              <button onClick={onClose}
+                style={{ padding: '10px 18px', border: '1px solid #E8E2D8', borderRadius: 8,
+                  background: '#FAF7F2', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Annuler
+              </button>
+              <button onClick={handleDelete} disabled={deleting}
+                style={{ padding: '10px 24px', background: '#dc2626', border: 'none', borderRadius: 8,
+                  color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                  opacity: deleting ? 0.6 : 1 }}>
+                {deleting ? 'Suppression…' : `Supprimer ${totalDel} doublon${totalDel > 1 ? 's' : ''}`}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Page principale CRM ────────────────────────────────────────────────────
 
 // ── Panneau recherche Google Places ───────────────────────────────────────
@@ -1322,6 +1491,7 @@ export default function CRM() {
   const [csvOpen, setCsvOpen]       = useState(false)
   const [selected, setSelected]     = useState(new Set()) // IDs sélectionnés
   const [bulkOpen, setBulkOpen]     = useState(false)
+  const [dedupOpen, setDedupOpen]   = useState(false)
 
   // Vérification admin au montage
   useEffect(() => {
@@ -1436,6 +1606,11 @@ export default function CRM() {
           <span style={{ fontSize: 12, color: '#A8A09A' }}>Baie de Seine</span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setDedupOpen(true)}
+            style={{ padding: '7px 14px', background: '#6B4040', border: 'none', borderRadius: 8,
+              color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+            🧹 Doublons
+          </button>
           <button onClick={() => setCsvOpen(true)}
             style={{ padding: '7px 14px', background: '#6B6358', border: 'none', borderRadius: 8,
               color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -1602,6 +1777,14 @@ export default function CRM() {
         <BulkSendModal
           prospects={[...prospects].filter(p => selected.has(p.id))}
           onClose={() => { setBulkOpen(false); setSelected(new Set()) }}
+        />
+      )}
+
+      {dedupOpen && (
+        <DedupModal
+          prospects={prospects}
+          onDeleted={loadProspects}
+          onClose={() => setDedupOpen(false)}
         />
       )}
     </div>
