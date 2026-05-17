@@ -29,6 +29,27 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
     return () => { cancelled = true; };
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Re-fetch des devis quand l'onglet redevient visible : capture les
+  // changements pilotés côté serveur dont le front n'est pas au courant
+  // (ex. statut basculé en 'en_negociation' par /api/devis-public quand
+  // le client envoie une demande de modification). Sans ce hook, le
+  // statut + le badge nav restaient à la valeur du dernier load.
+  useEffect(() => {
+    if (!user) return;
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      listDevisWithLignes()
+        .then(ds => { if (ds) setDevis(ds.length ? ds : []); })
+        .catch(err => console.error("[refresh devis]", err));
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const scheduleDevisSave = (d, immediate = false, saveLignes = false) => {
     if (!user) return;
     const run = async () => {

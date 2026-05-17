@@ -803,7 +803,11 @@ export default async function handler(req, res) {
       line_changes: changes.length ? changes : null,
       budget_target: budget_target ? Number(budget_target) : null,
     })
-    await admin.from('devis').update({ statut: 'en_negociation' }).eq('id', devis.id)
+    // L'UPDATE peut échouer silencieusement si la migration 0047 n'est pas
+    // appliquée (CHECK constraint sur statut). On log explicitement pour
+    // éviter qu'un futur ajout d'enum se retrouve à nouveau silencieux.
+    const { error: stUpdErr } = await admin.from('devis').update({ statut: 'en_negociation' }).eq('id', devis.id)
+    if (stUpdErr) console.error('[negotiate] devis status update failed:', stUpdErr.code, stUpdErr.message, '— migration 0047 manquante ?')
     await admin.from('devis_audit_log').insert({ devis_id: devis.id, event: 'negotiation_sent', from_party: 'client', meta: { round: (roundCount || 0) + 1, new_total: newTotal, ip } })
     notifyTg('devis_negotiation', { numero: devis.numero, objet: devis.objet, new_total: newTotal, message: message?.trim() || null, changes_count: changes.length })
 
