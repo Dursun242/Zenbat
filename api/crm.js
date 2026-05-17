@@ -9,10 +9,16 @@
 // POST {action:'update', id, ...}          → modifier un prospect
 // POST {action:'delete', id}               → supprimer un prospect
 // POST {action:'send_email', ...}          → envoyer + logger
+// POST {action:'schedule_bulk', emails:[]} → programmer des envois en file
+// GET  ?action=list_queue                  → liste la file d'envoi
+// POST {action:'cancel_scheduled', id}     → annuler un envoi programmé
+// POST {action:'cancel_all_pending'}       → annuler tous les envois en attente
+// POST {action:'process_queue'}            → traiter la file (appelé par pg_cron, auth CRON_SECRET)
 
 import { cors }         from './_cors.js'
 import { authenticate } from './_withAuth.js'
 import { sendEmail }    from './_email.js'
+import { createClient } from '@supabase/supabase-js'
 
 const GOOGLE_TYPES_TO_SECTEUR = {
   plumber: 'Plomberie', electrician: 'Électricité', painter: 'Peinture',
@@ -43,9 +49,74 @@ async function fetchGoogle(url) {
   return d
 }
 
+async function processQueue(res) {
+  const admin = createClient(
+    process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+  const now = new Date().toISOString()
+  const { data: rows, error } = await admin
+    .from('scheduled_prospect_emails')
+    .select('id, prospect_id, sujet, corps, corps_html, prospects!inner(nom, email, statut)')
+    .eq('status', 'pending')
+    .lte('send_at', now)
+    .order('send_at', { ascending: true })
+    .limit(10)
+  if (error) throw error
+
+  const results = []
+  for (const row of rows || []) {
+    const prospect = row.prospects
+    const sentAt   = new Date().toISOString()
+    if (!prospect?.email) {
+      await admin.from('scheduled_prospect_emails')
+        .update({ status: 'error', error_msg: 'Prospect sans email', sent_at: sentAt })
+        .eq('id', row.id)
+      results.push({ id: row.id, status: 'error' })
+      continue
+    }
+    try {
+      await sendEmail({
+        to:       prospect.email,
+        subject:  row.sujet,
+        html:     row.corps_html || row.corps.replace(/\n/g, '<br>'),
+        fromName: process.env.CRM_FROM_NAME || 'Zenbat',
+      })
+      await Promise.all([
+        admin.from('scheduled_prospect_emails')
+          .update({ status: 'sent', sent_at: sentAt }).eq('id', row.id),
+        admin.from('prospect_emails')
+          .insert({ prospect_id: row.prospect_id, sujet: row.sujet, corps: row.corps }),
+        ...(prospect.statut === 'a_contacter' ? [
+          admin.from('prospects')
+            .update({ statut: 'contacte', updated_at: sentAt }).eq('id', row.prospect_id),
+        ] : []),
+      ])
+      results.push({ id: row.id, status: 'sent' })
+    } catch (e) {
+      await admin.from('scheduled_prospect_emails')
+        .update({ status: 'error', error_msg: e.message, sent_at: sentAt }).eq('id', row.id)
+      results.push({ id: row.id, status: 'error', reason: e.message })
+    }
+  }
+  return res.status(200).json({ processed: results.length, results })
+}
+
 export default async function handler(req, res) {
   cors(req, res, { methods: 'GET, POST, OPTIONS' })
   if (req.method === 'OPTIONS') return res.status(204).end()
+
+  // Traitement cron — auth par CRON_SECRET (pg_cron, pas de JWT Supabase)
+  if (req.method === 'POST' && req.body?.action === 'process_queue') {
+    const cronSecret = process.env.CRON_SECRET
+    const provided   = (req.headers.authorization || '').replace('Bearer ', '')
+    if (!cronSecret || provided !== cronSecret) {
+      return res.status(401).json({ error: 'Non autorisé' })
+    }
+    try { return await processQueue(res) }
+    catch (e) { return res.status(500).json({ error: e?.message || 'Erreur serveur' }) }
+  }
 
   const auth = await authenticate(req, res, { adminOnly: true })
   if (!auth) return
