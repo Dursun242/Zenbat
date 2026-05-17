@@ -62,7 +62,7 @@ async function processQueue(res) {
     .eq('status', 'pending')
     .lte('send_at', now)
     .order('send_at', { ascending: true })
-    .limit(10)
+    .limit(1)
   if (error) throw error
 
   const results = []

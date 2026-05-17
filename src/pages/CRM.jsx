@@ -1330,8 +1330,8 @@ function DedupModal({ prospects, onDeleted, onClose }) {
 
 // ── Programmation d'envoi (10 emails/heure) ───────────────────────────────
 
-const RATE_PER_HOUR = 10
-const INTERVAL_MIN  = 60 / RATE_PER_HOUR // 6 minutes
+const RATE_PER_HOUR = 5
+const INTERVAL_MIN  = 60 / RATE_PER_HOUR // 12 minutes
 
 function ScheduleModal({ prospects, onScheduled, onClose }) {
   const withEmail = prospects.filter(p => p.email)
