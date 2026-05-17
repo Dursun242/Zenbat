@@ -651,6 +651,165 @@ function ProspectDetail({ prospectId, onUpdate, onDelete }) {
   )
 }
 
+// ── Envoi groupé ──────────────────────────────────────────────────────────
+
+function BulkSendModal({ prospects, onClose }) {
+  const withEmail = prospects.filter(p => p.email)
+  const noEmail   = prospects.filter(p => !p.email)
+  const first     = withEmail[0]
+  const [sujet, setSujet]     = useState(DEFAULT_SUJET)
+  const [corps, setCorps]     = useState(first ? buildTemplate(first) : '')
+  const [view, setView]       = useState('edit')
+  const [sending, setSending] = useState(false)
+  const [results, setResults] = useState([]) // {nom, email, status}
+  const [done, setDone]       = useState(false)
+
+  const handleSend = async () => {
+    if (!sujet.trim() || !corps.trim()) return
+    setSending(true)
+    const items = withEmail.map(p => ({ ...p, status: 'pending' }))
+    setResults([...items])
+
+    for (let i = 0; i < items.length; i++) {
+      const p = items[i]
+      items[i] = { ...p, status: 'sending' }
+      setResults([...items])
+      try {
+        const personalCorps = buildTemplate(p).replace(
+          // Remplace uniquement le corps avec la version personnalisée
+          // (sujet reste identique, corps adapté par buildTemplate)
+          /Bonjour .+?,/, `Bonjour ${p.nom.split(' ')[0]},`
+        )
+        // On utilise le corps édité mais on personnalise le Bonjour
+        const finalCorps = corps.replace(/^Bonjour [^,]+,/, `Bonjour ${p.nom.split(' ')[0]},`)
+        const corps_html = buildHtmlEmail(p, finalCorps)
+        await api('POST', { action: 'send_email', id: p.id, sujet, corps: finalCorps, corps_html })
+        items[i] = { ...p, status: 'ok' }
+      } catch { items[i] = { ...p, status: 'error' } }
+      setResults([...items])
+      // Pause anti-spam entre chaque envoi
+      if (i < items.length - 1) await new Promise(r => setTimeout(r, 800))
+    }
+    setSending(false)
+    setDone(true)
+  }
+
+  const stats = { ok: results.filter(r => r.status === 'ok').length, error: results.filter(r => r.status === 'error').length }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(26,22,18,0.6)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 680,
+        maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,0.25)' }}>
+
+        {/* Header */}
+        <div style={{ padding: '18px 24px', background: '#1A1612', borderRadius: '16px 16px 0 0',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>
+              ✉ Envoi groupé — {withEmail.length} prospect{withEmail.length > 1 ? 's' : ''}
+            </div>
+            {noEmail.length > 0 && (
+              <div style={{ fontSize: 11, color: '#d97706', marginTop: 2 }}>
+                ⚠ {noEmail.length} sans email seront ignorés
+              </div>
+            )}
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6B6358', fontSize: 22, cursor: 'pointer' }}>×</button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+          {!done ? (
+            <>
+              {/* Sujet */}
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6358',
+                  marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Objet</label>
+                <input value={sujet} onChange={e => setSujet(e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', border: '1px solid #E8E2D8', borderRadius: 8,
+                    fontSize: 13, fontFamily: 'inherit', outline: 'none', background: '#FAF7F2', boxSizing: 'border-box' }} />
+              </div>
+
+              {/* Éditeur / Preview */}
+              <div style={{ display: 'flex', marginBottom: 12, border: '1px solid #E8E2D8', borderRadius: 8, overflow: 'hidden' }}>
+                {[{ id: 'edit', label: '✏ Éditer' }, { id: 'preview', label: '👁 Aperçu (1er prospect)' }].map(v => (
+                  <button key={v.id} onClick={() => setView(v.id)}
+                    style={{ flex: 1, padding: '8px 0', border: 'none', fontSize: 12,
+                      background: view === v.id ? '#1A1612' : '#FAF7F2',
+                      color: view === v.id ? '#fff' : '#6B6358',
+                      fontWeight: view === v.id ? 600 : 400, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    {v.label}
+                  </button>
+                ))}
+              </div>
+              {view === 'edit' ? (
+                <textarea value={corps} onChange={e => setCorps(e.target.value)} rows={14}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #E8E2D8', borderRadius: 8,
+                    fontSize: 13, fontFamily: 'inherit', lineHeight: 1.7, outline: 'none',
+                    resize: 'vertical', boxSizing: 'border-box', background: '#FAF7F2', marginBottom: 12 }} />
+              ) : first ? (
+                <div style={{ border: '1px solid #E8E2D8', borderRadius: 10, overflow: 'hidden', marginBottom: 12 }}>
+                  <div style={{ background: '#F0ECE4', padding: '6px 12px', fontSize: 11, color: '#9A9088' }}>
+                    Aperçu pour {first.nom}
+                  </div>
+                  <iframe srcDoc={buildHtmlEmail(first, corps.replace(/^Bonjour [^,]+,/, `Bonjour ${first.nom.split(' ')[0]},`))}
+                    style={{ width: '100%', height: 400, border: 'none' }} sandbox="allow-same-origin" />
+                </div>
+              ) : null}
+
+              <p style={{ fontSize: 11, color: '#9A9088' }}>
+                Le "Bonjour" est personnalisé automatiquement pour chaque prospect. Pause de 0.8s entre chaque envoi.
+              </p>
+            </>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '24px 0' }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>{stats.error === 0 ? '✅' : '⚠️'}</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#1A1612', marginBottom: 8 }}>
+                {stats.ok} email{stats.ok > 1 ? 's' : ''} envoyé{stats.ok > 1 ? 's' : ''} avec succès
+              </div>
+              {stats.error > 0 && <div style={{ fontSize: 13, color: '#dc2626' }}>{stats.error} erreur{stats.error > 1 ? 's' : ''}</div>}
+            </div>
+          )}
+
+          {/* Progression */}
+          {results.length > 0 && !done && (
+            <div style={{ border: '1px solid #E8E2D8', borderRadius: 8, overflow: 'hidden', marginTop: 12 }}>
+              {results.map((r, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px',
+                  borderBottom: i < results.length - 1 ? '1px solid #F0ECE4' : 'none',
+                  background: r.status === 'sending' ? '#eff6ff' : '#fff' }}>
+                  <span style={{ fontSize: 14, width: 16 }}>
+                    {r.status === 'pending' ? '⏳' : r.status === 'sending' ? '🔄' : r.status === 'ok' ? '✓' : '✗'}
+                  </span>
+                  <span style={{ fontSize: 13, flex: 1, color: '#1A1612' }}>{r.nom}</span>
+                  <span style={{ fontSize: 11, color: '#6B6358' }}>{r.email}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: '14px 24px', borderTop: '1px solid #E8E2D8', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          {!done ? (
+            <button onClick={handleSend} disabled={sending || withEmail.length === 0}
+              style={{ padding: '10px 24px', background: '#C97B5C', border: 'none', borderRadius: 8,
+                color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                opacity: sending ? 0.6 : 1 }}>
+              {sending ? `Envoi en cours…` : `Envoyer à ${withEmail.length} prospect${withEmail.length > 1 ? 's' : ''} →`}
+            </button>
+          ) : (
+            <button onClick={onClose}
+              style={{ padding: '10px 24px', background: '#1A1612', border: 'none', borderRadius: 8,
+                color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              Fermer
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Import CSV + enrichissement email ─────────────────────────────────────
 
 const CSV_FIELD_ALIASES = {
@@ -1161,6 +1320,8 @@ export default function CRM() {
   const [addModal, setAddModal]     = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [csvOpen, setCsvOpen]       = useState(false)
+  const [selected, setSelected]     = useState(new Set()) // IDs sélectionnés
+  const [bulkOpen, setBulkOpen]     = useState(false)
 
   // Vérification admin au montage
   useEffect(() => {
@@ -1191,13 +1352,24 @@ export default function CRM() {
   useEffect(() => { if (authState === 'ok') loadProspects() }, [authState, loadProspects])
 
   const filtered = prospects.filter(p => {
-    if (filterStatut !== 'all' && p.statut !== filterStatut) return false
+    if (filterStatut === 'with_email'    && !p.email) return false
+    if (filterStatut === 'without_email' &&  p.email) return false
+    if (filterStatut !== 'all' && !['with_email','without_email'].includes(filterStatut) && p.statut !== filterStatut) return false
     if (search.trim()) {
       const q = search.toLowerCase()
       return (p.nom + p.entreprise + p.email + p.ville + p.secteur).toLowerCase().includes(q)
     }
     return true
   })
+
+  const toggleSelect = (id) => setSelected(prev => {
+    const n = new Set(prev)
+    n.has(id) ? n.delete(id) : n.add(id)
+    return n
+  })
+  const toggleAll = () => setSelected(prev =>
+    prev.size === filtered.length ? new Set() : new Set(filtered.map(p => p.id))
+  )
 
   const counts = STATUTS.reduce((acc, s) => {
     acc[s.id] = prospects.filter(p => p.statut === s.id).length
@@ -1285,18 +1457,20 @@ export default function CRM() {
       {/* Pipeline summary */}
       <div style={{ background: '#fff', borderBottom: '1px solid #E8E2D8',
         display: 'flex', gap: 0, overflowX: 'auto', flexShrink: 0 }}>
-        {[{ id: 'all', label: 'Tous', color: '#1A1612', bg: '#F0ECE4' }, ...STATUTS].map(s => {
-          const count = s.id === 'all' ? prospects.length : (counts[s.id] || 0)
+        {[
+          { id: 'all',           label: 'Tous',        color: '#1A1612', count: prospects.length },
+          ...STATUTS.map(s => ({ ...s, count: counts[s.id] || 0 })),
+          { id: 'with_email',    label: '✉ Avec email',  color: '#16a34a', count: prospects.filter(p => p.email).length },
+          { id: 'without_email', label: '∅ Sans email',  color: '#d97706', count: prospects.filter(p => !p.email).length },
+        ].map(s => {
           const active = filterStatut === s.id
           return (
             <button key={s.id} onClick={() => setFilter(s.id)}
               style={{ padding: '10px 16px', border: 'none', borderBottom: active ? `2px solid ${s.color}` : '2px solid transparent',
                 background: 'none', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
                 display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 18, fontWeight: 700, color: active ? s.color : '#6B6358' }}>{count}</span>
-              <span style={{ fontSize: 12, color: active ? s.color : '#6B6358', fontWeight: active ? 600 : 400 }}>
-                {s.id === 'all' ? 'Tous' : s.label}
-              </span>
+              <span style={{ fontSize: 18, fontWeight: 700, color: active ? s.color : '#6B6358' }}>{s.count}</span>
+              <span style={{ fontSize: 12, color: active ? s.color : '#6B6358', fontWeight: active ? 600 : 400 }}>{s.label}</span>
             </button>
           )
         })}
@@ -1316,6 +1490,15 @@ export default function CRM() {
               style={{ width: '100%', padding: '7px 10px', border: '1px solid #E8E2D8', borderRadius: 8,
                 fontSize: 13, fontFamily: 'inherit', outline: 'none', background: '#FAF7F2' }}
             />
+            {filtered.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 7 }}>
+                <input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0}
+                  onChange={toggleAll} style={{ cursor: 'pointer' }} />
+                <span style={{ fontSize: 11, color: '#6B6358' }}>
+                  {selected.size > 0 ? `${selected.size} sélectionné${selected.size > 1 ? 's' : ''}` : 'Tout sélectionner'}
+                </span>
+              </div>
+            )}
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -1328,21 +1511,29 @@ export default function CRM() {
                 const active = selId === p.id
                 const s = STATUTS.find(x => x.id === p.statut) || STATUTS[0]
                 return (
-                  <button key={p.id} onClick={() => setSelId(p.id)}
-                    style={{ width: '100%', textAlign: 'left', padding: '12px 14px',
-                      border: 'none', borderBottom: '1px solid #F0ECE4',
-                      background: active ? '#F0ECE4' : 'none', cursor: 'pointer',
-                      fontFamily: 'inherit', display: 'block' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#1A1612' }}>{p.nom}</span>
-                      <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 12,
-                        color: s.color, background: s.bg }}>{s.label}</span>
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'stretch',
+                    borderBottom: '1px solid #F0ECE4', background: active ? '#F0ECE4' : selected.has(p.id) ? '#fef9f0' : '#fff' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', paddingLeft: 10, flexShrink: 0 }}
+                      onClick={e => { e.stopPropagation(); toggleSelect(p.id) }}>
+                      <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)}
+                        style={{ cursor: 'pointer' }} onClick={e => e.stopPropagation()} />
                     </div>
-                    {p.entreprise && <div style={{ fontSize: 12, color: '#6B6358' }}>{p.entreprise}</div>}
-                    <div style={{ fontSize: 11, color: '#A8A09A', marginTop: 2 }}>
-                      {[p.ville, p.secteur].filter(Boolean).join(' · ')}
-                    </div>
-                  </button>
+                    <button onClick={() => setSelId(p.id)}
+                      style={{ flex: 1, textAlign: 'left', padding: '10px 10px 10px 8px',
+                        border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#1A1612' }}>{p.nom}</span>
+                        <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 12,
+                          color: s.color, background: s.bg }}>{s.label}</span>
+                      </div>
+                      {p.email
+                        ? <div style={{ fontSize: 11, color: '#16a34a' }}>✉ {p.email}</div>
+                        : <div style={{ fontSize: 11, color: '#d97706' }}>∅ Pas d'email</div>}
+                      <div style={{ fontSize: 11, color: '#A8A09A', marginTop: 1 }}>
+                        {[p.ville, p.secteur].filter(Boolean).join(' · ')}
+                      </div>
+                    </button>
+                  </div>
                 )
               })
             )}
@@ -1370,6 +1561,24 @@ export default function CRM() {
         </div>
       </div>
 
+      {/* Barre de sélection multiple */}
+      {selected.size > 0 && (
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          background: '#1A1612', borderRadius: 12, padding: '12px 20px', zIndex: 100,
+          display: 'flex', alignItems: 'center', gap: 16, boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}>
+          <span style={{ fontSize: 13, color: '#fff', fontWeight: 600 }}>
+            {selected.size} prospect{selected.size > 1 ? 's' : ''} sélectionné{selected.size > 1 ? 's' : ''}
+          </span>
+          <button onClick={() => setBulkOpen(true)}
+            style={{ padding: '8px 18px', background: '#C97B5C', border: 'none', borderRadius: 8,
+              color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            ✉ Envoyer le mail →
+          </button>
+          <button onClick={() => setSelected(new Set())}
+            style={{ background: 'none', border: 'none', color: '#6B6358', fontSize: 18, cursor: 'pointer' }}>×</button>
+        </div>
+      )}
+
       {addModal && (
         <ProspectModal onSave={handleProspectAdded} onClose={() => setAddModal(false)} />
       )}
@@ -1386,6 +1595,13 @@ export default function CRM() {
         <CsvImporter
           onImported={() => { loadProspects(); }}
           onClose={() => setCsvOpen(false)}
+        />
+      )}
+
+      {bulkOpen && (
+        <BulkSendModal
+          prospects={[...prospects].filter(p => selected.has(p.id))}
+          onClose={() => { setBulkOpen(false); setSelected(new Set()) }}
         />
       )}
     </div>
