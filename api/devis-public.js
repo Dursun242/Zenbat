@@ -223,6 +223,49 @@ function emailArtisanMsg({ devis, message }) {
 </div></body></html>`
 }
 
+// Email envoyé au client quand l'artisan refuse sa demande de modification.
+// Envoyé systématiquement (même si l'artisan n'a pas tapé de message libre)
+// pour que le client sache où en est sa demande et puisse rebondir
+// (renégocier, accepter le devis initial, ou contacter l'artisan).
+function emailRefusalToClient({ devis, clientName, company, brand, message, publicUrl }) {
+  const accent     = brand?.color || '#1A1612'
+  const senderName = company || "l'artisan"
+  return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif">
+<div style="max-width:520px;margin:32px auto;background:white;border-radius:12px;overflow:hidden;border:1px solid #ececec">
+
+  <div style="background:${accent};padding:18px 24px;color:white">
+    <div style="font-size:11px;font-weight:700;letter-spacing:1px;opacity:.9;text-transform:uppercase">Réponse de ${esc(senderName)}</div>
+    <div style="font-size:18px;font-weight:700;margin-top:4px">Devis ${esc(devis.numero)}</div>
+  </div>
+
+  <div style="padding:24px 28px">
+    <p style="font-size:14px;color:#1A1612;margin:0 0 6px">Bonjour${clientName ? ' ' + esc(clientName) : ''},</p>
+    <p style="font-size:14px;color:#555;line-height:1.55;margin:0 0 16px">
+      Votre demande de modification${devis.objet ? ` concernant <strong style="color:#1A1612">${esc(devis.objet)}</strong>` : ''} n'a pas pu être retenue par ${esc(senderName)}.
+    </p>
+
+    ${message ? `<div style="margin-bottom:18px">
+      <div style="font-size:11px;font-weight:700;color:#999;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px">Message</div>
+      <div style="background:#FAF7F2;border-left:3px solid ${accent};padding:12px 14px;border-radius:0 8px 8px 0;font-size:13px;color:#1A1612;white-space:pre-wrap;line-height:1.55">${esc(message)}</div>
+    </div>` : ''}
+
+    <p style="font-size:14px;color:#555;line-height:1.55;margin:0 0 20px">
+      Le devis initial reste valable. Vous pouvez le consulter à nouveau, l'accepter, le refuser, ou contacter l'artisan pour discuter d'une autre proposition.
+    </p>
+
+    ${publicUrl ? `<a href="${publicUrl}" style="display:block;text-align:center;background:${accent};color:white;text-decoration:none;padding:13px 24px;border-radius:8px;font-size:14px;font-weight:700">
+      Consulter le devis →
+    </a>` : ''}
+
+    ${(brand?.phone || brand?.email) ? `<p style="font-size:12px;color:#999;margin:18px 0 0;text-align:center">
+      ${brand.phone ? `Téléphone : <strong style="color:#666">${esc(brand.phone)}</strong>` : ''}
+      ${brand.phone && brand.email ? ' · ' : ''}
+      ${brand.email ? `<a href="mailto:${esc(brand.email)}" style="color:${accent};text-decoration:none">${esc(brand.email)}</a>` : ''}
+    </p>` : ''}
+  </div>
+</div></body></html>`
+}
+
 // Échappement HTML minimal pour ce qui vient du client public (message,
 // commentaires, nom) avant d'être interpolé dans un template email.
 const esc = s => String(s ?? '')
@@ -549,11 +592,25 @@ export default async function handler(req, res) {
       await admin.from('devis').update({ statut: 'envoye' }).eq('id', devis.id)
       await admin.from('devis_audit_log').insert({ devis_id: devis.id, event: 'artisan_responded', from_party: 'artisan', meta: { response: 'refused', message: artisan_message || null } })
 
-      if (artisan_message) {
-        const { data: client } = await admin.from('clients').select('email').eq('id', devis.client_id).maybeSingle()
-        if (client?.email) {
-          sendEmail({ to: client.email, subject: `Réponse concernant le devis ${devis.numero}`, html: emailArtisanMsg({ devis, message: artisan_message }) }).catch(() => {})
-        }
+      // Notification client systématique : qu'il y ait un message libre
+      // de l'artisan ou pas, le client doit savoir que sa demande a été
+      // refusée pour pouvoir rebondir (renégocier, accepter le devis
+      // initial, contacter directement).
+      const { data: client } = await admin.from('clients')
+        .select('email, nom, prenom, raison_sociale').eq('id', devis.client_id).maybeSingle()
+      if (client?.email) {
+        const { data: profile } = await admin.from('profiles')
+          .select('company_name, brand_data').eq('id', devis.owner_id).maybeSingle()
+        const brand     = (() => { const r = profile?.brand_data; if (!r) return {}; if (typeof r === 'string') { try { return JSON.parse(r) } catch { return {} } } return r })()
+        const company   = profile?.company_name || brand.companyName || ''
+        const cName     = (`${client.prenom || ''} ${client.nom || ''}`).trim() || client.raison_sociale || ''
+        const publicUrl = `${process.env.VITE_PUBLIC_URL || 'https://zenbat.vercel.app'}/d/${token}`
+        sendEmail({
+          to: client.email,
+          fromName: company ? `${company}` : 'Réponse devis',
+          subject: `Votre demande de modification du devis ${devis.numero}${devis.objet ? ' — ' + devis.objet : ''}`,
+          html: emailRefusalToClient({ devis, clientName: cName, company, brand, message: artisan_message?.trim() || null, publicUrl }),
+        }).catch(e => console.error('[refuse email]', e?.message))
       }
       return res.status(200).json({ ok: true })
     }
