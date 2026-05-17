@@ -47,9 +47,12 @@ function Header({ artisan }) {
 // ── Phase OTP ──────────────────────────────────────────────────────────────
 
 function PhaseEmail({ data, onVerified }) {
-  const [email,  setEmail]  = useState('')
-  const [sent,   setSent]   = useState(false)
-  const [sessId, setSessId] = useState(null)
+  // Hydratation depuis la session pré-vérification persistée : sur mobile,
+  // si l'onglet a été évincé pendant que le client lisait son email, on
+  // remonte directement sur l'écran de saisie du code.
+  const [email,  setEmail]  = useState(() => readPendingOtp(data?._token)?.email || '')
+  const [sessId, setSessId] = useState(() => readPendingOtp(data?._token)?.sid   || null)
+  const [sent,   setSent]   = useState(() => !!readPendingOtp(data?._token))
   const [code,   setCode]   = useState('')
   const [busy,   setBusy]   = useState(false)
   const [err,    setErr]    = useState(null)
@@ -64,6 +67,7 @@ function PhaseEmail({ data, onVerified }) {
       const json = await res.json()
       if (!res.ok) { setErr(json.error); return }
       setSessId(json.session_id); setSent(true)
+      writePendingOtp(data._token, json.session_id, email)
     } catch { setErr('Erreur réseau') } finally { setBusy(false) }
   }
 
@@ -74,6 +78,7 @@ function PhaseEmail({ data, onVerified }) {
         body: JSON.stringify({ action: 'verify_otp', token: data._token, session_id: sessId, code }) })
       const json = await res.json()
       if (!res.ok) { setErr(json.error); return }
+      clearPendingOtp(data._token)
       onVerified(sessId)
     } catch { setErr('Erreur réseau') } finally { setBusy(false) }
   }
@@ -132,7 +137,7 @@ function PhaseEmail({ data, onVerified }) {
                 style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: accent, color: 'white', fontWeight: 700, fontSize: 14, cursor: code.length !== 8 || busy ? 'default' : 'pointer', opacity: code.length !== 8 || busy ? 0.6 : 1 }}>
                 {busy ? 'Vérification…' : 'Accéder au devis'}
               </button>
-              <button onClick={() => { setSent(false); setCode(''); setErr(null) }}
+              <button onClick={() => { setSent(false); setCode(''); setErr(null); clearPendingOtp(data._token) }}
                 style={{ display: 'block', width: '100%', marginTop: 10, background: 'none', border: 'none', color: '#999', fontSize: 13, cursor: 'pointer' }}>
                 ← Modifier l'email
               </button>
@@ -297,6 +302,34 @@ function writePersistedSessionId(token, sid) {
 }
 function clearPersistedSessionId(token) {
   try { sessionStorage.removeItem(SESSION_KEY(token)) } catch {}
+}
+
+// Persiste la session OTP *pré-vérification* (id + email saisi) : sur
+// mobile, le client bascule sur son app mail pour lire le code, l'OS
+// peut évincer l'onglet en arrière-plan, et au retour le navigateur
+// recharge la page. Sans persistance, l'écran retombe sur la saisie de
+// l'email. Avec, on remonte directement sur la saisie du code.
+const PENDING_OTP_KEY = (token) => `zenbat_devis_pub_pending_${token}`
+const PENDING_OTP_TTL_MS = 15 * 60 * 1000 // 15 min — durée de validité de l'OTP côté serveur
+
+function readPendingOtp(token) {
+  if (!token) return null
+  try {
+    const raw = sessionStorage.getItem(PENDING_OTP_KEY(token))
+    if (!raw) return null
+    const { sid, email, t } = JSON.parse(raw)
+    if (!sid || !email || !t || Date.now() - t > PENDING_OTP_TTL_MS) {
+      sessionStorage.removeItem(PENDING_OTP_KEY(token))
+      return null
+    }
+    return { sid, email }
+  } catch { return null }
+}
+function writePendingOtp(token, sid, email) {
+  try { sessionStorage.setItem(PENDING_OTP_KEY(token), JSON.stringify({ sid, email, t: Date.now() })) } catch {}
+}
+function clearPendingOtp(token) {
+  try { sessionStorage.removeItem(PENDING_OTP_KEY(token)) } catch {}
 }
 
 export default function DevisPublicPage({ token }) {
