@@ -46,7 +46,7 @@ function Header({ artisan }) {
 
 // ── Phase OTP ──────────────────────────────────────────────────────────────
 
-function PhaseEmail({ data, onVerified, onSessionId }) {
+function PhaseEmail({ data, onVerified }) {
   const [email,  setEmail]  = useState('')
   const [sent,   setSent]   = useState(false)
   const [sessId, setSessId] = useState(null)
@@ -74,7 +74,7 @@ function PhaseEmail({ data, onVerified, onSessionId }) {
         body: JSON.stringify({ action: 'verify_otp', token: data._token, session_id: sessId, code }) })
       const json = await res.json()
       if (!res.ok) { setErr(json.error); return }
-      onSessionId(sessId); onVerified()
+      onVerified(sessId)
     } catch { setErr('Erreur réseau') } finally { setBusy(false) }
   }
 
@@ -452,7 +452,7 @@ export default function DevisPublicPage({ token }) {
     return (
       <div style={{ minHeight: '100vh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
         <Header artisan={data?.artisan} />
-        <PhaseEmail data={data} onVerified={() => load(sessionId)} onSessionId={id => { setSessionId(id); writePersistedSessionId(token, id); load(id) }} />
+        <PhaseEmail data={data} onVerified={id => { setSessionId(id); writePersistedSessionId(token, id); load(id) }} />
       </div>
     )
   }
