@@ -17,7 +17,7 @@ const AUDIT_LABELS = {
   artisan_responded:{ icon: '↪',  label: 'Réponse envoyée',              color: '#6b21a8' },
 }
 
-export default function DevisClientActions({ devis, client, onChange }) {
+export default function DevisClientActions({ devis, client, onChange, onCreateIndice }) {
   const [sending,    setSending]    = useState(false)
   const [sendErr,    setSendErr]    = useState(null)
   const [publicUrl,  setPublicUrl]  = useState(null)
@@ -126,33 +126,67 @@ export default function DevisClientActions({ devis, client, onChange }) {
     <div style={{ margin: '12px 0' }}>
 
       {/* ── Négociation en attente ── */}
-      {neg && !cloture && (
+      {neg && !cloture && (() => {
+        // Map id → ligne pour afficher les désignations dans la liste
+        // des changements (sans ça l'artisan ne sait pas QUELLES lignes
+        // le client veut retirer ou ajuster).
+        const lignesMap = new Map((devis.lignes || []).map(l => [l.id, l]))
+        const changes   = Array.isArray(neg.line_changes) ? neg.line_changes : []
+
+        return (
         <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 14, padding: 16, marginBottom: 12 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: '#c2410c', marginBottom: 8 }}>
-            🔄 Proposition client — Round {neg.round}
+          <div style={{ fontWeight: 700, fontSize: 14, color: '#c2410c', marginBottom: 4 }}>
+            🔄 Demande de modification du client — Round {neg.round}
+          </div>
+          <div style={{ fontSize: 12, color: '#9a3412', marginBottom: 12, lineHeight: 1.5 }}>
+            Le client propose les changements ci-dessous. À vous d'adapter le devis (créez un nouvel indice avec vos ajustements) ou de refuser sa proposition.
           </div>
 
-          {neg.message && (
-            <div style={{ fontSize: 13, color: '#1A1612', background: 'white', borderRadius: 10, padding: '8px 12px', marginBottom: 10 }}>
-              "{neg.message}"
+          {changes.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#9A8E82', textTransform: 'uppercase', marginBottom: 6, letterSpacing: '0.4px' }}>Modifications demandées</div>
+              {changes.map((c, i) => {
+                const ligne       = lignesMap.get(c.ligne_id)
+                const designation = ligne?.designation || `Ligne #${c.ligne_id?.slice?.(0, 6) || '?'}`
+                const unite       = ligne?.unite ? ` ${ligne.unite}` : ''
+                const isRemove    = c.action === 'remove'
+                return (
+                  <div key={i} style={{ background: 'white', borderRadius: 10, padding: '10px 12px', marginBottom: 6, border: '1px solid #fed7aa' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span style={{ display: 'inline-block', background: isRemove ? '#fee2e2' : '#fff7ed', color: isRemove ? '#991b1b' : '#c2410c', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, letterSpacing: '0.4px' }}>
+                        {isRemove ? 'RETIRER' : 'AJUSTER'}
+                      </span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#1A1612', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{designation}</span>
+                    </div>
+                    {!isRemove && (
+                      <div style={{ fontSize: 12, color: '#555', marginLeft: 2 }}>
+                        Quantité : <strong>{ligne?.quantite ?? '?'}{unite}</strong> → <strong style={{ color: '#c2410c' }}>{c.new_qty}{unite}</strong>
+                      </div>
+                    )}
+                    {c.comment && (
+                      <div style={{ fontSize: 12, color: '#6B6358', fontStyle: 'italic', marginTop: 4, marginLeft: 2 }}>
+                        « {c.comment} »
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
 
           {neg.budget_target && (
-            <div style={{ fontSize: 12, color: '#6B6358', marginBottom: 8 }}>
-              Budget cible : <strong>{fmtEur(neg.budget_target)}</strong>
+            <div style={{ background: 'white', borderRadius: 10, padding: '10px 12px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #fed7aa' }}>
+              <span style={{ fontSize: 12, color: '#6B6358' }}>Budget cible client</span>
+              <strong style={{ fontSize: 14, color: '#1A1612' }}>{fmtEur(neg.budget_target)} HT</strong>
             </div>
           )}
 
-          {neg.line_changes?.length > 0 && (
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#9A8E82', textTransform: 'uppercase', marginBottom: 6 }}>Modifications demandées</div>
-              {neg.line_changes.map((c, i) => (
-                <div key={i} style={{ display: 'flex', gap: 8, fontSize: 12, padding: '4px 0', color: c.action === 'remove' ? '#ef4444' : '#f97316' }}>
-                  <span>{c.action === 'remove' ? '✗ Retirer' : `~ Qté → ${c.new_qty}`}</span>
-                  <span style={{ color: '#6B6358' }}>{c.comment || ''}</span>
-                </div>
-              ))}
+          {neg.message && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#9A8E82', textTransform: 'uppercase', marginBottom: 6, letterSpacing: '0.4px' }}>Message du client</div>
+              <div style={{ fontSize: 13, color: '#1A1612', background: 'white', borderRadius: 10, padding: '10px 12px', border: '1px solid #fed7aa', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                {neg.message}
+              </div>
             </div>
           )}
 
@@ -166,16 +200,19 @@ export default function DevisClientActions({ devis, client, onChange }) {
 
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => respond('refuse_client_changes')} disabled={responding}
-              style={{ flex: 1, padding: '9px', borderRadius: 10, border: '1.5px solid #ef4444', background: 'white', color: '#ef4444', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+              style={{ flex: 1, padding: '9px', borderRadius: 10, border: '1.5px solid #ef4444', background: 'white', color: '#ef4444', fontWeight: 700, fontSize: 12, cursor: responding ? 'default' : 'pointer', opacity: responding ? 0.6 : 1 }}>
               ✗ Refuser
             </button>
-            <button onClick={() => respond('accept_client_changes')} disabled={responding}
-              style={{ flex: 2, padding: '9px', borderRadius: 10, border: 'none', background: '#22c55e', color: 'white', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
-              ✅ Accepter leurs modifications
-            </button>
+            {onCreateIndice && (
+              <button onClick={() => onCreateIndice(devis.id)} disabled={responding}
+                style={{ flex: 2, padding: '9px', borderRadius: 10, border: 'none', background: '#6b21a8', color: 'white', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                ✦ Créer un nouvel indice
+              </button>
+            )}
           </div>
         </div>
-      )}
+        )
+      })()}
 
       {/* ── Bouton d'envoi ── */}
       {!cloture && (

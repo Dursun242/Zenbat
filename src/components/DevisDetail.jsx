@@ -276,7 +276,7 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
 
         <div style={{ padding: 18 }}>
           {/* Suivi client — envoi, négociation, audit */}
-          <DevisClientActions devis={d} client={cl} onChange={onChange} />
+          <DevisClientActions devis={d} client={cl} onChange={onChange} onCreateIndice={onCreateIndice} />
 
           {/* Bouton PDF */}
           <button className="detail-pdf-btn" onClick={() => setShowPDF(true)}
