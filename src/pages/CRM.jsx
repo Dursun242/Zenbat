@@ -1328,6 +1328,344 @@ function DedupModal({ prospects, onDeleted, onClose }) {
   )
 }
 
+// ── Programmation d'envoi (10 emails/heure) ───────────────────────────────
+
+const RATE_PER_HOUR = 10
+const INTERVAL_MIN  = 60 / RATE_PER_HOUR // 6 minutes
+
+function ScheduleModal({ prospects, onScheduled, onClose }) {
+  const withEmail = prospects.filter(p => p.email)
+  const noEmail   = prospects.filter(p => !p.email)
+  const first     = withEmail[0]
+
+  const defaultStart = () => {
+    const d = new Date(); d.setSeconds(0, 0)
+    d.setMinutes(d.getMinutes() + 2)
+    return d.toISOString().slice(0, 16)
+  }
+
+  const [sujet, setSujet]   = useState(DEFAULT_SUJET)
+  const [corps, setCorps]   = useState(first ? buildTemplate(first) : '')
+  const [view, setView]     = useState('edit')
+  const [startNow, setStartNow] = useState(true)
+  const [startTime, setStartTime] = useState(defaultStart)
+  const [saving, setSaving] = useState(false)
+  const [done, setDone]     = useState(false)
+
+  const startDate = startNow ? new Date() : new Date(startTime)
+  const schedule  = withEmail.map((p, i) => ({
+    prospect: p,
+    sendAt: new Date(startDate.getTime() + i * INTERVAL_MIN * 60000),
+  }))
+  const endTime    = schedule.at(-1)?.sendAt
+  const totalMin   = endTime ? Math.round((endTime - startDate) / 60000) : 0
+  const durLabel   = totalMin >= 60
+    ? `${Math.floor(totalMin / 60)}h${totalMin % 60 > 0 ? `${totalMin % 60}min` : ''}`
+    : `${totalMin}min`
+
+  const handleSchedule = async () => {
+    if (!sujet.trim() || !corps.trim()) return
+    setSaving(true)
+    try {
+      const emails = withEmail.map((p, i) => {
+        const finalCorps = corps.replace(/^Bonjour [^,]+,/, `Bonjour ${p.nom.split(' ')[0]},`)
+        return {
+          id:        p.id,
+          sujet,
+          corps:     finalCorps,
+          corps_html: buildHtmlEmail(p, finalCorps),
+          send_at:   new Date(startDate.getTime() + i * INTERVAL_MIN * 60000).toISOString(),
+        }
+      })
+      await api('POST', { action: 'schedule_bulk', emails })
+      setDone(true)
+      onScheduled()
+    } catch (e) { alert(e.message) }
+    setSaving(false)
+  }
+
+  const fmt = d => d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) +
+    (d.toDateString() !== new Date().toDateString() ? ` · ${d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}` : '')
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(26,22,18,0.6)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 680,
+        maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,0.25)' }}>
+
+        <div style={{ padding: '18px 24px', background: '#1A1612', borderRadius: '16px 16px 0 0',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>
+              📅 Programmation — {withEmail.length} prospect{withEmail.length > 1 ? 's' : ''}
+            </div>
+            <div style={{ fontSize: 11, color: '#6B6358', marginTop: 2 }}>
+              Max {RATE_PER_HOUR} emails/heure · 1 email toutes les {INTERVAL_MIN} minutes
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6B6358', fontSize: 22, cursor: 'pointer' }}>×</button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+          {done ? (
+            <div style={{ textAlign: 'center', padding: '32px 0' }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>📅</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#1A1612', marginBottom: 8 }}>
+                {withEmail.length} emails programmés
+              </div>
+              <div style={{ fontSize: 13, color: '#6B6358' }}>
+                De {fmt(startDate)} à {endTime ? fmt(endTime) : '—'}
+              </div>
+              <div style={{ marginTop: 12, fontSize: 12, color: '#9A9088' }}>
+                Suivez la progression dans "📬 File d'envoi" (bouton en haut à droite).
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Heure de début */}
+              <div style={{ marginBottom: 16, background: '#FAF7F2', borderRadius: 10, padding: '14px 16px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#6B6358', marginBottom: 10,
+                  textTransform: 'uppercase', letterSpacing: '0.05em' }}>Début de l'envoi</div>
+                <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {[{ v: true, label: 'Dès maintenant' }, { v: false, label: 'Heure choisie' }].map(opt => (
+                    <label key={String(opt.v)} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
+                      <input type="radio" checked={startNow === opt.v} onChange={() => setStartNow(opt.v)} />
+                      {opt.label}
+                    </label>
+                  ))}
+                  {!startNow && (
+                    <input type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)}
+                      style={{ padding: '6px 10px', border: '1px solid #E8E2D8', borderRadius: 6,
+                        fontSize: 13, fontFamily: 'inherit', background: '#fff' }} />
+                  )}
+                </div>
+                {withEmail.length > 0 && (
+                  <div style={{ marginTop: 10, fontSize: 12, color: '#C97B5C', fontWeight: 600 }}>
+                    ⏱ Durée totale : ~{durLabel} · Dernier email : {endTime ? fmt(endTime) : '—'}
+                  </div>
+                )}
+              </div>
+
+              {noEmail.length > 0 && (
+                <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 8,
+                  padding: '8px 12px', marginBottom: 14, fontSize: 12, color: '#92400e' }}>
+                  ⚠ {noEmail.length} prospect{noEmail.length > 1 ? 's' : ''} sans email ignoré{noEmail.length > 1 ? 's' : ''}
+                </div>
+              )}
+
+              {/* Sujet */}
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6358',
+                  marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Objet</label>
+                <input value={sujet} onChange={e => setSujet(e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', border: '1px solid #E8E2D8', borderRadius: 8,
+                    fontSize: 13, fontFamily: 'inherit', outline: 'none', background: '#FAF7F2', boxSizing: 'border-box' }} />
+              </div>
+
+              {/* Onglets éditeur */}
+              <div style={{ display: 'flex', marginBottom: 12, border: '1px solid #E8E2D8', borderRadius: 8, overflow: 'hidden' }}>
+                {[
+                  { id: 'edit',     label: '✏ Éditer' },
+                  { id: 'preview',  label: '👁 Aperçu' },
+                  { id: 'schedule', label: `📋 Horaires (${withEmail.length})` },
+                ].map(v => (
+                  <button key={v.id} onClick={() => setView(v.id)}
+                    style={{ flex: 1, padding: '8px 0', border: 'none', fontSize: 12,
+                      background: view === v.id ? '#1A1612' : '#FAF7F2',
+                      color: view === v.id ? '#fff' : '#6B6358',
+                      fontWeight: view === v.id ? 600 : 400, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    {v.label}
+                  </button>
+                ))}
+              </div>
+
+              {view === 'edit' && (
+                <textarea value={corps} onChange={e => setCorps(e.target.value)} rows={12}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #E8E2D8', borderRadius: 8,
+                    fontSize: 13, fontFamily: 'inherit', lineHeight: 1.7, outline: 'none',
+                    resize: 'vertical', boxSizing: 'border-box', background: '#FAF7F2' }} />
+              )}
+
+              {view === 'preview' && first && (
+                <div style={{ border: '1px solid #E8E2D8', borderRadius: 10, overflow: 'hidden' }}>
+                  <div style={{ background: '#F0ECE4', padding: '6px 12px', fontSize: 11, color: '#9A9088' }}>
+                    Aperçu pour {first.nom}
+                  </div>
+                  <iframe
+                    srcDoc={buildHtmlEmail(first, corps.replace(/^Bonjour [^,]+,/, `Bonjour ${first.nom.split(' ')[0]},`))}
+                    style={{ width: '100%', height: 400, border: 'none' }} sandbox="allow-same-origin" />
+                </div>
+              )}
+
+              {view === 'schedule' && (
+                <div style={{ border: '1px solid #E8E2D8', borderRadius: 8, overflow: 'hidden', maxHeight: 300, overflowY: 'auto' }}>
+                  {schedule.map(({ prospect: p, sendAt }, i) => (
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px',
+                      borderBottom: i < schedule.length - 1 ? '1px solid #F0ECE4' : 'none',
+                      background: i % 2 === 0 ? '#fff' : '#FAF7F2' }}>
+                      <span style={{ fontSize: 11, color: '#9A9088', width: 28, textAlign: 'right', flexShrink: 0 }}>#{i + 1}</span>
+                      <span style={{ fontSize: 13, flex: 1, color: '#1A1612', fontWeight: 600,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nom}</span>
+                      <span style={{ fontSize: 11, color: '#6B6358', whiteSpace: 'nowrap' }}>{fmt(sendAt)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div style={{ padding: '14px 24px', borderTop: '1px solid #E8E2D8', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          {done ? (
+            <button onClick={onClose}
+              style={{ padding: '10px 24px', background: '#1A1612', border: 'none', borderRadius: 8,
+                color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              Fermer
+            </button>
+          ) : (
+            <>
+              <button onClick={onClose}
+                style={{ padding: '10px 18px', border: '1px solid #E8E2D8', borderRadius: 8,
+                  background: '#FAF7F2', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Annuler
+              </button>
+              <button onClick={handleSchedule} disabled={saving || withEmail.length === 0}
+                style={{ padding: '10px 24px', background: '#C97B5C', border: 'none', borderRadius: 8,
+                  color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                  opacity: saving ? 0.6 : 1 }}>
+                {saving ? 'Programmation…' : `📅 Programmer ${withEmail.length} email${withEmail.length > 1 ? 's' : ''}`}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Panneau file d'envoi ───────────────────────────────────────────────────
+
+function QueuePanel({ onClose }) {
+  const [items, setItems]       = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [cancelling, setCancelling] = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try { const d = await api('GET', { action: 'list_queue' }); setItems(d.queue || []) } catch {}
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const cancelOne = async (id) => {
+    setCancelling(id)
+    try {
+      await api('POST', { action: 'cancel_scheduled', id })
+      setItems(prev => prev.map(x => x.id === id ? { ...x, status: 'cancelled' } : x))
+    } catch {}
+    setCancelling(null)
+  }
+
+  const cancelAll = async () => {
+    if (!window.confirm('Annuler tous les emails en attente ?')) return
+    try {
+      await api('POST', { action: 'cancel_all_pending' })
+      setItems(prev => prev.map(x => x.status === 'pending' ? { ...x, status: 'cancelled' } : x))
+    } catch {}
+  }
+
+  const ST = {
+    pending:   { icon: '⏳', color: '#d97706', label: 'En attente' },
+    sent:      { icon: '✓',  color: '#16a34a', label: 'Envoyé' },
+    error:     { icon: '✗',  color: '#dc2626', label: 'Erreur' },
+    cancelled: { icon: '—',  color: '#9A9088', label: 'Annulé' },
+  }
+
+  const pending = items.filter(x => x.status === 'pending').length
+  const sent    = items.filter(x => x.status === 'sent').length
+  const errors  = items.filter(x => x.status === 'error').length
+
+  const fmt = d => new Date(d).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', justifyContent: 'flex-end' }}>
+      <div onClick={onClose} style={{ flex: 1, background: 'rgba(26,22,18,0.4)' }} />
+      <div style={{ width: 480, background: '#fff', display: 'flex', flexDirection: 'column',
+        boxShadow: '-8px 0 40px rgba(0,0,0,0.15)' }}>
+
+        <div style={{ padding: '20px 24px', background: '#1A1612',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>📬 File d'envoi</div>
+            <div style={{ fontSize: 11, color: '#6B6358', marginTop: 2 }}>
+              {pending} en attente · {sent} envoyés{errors > 0 ? ` · ${errors} erreurs` : ''}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {pending > 0 && (
+              <button onClick={cancelAll}
+                style={{ padding: '5px 10px', background: '#dc2626', border: 'none', borderRadius: 6,
+                  color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Tout annuler
+              </button>
+            )}
+            <button onClick={load}
+              style={{ background: 'none', border: 'none', color: '#9A9088', fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>↻</button>
+            <button onClick={onClose}
+              style={{ background: 'none', border: 'none', color: '#6B6358', fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
+          </div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {loading ? <Spinner /> : items.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', color: '#9A9088', fontSize: 13 }}>
+              Aucun email programmé.
+            </div>
+          ) : (
+            items.map((item, i) => {
+              const st = ST[item.status] || ST.pending
+              return (
+                <div key={item.id} style={{ padding: '11px 20px', borderBottom: '1px solid #F0ECE4',
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  background: item.status === 'pending' ? '#fff' : item.status === 'sent' ? '#f0fdf4' : item.status === 'error' ? '#fff5f5' : '#fafafa' }}>
+                  <span style={{ fontSize: 14, color: st.color, flexShrink: 0, width: 16, textAlign: 'center' }}>{st.icon}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1612',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {item.prospect_nom || '—'}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#6B6358' }}>
+                      {fmt(item.send_at)}
+                      {item.status === 'error' && item.error_msg && (
+                        <span style={{ color: '#dc2626', marginLeft: 6 }}>· {item.error_msg}</span>
+                      )}
+                    </div>
+                  </div>
+                  {item.status === 'pending' && (
+                    <button onClick={() => cancelOne(item.id)} disabled={cancelling === item.id}
+                      style={{ padding: '3px 8px', border: '1px solid #fecaca', borderRadius: 5,
+                        background: '#fff', color: '#dc2626', fontSize: 11, cursor: 'pointer',
+                        fontFamily: 'inherit', opacity: cancelling === item.id ? 0.5 : 1 }}>
+                      ×
+                    </button>
+                  )}
+                </div>
+              )
+            })
+          )}
+        </div>
+
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #E8E2D8', background: '#FAF7F2' }}>
+          <p style={{ fontSize: 11, color: '#9A9088', margin: 0, lineHeight: 1.5 }}>
+            Traitement automatique toutes les 5 min via pg_cron · Max {RATE_PER_HOUR} emails/heure
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Page principale CRM ────────────────────────────────────────────────────
 
 // ── Panneau recherche Google Places ───────────────────────────────────────
@@ -1491,6 +1829,8 @@ export default function CRM() {
   const [csvOpen, setCsvOpen]       = useState(false)
   const [selected, setSelected]     = useState(new Set()) // IDs sélectionnés
   const [bulkOpen, setBulkOpen]     = useState(false)
+  const [scheduleOpen, setScheduleOpen] = useState(false)
+  const [queueOpen, setQueueOpen]   = useState(false)
   const [dedupOpen, setDedupOpen]   = useState(false)
 
   // Vérification admin au montage
@@ -1606,6 +1946,11 @@ export default function CRM() {
           <span style={{ fontSize: 12, color: '#A8A09A' }}>Baie de Seine</span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setQueueOpen(true)}
+            style={{ padding: '7px 14px', background: '#2563eb', border: 'none', borderRadius: 8,
+              color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+            📬 File d'envoi
+          </button>
           <button onClick={() => setDedupOpen(true)}
             style={{ padding: '7px 14px', background: '#6B4040', border: 'none', borderRadius: 8,
               color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -1747,7 +2092,12 @@ export default function CRM() {
           <button onClick={() => setBulkOpen(true)}
             style={{ padding: '8px 18px', background: '#C97B5C', border: 'none', borderRadius: 8,
               color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-            ✉ Envoyer le mail →
+            ✉ Envoyer maintenant
+          </button>
+          <button onClick={() => setScheduleOpen(true)}
+            style={{ padding: '8px 18px', background: '#2563eb', border: 'none', borderRadius: 8,
+              color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            📅 Programmer →
           </button>
           <button onClick={() => setSelected(new Set())}
             style={{ background: 'none', border: 'none', color: '#6B6358', fontSize: 18, cursor: 'pointer' }}>×</button>
@@ -1786,6 +2136,18 @@ export default function CRM() {
           onDeleted={loadProspects}
           onClose={() => setDedupOpen(false)}
         />
+      )}
+
+      {scheduleOpen && (
+        <ScheduleModal
+          prospects={[...prospects].filter(p => selected.has(p.id))}
+          onScheduled={() => { setSelected(new Set()) }}
+          onClose={() => setScheduleOpen(false)}
+        />
+      )}
+
+      {queueOpen && (
+        <QueuePanel onClose={() => setQueueOpen(false)} />
       )}
     </div>
   )

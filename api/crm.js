@@ -159,6 +159,21 @@ export default async function handler(req, res) {
         return res.status(200).json({ emails: [...found] })
       }
 
+      if (action === 'list_queue') {
+        const { data, error } = await admin
+          .from('scheduled_prospect_emails')
+          .select('id, sujet, send_at, status, error_msg, sent_at, prospect_id, prospects(nom, email)')
+          .order('send_at', { ascending: true })
+          .limit(500)
+        if (error) throw error
+        const queue = (data || []).map(x => ({
+          id: x.id, sujet: x.sujet, send_at: x.send_at, status: x.status,
+          error_msg: x.error_msg, sent_at: x.sent_at, prospect_id: x.prospect_id,
+          prospect_nom: x.prospects?.nom, prospect_email: x.prospects?.email,
+        }))
+        return res.status(200).json({ queue })
+      }
+
       return res.status(400).json({ error: 'action inconnue' })
     }
 
@@ -244,6 +259,47 @@ export default async function handler(req, res) {
           await admin.from('prospects').update({ statut: 'contacte', updated_at: new Date().toISOString() }).eq('id', id)
         }
 
+        return res.status(200).json({ ok: true })
+      }
+
+      if (action === 'schedule_bulk') {
+        const { emails } = body
+        if (!Array.isArray(emails) || emails.length === 0)
+          return res.status(400).json({ error: 'emails[] requis' })
+        const rows = emails.map(e => ({
+          prospect_id: e.id,
+          sujet:       e.sujet?.trim(),
+          corps:       e.corps?.trim(),
+          corps_html:  e.corps_html || null,
+          send_at:     e.send_at,
+          status:      'pending',
+        }))
+        const { data, error } = await admin
+          .from('scheduled_prospect_emails')
+          .insert(rows)
+          .select('id')
+        if (error) throw error
+        return res.status(200).json({ scheduled: data.length })
+      }
+
+      if (action === 'cancel_scheduled') {
+        const { id } = body
+        if (!id) return res.status(400).json({ error: 'id requis' })
+        const { error } = await admin
+          .from('scheduled_prospect_emails')
+          .update({ status: 'cancelled' })
+          .eq('id', id)
+          .eq('status', 'pending')
+        if (error) throw error
+        return res.status(200).json({ ok: true })
+      }
+
+      if (action === 'cancel_all_pending') {
+        const { error } = await admin
+          .from('scheduled_prospect_emails')
+          .update({ status: 'cancelled' })
+          .eq('status', 'pending')
+        if (error) throw error
         return res.status(200).json({ ok: true })
       }
 
