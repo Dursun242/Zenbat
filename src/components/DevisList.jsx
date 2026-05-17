@@ -202,6 +202,7 @@ export default function DevisList({ devis, clients, goDevis, setTab, onDelete })
   });
 
   const total = devis.filter(d => !d.root_devis_id || !devis.find(x => x.id === d.root_devis_id)).length;
+  const negociationCount = devis.filter(d => d.statut === "en_negociation").length;
 
   return (
     <div style={{ padding: 18 }} className="fu">
@@ -218,17 +219,42 @@ export default function DevisList({ devis, clients, goDevis, setTab, onDelete })
         </button>
       </div>
 
+      {/* Bannière d'alerte si des clients ont envoyé des demandes de modification.
+          Cliquable : filtre la liste sur les devis en négociation. */}
+      {negociationCount > 0 && filtre !== "en_negociation" && (
+        <button onClick={() => setFiltre("en_negociation")}
+          style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", marginBottom: 12,
+            background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10,
+            padding: "10px 14px", cursor: "pointer", textAlign: "left" }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#f97316", flexShrink: 0 }}/>
+          <span style={{ fontSize: 12, color: "#9a3412", fontWeight: 600, flex: 1 }}>
+            {negociationCount} demande{negociationCount > 1 ? "s" : ""} de modification en attente de votre réponse
+          </span>
+          <span style={{ fontSize: 11, color: "#c2410c", fontWeight: 700 }}>Voir →</span>
+        </button>
+      )}
+
       <div style={{ display: "flex", gap: 6, marginBottom: 14, overflowX: "auto", paddingBottom: 4 }}>
-        {["tous", "brouillon", "en_signature", "accepte", "refuse"].map(s => (
-          <button key={s} onClick={() => setFiltre(s)}
-            style={{ flexShrink: 0, padding: "5px 12px", borderRadius: 20, border: "none",
-              fontSize: 11, fontWeight: 600, cursor: "pointer",
-              background: filtre === s ? "#1A1612" : "white",
-              color: filtre === s ? "white" : "#6B6358",
-              boxShadow: filtre === s ? "none" : "0 1px 3px rgba(0,0,0,.06)" }}>
-            {s === "tous" ? "Tous" : STATUT[s]?.label}
-          </button>
-        ))}
+        {["tous", "brouillon", "en_signature", "en_negociation", "accepte", "refuse"].map(s => {
+          const showAlert = s === "en_negociation" && negociationCount > 0;
+          return (
+            <button key={s} onClick={() => setFiltre(s)}
+              style={{ flexShrink: 0, padding: "5px 12px", borderRadius: 20, border: "none",
+                fontSize: 11, fontWeight: 600, cursor: "pointer",
+                background: filtre === s ? "#1A1612" : "white",
+                color: filtre === s ? "white" : "#6B6358",
+                boxShadow: filtre === s ? "none" : "0 1px 3px rgba(0,0,0,.06)",
+                display: "inline-flex", alignItems: "center", gap: 5 }}>
+              {s === "tous" ? "Tous" : STATUT[s]?.label}
+              {showAlert && (
+                <span style={{ background: "#ef4444", color: "white", fontSize: 9, fontWeight: 700,
+                  padding: "1px 6px", borderRadius: 8, minWidth: 16, textAlign: "center" }}>
+                  {negociationCount}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div style={{ background: "white", borderRadius: 14, border: "1px solid #F0EBE3", overflow: "hidden" }}>

@@ -55,9 +55,27 @@ const NAV = [
   { id: "factures",  label: "Factures", icon: I.file  },
 ];
 
+// Onglet initial depuis ?tab= dans l'URL — utilisé par les liens dans les
+// emails artisan (ex. notification de négociation client). On nettoie
+// l'URL après lecture pour ne pas la re-jouer à chaque refresh.
+function initialTabFromUrl() {
+  if (typeof window === "undefined") return "dashboard";
+  try {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    const allowed = ["dashboard", "clients", "agent", "devis", "factures"];
+    if (t && allowed.includes(t)) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("tab");
+      window.history.replaceState({}, "", url.pathname + (url.search ? url.search : "") + url.hash);
+      return t;
+    }
+  } catch { /* ignore */ }
+  return "dashboard";
+}
+
 export default function App() {
   const [screen, setScreen] = useState("app");
-  const [tab,    setTab]    = useState("dashboard");
+  const [tab,    setTab]    = useState(initialTabFromUrl);
   const [selC,   setSelC]   = useState(null);
   const [plan,         setPlan]         = useState("free");
   const [billingCycle, setBillingCycle] = useState(null);
@@ -239,10 +257,12 @@ export default function App() {
   const activeNav = NAV.find(n => tab.startsWith(n.id))?.id || "dashboard";
 
   // Compteurs pour les pastilles des onglets de la BottomNav.
-  // - Devis : en attente de signature (action requise côté client).
+  // - Devis : en attente de signature ou en négociation (le client a
+  //   envoyé une demande de modification → action requise côté artisan).
   // - Factures : envoyées non payées.
+  const negociationsCount = devis.filter(d => d.statut === "en_negociation").length;
   const navBadges = {
-    devis:    devis.filter(d => d.statut === "en_signature").length,
+    devis:    devis.filter(d => ["en_signature", "en_negociation"].includes(d.statut)).length,
     factures: invoices.filter(i => i.statut === "envoyee").length,
   };
 
@@ -494,6 +514,7 @@ export default function App() {
         <nav className="app-sidebar" style={{ display: "none", width: 220, flexDirection: "column", background: "#1A1612", borderRight: "1px solid rgba(255,255,255,.06)", flexShrink: 0, paddingTop: 8, overflowY: "auto" }}>
           {NAV.map(({ id, label, icon }) => {
             const active = activeNav === id;
+            const badgeCount = navBadges[id] || 0;
             return (
               <button key={id} onClick={() => setTab(id)}
                 className={active ? "active-nav" : ""}
@@ -503,6 +524,11 @@ export default function App() {
                 {id === "agent" && isFreemium && freemiumQuotaReached && (
                   <span style={{ marginLeft: "auto", background: "#ef4444", color: "white", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 10 }}>
                     !
+                  </span>
+                )}
+                {id !== "agent" && badgeCount > 0 && (
+                  <span style={{ marginLeft: "auto", background: "#ef4444", color: "white", fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 10, minWidth: 18, textAlign: "center" }}>
+                    {badgeCount > 99 ? "99+" : badgeCount}
                   </span>
                 )}
               </button>

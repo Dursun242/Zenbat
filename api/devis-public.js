@@ -223,6 +223,101 @@ function emailArtisanMsg({ devis, message }) {
 </div></body></html>`
 }
 
+// Échappement HTML minimal pour ce qui vient du client public (message,
+// commentaires, nom) avant d'être interpolé dans un template email.
+const esc = s => String(s ?? '')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+
+// Email pour l'artisan quand le client envoie une demande de modification
+// du devis (action 'negotiate'). Résume les changements de lignes, le
+// budget cible, le message libre, et redirige vers l'app pour répondre.
+function emailNegotiationArtisan({ company, devis, clientName, clientEmail, changes, lignesMap, budgetTarget, message, newTotal, oldTotal, appUrl }) {
+  const accent = '#f97316' // orange — code couleur du statut "Négociation"
+
+  const changesHtml = (changes || []).map(c => {
+    const ligne = lignesMap.get(c.ligne_id)
+    const designation = esc(ligne?.designation || 'Ligne')
+    const commentHtml = c.comment
+      ? `<div style="font-size:12px;color:#777;font-style:italic;margin-top:4px">« ${esc(c.comment)} »</div>`
+      : ''
+    if (c.action === 'remove') {
+      return `<li style="padding:10px 0;border-bottom:1px solid #f0f0f0;list-style:none">
+        <span style="display:inline-block;background:#fee2e2;color:#991b1b;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;letter-spacing:.3px">RETIRER</span>
+        <div style="font-size:14px;color:#1A1612;margin-top:6px;text-decoration:line-through;text-decoration-color:#bbb">${designation}</div>
+        ${commentHtml}
+      </li>`
+    }
+    if (c.action === 'change_qty') {
+      const oldQty = ligne?.quantite ?? '?'
+      const unite  = ligne?.unite ? ` ${esc(ligne.unite)}` : ''
+      return `<li style="padding:10px 0;border-bottom:1px solid #f0f0f0;list-style:none">
+        <span style="display:inline-block;background:#fff7ed;color:#c2410c;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;letter-spacing:.3px">AJUSTER</span>
+        <div style="font-size:14px;color:#1A1612;margin-top:6px">${designation}</div>
+        <div style="font-size:13px;color:#555;margin-top:2px">Quantité : <strong>${oldQty}${unite}</strong> → <strong style="color:${accent}">${esc(c.new_qty)}${unite}</strong></div>
+        ${commentHtml}
+      </li>`
+    }
+    return ''
+  }).filter(Boolean).join('')
+
+  const diff = newTotal - oldTotal
+  const showTotal = changes && changes.length > 0 && newTotal !== oldTotal
+  const diffLabel = diff < 0
+    ? `<span style="color:#15803d;font-size:12px">Économie de ${fmtEur(Math.abs(diff))} HT</span>`
+    : diff > 0
+      ? `<span style="color:#b45309;font-size:12px">+${fmtEur(diff)} HT</span>`
+      : ''
+
+  return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif">
+<div style="max-width:560px;margin:32px auto;background:white;border-radius:12px;overflow:hidden;border:1px solid #ececec">
+
+  <div style="background:${accent};padding:18px 24px;color:white">
+    <div style="font-size:11px;font-weight:700;letter-spacing:1px;opacity:.9;text-transform:uppercase">Demande client</div>
+    <div style="font-size:18px;font-weight:700;margin-top:4px">Modification du devis ${esc(devis.numero)}</div>
+  </div>
+
+  <div style="padding:24px 28px">
+    <p style="font-size:14px;color:#1A1612;margin:0 0 6px">Bonjour${company ? ' ' + esc(company) : ''},</p>
+    <p style="font-size:14px;color:#555;line-height:1.55;margin:0 0 18px">
+      <strong>${esc(clientName) || 'Votre client'}</strong>${clientEmail ? ` (<a href="mailto:${esc(clientEmail)}" style="color:${accent};text-decoration:none">${esc(clientEmail)}</a>)` : ''}
+      vous a transmis une proposition de modification${devis.objet ? ` pour <strong style="color:#1A1612">${esc(devis.objet)}</strong>` : ''}.
+    </p>
+
+    ${changesHtml ? `<div style="margin-bottom:18px">
+      <div style="font-size:11px;font-weight:700;color:#999;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Modifications demandées</div>
+      <ul style="margin:0;padding:0">${changesHtml}</ul>
+    </div>` : ''}
+
+    ${budgetTarget ? `<div style="background:#fafafa;border-radius:8px;padding:12px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:13px;color:#555">Budget cible client</span>
+      <strong style="font-size:15px;color:#1A1612">${fmtEur(budgetTarget)} HT</strong>
+    </div>` : ''}
+
+    ${message ? `<div style="margin-bottom:18px">
+      <div style="font-size:11px;font-weight:700;color:#999;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px">Message</div>
+      <div style="background:#FAF7F2;border-left:3px solid ${accent};padding:12px 14px;border-radius:0 8px 8px 0;font-size:13px;color:#1A1612;white-space:pre-wrap;line-height:1.55">${esc(message)}</div>
+    </div>` : ''}
+
+    ${showTotal ? `<div style="background:#fafafa;border-radius:8px;padding:14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:11px;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Nouveau total estimé</div>
+        ${diffLabel ? `<div style="margin-top:3px">${diffLabel}</div>` : ''}
+      </div>
+      <strong style="font-size:20px;color:#1A1612;letter-spacing:-.5px">${fmtEur(newTotal)}</strong>
+    </div>` : ''}
+
+    <a href="${appUrl}" style="display:block;text-align:center;background:#1A1612;color:white;text-decoration:none;padding:13px 24px;border-radius:8px;font-size:14px;font-weight:700">
+      Répondre dans l'app →
+    </a>
+
+    <p style="font-size:12px;color:#999;margin:18px 0 0;text-align:center">
+      Vous pouvez accepter ces modifications, les refuser, ou contacter le client directement.
+    </p>
+  </div>
+</div></body></html>`
+}
+
 // ── Handler principal ──────────────────────────────────────────────────────
 export default async function handler(req, res) {
   cors(req, res, { methods: 'GET, POST, OPTIONS' })
@@ -689,13 +784,15 @@ export default async function handler(req, res) {
 
     const removedIds = changes.filter(c => c.action === 'remove').map(c => c.ligne_id)
     const qtyChanges = changes.filter(c => c.action === 'change_qty')
-    const newTotal   = Math.round((devis.lignes || [])
-      .filter(l => l.type_ligne === 'ouvrage' && !removedIds.includes(l.id))
+    const ouvrages   = (devis.lignes || []).filter(l => l.type_ligne === 'ouvrage')
+    const oldTotal   = Math.round(ouvrages.reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0), 0) * 100) / 100
+    const newTotal   = Math.round(ouvrages
+      .filter(l => !removedIds.includes(l.id))
       .reduce((s, l) => {
         const qc  = qtyChanges.find(c => c.ligne_id === l.id)
         const qty = qc ? Number(qc.new_qty) : (l.quantite || 0)
         return s + qty * (l.prix_unitaire || 0)
-      }, 0))
+      }, 0) * 100) / 100
 
     const { count: roundCount } = await admin.from('devis_negotiations')
       .select('id', { count: 'exact', head: true }).eq('devis_id', devis.id)
@@ -709,6 +806,38 @@ export default async function handler(req, res) {
     await admin.from('devis').update({ statut: 'en_negociation' }).eq('id', devis.id)
     await admin.from('devis_audit_log').insert({ devis_id: devis.id, event: 'negotiation_sent', from_party: 'client', meta: { round: (roundCount || 0) + 1, new_total: newTotal, ip } })
     notifyTg('devis_negotiation', { numero: devis.numero, objet: devis.objet, new_total: newTotal, message: message?.trim() || null, changes_count: changes.length })
+
+    // Email artisan — fire-and-forget : la négo est déjà enregistrée en
+    // DB, l'email est une notification best-effort (ne bloque pas la
+    // réponse client). Pattern identique à artisan_respond.
+    const { data: profile } = await admin.from('profiles')
+      .select('company_name, brand_data').eq('id', devis.owner_id).maybeSingle()
+    let authEmail = null
+    try {
+      const { data: ownerData } = await admin.auth.admin.getUserById(devis.owner_id)
+      authEmail = ownerData?.user?.email || null
+    } catch { /* auth admin indisponible (tests, perm) — fallback brand.email */ }
+    const { data: client }    = await admin.from('clients')
+      .select('email, nom, prenom, raison_sociale').eq('id', devis.client_id).maybeSingle()
+    const brand        = (() => { const r = profile?.brand_data; if (!r) return {}; if (typeof r === 'string') { try { return JSON.parse(r) } catch { return {} } } return r })()
+    const company      = profile?.company_name || brand.companyName || ''
+    const artisanEmail = brand.email || authEmail
+    if (artisanEmail) {
+      const clientName = (`${client?.prenom || ''} ${client?.nom || ''}`).trim() || client?.raison_sociale || ''
+      const lignesMap  = new Map(ouvrages.map(l => [l.id, l]))
+      const appUrl     = `${process.env.ZENBAT_APP_URL || process.env.VITE_PUBLIC_URL || 'https://zenbat.vercel.app'}/?tab=devis`
+      sendEmail({
+        to: artisanEmail,
+        fromName: 'Zenbat',
+        subject: `Demande de modification — devis ${devis.numero}${devis.objet ? ' · ' + devis.objet : ''}`,
+        html: emailNegotiationArtisan({
+          company, devis, clientName, clientEmail: client?.email || null,
+          changes, lignesMap, budgetTarget: budget_target ? Number(budget_target) : null,
+          message: message?.trim() || null, newTotal, oldTotal, appUrl,
+        }),
+      }).catch(e => console.error('[negotiate email]', e?.message))
+    }
+
     return res.status(200).json({ ok: true, newTotal })
   }
 
