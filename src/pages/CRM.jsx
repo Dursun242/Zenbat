@@ -651,6 +651,355 @@ function ProspectDetail({ prospectId, onUpdate, onDelete }) {
   )
 }
 
+// ── Import CSV + enrichissement email ─────────────────────────────────────
+
+const CSV_FIELD_ALIASES = {
+  nom:       ['nom','name','société','societe','entreprise','company','raison sociale','établissement'],
+  email:     ['email','mail','e-mail','courriel'],
+  telephone: ['tel','téléphone','telephone','phone','mobile','fixe'],
+  ville:     ['ville','city','commune','localité'],
+  secteur:   ['secteur','métier','activité','categorie','type'],
+  website:   ['site','website','url','web','site web','site internet','lien'],
+  adresse:   ['adresse','address','rue','voie'],
+}
+
+function detectColumns(headers) {
+  const result = {}
+  headers.forEach((h, i) => {
+    const low = h.toLowerCase().trim()
+    for (const [field, aliases] of Object.entries(CSV_FIELD_ALIASES)) {
+      if (!result[field] && aliases.some(a => low.includes(a))) result[field] = i
+    }
+  })
+  return result
+}
+
+function parseCSV(text) {
+  // Détecte le délimiteur (virgule ou point-virgule)
+  const delim = (text.split('\n')[0].split(';').length > text.split('\n')[0].split(',').length) ? ';' : ','
+  const lines = text.split(/\r?\n/).filter(l => l.trim())
+  return lines.map(line => {
+    const row = []; let cur = ''; let inQ = false
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i]
+      if (c === '"') { inQ = !inQ }
+      else if (c === delim && !inQ) { row.push(cur.trim()); cur = '' }
+      else cur += c
+    }
+    row.push(cur.trim())
+    return row
+  })
+}
+
+function CsvImporter({ onImported, onClose }) {
+  const [step, setStep]           = useState('upload')   // upload → map → enrich → done
+  const [headers, setHeaders]     = useState([])
+  const [rows, setRows]           = useState([])
+  const [mapping, setMapping]     = useState({})
+  const [progress, setProgress]   = useState([])         // [{nom, website, email, status}]
+  const [running, setRunning]     = useState(false)
+  const [importDone, setImportDone] = useState(false)
+
+  const handleFile = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const parsed = parseCSV(ev.target.result)
+      if (parsed.length < 2) return
+      const hdrs = parsed[0]
+      setHeaders(hdrs)
+      setRows(parsed.slice(1).filter(r => r.some(c => c)))
+      setMapping(detectColumns(hdrs))
+      setStep('map')
+    }
+    reader.readAsText(file, 'UTF-8')
+  }
+
+  const getCell = (row, field) => mapping[field] !== undefined ? (row[mapping[field]] || '').trim() : ''
+
+  const startEnrichment = async () => {
+    const items = rows.map(row => ({
+      nom:       getCell(row, 'nom'),
+      email:     getCell(row, 'email'),
+      telephone: getCell(row, 'telephone'),
+      ville:     getCell(row, 'ville'),
+      secteur:   getCell(row, 'secteur'),
+      website:   getCell(row, 'website'),
+      adresse:   getCell(row, 'adresse'),
+      status:    'pending',
+      found:     [],
+    }))
+    setProgress(items)
+    setStep('enrich')
+    setRunning(true)
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (!item.website) {
+        items[i] = { ...item, status: item.email ? 'existing' : 'no_site' }
+        setProgress([...items])
+        continue
+      }
+      if (item.email) {
+        items[i] = { ...item, status: 'existing' }
+        setProgress([...items])
+        continue
+      }
+      items[i] = { ...item, status: 'scanning' }
+      setProgress([...items])
+      try {
+        const d = await api('GET', { action: 'scrape_email', url: item.website })
+        const emails = d.emails || []
+        items[i] = { ...item, status: emails.length ? 'found' : 'not_found', found: emails, email: emails[0] || '' }
+      } catch {
+        items[i] = { ...item, status: 'error' }
+      }
+      setProgress([...items])
+    }
+    setRunning(false)
+  }
+
+  const importAll = async () => {
+    const toImport = progress.filter(p => p.nom)
+    for (const p of toImport) {
+      try {
+        await api('POST', {
+          action: 'create', nom: p.nom, entreprise: p.nom,
+          email: p.email || '', telephone: p.telephone,
+          ville: p.ville, secteur: p.secteur,
+          notes: p.adresse, google_business_url: '',
+        })
+      } catch {}
+    }
+    onImported()
+    setImportDone(true)
+  }
+
+  const downloadCSV = () => {
+    const hdrs = ['Nom','Email','Téléphone','Ville','Secteur','Site','Adresse']
+    const rows  = progress.map(p => [p.nom, p.email, p.telephone, p.ville, p.secteur, p.website, p.adresse]
+      .map(v => `"${(v||'').replace(/"/g,'""')}"`).join(','))
+    const csv   = [hdrs.join(','), ...rows].join('\n')
+    const a     = document.createElement('a')
+    a.href      = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
+    a.download  = 'prospects_enrichis.csv'
+    a.click()
+  }
+
+  const stats = {
+    found:    progress.filter(p => p.status === 'found').length,
+    existing: progress.filter(p => p.status === 'existing').length,
+    notFound: progress.filter(p => p.status === 'not_found').length,
+    noSite:   progress.filter(p => p.status === 'no_site').length,
+    scanning: progress.filter(p => p.status === 'scanning').length,
+    pending:  progress.filter(p => p.status === 'pending').length,
+  }
+
+  const STATUS_STYLE = {
+    pending:    { icon: '⏳', color: '#9A9088' },
+    scanning:   { icon: '🔍', color: '#2563eb' },
+    found:      { icon: '✓',  color: '#16a34a' },
+    existing:   { icon: '✓',  color: '#6B6358' },
+    not_found:  { icon: '—',  color: '#9A9088' },
+    no_site:    { icon: '∅',  color: '#d97706' },
+    error:      { icon: '!',  color: '#dc2626' },
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(26,22,18,0.55)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 760,
+        maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+        boxShadow: '0 24px 80px rgba(0,0,0,0.25)' }}>
+
+        {/* Header */}
+        <div style={{ padding: '20px 28px', borderBottom: '1px solid #E8E2D8',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1A1612', borderRadius: '16px 16px 0 0' }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>
+              📂 Import CSV + Enrichissement email
+            </div>
+            <div style={{ fontSize: 11, color: '#6B6358', marginTop: 2 }}>
+              {step === 'upload' && 'Chargez votre fichier Instant Data Scraper'}
+              {step === 'map'    && `${rows.length} lignes détectées — vérifiez le mapping des colonnes`}
+              {step === 'enrich' && `Scan en cours… ${progress.filter(p => !['pending','scanning'].includes(p.status)).length}/${progress.length}`}
+              {step === 'done'   && 'Enrichissement terminé'}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6B6358', fontSize: 22, cursor: 'pointer' }}>×</button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+
+          {/* STEP 1 — Upload */}
+          {step === 'upload' && (
+            <label style={{ display: 'block', border: '2px dashed #E8E2D8', borderRadius: 12,
+              padding: 48, textAlign: 'center', cursor: 'pointer', background: '#FAF7F2' }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>📂</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: '#1A1612', marginBottom: 6 }}>
+                Glissez votre fichier CSV ici
+              </div>
+              <div style={{ fontSize: 13, color: '#6B6358', marginBottom: 16 }}>
+                Export Instant Data Scraper, Pages Jaunes, ou tout fichier CSV
+              </div>
+              <div style={{ fontSize: 12, color: '#C97B5C', fontWeight: 600 }}>
+                Colonnes reconnues automatiquement : nom, site, tel, ville, secteur…
+              </div>
+              <input type="file" accept=".csv,.txt" onChange={handleFile} style={{ display: 'none' }} />
+            </label>
+          )}
+
+          {/* STEP 2 — Mapping */}
+          {step === 'map' && (
+            <div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+                {Object.keys(CSV_FIELD_ALIASES).map(field => (
+                  <div key={field}>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6358',
+                      marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      {field === 'website' ? 'Site web ⭐' : field}
+                    </label>
+                    <select
+                      value={mapping[field] ?? ''}
+                      onChange={e => setMapping(m => ({ ...m, [field]: e.target.value === '' ? undefined : +e.target.value }))}
+                      style={{ width: '100%', padding: '7px 10px', border: '1px solid #E8E2D8',
+                        borderRadius: 8, fontSize: 13, fontFamily: 'inherit', background: '#FAF7F2' }}>
+                      <option value="">— ignorer —</option>
+                      {headers.map((h, i) => <option key={i} value={i}>{h}</option>)}
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              {/* Preview */}
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#6B6358', marginBottom: 8,
+                textTransform: 'uppercase', letterSpacing: '0.05em' }}>Aperçu (5 premières lignes)</div>
+              <div style={{ overflowX: 'auto', border: '1px solid #E8E2D8', borderRadius: 8 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: '#FAF7F2' }}>
+                      {['Nom','Email','Téléphone','Site web','Ville'].map(h => (
+                        <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: '#6B6358',
+                          fontWeight: 600, borderBottom: '1px solid #E8E2D8', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.slice(0, 5).map((row, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #F0ECE4' }}>
+                        {['nom','email','telephone','website','ville'].map(f => (
+                          <td key={f} style={{ padding: '7px 10px', color: '#1A1612', maxWidth: 160,
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {getCell(row, f) || <span style={{ color: '#D8D2C8' }}>—</span>}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3 — Enrichissement */}
+          {(step === 'enrich' || step === 'done') && (
+            <div>
+              {/* Stats bar */}
+              <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+                {[
+                  { label: 'Emails trouvés', val: stats.found, color: '#16a34a' },
+                  { label: 'Déjà présents', val: stats.existing, color: '#6B6358' },
+                  { label: 'Non trouvés', val: stats.notFound, color: '#9A9088' },
+                  { label: 'Sans site', val: stats.noSite, color: '#d97706' },
+                ].map(s => (
+                  <div key={s.label} style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.val}</div>
+                    <div style={{ fontSize: 10, color: '#9A9088', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{s.label}</div>
+                  </div>
+                ))}
+                {running && <div style={{ fontSize: 12, color: '#2563eb', alignSelf: 'center' }}>
+                  🔍 Scan en cours…
+                </div>}
+              </div>
+
+              {/* Liste des résultats */}
+              <div style={{ border: '1px solid #E8E2D8', borderRadius: 8, overflow: 'hidden' }}>
+                {progress.map((p, i) => {
+                  const st = STATUS_STYLE[p.status] || STATUS_STYLE.pending
+                  return (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '9px 14px', borderBottom: '1px solid #F0ECE4',
+                      background: p.status === 'scanning' ? '#eff6ff' : '#fff' }}>
+                      <span style={{ fontSize: 14, color: st.color, width: 16, textAlign: 'center', flexShrink: 0 }}>{st.icon}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#1A1612', flex: 1, minWidth: 0,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nom || '—'}</span>
+                      <span style={{ fontSize: 11, color: '#6B6358', flex: 1, minWidth: 0,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {p.email
+                          ? <span style={{ color: '#16a34a', fontWeight: 600 }}>{p.email}</span>
+                          : <span style={{ color: '#D8D2C8' }}>{p.website || 'Pas de site'}</span>}
+                      </span>
+                      {p.found?.length > 1 && (
+                        <select onChange={e => { const cp=[...progress]; cp[i]={...cp[i],email:e.target.value}; setProgress(cp) }}
+                          style={{ fontSize: 11, padding: '2px 6px', border: '1px solid #E8E2D8', borderRadius: 4,
+                            fontFamily: 'inherit', cursor: 'pointer' }}>
+                          {p.found.map(e => <option key={e} value={e}>{e}</option>)}
+                        </select>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer actions */}
+        <div style={{ padding: '16px 28px', borderTop: '1px solid #E8E2D8', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          {step === 'map' && (
+            <>
+              <button onClick={() => setStep('upload')}
+                style={{ padding: '9px 18px', border: '1px solid #E8E2D8', borderRadius: 8,
+                  background: '#FAF7F2', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+                ← Retour
+              </button>
+              <button onClick={startEnrichment}
+                style={{ padding: '9px 20px', border: 'none', borderRadius: 8, background: '#C97B5C',
+                  color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                🔍 Enrichir les emails ({rows.length} lignes)
+              </button>
+            </>
+          )}
+          {(step === 'enrich' || step === 'done') && !importDone && (
+            <>
+              <button onClick={downloadCSV}
+                style={{ padding: '9px 18px', border: '1px solid #E8E2D8', borderRadius: 8,
+                  background: '#FAF7F2', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+                ⬇ Télécharger CSV enrichi
+              </button>
+              {!running && (
+                <button onClick={importAll}
+                  style={{ padding: '9px 20px', border: 'none', borderRadius: 8, background: '#1A1612',
+                    color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Importer dans le CRM ({progress.filter(p => p.nom).length} prospects)
+                </button>
+              )}
+            </>
+          )}
+          {importDone && (
+            <button onClick={onClose}
+              style={{ padding: '9px 20px', border: 'none', borderRadius: 8, background: '#22c55e',
+                color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              ✓ Terminé — voir le CRM
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Page principale CRM ────────────────────────────────────────────────────
 
 // ── Panneau recherche Google Places ───────────────────────────────────────
@@ -811,6 +1160,7 @@ export default function CRM() {
   const [search, setSearch]         = useState('')
   const [addModal, setAddModal]     = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [csvOpen, setCsvOpen]       = useState(false)
 
   // Vérification admin au montage
   useEffect(() => {
@@ -914,6 +1264,11 @@ export default function CRM() {
           <span style={{ fontSize: 12, color: '#A8A09A' }}>Baie de Seine</span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setCsvOpen(true)}
+            style={{ padding: '7px 14px', background: '#6B6358', border: 'none', borderRadius: 8,
+              color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+            📂 CSV
+          </button>
           <button onClick={() => setSearchOpen(true)}
             style={{ padding: '7px 14px', background: '#4285F4', border: 'none', borderRadius: 8,
               color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -1024,6 +1379,13 @@ export default function CRM() {
           existingEmails={new Set(prospects.map(p => p.nom?.toLowerCase()))}
           onAdd={p => { setProspects(prev => [p, ...prev]); setSelId(p.id) }}
           onClose={() => setSearchOpen(false)}
+        />
+      )}
+
+      {csvOpen && (
+        <CsvImporter
+          onImported={() => { loadProspects(); }}
+          onClose={() => setCsvOpen(false)}
         />
       )}
     </div>

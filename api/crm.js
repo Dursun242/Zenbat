@@ -112,6 +112,53 @@ export default async function handler(req, res) {
         })
       }
 
+      if (action === 'scrape_email') {
+        const rawUrl = (req.query.url || '').toString().trim()
+        if (!rawUrl) return res.status(400).json({ error: 'url requise' })
+
+        const EMAIL_RE = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g
+        const IGNORE   = ['png','jpg','jpeg','gif','svg','woff','css','js','example','sentry','wix','wordpress','schema','google','w3.org']
+        const found    = new Set()
+
+        const scrape = async (pageUrl) => {
+          try {
+            const ac = new AbortController()
+            const t  = setTimeout(() => ac.abort(), 6000)
+            const r  = await fetch(pageUrl, {
+              signal: ac.signal,
+              headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Zenbat/1.0 contact-finder)' }
+            })
+            clearTimeout(t)
+            if (!r.ok) return
+            if (!(r.headers.get('content-type') || '').includes('text')) return
+            const html = await r.text()
+            const decoded = html
+              .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n))
+              .replace(/&amp;/g, '&')
+              .replace(/\[at\]/gi, '@').replace(/\(at\)/gi, '@')
+              .replace(/\[dot\]/gi, '.').replace(/\(dot\)/gi, '.')
+            ;(decoded.match(EMAIL_RE) || []).forEach(e => {
+              const low = e.toLowerCase()
+              if (!IGNORE.some(x => low.includes(x)) && low.includes('.')) found.add(low)
+            })
+          } catch {}
+        }
+
+        let base = rawUrl
+        if (!base.startsWith('http')) base = 'https://' + base
+        base = base.replace(/\/$/, '')
+
+        await scrape(base)
+        if (found.size === 0) await Promise.all([
+          scrape(base + '/contact'),
+          scrape(base + '/nous-contacter'),
+          scrape(base + '/contactez-nous'),
+          scrape(base + '/a-propos'),
+        ])
+
+        return res.status(200).json({ emails: [...found] })
+      }
+
       return res.status(400).json({ error: 'action inconnue' })
     }
 
