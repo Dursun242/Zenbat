@@ -2085,7 +2085,7 @@ export default function CRM() {
       {selected.size > 0 && (
         <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
           background: '#1A1612', borderRadius: 12, padding: '12px 20px', zIndex: 100,
-          display: 'flex', alignItems: 'center', gap: 16, boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}>
+          display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}>
           <span style={{ fontSize: 13, color: '#fff', fontWeight: 600 }}>
             {selected.size} prospect{selected.size > 1 ? 's' : ''} sélectionné{selected.size > 1 ? 's' : ''}
           </span>
@@ -2098,6 +2098,20 @@ export default function CRM() {
             style={{ padding: '8px 18px', background: '#2563eb', border: 'none', borderRadius: 8,
               color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
             📅 Programmer →
+          </button>
+          <button onClick={async () => {
+            if (!window.confirm(`Supprimer ${selected.size} prospect${selected.size > 1 ? 's' : ''} définitivement ?`)) return
+            const ids = [...selected]
+            for (const id of ids) {
+              try { await api('POST', { action: 'delete', id }) } catch {}
+            }
+            setProspects(prev => prev.filter(p => !selected.has(p.id)))
+            if (selected.has(selId)) setSelId(null)
+            setSelected(new Set())
+          }}
+            style={{ padding: '8px 18px', background: '#dc2626', border: 'none', borderRadius: 8,
+              color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            🗑 Supprimer
           </button>
           <button onClick={() => setSelected(new Set())}
             style={{ background: 'none', border: 'none', color: '#6B6358', fontSize: 18, cursor: 'pointer' }}>×</button>
