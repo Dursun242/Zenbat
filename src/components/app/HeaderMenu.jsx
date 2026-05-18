@@ -211,6 +211,12 @@ export default function HeaderMenu({
                   <span style={{ color: "#f59e0b", display: "inline-flex" }}>{I.cog}</span>
                   Panel admin
                 </button>
+                <a href="/crm" role="menuitem" style={{ ...itemBase, textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: 10 }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#FAF7F2"}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  <span style={{ color: "#C97B5C", display: "inline-flex" }}>👥</span>
+                  CRM Prospection
+                </a>
               </>
             )}
 
