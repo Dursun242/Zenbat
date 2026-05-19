@@ -328,3 +328,174 @@ describe("claude endpoint — appel Anthropic non-streamé", () => {
     expect(res.statusCode).toBe(502);
   });
 });
+
+describe("claude endpoint — mode scrape_urls (import sites web)", () => {
+  function setupAuthed() {
+    getUserMock.mockResolvedValueOnce({ data: { user: { id: "u1", email: "u@x.fr", created_at: new Date().toISOString() } }, error: null });
+    // setupSupabaseProfile + retourne le from() generic pour les inserts claude_api_logs
+    const baseProfile = {
+      select: vi.fn().mockReturnThis(),
+      eq:     vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: { plan: "pro" }, error: null }),
+    };
+    const countChain = {
+      select: vi.fn().mockReturnThis(),
+      eq:     vi.fn().mockReturnThis(),
+      gte:    vi.fn().mockResolvedValue({ count: 0, error: null }),
+    };
+    fromMock.mockImplementation((table) => {
+      if (table === "profiles")         return baseProfile;
+      if (table === "ia_conversations") return countChain;
+      if (table === "claude_api_logs")  return { insert: vi.fn().mockResolvedValue({ data: null, error: null }) };
+      return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis() };
+    });
+  }
+
+  // Helper : fabrique un Response stream qu'on lit en boucle reader.read()
+  function htmlResp(html, contentType = "text/html; charset=utf-8") {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(html);
+    let consumed = false;
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: (k) => (k.toLowerCase() === "content-type" ? contentType : null) },
+      body: {
+        getReader: () => ({
+          read: async () => {
+            if (consumed) return { done: true, value: undefined };
+            consumed = true;
+            return { done: false, value: bytes };
+          },
+          cancel: async () => {},
+        }),
+      },
+    };
+  }
+
+  it("renvoie 400 si scrape_urls est vide", async () => {
+    setupAuthed();
+    const res = makeRes();
+    await handler(
+      makeReq({ headers: { authorization: "Bearer t" }, body: { scrape_urls: [] } }),
+      res,
+    );
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toMatch(/tableau non vide/);
+  });
+
+  it("renvoie 400 si trop d'URLs (>5)", async () => {
+    setupAuthed();
+    const res = makeRes();
+    await handler(
+      makeReq({ headers: { authorization: "Bearer t" }, body: { scrape_urls: Array(6).fill("https://example.com") } }),
+      res,
+    );
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toMatch(/Maximum 5/);
+  });
+
+  it("bloque les IP privées (SSRF) sans appeler fetch", async () => {
+    setupAuthed();
+    const res = makeRes();
+    await handler(
+      makeReq({ headers: { authorization: "Bearer t" }, body: { scrape_urls: ["http://127.0.0.1/admin", "http://192.168.1.1/", "http://169.254.169.254/latest/meta-data/"] } }),
+      res,
+    );
+    expect(res.statusCode).toBe(200);
+    // Aucun fetch HTTP ne doit avoir été appelé pour ces URLs privées
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(res.body.results).toHaveLength(3);
+    res.body.results.forEach(r => {
+      expect(r.error).toBeTruthy();
+      expect(r.error).toMatch(/privée|bloquée/i);
+    });
+  });
+
+  it("renvoie une erreur par URL invalide sans casser le batch", async () => {
+    setupAuthed();
+    const res = makeRes();
+    await handler(
+      makeReq({ headers: { authorization: "Bearer t" }, body: { scrape_urls: ["pas-une-url valide ! @#$", "ftp://example.com/x"] } }),
+      res,
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.body.results).toHaveLength(2);
+    expect(res.body.results[0].error).toBeTruthy();
+    expect(res.body.results[1].error).toMatch(/Protocole/);
+  });
+
+  it("happy path : extrait un contact JSON depuis une page HTML", async () => {
+    setupAuthed();
+    // 1er fetch = HTML site, 2e fetch = appel Anthropic
+    global.fetch
+      .mockResolvedValueOnce(htmlResp(`<html><head><title>Dupont Maçonnerie</title><meta name="description" content="Artisan maçon en Normandie"></head><body><h1>Contactez-nous</h1><p>06 12 34 56 78</p><p>contact@dupont-maconnerie.fr</p></body></html>`))
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          content: [{ text: `<CONTACT>{"type":"artisan","raison_sociale":"Dupont Maçonnerie","nom":"","prenom":"","email":"contact@dupont-maconnerie.fr","telephone":"06 12 34 56 78","telephone_fixe":"","adresse":"","code_postal":"","ville":"","siret":"","tva_intra":"","activite":"Maçonnerie générale"}</CONTACT>` }],
+          usage: { input_tokens: 1000, output_tokens: 100 },
+        }),
+      });
+
+    const res = makeRes();
+    await handler(
+      makeReq({ headers: { authorization: "Bearer t" }, body: { scrape_urls: ["https://1.1.1.1/"] } }),
+      res,
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.body.results).toHaveLength(1);
+    const r = res.body.results[0];
+    expect(r.error).toBeUndefined();
+    expect(r.contact.raison_sociale).toBe("Dupont Maçonnerie");
+    expect(r.contact.telephone).toBe("06 12 34 56 78");
+    expect(r.contact.type).toBe("artisan");
+  });
+
+  it("renvoie une erreur si le JSON Claude est mal formé", async () => {
+    setupAuthed();
+    global.fetch
+      .mockResolvedValueOnce(htmlResp("<html><body>plop</body></html>"))
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ content: [{ text: "ce n'est pas du JSON" }], usage: { input_tokens: 10, output_tokens: 5 } }),
+      });
+    const res = makeRes();
+    await handler(
+      makeReq({ headers: { authorization: "Bearer t" }, body: { scrape_urls: ["https://1.1.1.1/"] } }),
+      res,
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.body.results[0].error).toMatch(/Extraction|JSON/);
+  });
+
+  it("rejette les content-type non HTML (PDF, image…)", async () => {
+    setupAuthed();
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: { get: () => "application/pdf" },
+      body: { getReader: () => ({ read: async () => ({ done: true }), cancel: async () => {} }) },
+    });
+    const res = makeRes();
+    await handler(
+      makeReq({ headers: { authorization: "Bearer t" }, body: { scrape_urls: ["https://1.1.1.1/doc.pdf"] } }),
+      res,
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.body.results[0].error).toMatch(/HTML/);
+  });
+
+  it("respecte la limite journalière même en mode scrape", async () => {
+    getUserMock.mockResolvedValueOnce({ data: { user: { id: "u1", email: "u@x.fr", created_at: new Date().toISOString() } }, error: null });
+    setupSupabaseProfile("free", 40); // free saturé
+    const res = makeRes();
+    await handler(
+      makeReq({ headers: { authorization: "Bearer t" }, body: { scrape_urls: ["https://1.1.1.1/"] } }),
+      res,
+    );
+    expect(res.statusCode).toBe(429);
+  });
+});
