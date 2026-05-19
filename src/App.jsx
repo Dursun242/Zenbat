@@ -11,6 +11,7 @@ import { useKeyboardOpen } from "./hooks/useKeyboardOpen.js";
 import { useClients }   from "./hooks/useClients.js";
 import { useDevis }     from "./hooks/useDevis.js";
 import { useInvoices }  from "./hooks/useInvoices.js";
+import { useSupportUnread } from "./hooks/useSupportUnread.js";
 
 import Logo          from "./components/ui/Logo.jsx";
 import { I }         from "./components/ui/icons.jsx";
@@ -81,6 +82,7 @@ export default function App() {
   const [billingCycle, setBillingCycle] = useState(null);
   const [showPwa,setShowPwa]= useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
+  const { hasUnread: supportUnread, refresh: refreshSupportUnread } = useSupportUnread();
   const [comptableOpen, setComptableOpen] = useState(false);
   const [checkoutPending, setCheckoutPending] = useState(() => {
     try { return ['monthly','biannual'].includes(localStorage.getItem('pending_checkout_plan')) }
@@ -486,6 +488,7 @@ export default function App() {
             billingCycle={billingCycle}
             weekCount={devisThisWeekCount}
             weekLimit={FREEMIUM_WEEKLY_DEVIS_LIMIT}
+            supportUnread={supportUnread}
             onOpenAdmin={() => setTab("admin")}
             onOpenProfile={() => setScreen("onboarding")}
             onOpenSubscription={() => setScreen("subscription")}
@@ -639,7 +642,7 @@ export default function App() {
 
       <Toast toast={toast} onDismiss={dismissToast}/>
       <UpdateAvailableToast />
-      <SupportChat accent={brand?.color || "#22c55e"} open={supportOpen} onClose={() => setSupportOpen(false)}/>
+      <SupportChat accent={brand?.color || "#22c55e"} open={supportOpen} onClose={() => { setSupportOpen(false); refreshSupportUnread(); }}/>
       {comptableOpen && (
         <SendToComptableModal user={user} onClose={() => setComptableOpen(false)}/>
       )}

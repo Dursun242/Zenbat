@@ -57,6 +57,14 @@ export default function SupportChat({ accent = "#22c55e", open, onClose }) {
           .eq("ticket_id", existing[0].id)
           .order("created_at", { ascending: true });
         if (!cancelled) setMessages(msgs || []);
+
+        // Marque les messages comme vus (badge "non lu" disparaît).
+        // Fire-and-forget : un échec ne bloque pas l'affichage du chat.
+        supabase
+          .from("support_tickets")
+          .update({ user_last_seen_at: new Date().toISOString() })
+          .eq("id", existing[0].id)
+          .then(() => {}, () => {});
       } else {
         setTicket(null);
         setMessages([]);
@@ -169,6 +177,14 @@ export default function SupportChat({ accent = "#22c55e", open, onClose }) {
           .eq("ticket_id", currentTicket.id)
           .order("created_at", { ascending: true });
         setMessages(refreshed || newMessages);
+
+        // Bump user_last_seen_at après que l'user a vu la réponse Claude
+        // (sinon le badge "non lu" réapparaîtrait au prochain check focus).
+        supabase
+          .from("support_tickets")
+          .update({ user_last_seen_at: new Date().toISOString() })
+          .eq("id", currentTicket.id)
+          .then(() => {}, () => {});
       }
     } catch (err) {
       console.error("[SupportChat] send failed:", err);

@@ -35,6 +35,7 @@ export default function HeaderMenu({
   billingCycle,
   weekCount = 0,
   weekLimit = 5,
+  supportUnread = false,
   onOpenAdmin,
   onOpenProfile,
   onOpenSubscription,
@@ -98,11 +99,13 @@ export default function HeaderMenu({
           color: "#E8E2D8", cursor: "pointer",
         }}>
         {I.menu}
-        {(quotaReached || quotaWarning) && (
+        {(quotaReached || quotaWarning || supportUnread) && (
           <span style={{
             position: "absolute", top: -3, right: -3,
             width: 8, height: 8, borderRadius: "50%",
-            background: quotaReached ? "#ef4444" : "#f97316",
+            background: quotaReached ? "#ef4444"
+                      : quotaWarning ? "#f97316"
+                      :                "#22c55e",
             border: "2px solid #1A1612",
           }}/>
         )}
@@ -182,6 +185,13 @@ export default function HeaderMenu({
                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                 <span style={{ color: "#22c55e", display: "inline-flex" }}>{I.chat}</span>
                 Support
+                {supportUnread && (
+                  <span aria-label="Nouveau message" style={{
+                    marginLeft: "auto",
+                    width: 8, height: 8, borderRadius: "50%",
+                    background: "#22c55e",
+                  }}/>
+                )}
               </button>
             )}
 
