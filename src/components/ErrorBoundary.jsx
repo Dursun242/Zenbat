@@ -1,14 +1,28 @@
 import { Component } from 'react'
-import { logError } from '../lib/logger.js'
+import { logError, logInfo } from '../lib/logger.js'
+import { isChunkLoadError, recoverFromChunkError } from '../lib/chunkReload.js'
 
 export default class ErrorBoundary extends Component {
-  state = { error: null }
+  state = { error: null, recovering: false }
 
   static getDerivedStateFromError(error) {
-    return { error }
+    // Erreur de chunk après redéploiement : React rattrape les rejets de
+    // lazy(() => import(...)), donc les listeners globaux dans main.jsx ne
+    // se déclenchent jamais. On déclenche la récupération ici.
+    if (isChunkLoadError(error) && recoverFromChunkError()) {
+      return { error: null, recovering: true }
+    }
+    return { error, recovering: false }
   }
 
   componentDidCatch(error, info) {
+    if (isChunkLoadError(error)) {
+      // Reload armé par getDerivedStateFromError. On log en INFO (pas en
+      // erreur) avec un marker dédié pour pouvoir suivre la fréquence :
+      //   select * from app_logs where context->>'type' = 'chunk_recovery';
+      logInfo(error.message || 'chunk recovery', { type: 'chunk_recovery' })
+      return
+    }
     console.error('[Zenbat] Crash React:', error, info?.componentStack)
     logError(
       error.message || 'React crash',
@@ -18,6 +32,13 @@ export default class ErrorBoundary extends Component {
   }
 
   render() {
+    if (this.state.recovering) {
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, background: '#FAF7F2', fontFamily: 'system-ui, sans-serif', textAlign: 'center' }}>
+          <p style={{ fontSize: 14, color: '#6B6358' }}>Mise à jour en cours…</p>
+        </div>
+      )
+    }
     if (this.state.error) {
       return (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, background: '#FAF7F2', fontFamily: 'system-ui, sans-serif', textAlign: 'center' }}>
