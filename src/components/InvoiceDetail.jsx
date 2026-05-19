@@ -7,10 +7,14 @@ import ClientPickerModal from "./app/ClientPickerModal.jsx";
 import { getToken } from "../lib/getToken.js";
 
 export default function InvoiceDetail({ invoice, client, clients = [], brand, invoices, onBack, onChange, onCreateAvoir, onDelete }) {
-  const [showPDF,      setShowPDF]      = useState(false);
-  const [exporting,    setExporting]    = useState(false);
-  const [exportMsg,    setExportMsg]    = useState(null);
-  const [clientPicker, setClientPicker] = useState(false);
+  const [showPDF,        setShowPDF]        = useState(false);
+  const [exporting,      setExporting]      = useState(false);
+  const [exportMsg,      setExportMsg]      = useState(null);
+  const [clientPicker,   setClientPicker]   = useState(false);
+  const [showSendForm,   setShowSendForm]   = useState(false);
+  const [sendMessage,    setSendMessage]    = useState("");
+  const [sending,        setSending]        = useState(false);
+  const [sendStatusMsg,  setSendStatusMsg]  = useState(null);
   const ac = brand.color || "#22c55e";
 
   const lignes = invoice.lignes || [];
@@ -108,6 +112,50 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
     }
   };
 
+  const handleSend = async () => {
+    setSending(true); setSendStatusMsg(null);
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/facturx", {
+        method:  "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          action:     "send",
+          invoice_id: invoice.id,
+          message:    sendMessage?.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      // Facture verrouillée : onSaveInvoice (cf useInvoices.js) ne fera qu'un
+      // setInvoices local, sans UPDATE redondant. La DB a déjà été mise à jour
+      // côté serveur par /api/facturx?action=send.
+      onChange({
+        ...invoice,
+        sent_to_client_at:    data.sent_at,
+        sent_to_client_count: data.sent_to_client_count,
+      }, false);
+      setSendStatusMsg(`✓ Envoyée à ${client.email}.`);
+      setShowSendForm(false);
+      setSendMessage("");
+    } catch (err) {
+      console.error("[invoice/send]", err);
+      setSendStatusMsg("❌ " + (err.message || "Erreur d'envoi"));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const formatSentAt = (iso) => {
+    if (!iso) return "";
+    try {
+      return new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+    } catch { return ""; }
+  };
+
   // Adapte la facture au format attendu par PDFViewer (qui parle "devis")
   const asDevisShape = {
     ...invoice,
@@ -199,6 +247,68 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
           <div style={{ background: "#fef3c7", border: "1px solid #fde68a", color: "#92400e", padding: "8px 10px", borderRadius: 10, fontSize: 11, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 14 }}>🔒</span>
             <span><strong>Avoir verrouillé</strong> — émis et immuable.</span>
+          </div>
+        )}
+        {/* Envoi par email au client — uniquement pour les factures émises non avoir */}
+        {isLocked && !isAvoir && (
+          <div style={{ background: invoice.sent_to_client_at ? "#ecfdf5" : "#eff6ff", border: `1px solid ${invoice.sent_to_client_at ? "#bbf7d0" : "#bfdbfe"}`, borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
+            {invoice.sent_to_client_at && !showSendForm ? (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: 12, color: "#065f46", flexWrap: "wrap" }}>
+                <span>
+                  ✉ Envoyée à <strong>{client?.email || "—"}</strong> le {formatSentAt(invoice.sent_to_client_at)}
+                  {invoice.sent_to_client_count > 1 && <span style={{ color: "#6B6358", fontWeight: 500 }}> · {invoice.sent_to_client_count} envois</span>}
+                </span>
+                {client?.email && (
+                  <button onClick={() => { setShowSendForm(true); setSendStatusMsg(null); }}
+                    style={{ background: "transparent", border: "none", color: "#065f46", fontSize: 12, fontWeight: 600, cursor: "pointer", textDecoration: "underline", padding: 0 }}>
+                    Renvoyer
+                  </button>
+                )}
+              </div>
+            ) : !client?.email ? (
+              <div style={{ fontSize: 12, color: "#b45309" }}>
+                ⚠ Ajoutez un email au client pour pouvoir lui envoyer cette facture.
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1612", marginBottom: 4 }}>
+                  📧 Envoyer cette facture à {client.email}
+                </div>
+                <div style={{ fontSize: 11, color: "#6B6358", lineHeight: 1.5, marginBottom: 10 }}>
+                  PDF Factur-X en pièce jointe, au nom de <strong>{brand.companyName || "votre entreprise"}</strong>.
+                  {brand.email && <> Les réponses du client arriveront sur <strong>{brand.email}</strong>.</>}
+                </div>
+                <textarea
+                  value={sendMessage}
+                  onChange={e => setSendMessage(e.target.value)}
+                  placeholder="Message personnel (optionnel) — par ex. « Merci pour votre confiance, à bientôt. »"
+                  rows={3}
+                  disabled={sending}
+                  style={{ width: "100%", border: "1px solid #E8E2D8", borderRadius: 8, padding: "8px 10px", fontSize: 12, fontFamily: "inherit", resize: "vertical", outline: "none", boxSizing: "border-box", background: sending ? "#F0EBE3" : "white", marginBottom: 8 }}
+                />
+                <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                  {(showSendForm || invoice.sent_to_client_at) && (
+                    <button onClick={() => { setShowSendForm(false); setSendMessage(""); setSendStatusMsg(null); }} disabled={sending}
+                      style={{ background: "white", color: "#6B6358", border: "1px solid #E8E2D8", borderRadius: 8, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: sending ? "not-allowed" : "pointer" }}>
+                      Annuler
+                    </button>
+                  )}
+                  <button onClick={handleSend} disabled={sending}
+                    style={{ background: sending ? "#cbd5e1" : "#1A1612", color: "white", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: sending ? "not-allowed" : "pointer" }}>
+                    {sending ? "⏳ Envoi…" : invoice.sent_to_client_at ? "Renvoyer maintenant" : "Envoyer maintenant"}
+                  </button>
+                </div>
+              </>
+            )}
+            {sendStatusMsg && (
+              <div style={{ marginTop: 8, fontSize: 11, padding: "6px 8px", borderRadius: 6,
+                background: sendStatusMsg.startsWith("❌") ? "#fef2f2" : "#ffffff",
+                color:      sendStatusMsg.startsWith("❌") ? "#991b1b" : "#065f46",
+                border:     sendStatusMsg.startsWith("❌") ? "1px solid #fecaca" : "1px solid #bbf7d0",
+              }}>
+                {sendStatusMsg}
+              </div>
+            )}
           </div>
         )}
         {/* Client */}

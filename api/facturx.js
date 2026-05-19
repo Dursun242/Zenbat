@@ -17,6 +17,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { cors } from "./_cors.js"
 import { authenticate } from "./_withAuth.js"
+import { sendEmail } from "./_email.js"
 
 const XML_FILENAME    = "factur-x.xml";
 // Profil EN 16931 (norme européenne, obligatoire PPF/PDP à partir de 09/2026).
@@ -363,6 +364,10 @@ export default async function handler(req, res) {
   if (!auth) return;
   const { user, admin } = auth;
 
+  // Routage par action : 'send' = email du Factur-X au client (depuis Storage),
+  // sinon flux historique = génère + assemble + uploade le Factur-X.
+  if (req.body?.action === "send") return handleSend(req, res, { user, admin });
+
   const { pdf_base64, invoice, client, brand, sourceInvoice } = req.body || {};
   if (!pdf_base64 || !invoice?.id) {
     return res.status(400).json({ error: "pdf_base64 et invoice.id requis" });
@@ -439,4 +444,142 @@ export default async function handler(req, res) {
     console.error("[facturx]", err);
     return res.status(500).json({ error: err.message || "Erreur génération Factur-X" });
   }
+}
+
+// ── Action 'send' : envoie le PDF Factur-X au client par email ──────────────
+// Pré-requis : la facture doit être verrouillée (statut !== 'brouillon' et
+// locked=true) — son PDF Factur-X a alors été uploadé dans Supabase Storage
+// par le flux d'émission ci-dessus. On télécharge ce PDF et on l'attache à
+// un email envoyé au nom de l'entreprise artisan (brand.companyName via
+// fromName) avec Reply-To = brand.email pour que les réponses du client
+// arrivent directement à l'artisan, pas sur le compte SMTP technique.
+//
+// Le compte Gmail/Resend reste l'expéditeur SMTP réel (impossible d'usurper
+// l'adresse de l'artisan sans configuration SPF/DKIM par domaine) — ce qui
+// change c'est l'affichage : le destinataire voit "Mon Entreprise <gmail-zenbat@…>".
+async function handleSend(req, res, { user, admin }) {
+  const { invoice_id, message } = req.body || {};
+  if (!invoice_id) return res.status(400).json({ error: "invoice_id requis" });
+
+  const { data: invoice } = await admin
+    .from("invoices")
+    .select("*")
+    .eq("id", invoice_id)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!invoice) return res.status(404).json({ error: "Facture introuvable" });
+  if (invoice.statut === "brouillon" || !invoice.locked) {
+    return res.status(400).json({ error: "Émettez d'abord la facture avant de l'envoyer" });
+  }
+
+  const { data: client } = await admin
+    .from("clients")
+    .select("nom, prenom, raison_sociale, email")
+    .eq("id", invoice.client_id)
+    .maybeSingle();
+  if (!client?.email) return res.status(400).json({ error: "Le client n'a pas d'email" });
+
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("company_name, brand_data")
+    .eq("id", user.id)
+    .maybeSingle();
+  const brand = (() => {
+    const r = profile?.brand_data;
+    if (!r) return {};
+    if (typeof r === "string") { try { return JSON.parse(r); } catch { return {}; } }
+    return r;
+  })();
+  const company      = profile?.company_name || brand.companyName || "Votre prestataire";
+  const artisanEmail = brand.email || null;
+  const clientName   = `${client.prenom || ""} ${client.nom || ""}`.trim() || client.raison_sociale || "";
+
+  const safeNumero = String(invoice.numero || "").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
+  if (!safeNumero) return res.status(400).json({ error: "Numéro de facture manquant" });
+  const path = `${user.id}/invoices/${safeNumero}.pdf`;
+  const { data: blob, error: dlErr } = await admin.storage.from("devis-pdfs").download(path);
+  if (dlErr || !blob) {
+    return res.status(404).json({
+      error: "PDF Factur-X introuvable dans le stockage. Cliquez d'abord sur « ⬇ Factur-X » pour régénérer, puis renvoyez.",
+    });
+  }
+  const pdfBase64 = Buffer.from(await blob.arrayBuffer()).toString("base64");
+
+  const filename = `${safeNumero}.pdf`;
+  const subject  = `Facture ${invoice.numero} — ${company}`;
+  const html     = buildSendEmailHtml({ company, brand, invoice, clientName, message });
+
+  try {
+    await sendEmail({
+      to:        client.email,
+      fromName:  company,
+      ...(artisanEmail ? { replyTo: artisanEmail, cc: artisanEmail } : {}),
+      subject,
+      html,
+      attachments: [{ filename, content: pdfBase64, contentType: "application/pdf" }],
+    });
+  } catch (err) {
+    console.error("[facturx/send]", err);
+    return res.status(500).json({ error: "Échec envoi email : " + (err.message || "inconnu") });
+  }
+
+  const sentAt = new Date().toISOString();
+  let { error: upErr } = await admin
+    .from("invoices")
+    .update({ sent_to_client_at: sentAt, sent_to_client_count: (invoice.sent_to_client_count || 0) + 1 })
+    .eq("id", invoice.id);
+  if (upErr?.code === "42703") {
+    // Migration 0049 partiellement appliquée — retente sans le compteur, puis sans le timestamp.
+    ({ error: upErr } = await admin.from("invoices").update({ sent_to_client_at: sentAt }).eq("id", invoice.id));
+    if (upErr?.code === "42703") {
+      console.warn("[facturx/send] migration 0049 non appliquée — tracking d'envoi sauté");
+      upErr = null;
+    }
+  }
+  if (upErr) console.warn("[facturx/send] update timestamp:", upErr.message);
+
+  return res.status(200).json({
+    ok: true,
+    sent_at: sentAt,
+    sent_to_client_count: (invoice.sent_to_client_count || 0) + 1,
+  });
+}
+
+function buildSendEmailHtml({ company, brand, invoice, clientName, message }) {
+  const ac       = brand?.color || "#22c55e";
+  const ttc      = Number(invoice.montant_ttc || 0).toFixed(2).replace(".", ",");
+  const echeance = invoice.date_echeance
+    ? new Date(invoice.date_echeance).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
+    : "";
+  const iban = brand?.iban
+    ? `<p style="font-size:13px;color:#6B6358;margin:8px 0 0">IBAN : <strong style="color:#1A1612">${esc(brand.iban)}</strong>${brand.bic ? ` · BIC : <strong style="color:#1A1612">${esc(brand.bic)}</strong>` : ""}</p>`
+    : "";
+  const customMsg = message?.trim()
+    ? `<div style="background:#FAF7F2;border-left:3px solid ${ac};padding:12px 16px;margin:18px 0;font-size:13px;color:#1A1612;line-height:1.55;white-space:pre-wrap">${esc(message.trim())}</div>`
+    : "";
+  const sig = [
+    company,
+    brand?.phone ? brand.phone : "",
+    brand?.email ? brand.email : "",
+  ].filter(Boolean).map(esc).join(" · ");
+
+  return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <div style="max-width:540px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.05)">
+    <div style="background:${ac};padding:24px;text-align:center">
+      <div style="color:#fff;font-size:12px;letter-spacing:1.5px;opacity:.9">FACTURE ${esc(invoice.numero || "")}</div>
+      <div style="color:#fff;font-size:26px;font-weight:700;margin-top:8px">${ttc} € TTC</div>
+    </div>
+    <div style="padding:28px">
+      <p style="color:#1A1612;font-size:14px;margin:0 0 14px">Bonjour ${esc(clientName) || "Madame, Monsieur"},</p>
+      <p style="color:#6B6358;font-size:14px;line-height:1.6;margin:0">
+        Vous trouverez ci-joint la facture <strong style="color:#1A1612">${esc(invoice.numero || "")}</strong>${invoice.objet ? ` (${esc(invoice.objet)})` : ""} d'un montant de <strong style="color:#1A1612">${ttc} € TTC</strong>${echeance ? `, à régler avant le <strong style="color:#1A1612">${esc(echeance)}</strong>` : ""}.
+      </p>
+      ${customMsg}
+      ${iban}
+      <p style="color:#9A8E82;font-size:11px;margin-top:24px;line-height:1.5">
+        Document Factur-X (PDF + XML embarqué) — votre comptable peut l'intégrer automatiquement.
+      </p>
+      <p style="color:#1A1612;font-size:13px;margin:22px 0 0;padding-top:16px;border-top:1px solid #F0EBE3">${sig}</p>
+    </div>
+  </div></body></html>`;
 }

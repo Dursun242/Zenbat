@@ -2,16 +2,20 @@
 // fallback Resend HTTP (si RESEND_API_KEY).
 //
 // Usage :
-//   await sendEmail({ to, subject, html, cc?, fromName?, attachments? })
+//   await sendEmail({ to, subject, html, cc?, fromName?, replyTo?, attachments? })
 //
 // Format attachments (uniforme pour les deux providers) :
 //   [{ filename: 'foo.csv', content: '<base64-string>' }]
 // Le helper convertit pour chaque provider (nodemailer = encoding:'base64',
 // Resend HTTP = base64 brut).
+//
+// replyTo : utile quand l'expéditeur SMTP est partagé (ex. Gmail Zenbat) mais
+// qu'on veut que la réponse du destinataire arrive directement chez l'artisan
+// (brand.email). Évite que le client réponde à noreply@zenbat.
 
 const DEFAULT_FROM_NAME = 'Zenbat'
 
-export async function sendEmail({ to, subject, html, cc, fromName, attachments }) {
+export async function sendEmail({ to, subject, html, cc, fromName, replyTo, attachments }) {
   const gmailUser = process.env.GMAIL_USER
   const gmailPass = process.env.GMAIL_APP_PASSWORD || process.env.GMAIL_APP_PASWORD
   const displayName = fromName || DEFAULT_FROM_NAME
@@ -32,6 +36,7 @@ export async function sendEmail({ to, subject, html, cc, fromName, attachments }
       from: `${displayName} <${gmailUser}>`,
       to, subject, html,
       ...(cc ? { cc: Array.isArray(cc) ? cc.join(',') : cc } : {}),
+      ...(replyTo ? { replyTo } : {}),
       ...(nodeAttachments.length ? { attachments: nodeAttachments } : {}),
     })
     return { provider: 'gmail' }
@@ -45,6 +50,7 @@ export async function sendEmail({ to, subject, html, cc, fromName, attachments }
     to, subject, html,
   }
   if (cc) payload.cc = Array.isArray(cc) ? cc : [cc]
+  if (replyTo) payload.reply_to = Array.isArray(replyTo) ? replyTo : [replyTo]
   if (attachments?.length) {
     payload.attachments = attachments.map(a => ({
       filename: a.filename,

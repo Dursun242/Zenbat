@@ -34,7 +34,8 @@ L'utilisateur les copie-colle dans le SQL Editor de Supabase.
   - `0041_fix_devis_week_count_null.sql` — fix critique qui empêche tout nouveau freemium de créer son tout premier devis (bug RLS sur la policy `devis_insert_freemium_weekly_limit`, cf. section Bugs connus).
   - `0043_schema_migrations.sql` — crée la table de tracking (cf ci-dessous).
   - `0047_devis_negociation_status.sql` — étend la CHECK constraint `devis_statut_check` pour autoriser `'en_negociation'`. Sans cette migration, toute négociation client échoue silencieusement à mettre à jour le statut du devis (cf. section Bugs connus).
-- Prochaine migration à créer : préfixer avec `0048_`.
+  - `0049_invoices_sent_to_client.sql` — ajoute `invoices.sent_to_client_at` + `sent_to_client_count` pour tracker l'envoi par email du PDF Factur-X au client (action `send` de `api/facturx.js`). `api/facturx.js` catche le 42703 si la migration n'est pas appliquée — l'email part quand même, seul le tracking en DB est sauté.
+- Prochaine migration à créer : préfixer avec `0050_`.
 
 **Tracking depuis 0043** : la table `public.schema_migrations(version, label, applied_at)` est créée par la migration `0043`. À partir de là, chaque nouvelle migration **doit** se terminer par un INSERT idempotent qui s'auto-enregistre :
 ```sql
@@ -120,7 +121,7 @@ Helpers non déployés (préfixés `_`, importés par les endpoints) :
 | `claude.js` | Proxy Claude API avec timeout 28s + AbortController |
 | `contact.js` | Formulaire de contact public — POST avec honeypot anti-bot, envoie un email à l'admin |
 | `devis-public.js` | Endpoint public pour signature client de devis — token + OTP 8 chiffres + audit, multi-routes par `action` (`send`, `request_otp`, `verify_otp`, `accept`, `refuse`, `negotiate`, `artisan_respond`, `send_signed_pdf`). `send_signed_pdf` reçoit le PDF généré côté navigateur en base64 et l'email en pièce jointe au client + à l'artisan ; idempotence via audit log (`event = 'signed_pdf_sent'`). |
-| `facturx.js` | Génération PDF Factur-X (XML CII embarqué) |
+| `facturx.js` | Génération PDF Factur-X (XML CII embarqué). Multi-actions par champ `action` du body : par défaut = assemble + uploade en Storage ; `action: 'send'` = télécharge le PDF depuis Storage et l'envoie par email au client (au nom de `brand.companyName`, avec Reply-To = `brand.email`), met à jour `invoices.sent_to_client_at`. |
 | `newsletter.js` | Inscription newsletter |
 | `stripe.js` | Stripe checkout/portal/info (POST authentifié) + webhook (détection par header `stripe-signature`) |
 
