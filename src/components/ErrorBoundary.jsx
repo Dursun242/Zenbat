@@ -1,5 +1,5 @@
 import { Component } from 'react'
-import { logError } from '../lib/logger.js'
+import { logError, logInfo } from '../lib/logger.js'
 import { isChunkLoadError, recoverFromChunkError } from '../lib/chunkReload.js'
 
 export default class ErrorBoundary extends Component {
@@ -17,8 +17,10 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     if (isChunkLoadError(error)) {
-      // Reload déjà armé par getDerivedStateFromError — pas la peine de polluer
-      // les logs d'erreur Supabase avec ces faux positifs récurrents.
+      // Reload armé par getDerivedStateFromError. On log en INFO (pas en
+      // erreur) avec un marker dédié pour pouvoir suivre la fréquence :
+      //   select * from app_logs where context->>'type' = 'chunk_recovery';
+      logInfo(error.message || 'chunk recovery', { type: 'chunk_recovery' })
       return
     }
     console.error('[Zenbat] Crash React:', error, info?.componentStack)
