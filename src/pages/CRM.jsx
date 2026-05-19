@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase.js'
+import WebScraperModal from '../components/WebScraperModal.jsx'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -37,6 +38,65 @@ const SECTEURS = [
   'Carrelage', 'Toiture', 'Isolation', 'Climatisation', 'Chauffage',
   'Serrurerie', 'Plâtrerie', 'Jardinage', 'Nettoyage', 'Autre',
 ]
+
+// Devine un secteur à partir d'un texte d'activité libre. Match simple par
+// inclusion lowercase — couvre "Maçonnerie générale" → "Maçonnerie",
+// "Plomberie chauffagiste" → "Plomberie". Sinon chaîne vide (l'admin choisira).
+function guessSecteur(activite = '') {
+  const a = activite.toLowerCase()
+  if (!a) return ''
+  for (const s of SECTEURS) {
+    if (s === 'Autre') continue
+    if (a.includes(s.toLowerCase())) return s
+  }
+  if (/electric/.test(a))                return 'Électricité'
+  if (/plat[rî]/.test(a))                return 'Plâtrerie'
+  if (/plomb/.test(a))                   return 'Plomberie'
+  if (/charpent|menuis/.test(a))         return 'Menuiserie'
+  if (/peint/.test(a))                   return 'Peinture'
+  if (/macon|maçon/.test(a))             return 'Maçonnerie'
+  if (/toit|couvr|zingu/.test(a))        return 'Toiture'
+  if (/clim/.test(a))                    return 'Climatisation'
+  if (/chauff/.test(a))                  return 'Chauffage'
+  if (/serrur/.test(a))                  return 'Serrurerie'
+  if (/jardin|paysag|espace.*vert/.test(a)) return 'Jardinage'
+  if (/nettoy/.test(a))                  return 'Nettoyage'
+  if (/isol/.test(a))                    return 'Isolation'
+  if (/carrel/.test(a))                  return 'Carrelage'
+  return ''
+}
+
+// Mappe le contact brut renvoyé par /api/claude (mode scrape_urls) vers le
+// payload attendu par /api/crm action 'create'. Les champs absents du schéma
+// prospect (siret, code_postal, adresse, tva_intra) sont conservés en notes
+// pour ne rien perdre.
+function contactToProspectPayload(c, url) {
+  const fullName = [c.prenom, c.nom].filter(Boolean).join(' ').trim()
+  const company  = (c.raison_sociale || '').trim()
+  let host = ''
+  try { host = new URL(url).hostname.replace(/^www\./, '') } catch {}
+  const displayNom    = company || fullName || host || '—'
+  const entreprise    = company || fullName || host
+  const notesParts = [
+    c.activite,
+    [c.adresse, c.code_postal].filter(Boolean).join(' '),
+    c.siret    && `SIRET: ${c.siret}`,
+    c.tva_intra && `TVA: ${c.tva_intra}`,
+    c.telephone_fixe && `Tél fixe: ${c.telephone_fixe}`,
+    `Importé depuis ${url}`,
+  ].filter(Boolean)
+  return {
+    action: 'create',
+    nom:                 displayNom,
+    entreprise,
+    email:               c.email || '',
+    telephone:           c.telephone || c.telephone_fixe || '',
+    ville:               c.ville || '',
+    secteur:             guessSecteur(c.activite),
+    google_business_url: '',
+    notes:               notesParts.join('\n'),
+  }
+}
 
 const DEFAULT_SUJET = 'Ce que vous faisiez en 2h, Zenbat le fait en 5 minutes'
 
@@ -1832,6 +1892,7 @@ export default function CRM() {
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [queueOpen, setQueueOpen]   = useState(false)
   const [dedupOpen, setDedupOpen]   = useState(false)
+  const [scraperOpen, setScraperOpen] = useState(false)
 
   // Vérification admin au montage
   useEffect(() => {
@@ -1901,6 +1962,14 @@ export default function CRM() {
     if (selId === id) setSelId(null)
   }
 
+  // Handler du WebScraperModal : reçoit un contact extrait par Claude + l'URL
+  // source, mappe vers le schéma prospect et persiste via /api/crm.
+  const handleScrapedProspect = async (contact, url) => {
+    const payload = contactToProspectPayload(contact, url)
+    const data = await api('POST', payload)
+    if (data?.prospect) setProspects(prev => [data.prospect, ...prev])
+  }
+
   // ── Guards ─────────────────────────────────────────────────────────────
 
   if (authState === 'loading') {
@@ -1965,6 +2034,11 @@ export default function CRM() {
             style={{ padding: '7px 14px', background: '#4285F4', border: 'none', borderRadius: 8,
               color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
             🔍 Google Maps
+          </button>
+          <button onClick={() => setScraperOpen(true)}
+            style={{ padding: '7px 14px', background: '#16a34a', border: 'none', borderRadius: 8,
+              color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+            🌐 Sites web
           </button>
           <button onClick={() => setAddModal(true)}
             style={{ padding: '7px 14px', background: '#22c55e', border: 'none', borderRadius: 8,
@@ -2120,6 +2194,13 @@ export default function CRM() {
 
       {addModal && (
         <ProspectModal onSave={handleProspectAdded} onClose={() => setAddModal(false)} />
+      )}
+
+      {scraperOpen && (
+        <WebScraperModal
+          onSave={handleScrapedProspect}
+          onClose={() => setScraperOpen(false)}
+        />
       )}
 
       {searchOpen && (

@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { uid, displayName, emptyClient } from "../lib/utils.js";
+import { displayName } from "../lib/utils.js";
 import { getToken } from "../lib/getToken.js";
 
 const MAX_URLS = 5;
 
 // Une carte de résultat scrape : soit erreur, soit contact extrait éditable.
-function ResultCard({ result, included, onToggle, onEdit }) {
+function ResultCard({ result, included, onToggle, onEdit, canEdit }) {
   if (result.error) {
     return (
       <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: 12, fontSize: 12 }}>
@@ -42,10 +42,12 @@ function ResultCard({ result, included, onToggle, onEdit }) {
           {result.url}
         </div>
       </div>
-      <button onClick={onEdit}
-        style={{ background: "#F0EBE3", border: "none", borderRadius: 8, padding: "6px 10px", fontSize: 11, fontWeight: 600, color: "#6B6358", cursor: "pointer", flexShrink: 0 }}>
-        ✏️
-      </button>
+      {canEdit && (
+        <button onClick={onEdit}
+          style={{ background: "#F0EBE3", border: "none", borderRadius: 8, padding: "6px 10px", fontSize: 11, fontWeight: 600, color: "#6B6358", cursor: "pointer", flexShrink: 0 }}>
+          ✏️
+        </button>
+      )}
     </div>
   );
 }
@@ -101,14 +103,9 @@ export default function WebScraperModal({ onSave, onClose, onEditOne }) {
     const toCreate = results.filter(r => !r.error && included[r.url]);
     try {
       for (const r of toCreate) {
-        const c = { ...emptyClient(), ...r.contact, id: uid() };
-        // Sécurise : si type vide ou invalide, fallback
-        if (!["particulier", "entreprise", "artisan"].includes(c.type)) {
-          c.type = c.raison_sociale ? "entreprise" : "particulier";
-        }
-        // Trace l'origine dans les notes
-        c.notes = c.notes ? `${c.notes}\n\nImporté depuis ${r.url}` : `Importé depuis ${r.url}`;
-        await onSave(c);
+        // Le parent reçoit le contact brut + l'URL source et décide du mapping
+        // (client vs prospect vs autre schéma) avant persistance.
+        await onSave(r.contact, r.url);
       }
       onClose();
     } catch (err) {
@@ -186,7 +183,8 @@ export default function WebScraperModal({ onSave, onClose, onEditOne }) {
                   result={r}
                   included={!!included[r.url]}
                   onToggle={() => setIncluded(prev => ({ ...prev, [r.url]: !prev[r.url] }))}
-                  onEdit={() => onEditOne?.({ ...emptyClient(), ...r.contact, id: uid(), _scrapeUrl: r.url })}
+                  onEdit={() => onEditOne?.(r.contact, r.url)}
+                  canEdit={!!onEditOne}
                 />
               ))}
               {error && (

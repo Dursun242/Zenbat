@@ -2,7 +2,6 @@ import { useState, useRef, useMemo } from "react";
 import { CLAUDE_MODEL } from "../lib/constants.js";
 import { uid, displayName, emptyClient } from "../lib/utils.js";
 import ContactEditor from "./ContactEditor.jsx";
-import WebScraperModal from "./WebScraperModal.jsx";
 import { getToken } from "../lib/getToken.js";
 import { useDebouncedValue } from "../hooks/useDebouncedValue.js";
 
@@ -24,7 +23,6 @@ export default function ClientsList({ clients, onSave, onDelete, onRestore, goCl
   const [editing,     setEditing]     = useState(null);
   const [importing,   setImporting]   = useState(false);
   const [importError, setImportError] = useState("");
-  const [scraperOpen, setScraperOpen] = useState(false);
   const [openMenu,    setOpenMenu]    = useState(null);
   const fileRef = useRef(null);
 
@@ -126,10 +124,6 @@ Règles :
             📷 Importer une photo
           </button>
         )}
-        <button onClick={() => setScraperOpen(true)}
-          style={{ background: "#ecfdf5", border: "1.5px solid #a7f3d0", borderRadius: 14, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, color: "#047857", fontSize: 13, fontWeight: 600, cursor: "pointer", width: "100%" }}>
-          🌐 Importer depuis sites web
-        </button>
         <button onClick={() => setEditing(emptyClient())}
           style={{ background: "#1A1612", color: "white", border: "none", borderRadius: 14, padding: "12px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           + Nouveau contact
@@ -215,13 +209,6 @@ Règles :
       </div>
 
       {editing && <ContactEditor c={editing} onSave={saveContact} onClose={() => setEditing(null)}/>}
-      {scraperOpen && (
-        <WebScraperModal
-          onSave={onSave}
-          onClose={() => setScraperOpen(false)}
-          onEditOne={c => { setScraperOpen(false); setEditing(c); }}
-        />
-      )}
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
