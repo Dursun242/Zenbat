@@ -119,6 +119,9 @@ const HELP_TEXT = [
   "/tickets — tickets de support ouverts",
   "/reply &lt;ticket_id&gt; &lt;message&gt; — répondre à un ticket",
   "/help — afficher cette aide",
+  "",
+  "💡 Astuce : pour répondre à un ticket, utilise simplement la fonction",
+  "« Répondre » de Telegram sur la notif — le ticket est détecté tout seul.",
 ].join("\n");
 
 // deno-lint-ignore no-explicit-any
@@ -207,19 +210,22 @@ async function cmdReply(sb: Sb, args: string): Promise<string> {
   const message = args.slice(space + 1).trim();
   if (!idPart || !message) return "Usage : <code>/reply &lt;ticket_id&gt; &lt;message&gt;</code>";
 
-  // Le ticket_id peut être l'UUID complet ou son préfixe (8 chars) renvoyé par /tickets.
-  let ticket;
-  if (idPart.length === 36) {
-    const r = await sb.from("support_tickets").select("id, status").eq("id", idPart).maybeSingle();
-    ticket = r.data;
-  } else {
-    const r = await sb.from("support_tickets")
-      .select("id, status")
-      .like("id", `${idPart}%`)
-      .limit(2);
-    if (r.data && r.data.length > 1) return "Préfixe ambigu — utilise l'UUID complet.";
-    ticket = r.data?.[0];
-  }
+  // Le ticket_id peut être l'UUID complet ou son préfixe (8 chars) renvoyé par
+  // /tickets et les notifs. On ne peut PAS faire .like() sur une colonne uuid
+  // (PostgREST refuse), donc on borne par gte/lte sur les UUIDs équivalents :
+  //   préfixe "bd87d1e5" → de "bd87d1e5-0000-...-0..0" à "bd87d1e5-ffff-...-f..f".
+  const lo = uuidPrefixBoundary(idPart, "0");
+  const hi = uuidPrefixBoundary(idPart, "f");
+  if (!lo || !hi) return `ID invalide : <code>${escapeHtml(idPart)}</code>`;
+
+  const r = await sb.from("support_tickets")
+    .select("id, status")
+    .gte("id", lo)
+    .lte("id", hi)
+    .limit(2);
+  if (r.error) return `Erreur recherche : ${escapeHtml(r.error.message)}`;
+  if (r.data && r.data.length > 1) return "Préfixe ambigu — utilise l'UUID complet.";
+  const ticket = r.data?.[0];
   if (!ticket) return `Ticket introuvable : <code>${escapeHtml(idPart)}</code>`;
 
   const { error: insertErr } = await sb.from("support_messages").insert({
@@ -235,6 +241,25 @@ async function cmdReply(sb: Sb, args: string): Promise<string> {
     .eq("id", ticket.id);
 
   return `✅ Réponse envoyée sur <code>${ticket.id.slice(0, 8)}</code>`;
+}
+
+// Construit la borne basse ("0") ou haute ("f") d'un UUID à partir d'un préfixe
+// (avec ou sans tirets). Renvoie null si le préfixe n'est pas hex valide ou
+// dépasse 32 caractères de contenu.
+function uuidPrefixBoundary(prefix: string, fill: "0" | "f"): string | null {
+  const clean = prefix.replace(/-/g, "").toLowerCase();
+  if (!/^[0-9a-f]+$/.test(clean) || clean.length > 32) return null;
+  const padded = clean.padEnd(32, fill);
+  return `${padded.slice(0,8)}-${padded.slice(8,12)}-${padded.slice(12,16)}-${padded.slice(16,20)}-${padded.slice(20,32)}`;
+}
+
+// Extrait un ticket_id (UUID complet ou préfixe 8 chars) d'un message de notif.
+// La notif contient toujours "/reply <id>" en clair → on s'appuie dessus.
+function extractTicketIdFromNotif(text: string | null | undefined): string | null {
+  if (!text) return null;
+  // Cherche /reply suivi d'un UUID complet (avec tirets) ou d'un préfixe hex.
+  const m = text.match(/\breply\s+([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}|[0-9a-f]{8,32})\b/i);
+  return m ? m[1].toLowerCase() : null;
 }
 
 // ─── Handler principal ────────────────────────────────────────────────────
@@ -300,15 +325,36 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  // ── Reply natif Telegram ─────────────────────────────────────────────────
+  // Si l'admin utilise la fonction "Répondre" de Telegram sur une notif de
+  // ticket, on extrait le ticket_id du message original et on traite le texte
+  // de réponse comme contenu de /reply. UX : aucun copier-coller d'UUID.
+  // deno-lint-ignore no-explicit-any
+  const replyTo: any = message.reply_to_message;
   const cmd = parseCommand(message.text);
+  if (replyTo && !cmd) {
+    const ticketId = extractTicketIdFromNotif(replyTo.text);
+    if (ticketId) {
+      let reply = "";
+      try {
+        reply = await cmdReply(sb, `${ticketId} ${message.text}`);
+      } catch (err) {
+        console.error("[telegram-bot] reply-to error:", err);
+        reply = `❌ Erreur : ${escapeHtml(err instanceof Error ? err.message : String(err))}`;
+      }
+      await sendMessage(chatId, reply);
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+  }
+
   if (!cmd) {
     await sendMessage(chatId, "Tape /help pour voir les commandes.");
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
   }
-
-  const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   let reply = "";
   try {

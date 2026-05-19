@@ -221,7 +221,8 @@ async function formatEvent(kind: EventKind, payload: Record<string, unknown>): P
         p.user_email ? `User : ${escapeHtml(p.user_email)}` : "",
         p.subject    ? `Sujet : ${escapeHtml(clip(p.subject, 80))}` : "",
         "",
-        `Pour répondre : <code>/reply ${escapeHtml(shortId)} &lt;message&gt;</code>`,
+        `↩️ <i>Réponds à ce message pour parler à l'utilisateur</i>`,
+        `(ou tape <code>/reply ${escapeHtml(shortId)} ton message</code>)`,
       ].filter(Boolean).join("\n");
     }
 
@@ -235,7 +236,8 @@ async function formatEvent(kind: EventKind, payload: Record<string, unknown>): P
         p.user_message ? `<b>Question</b>\n${escapeHtml(clip(p.user_message, 600))}` : "",
         p.claude_reply ? `\n<b>Claude</b>\n${escapeHtml(clip(p.claude_reply, 600))}` : "",
         "",
-        `Reprendre la main : <code>/reply ${escapeHtml(shortId)} &lt;message&gt;</code>`,
+        `↩️ <i>Réponds à ce message pour reprendre la main</i>`,
+        `(ou tape <code>/reply ${escapeHtml(shortId)} ton message</code>)`,
       ].filter(Boolean).join("\n");
     }
 
@@ -250,7 +252,8 @@ async function formatEvent(kind: EventKind, payload: Record<string, unknown>): P
         p.user_message ? `<b>Relance</b>\n${escapeHtml(clip(p.user_message, 600))}` : "",
         p.claude_reply ? `\n<b>Claude</b>\n${escapeHtml(clip(p.claude_reply, 600))}` : "",
         "",
-        `Reprendre la main : <code>/reply ${escapeHtml(shortId)} &lt;message&gt;</code>`,
+        `↩️ <i>Réponds à ce message pour reprendre la main</i>`,
+        `(ou tape <code>/reply ${escapeHtml(shortId)} ton message</code>)`,
       ].filter(Boolean).join("\n");
     }
 
