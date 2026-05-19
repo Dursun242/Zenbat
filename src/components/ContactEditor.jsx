@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { searchEntreprises } from "../lib/insee";
 
 // Composant champ de formulaire générique
 function Field({ label, val, onChange, type = "text", placeholder = "" }) {
@@ -21,6 +22,60 @@ export default function ContactEditor({ c, onSave, onClose }) {
   const [form, setForm] = useState(c);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const isValid = form.raison_sociale?.trim() || form.nom?.trim() || form.prenom?.trim();
+
+  // Recherche INSEE (recherche-entreprises.api.gouv.fr) — uniquement pour entreprise/artisan.
+  const [inseeQuery, setInseeQuery] = useState("");
+  const [inseeResults, setInseeResults] = useState([]);
+  const [inseeLoading, setInseeLoading] = useState(false);
+  const [inseeError, setInseeError] = useState(null);
+  const [inseeOpen, setInseeOpen] = useState(false);
+  const abortRef = useRef(null);
+
+  useEffect(() => {
+    if (form.type === "particulier") return;
+    const q = inseeQuery.trim();
+    if (q.length < 3) {
+      setInseeResults([]);
+      setInseeError(null);
+      return;
+    }
+    const t = setTimeout(async () => {
+      abortRef.current?.abort();
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
+      setInseeLoading(true);
+      setInseeError(null);
+      try {
+        const list = await searchEntreprises(q, { signal: ctrl.signal });
+        setInseeResults(list);
+        setInseeOpen(true);
+      } catch (e) {
+        if (e.name === "AbortError") return;
+        setInseeError(e.message || "Erreur INSEE");
+        setInseeResults([]);
+      } finally {
+        setInseeLoading(false);
+      }
+    }, 350);
+    return () => clearTimeout(t);
+  }, [inseeQuery, form.type]);
+
+  function pickInseeResult(r) {
+    setForm(f => ({
+      ...f,
+      raison_sociale: r.raison_sociale || f.raison_sociale,
+      siret: r.siret || f.siret,
+      tva_intra: r.tva_intra || f.tva_intra,
+      adresse: r.adresse || f.adresse,
+      code_postal: r.code_postal || f.code_postal,
+      ville: r.ville || f.ville,
+      naf: r.naf || f.naf,
+      activite: r.activite || f.activite,
+    }));
+    setInseeQuery("");
+    setInseeResults([]);
+    setInseeOpen(false);
+  }
 
   return createPortal(
     <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(15,23,42,.7)", zIndex: 9999, fontFamily: "'DM Sans',sans-serif" }}>
@@ -55,6 +110,50 @@ export default function ContactEditor({ c, onSave, onClose }) {
           </div>
 
           {form.type !== "particulier" && (
+            <div style={{ position: "relative" }}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#6B6358", marginBottom: 6 }}>
+                RECHERCHE INSEE (NOM OU SIRET)
+              </label>
+              <input
+                type="text"
+                value={inseeQuery}
+                onChange={e => setInseeQuery(e.target.value)}
+                onFocus={() => inseeResults.length && setInseeOpen(true)}
+                placeholder="Ex : Dupont Maçonnerie ou 12345678900010"
+                style={{ width: "100%", background: "white", border: "1px solid #E8E2D8", borderRadius: 12, padding: "10px 14px", fontSize: 13, color: "#1A1612", outline: "none", boxSizing: "border-box" }}
+              />
+              {inseeLoading && (
+                <div style={{ fontSize: 11, color: "#6B6358", marginTop: 4 }}>Recherche…</div>
+              )}
+              {inseeError && (
+                <div style={{ fontSize: 11, color: "#dc2626", marginTop: 4 }}>{inseeError}</div>
+              )}
+              {inseeOpen && inseeResults.length > 0 && (
+                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: "white", border: "1px solid #E8E2D8", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,.08)", zIndex: 50, maxHeight: 240, overflowY: "auto" }}>
+                  {inseeResults.map((r, i) => (
+                    <button
+                      key={`${r.siret}-${i}`}
+                      type="button"
+                      onClick={() => pickInseeResult(r)}
+                      style={{ display: "block", width: "100%", textAlign: "left", background: "white", border: "none", borderBottom: i < inseeResults.length - 1 ? "1px solid #F0EBE3" : "none", padding: "10px 12px", cursor: "pointer", fontSize: 12 }}
+                    >
+                      <div style={{ fontWeight: 600, color: "#1A1612", display: "flex", gap: 6, alignItems: "center" }}>
+                        <span>{r._display.label}</span>
+                        {r._display.etat && (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: "#dc2626", background: "#fee2e2", padding: "1px 6px", borderRadius: 6 }}>{r._display.etat}</span>
+                        )}
+                      </div>
+                      {r._display.sub && (
+                        <div style={{ color: "#6B6358", marginTop: 2 }}>{r._display.sub}</div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {form.type !== "particulier" && (
             <Field label="Raison sociale *" val={form.raison_sociale} onChange={v => set("raison_sociale", v)} placeholder="Ex : Dupont Maçonnerie SAS"/>
           )}
 
@@ -81,7 +180,10 @@ export default function ContactEditor({ c, onSave, onClose }) {
             <>
               <Field label="SIRET" val={form.siret} onChange={v => set("siret", v)} placeholder="12345678900010"/>
               <Field label="N° TVA intracommunautaire" val={form.tva_intra} onChange={v => set("tva_intra", v)} placeholder="FR12345678901"/>
-              <Field label="Activité" val={form.activite} onChange={v => set("activite", v)} placeholder="Ex : Maçonnerie générale et gros œuvre"/>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 10 }}>
+                <Field label="Code NAF/APE" val={form.naf} onChange={v => set("naf", v)} placeholder="43.32A"/>
+                <Field label="Activité" val={form.activite} onChange={v => set("activite", v)} placeholder="Ex : Travaux de menuiserie bois et PVC"/>
+              </div>
             </>
           )}
 

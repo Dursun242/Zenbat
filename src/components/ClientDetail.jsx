@@ -15,6 +15,7 @@ export default function ClientDetail({ c, clientDevis, onBack, goDevis, onUpdate
     ["Adresse",       [c.adresse, [c.code_postal, c.ville].filter(Boolean).join(" ")].filter(Boolean).join(" — ")],
     ["SIRET",         c.siret],
     ["TVA intracom.", c.tva_intra],
+    ["Code NAF",      c.naf],
     ["Activité",      c.activite],
     ["Notes",         c.notes],
   ].filter(([, v]) => v);

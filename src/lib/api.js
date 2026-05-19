@@ -123,13 +123,22 @@ export async function listClients() {
 
 export async function createClient(client) {
   const { data: { user } } = await supabase.auth.getUser()
+  const payload = { ...client, owner_id: user.id }
   const { data, error } = await supabase
     .from('clients')
-    .insert({ ...client, owner_id: user.id })
+    .insert(payload)
     .select()
     .single()
-  if (error) throw error
-  return data
+  if (!error) return data
+  // Fallback : migration 0048 (colonne naf) pas encore appliquée côté DB.
+  if (error.code === '42703') {
+    const { naf, ...safe } = payload
+    const { data: d2, error: e2 } = await supabase
+      .from('clients').insert(safe).select().single()
+    if (!e2) return d2
+    throw e2
+  }
+  throw error
 }
 
 export async function updateClient(id, patch) {
@@ -139,8 +148,15 @@ export async function updateClient(id, patch) {
     .eq('id', id)
     .select()
     .single()
-  if (error) throw error
-  return data
+  if (!error) return data
+  if (error.code === '42703') {
+    const { naf, ...safe } = patch
+    const { data: d2, error: e2 } = await supabase
+      .from('clients').update(safe).eq('id', id).select().single()
+    if (!e2) return d2
+    throw e2
+  }
+  throw error
 }
 
 export async function deleteClient(id) {
