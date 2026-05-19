@@ -103,6 +103,8 @@ type EventKind =
   | "subscription_canceled"
   | "account_deleted"
   | "support_escalation"
+  | "support_new_ticket"
+  | "support_followup"
   | "pdf_generated"
   | "devis_sent"
   | "raw";
@@ -220,6 +222,35 @@ async function formatEvent(kind: EventKind, payload: Record<string, unknown>): P
         p.subject    ? `Sujet : ${escapeHtml(clip(p.subject, 80))}` : "",
         "",
         `Pour répondre : <code>/reply ${escapeHtml(shortId)} &lt;message&gt;</code>`,
+      ].filter(Boolean).join("\n");
+    }
+
+    case "support_new_ticket": {
+      const tid = String(p.ticket_id ?? "");
+      const shortId = tid.length >= 8 ? tid.slice(0, 8) : tid;
+      return [
+        "💬 <b>Nouveau ticket support</b>",
+        p.user_email ? `User : ${escapeHtml(p.user_email)}` : "",
+        "",
+        p.user_message ? `<b>Question</b>\n${escapeHtml(clip(p.user_message, 600))}` : "",
+        p.claude_reply ? `\n<b>Claude</b>\n${escapeHtml(clip(p.claude_reply, 600))}` : "",
+        "",
+        `Reprendre la main : <code>/reply ${escapeHtml(shortId)} &lt;message&gt;</code>`,
+      ].filter(Boolean).join("\n");
+    }
+
+    case "support_followup": {
+      const tid = String(p.ticket_id ?? "");
+      const shortId = tid.length >= 8 ? tid.slice(0, 8) : tid;
+      return [
+        "🔁 <b>Suivi ticket — Claude n'a pas résolu</b>",
+        p.user_email ? `User : ${escapeHtml(p.user_email)}` : "",
+        p.subject    ? `Sujet d'origine : ${escapeHtml(clip(p.subject, 80))}` : "",
+        "",
+        p.user_message ? `<b>Relance</b>\n${escapeHtml(clip(p.user_message, 600))}` : "",
+        p.claude_reply ? `\n<b>Claude</b>\n${escapeHtml(clip(p.claude_reply, 600))}` : "",
+        "",
+        `Reprendre la main : <code>/reply ${escapeHtml(shortId)} &lt;message&gt;</code>`,
       ].filter(Boolean).join("\n");
     }
 

@@ -1,5 +1,5 @@
 import { cors } from "./_cors.js";
-import { authenticate } from "./_withAuth.js";
+import { authenticate, notifyTelegram } from "./_withAuth.js";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
@@ -272,7 +272,7 @@ export default async function handler(req, res) {
     if (typeof support_ticket_id !== "string")
       return res.status(400).json({ error: "support_ticket_id invalide" });
     const { data, error: ticketErr } = await admin.from("support_tickets")
-      .select("id, status")
+      .select("id, status, subject")
       .eq("id", support_ticket_id)
       .eq("user_id", user.id)
       .maybeSingle();
@@ -434,6 +434,27 @@ export default async function handler(req, res) {
           content:   claudeText.slice(0, 8000),
         });
         if (insertErr) console.error("[claude/support] insert claude msg:", insertErr.message);
+
+        // Notif Telegram admin : nouveau ticket (1er échange) vs suivi (Claude
+        // a déjà répondu mais l'user revient → signal que Claude n'a pas suffi).
+        // Awaited (et pas fire-and-forget) parce que la fonction Vercel peut
+        // recycler avant la fin du fetch sortant — on accepte ~300ms de latence
+        // pour garantir la notif. notifyTelegram catche en interne, donc pas
+        // de risque de faire échouer la réponse Claude.
+        const prior = messages.slice(0, -1);
+        const hasPriorClaudeReply = prior.some((m) => m?.role === "assistant");
+        const lastUser = [...messages].reverse().find((m) => m?.role === "user");
+        const userMessage = typeof lastUser?.content === "string" ? lastUser.content : "";
+        await notifyTelegram(
+          hasPriorClaudeReply ? "support_followup" : "support_new_ticket",
+          {
+            ticket_id:    supportTicket.id,
+            user_email:   user.email || null,
+            subject:      supportTicket.subject || null,
+            user_message: userMessage,
+            claude_reply: claudeText,
+          },
+        );
       }
     }
 
