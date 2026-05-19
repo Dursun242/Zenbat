@@ -1728,155 +1728,6 @@ function QueuePanel({ onClose }) {
 
 // ── Page principale CRM ────────────────────────────────────────────────────
 
-// ── Panneau recherche Google Places ───────────────────────────────────────
-
-function PlacesSearch({ existingEmails, onAdd, onClose }) {
-  const [query, setQuery]       = useState('plombier Le Havre')
-  const [results, setResults]   = useState([])
-  const [loading, setLoading]   = useState(false)
-  const [err, setErr]           = useState('')
-  const [details, setDetails]   = useState({}) // place_id → détails
-  const [loadingId, setLoadingId] = useState(null)
-  const [addedIds, setAddedIds] = useState(new Set())
-
-  const search = async () => {
-    if (!query.trim()) return
-    setLoading(true); setErr(''); setResults([])
-    try {
-      const d = await api('GET', { action: 'search_places', q: query.trim() })
-      setResults(d.results || [])
-      if (!d.results?.length) setErr('Aucun résultat. Essayez "électricien Rouen" ou "maçon Caen".')
-    } catch (e) { setErr(e.message) }
-    finally { setLoading(false) }
-  }
-
-  const fetchDetails = async (place_id) => {
-    if (details[place_id]) return
-    setLoadingId(place_id)
-    try {
-      const d = await api('GET', { action: 'place_details', place_id })
-      setDetails(prev => ({ ...prev, [place_id]: d }))
-    } catch {}
-    finally { setLoadingId(null) }
-  }
-
-  const handleAdd = async (r) => {
-    const det = details[r.place_id] || {}
-    const prospect = {
-      action: 'create',
-      nom: r.nom,
-      entreprise: r.nom,
-      email: '',
-      telephone: det.telephone || '',
-      ville: r.ville,
-      secteur: r.secteur || det.secteur || '',
-      google_business_url: det.maps_url || r.maps_url,
-      notes: r.adresse,
-    }
-    try {
-      const data = await api('POST', prospect)
-      onAdd(data.prospect)
-      setAddedIds(prev => new Set([...prev, r.place_id]))
-    } catch (e) { alert(e.message) }
-  }
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', justifyContent: 'flex-end' }}>
-      <div onClick={onClose} style={{ flex: 1, background: 'rgba(26,22,18,0.4)' }} />
-      <div style={{ width: 480, background: '#fff', display: 'flex', flexDirection: 'column',
-        boxShadow: '-8px 0 40px rgba(0,0,0,0.15)', overflowY: 'auto' }}>
-
-        {/* Header */}
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #E8E2D8', background: '#1A1612',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>🔍 Recherche Google Maps</div>
-            <div style={{ fontSize: 11, color: '#6B6358', marginTop: 2 }}>Trouvez des artisans et ajoutez-les en 1 clic</div>
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6B6358',
-            fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
-        </div>
-
-        {/* Barre de recherche */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #E8E2D8', background: '#FAF7F2' }}>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && search()}
-              placeholder="plombier Le Havre, électricien Rouen…"
-              style={{ flex: 1, padding: '10px 12px', border: '1px solid #E8E2D8', borderRadius: 8,
-                fontSize: 13, fontFamily: 'inherit', outline: 'none', background: '#fff' }}
-            />
-            <button onClick={search} disabled={loading}
-              style={{ padding: '10px 16px', background: '#1A1612', color: '#fff', border: 'none',
-                borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-                opacity: loading ? 0.6 : 1, whiteSpace: 'nowrap' }}>
-              {loading ? '…' : 'Chercher'}
-            </button>
-          </div>
-          {err && <p style={{ fontSize: 12, color: '#dc2626', marginTop: 8 }}>{err}</p>}
-          <p style={{ fontSize: 11, color: '#9A9088', marginTop: 6 }}>
-            ⚠ Nécessite <code style={{ background: '#E8E2D8', padding: '1px 4px', borderRadius: 3 }}>GOOGLE_PLACES_API_KEY</code> dans Vercel
-          </p>
-        </div>
-
-        {/* Résultats */}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          {results.length === 0 && !loading && (
-            <div style={{ padding: 32, textAlign: 'center', color: '#9A9088', fontSize: 13 }}>
-              Lancez une recherche pour trouver des prospects.
-            </div>
-          )}
-          {results.map(r => {
-            const det = details[r.place_id]
-            const alreadyIn = existingEmails.has(r.nom?.toLowerCase()) || addedIds.has(r.place_id)
-            return (
-              <div key={r.place_id} style={{ padding: '14px 20px', borderBottom: '1px solid #F0ECE4',
-                background: alreadyIn ? '#f0fdf4' : '#fff' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#1A1612', marginBottom: 2 }}>{r.nom}</div>
-                    <div style={{ fontSize: 11, color: '#6B6358', marginBottom: 4, lineHeight: 1.4 }}>{r.adresse}</div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                      {r.secteur && <span style={{ fontSize: 10, background: '#F0ECE4', color: '#6B6358',
-                        padding: '2px 6px', borderRadius: 10, fontWeight: 600 }}>{r.secteur}</span>}
-                      {r.rating && <span style={{ fontSize: 11, color: '#d97706' }}>★ {r.rating} ({r.nb_avis})</span>}
-                      {det?.telephone && <span style={{ fontSize: 11, color: '#6B6358' }}>📞 {det.telephone}</span>}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-                    {alreadyIn ? (
-                      <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>✓ Ajouté</span>
-                    ) : (
-                      <button onClick={() => handleAdd(r)}
-                        style={{ padding: '6px 12px', background: '#C97B5C', color: '#fff', border: 'none',
-                          borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                        + Ajouter
-                      </button>
-                    )}
-                    {!det && !alreadyIn && (
-                      <button onClick={() => fetchDetails(r.place_id)} disabled={loadingId === r.place_id}
-                        style={{ padding: '5px 10px', background: 'none', border: '1px solid #E8E2D8',
-                          borderRadius: 6, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', color: '#6B6358' }}>
-                        {loadingId === r.place_id ? '…' : 'Détails'}
-                      </button>
-                    )}
-                    <a href={r.maps_url} target="_blank" rel="noopener noreferrer"
-                      style={{ fontSize: 10, color: '#4285F4', textDecoration: 'none', textAlign: 'center' }}>
-                      Maps ↗
-                    </a>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function CRM() {
   const [authState, setAuthState]   = useState('loading') // 'loading' | 'ok' | 'denied'
   const [prospects, setProspects]   = useState([])
@@ -1885,7 +1736,6 @@ export default function CRM() {
   const [filterStatut, setFilter]   = useState('all')
   const [search, setSearch]         = useState('')
   const [addModal, setAddModal]     = useState(false)
-  const [searchOpen, setSearchOpen] = useState(false)
   const [csvOpen, setCsvOpen]       = useState(false)
   const [selected, setSelected]     = useState(new Set()) // IDs sélectionnés
   const [bulkOpen, setBulkOpen]     = useState(false)
@@ -2029,11 +1879,6 @@ export default function CRM() {
             style={{ padding: '7px 14px', background: '#6B6358', border: 'none', borderRadius: 8,
               color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
             📂 CSV
-          </button>
-          <button onClick={() => setSearchOpen(true)}
-            style={{ padding: '7px 14px', background: '#4285F4', border: 'none', borderRadius: 8,
-              color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-            🔍 Google Maps
           </button>
           <button onClick={() => setScraperOpen(true)}
             style={{ padding: '7px 14px', background: '#16a34a', border: 'none', borderRadius: 8,
@@ -2200,14 +2045,6 @@ export default function CRM() {
         <WebScraperModal
           onSave={handleScrapedProspect}
           onClose={() => setScraperOpen(false)}
-        />
-      )}
-
-      {searchOpen && (
-        <PlacesSearch
-          existingEmails={new Set(prospects.map(p => p.nom?.toLowerCase()))}
-          onAdd={p => { setProspects(prev => [p, ...prev]); setSelId(p.id) }}
-          onClose={() => setSearchOpen(false)}
         />
       )}
 
