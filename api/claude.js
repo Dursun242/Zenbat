@@ -1,5 +1,7 @@
 import { cors } from "./_cors.js";
 import { authenticate } from "./_withAuth.js";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 
 const ALLOWED_MODELS = [
   "claude-haiku-4-5-20251001",
@@ -12,6 +14,196 @@ const MAX_MESSAGES_CHARS = 40_000;
 const STREAM_TIMEOUT_MS  = 55_000;
 const AI_LIMIT_FREE      = 40;
 const AI_LIMIT_PRO       = 200;
+
+// ── Scraper de sites web (action scrape_urls) ───────────────────────────────
+// Limites volontairement basses pour tenir dans le maxDuration 60s de Vercel
+// et garder le coût Claude prévisible. Le batch tourne en parallèle.
+const SCRAPE_MAX_URLS         = 5;
+const SCRAPE_FETCH_TIMEOUT_MS = 10_000;
+const SCRAPE_HTML_MAX_BYTES   = 2_000_000;
+const SCRAPE_TEXT_MAX_CHARS   = 20_000;
+const SCRAPE_MODEL            = "claude-haiku-4-5-20251001";
+
+const SCRAPE_SYSTEM_PROMPT = `Tu extrais les informations de contact d'un site web professionnel (artisan, entreprise, indépendant).
+Renvoie UNIQUEMENT un JSON valide entre <CONTACT></CONTACT>, sans texte autour.
+Format strict :
+{"type":"particulier|entreprise|artisan","raison_sociale":"","nom":"","prenom":"","email":"","telephone":"","telephone_fixe":"","adresse":"","code_postal":"","ville":"","siret":"","tva_intra":"","activite":""}
+Règles :
+- "type" : "artisan" pour métiers BTP/bâtiment, "entreprise" pour autres sociétés, "particulier" sinon.
+- Numéros français : format "06 XX XX XX XX". Mobile commence par 06/07, fixe par 01-05/09. Si plusieurs numéros, "telephone" = mobile, "telephone_fixe" = fixe.
+- Sépare "code_postal" (5 chiffres) de "ville".
+- "activite" : description courte (ex : "Maçonnerie générale", "Plomberie chauffage").
+- Si un champ est absent ou ambigu, laisse une chaîne vide "".
+- Ne devine pas. Si la page ne contient pas d'info contact claire, tous les champs vides.`;
+
+// IP privées / réservées — protection SSRF. Bloque AWS metadata (169.254.x),
+// localhost, RFC1918, link-local, IPv6 ULA/link-local.
+function isPrivateIp(ip) {
+  if (!ip) return true;
+  if (ip === "::1" || ip === "::" || ip === "0.0.0.0") return true;
+  if (/^127\./.test(ip)) return true;
+  if (/^10\./.test(ip)) return true;
+  if (/^192\.168\./.test(ip)) return true;
+  if (/^172\.(1[6-9]|2[0-9]|3[01])\./.test(ip)) return true;
+  if (/^169\.254\./.test(ip)) return true;
+  if (/^0\./.test(ip)) return true;
+  if (/^f[cd]/i.test(ip)) return true;
+  if (/^fe[89ab]/i.test(ip)) return true;
+  return false;
+}
+
+async function assertPublicHost(hostname) {
+  if (!hostname) throw new Error("Hôte invalide");
+  const lower = hostname.toLowerCase();
+  if (lower === "localhost" || lower.endsWith(".local") || lower.endsWith(".internal") || lower.endsWith(".localhost")) {
+    throw new Error("Domaine interdit");
+  }
+  if (isIP(hostname)) {
+    if (isPrivateIp(hostname)) throw new Error("IP privée bloquée");
+    return;
+  }
+  let address;
+  try { address = (await lookup(hostname)).address; }
+  catch { throw new Error("Domaine introuvable"); }
+  if (isPrivateIp(address)) throw new Error("Domaine résout vers une IP privée");
+}
+
+function htmlToText(html) {
+  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const descMatch  = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
+  const title = titleMatch ? titleMatch[1].replace(/\s+/g, " ").trim() : "";
+  const desc  = descMatch  ? descMatch[1].replace(/\s+/g, " ").trim()  : "";
+  const body = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&eacute;/gi, "é").replace(/&egrave;/gi, "è").replace(/&ecirc;/gi, "ê")
+    .replace(/&agrave;/gi, "à").replace(/&acirc;/gi, "â").replace(/&ccedil;/gi, "ç")
+    .replace(/&ocirc;/gi, "ô").replace(/&ucirc;/gi, "û").replace(/&ugrave;/gi, "ù")
+    .replace(/\s+/g, " ")
+    .trim();
+  const header = [title && `TITRE: ${title}`, desc && `DESCRIPTION: ${desc}`].filter(Boolean).join("\n");
+  return (header ? header + "\n\n" : "") + body;
+}
+
+async function fetchHtml(url) {
+  const ctrl = new AbortController();
+  const timeout = setTimeout(() => ctrl.abort(), SCRAPE_FETCH_TIMEOUT_MS);
+  try {
+    const resp = await fetch(url, {
+      signal: ctrl.signal,
+      redirect: "follow",
+      headers: {
+        "User-Agent":      "Mozilla/5.0 (compatible; ZenbatBot/1.0; +https://zenbat.fr)",
+        "Accept":          "text/html,application/xhtml+xml",
+        "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.5",
+      },
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const ct = (resp.headers.get("content-type") || "").toLowerCase();
+    if (!ct.includes("html") && !ct.includes("xml")) throw new Error("Pas une page HTML");
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder("utf-8", { fatal: false });
+    let html = "";
+    let total = 0;
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > SCRAPE_HTML_MAX_BYTES) {
+        reader.cancel().catch(() => {});
+        break;
+      }
+      html += decoder.decode(value, { stream: true });
+    }
+    html += decoder.decode();
+    return html;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function scrapeOneUrl(rawUrl, { admin, user }) {
+  let urlStr = String(rawUrl || "").trim();
+  if (!urlStr) throw new Error("URL vide");
+  // Si l'utilisateur a tapé un schéma explicite, on le respecte pour pouvoir
+  // rejeter ftp://, file://, javascript:, etc. Sinon on préfixe https://.
+  const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(urlStr);
+  if (hasScheme && !/^https?:/i.test(urlStr)) throw new Error("Protocole non autorisé");
+  if (!hasScheme) urlStr = "https://" + urlStr;
+  let u;
+  try { u = new URL(urlStr); } catch { throw new Error("URL invalide"); }
+  if (!["http:", "https:"].includes(u.protocol)) throw new Error("Protocole non autorisé");
+  await assertPublicHost(u.hostname);
+
+  const html = await fetchHtml(u.toString());
+  const text = htmlToText(html).slice(0, SCRAPE_TEXT_MAX_CHARS);
+  if (!text.trim()) throw new Error("Page vide");
+
+  const startTime = Date.now();
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type":      "application/json",
+      "x-api-key":         process.env.ANTHROPIC_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model:      SCRAPE_MODEL,
+      max_tokens: 800,
+      system:     SCRAPE_SYSTEM_PROMPT,
+      messages:   [{ role: "user", content: `URL: ${u.toString()}\n\nContenu de la page :\n${text}` }],
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(data?.error?.message || `Anthropic ${resp.status}`);
+
+  if (data?.usage) {
+    admin.from("claude_api_logs").insert({
+      model:          SCRAPE_MODEL,
+      use_case:       "scrape",
+      input_tokens:   data.usage.input_tokens  || 0,
+      output_tokens:  data.usage.output_tokens || 0,
+      latency_ms:     Date.now() - startTime,
+      status_code:    200,
+      stream_enabled: false,
+      user_id:        user.id,
+    }).then(() => {}).catch(() => {});
+  }
+
+  const raw = data.content?.[0]?.text || "";
+  const match = raw.match(/<CONTACT>([\s\S]*?)<\/CONTACT>/) || raw.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("Extraction impossible");
+  let parsed;
+  try { parsed = JSON.parse((match[1] || match[0]).trim()); }
+  catch { throw new Error("JSON invalide"); }
+  return { url: u.toString(), contact: parsed };
+}
+
+async function handleScrape(res, { urls, admin, user }) {
+  if (!Array.isArray(urls) || urls.length === 0)
+    return res.status(400).json({ error: "scrape_urls doit être un tableau non vide" });
+  if (urls.length > SCRAPE_MAX_URLS)
+    return res.status(400).json({ error: `Maximum ${SCRAPE_MAX_URLS} URLs par requête` });
+  if (!process.env.ANTHROPIC_KEY)
+    return res.status(500).json({ error: "ANTHROPIC_KEY non configurée côté serveur" });
+
+  const results = await Promise.allSettled(urls.map(u => scrapeOneUrl(u, { admin, user })));
+  return res.status(200).json({
+    results: results.map((r, i) => r.status === "fulfilled"
+      ? { url: r.value.url, contact: r.value.contact }
+      : { url: String(urls[i] || "").trim(), error: r.reason?.message || String(r.reason || "Erreur") }
+    ),
+  });
+}
 
 export default async function handler(req, res) {
   cors(req, res, { methods: "POST, OPTIONS", auth: true });
@@ -56,6 +248,18 @@ export default async function handler(req, res) {
   // ── Clé Anthropic ────────────────────────────────────────────────────────────
   if (!process.env.ANTHROPIC_KEY)
     return res.status(500).json({ error: "ANTHROPIC_KEY non configurée côté serveur" });
+
+  // ── Mode scrape (import contacts depuis sites web) ──────────────────────────
+  // Détecté via la présence de `scrape_urls`. Court-circuite la validation
+  // classique (model/messages/etc.) car le payload est différent.
+  if (Array.isArray(req.body?.scrape_urls)) {
+    try {
+      return await handleScrape(res, { urls: req.body.scrape_urls, admin, user });
+    } catch (err) {
+      console.error("[claude/scrape]", err?.message || err);
+      return res.status(500).json({ error: "Erreur scrape" });
+    }
+  }
 
   // ── Validation des paramètres ────────────────────────────────────────────────
   const { model, max_tokens, messages, system, stream, temperature, top_p, support_ticket_id } = req.body || {};
