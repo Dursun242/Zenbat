@@ -436,9 +436,48 @@ export default async function handler(req, res) {
       if (upErr) console.warn("[facturx] storage upload:", upErr.message);
     }
 
+    // Émission : transition brouillon → envoyee + locked=true, faite
+    // server-side via admin (service_role) pour bypasser la RLS. Certaines
+    // installations ont conservé la policy 0022 (with check ... and not locked)
+    // sans le fix 0035, ce qui faisait silencieusement échouer le UPDATE
+    // côté client → toast "Impossible de sauvegarder la facture", facture
+    // qui repassait en brouillon à la session suivante (cf section "Bugs
+    // connus" de CLAUDE.md). Désormais la transition est garantie côté
+    // serveur. Le .eq('statut','brouillon') rend l'opération idempotente.
+    let lockedNow   = !!invoice.locked;
+    let statutNow   = invoice.statut || null;
+    if (invoice.id) {
+      const { data: stateRow } = await admin
+        .from("invoices")
+        .select("statut, locked")
+        .eq("id", invoice.id)
+        .eq("owner_id", user.id)
+        .maybeSingle();
+      if (stateRow) {
+        statutNow = stateRow.statut;
+        lockedNow = !!stateRow.locked;
+        if (stateRow.statut === "brouillon" && !stateRow.locked) {
+          const { error: lockErr } = await admin
+            .from("invoices")
+            .update({ statut: "envoyee", locked: true })
+            .eq("id", invoice.id)
+            .eq("owner_id", user.id)
+            .eq("statut", "brouillon");
+          if (lockErr) {
+            console.warn("[facturx/lock]", lockErr.message);
+          } else {
+            statutNow = "envoyee";
+            lockedNow = true;
+          }
+        }
+      }
+    }
+
     return res.status(200).json({
-      pdf_base64: Buffer.from(out).toString("base64"),
+      pdf_base64:  Buffer.from(out).toString("base64"),
       icc_applied: !!icc,
+      locked:      lockedNow,
+      statut:      statutNow,
     });
   } catch (err) {
     console.error("[facturx]", err);

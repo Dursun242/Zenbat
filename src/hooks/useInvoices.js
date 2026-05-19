@@ -35,7 +35,15 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
 
   const goInvoice = (id) => { setSelI(id); setTab("factures_detail"); };
 
-  const onSaveInvoice = (inv, saveLignes = false) => {
+  const onSaveInvoice = (inv, saveLignes = false, skipPersist = false) => {
+    // skipPersist : la DB a déjà été mise à jour côté serveur (ex. transition
+    // brouillon → émise faite dans /api/facturx via service_role). On ne ré-UPDATE
+    // pas côté client — la RLS USING (not locked) rejetterait justement parce
+    // que la facture vient d'être verrouillée. On synchronise juste le state local.
+    if (skipPersist) {
+      setInvoices(prev => prev.map(x => x.id === inv.id ? inv : x));
+      return;
+    }
     // Garde-fou : une facture verrouillée (CGI art. 289) ne peut pas être
     // modifiée côté DB. La RLS la rejette → toast d'erreur inutile pour
     // l'utilisateur. On lit invoicesRef pour avoir l'état COURANT (pas la

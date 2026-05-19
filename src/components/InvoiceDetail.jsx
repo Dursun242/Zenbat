@@ -83,16 +83,21 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
       const blob     = new Blob([pdfBytes], { type: "application/pdf" });
       downloadBlob(blob, `${invoice.numero}-facturx.pdf`);
 
-      // Conformité : la génération Factur-X est l'émission de la facture.
-      // On bascule statut → 'envoyee' ; le trigger Postgres pose locked=true.
-      // Double-check sur invoice.locked en plus du statut : la closure peut
-      // être stale après les ~5s d'awaits ci-dessus, et un autre flux a pu
-      // déjà verrouiller la facture (race entre 2 clics).
-      if (invoice.statut === "brouillon" && !invoice.locked) {
+      // Conformité : l'émission de la facture (transition brouillon → envoyee
+      // + locked=true) est désormais faite server-side par /api/facturx via
+      // admin/service_role pour bypasser la RLS. On synchronise juste le state
+      // local depuis la réponse, en sautant la persistance côté client (la DB
+      // est déjà à jour, et un UPDATE supabase-js échouerait avec USING (not
+      // locked) puisque la ligne vient d'être verrouillée).
+      if (data.locked && !invoice.locked) {
         try {
-          onChange({ ...invoice, statut: "envoyee", locked: true }, false);
+          onChange(
+            { ...invoice, statut: data.statut || "envoyee", locked: true },
+            false,
+            true, // skipPersist
+          );
         } catch (lockErr) {
-          console.warn("[facturx/lock]", lockErr);
+          console.warn("[facturx/local-sync]", lockErr);
         }
       }
 
