@@ -54,7 +54,7 @@ export const STATUT = {
 // ── Statuts factures ─────────────────────────────────────
 export const STATUT_FACTURE = {
   brouillon: { label: "Brouillon", bg: "#f1f5f9", color: "#64748b", dot: "#94a3b8" },
-  envoyee:   { label: "Envoyée",   bg: "#eff6ff", color: "#1d4ed8", dot: "#3b82f6" },
+  envoyee:   { label: "Émise",     bg: "#eff6ff", color: "#1d4ed8", dot: "#3b82f6" },
   recue:     { label: "Reçue",     bg: "#ecfeff", color: "#0e7490", dot: "#06b6d4" },
   payee:     { label: "Payée",     bg: "#ecfdf5", color: "#065f46", dot: "#10b981" },
   rejetee:   { label: "Rejetée",   bg: "#fef2f2", color: "#991b1b", dot: "#ef4444" },

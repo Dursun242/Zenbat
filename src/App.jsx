@@ -259,7 +259,7 @@ export default function App() {
   // Compteurs pour les pastilles des onglets de la BottomNav.
   // - Devis : en attente de signature ou en négociation (le client a
   //   envoyé une demande de modification → action requise côté artisan).
-  // - Factures : envoyées non payées.
+  // - Factures : émises non payées.
   const negociationsCount = devis.filter(d => d.statut === "en_negociation").length;
   const navBadges = {
     devis:    devis.filter(d => ["en_signature", "en_negociation"].includes(d.statut)).length,
