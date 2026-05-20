@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fmtEur, fmtDT, relTime, SC, SL } from "../../lib/admin/format.js";
+import { sanitizeEmail, isValidEmail } from "../../lib/utils.js";
 import { useModalGuard } from "../../hooks/useModalGuard.js";
 
 // Drawer de détail d'un utilisateur dans le panel admin.
@@ -39,8 +40,11 @@ export default function UserDetailDrawer({
     setEditing(true);
   };
   const cancelEdit = () => { setEditing(false); setFormValues({}); };
+  const emailFilled = (formValues.email || "").trim().length > 0;
+  const emailInvalid = editing && emailFilled && !isValidEmail(formValues.email);
   const saveEdit = async () => {
     if (!onUpdateBrandData) return;
+    if (emailInvalid) return; // garde-fou : bouton désactivé mais on double-checke
     const bd = data?.profile?.brand_data || {};
     // Patch = uniquement les champs dont la valeur a changé. Permet à
     // l'API d'écrire le minimum nécessaire et garde la trace dans les
@@ -54,22 +58,40 @@ export default function UserDetailDrawer({
     const ok = await onUpdateBrandData(patch);
     if (ok) setEditing(false);
   };
-  const setField = (k) => (e) => setFormValues(v => ({ ...v, [k]: e.target.value }));
-  const inputStyle = { width: "100%", border: "1px solid #E8E2D8", borderRadius: 6, padding: "6px 8px", fontSize: 12, color: "#2A231C", background: "white", fontFamily: "inherit" };
-  const editRow = (label, key, opts = {}) => (
-    <div key={label} style={{ display: "flex", gap: 8, padding: "6px 0", borderBottom: "1px solid #F0EBE3", fontSize: 12, alignItems: "center" }}>
-      <span style={{ width: 130, flexShrink: 0, color: "#9A8E82", fontWeight: 600 }}>{label}</span>
-      {opts.type === "select" ? (
-        <select value={formValues[key] || ""} onChange={setField(key)} style={inputStyle}>
-          {opts.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-      ) : opts.type === "textarea" ? (
-        <textarea value={formValues[key] || ""} onChange={setField(key)} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
-      ) : (
-        <input type={opts.type || "text"} value={formValues[key] || ""} onChange={setField(key)} placeholder={opts.placeholder} style={inputStyle} />
-      )}
-    </div>
-  );
+  const setField = (k) => (e) => {
+    // Sanitize l'email à la frappe (cas Kontelec76@gmail. Com → on retire
+    // l'espace inséré par l'autocorrect mobile avant qu'il soit posté).
+    const v = k === "email" ? sanitizeEmail(e.target.value) : e.target.value;
+    setFormValues(prev => ({ ...prev, [k]: v }));
+  };
+  const baseInputStyle = { width: "100%", border: "1px solid #E8E2D8", borderRadius: 6, padding: "6px 8px", fontSize: 12, color: "#2A231C", background: "white", fontFamily: "inherit" };
+  const editRow = (label, key, opts = {}) => {
+    const showInvalid = key === "email" && emailInvalid;
+    const inputStyle = showInvalid
+      ? { ...baseInputStyle, borderColor: "#ef4444", background: "#fef2f2" }
+      : baseInputStyle;
+    return (
+      <div key={label} style={{ display: "flex", gap: 8, padding: "6px 0", borderBottom: "1px solid #F0EBE3", fontSize: 12, alignItems: "flex-start" }}>
+        <span style={{ width: 130, flexShrink: 0, color: "#9A8E82", fontWeight: 600, paddingTop: 6 }}>{label}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {opts.type === "select" ? (
+            <select value={formValues[key] || ""} onChange={setField(key)} style={inputStyle}>
+              {opts.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          ) : opts.type === "textarea" ? (
+            <textarea value={formValues[key] || ""} onChange={setField(key)} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
+          ) : (
+            <input type={opts.type || "text"} value={formValues[key] || ""} onChange={setField(key)} placeholder={opts.placeholder} style={inputStyle} />
+          )}
+          {showInvalid && (
+            <div style={{ fontSize: 10, color: "#ef4444", marginTop: 4 }}>
+              ⚠ Format email invalide. Exemple : contact@monentreprise.fr
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
   return (
     <div onClick={onClose}
       style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.65)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 90, animation: "fadeUp .15s ease both" }}>
@@ -314,8 +336,9 @@ export default function UserDetailDrawer({
                           style={{ background: "white", border: "1px solid #E8E2D8", color: "#6B6358", borderRadius: 8, padding: "7px 14px", fontSize: 11, fontWeight: 700, cursor: brandSaving ? "default" : "pointer", opacity: brandSaving ? 0.6 : 1 }}>
                           Annuler
                         </button>
-                        <button onClick={saveEdit} disabled={brandSaving}
-                          style={{ background: "#22c55e", border: "none", color: "white", borderRadius: 8, padding: "7px 14px", fontSize: 11, fontWeight: 700, cursor: brandSaving ? "default" : "pointer", opacity: brandSaving ? 0.6 : 1 }}>
+                        <button onClick={saveEdit} disabled={brandSaving || emailInvalid}
+                          title={emailInvalid ? "Email au format invalide" : undefined}
+                          style={{ background: emailInvalid ? "#cbd5e1" : "#22c55e", border: "none", color: "white", borderRadius: 8, padding: "7px 14px", fontSize: 11, fontWeight: 700, cursor: (brandSaving || emailInvalid) ? "not-allowed" : "pointer", opacity: brandSaving ? 0.6 : 1 }}>
                           {brandSaving ? "Enregistrement…" : "Enregistrer"}
                         </button>
                       </>

@@ -81,10 +81,25 @@ export default async function handler(req, res) {
       ])
       const cleanPatch = {}
       for (const [k, v] of Object.entries(patch)) {
-        if (ALLOWED.has(k)) cleanPatch[k] = typeof v === 'string' ? v.trim() : v
+        if (!ALLOWED.has(k)) continue
+        if (k === 'email' && typeof v === 'string') {
+          // Sanitize : retire tous les caractères blancs (autocap iOS).
+          cleanPatch[k] = v.replace(/\s+/g, '')
+        } else {
+          cleanPatch[k] = typeof v === 'string' ? v.trim() : v
+        }
       }
       if (Object.keys(cleanPatch).length === 0)
         return res.status(400).json({ error: 'aucun champ valide à mettre à jour' })
+
+      // Validation email — défense en profondeur, le front bloque déjà
+      // mais on garde-fou pour qu'aucune saisie cassée ne descende en DB.
+      // Email vide accepté (l'admin peut vouloir l'effacer).
+      if (cleanPatch.email && cleanPatch.email.length > 0) {
+        const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/
+        if (cleanPatch.email.length > 254 || !EMAIL_RE.test(cleanPatch.email))
+          return res.status(400).json({ error: 'Email invalide' })
+      }
 
       const { data: current, error: readErr } = await admin
         .from('profiles')

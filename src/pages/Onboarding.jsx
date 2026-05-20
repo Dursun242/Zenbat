@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { brandCompleteness } from "../lib/brandCompleteness.js"
+import { isValidEmail } from "../lib/utils.js"
 import { useAuth } from "../lib/auth.jsx"
 import { Logo, STEPS } from "../components/onboarding/shared.jsx"
 import BrandingStep    from "../components/onboarding/BrandingStep.jsx"
@@ -58,9 +59,17 @@ export default function Onboarding({ brand, setBrand, onDone }) {
     writeDraft(userId, step, local)
   }, [userId, step, local])
 
+  // Reset tryNext quand on change d'étape pour ne pas garder un état
+  // d'erreur visible quand l'utilisateur revient en arrière.
+  useEffect(() => { setTryNext(false) }, [step])
+
   const quality = brandCompleteness(local)
   const step0Invalid = !local.companyName?.trim()
-  const canGoNext = step === 0 ? !step0Invalid : true
+  const step2Invalid = !isValidEmail(local.email)
+  const canGoNext =
+    step === 0 ? !step0Invalid :
+    step === 2 ? !step2Invalid :
+    true
 
   const save = () => {
     setBrand(local)
@@ -127,7 +136,7 @@ export default function Onboarding({ brand, setBrand, onDone }) {
 
         {step===0 && <BrandingStep local={local} set={set} tryNext={tryNext} setTryNext={setTryNext} step0Invalid={step0Invalid}/>}
         {step===1 && <TradesStep   local={local} set={set}/>}
-        {step===2 && <ContactStep  local={local} set={set}/>}
+        {step===2 && <ContactStep  local={local} set={set} tryNext={tryNext}/>}
         {step===3 && <StyleStep    local={local} set={set} fontFamily={fontFamily}/>}
         {step===4 && <LegalStep    local={local} set={set}/>}
         {step===5 && <DataPrivacyStep/>}
