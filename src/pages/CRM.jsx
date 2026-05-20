@@ -265,31 +265,12 @@ function buildHtmlEmail(prospect, textBody) {
 
     <!-- FOOTER -->
     <tr><td style="background:#F0ECE4;border-radius:0 0 16px 16px;padding:22px 36px;border-top:1px solid #E8E2D8;">
-      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-        <tr>
-          <td>
-            <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#3D3832;">Dursun — Créateur de ${ZENBAT_LINK}</p>
-            <p style="margin:0;font-size:12px;color:#9A9088;">Le Havre &nbsp;·&nbsp; <a href="https://zenbat.vercel.app" style="color:#C97B5C;text-decoration:none;">zenbat.vercel.app</a></p>
-          </td>
-          <td align="right" style="vertical-align:top;">
-            <table cellpadding="0" cellspacing="0" role="presentation">
-              <tr>
-                <td style="padding-right:6px;">
-                  <div style="background:#1A1612;border-radius:4px;padding:4px 8px;">
-                    <span style="font-size:11px;font-weight:800;color:#fff;">Z</span>
-                  </div>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr><td colspan="2" style="padding-top:14px;">
-          <p style="margin:0;font-size:11px;color:#B0A898;line-height:1.6;">
-            Vous recevez cet email car vous avez été contacté personnellement par Dursun.<br>
-            Pour ne plus recevoir de messages, répondez simplement « Non merci » à cet email.
-          </p>
-        </td></tr>
-      </table>
+      <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#3D3832;">Dursun — Créateur de ${ZENBAT_LINK}</p>
+      <p style="margin:0;font-size:12px;color:#9A9088;">Le Havre &nbsp;·&nbsp; <a href="https://zenbat.vercel.app" style="color:#C97B5C;text-decoration:none;">zenbat.vercel.app</a></p>
+      <p style="margin:14px 0 0;font-size:11px;color:#B0A898;line-height:1.6;">
+        Vous recevez cet email car vous avez été contacté personnellement par Dursun.<br>
+        Pour ne plus recevoir de messages, répondez simplement « Non merci » à cet email.
+      </p>
     </td></tr>
 
   </table>
@@ -333,11 +314,10 @@ Et c'est tout. Vous venez de faire en 2 minutes ce qui vous prenait une demi-heu
 • Suivi des paiements et relances pré-rédigées
 • Statistiques CA / marge en temps réel
 
-Si vous bloquez quelque part, répondez simplement à ce mail ou utilisez le **chat support** intégré (bouton en bas à droite). Je réponds personnellement.
+Si vous bloquez quelque part, répondez simplement à ce mail ou utilisez le **chat support** intégré (bouton en bas à droite). On répond personnellement.
 
 Bonne route avec Zenbat,
-Dursun
-Créateur de Zenbat · Le Havre`
+L'équipe Zenbat`
 }
 
 function buildWelcomeHtmlEmail(prospect, textBody) {
@@ -426,7 +406,7 @@ function buildWelcomeHtmlEmail(prospect, textBody) {
       <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;margin:28px 0 0;background:#FAF7F2;border-radius:10px;border-left:3px solid #C97B5C;">
         <tr><td style="padding:14px 18px;">
           <p style="margin:0;font-size:12px;color:#6B6358;line-height:1.6;">
-            <strong style="color:#1A1612;">Besoin d'aide ?</strong> Répondez à ce mail ou utilisez le chat support en bas à droite de l'app. Je réponds personnellement, en français, dans la journée.
+            <strong style="color:#1A1612;">Besoin d'aide ?</strong> Répondez à ce mail ou utilisez le chat support en bas à droite de l'app. On répond personnellement, en français, dans la journée.
           </p>
         </td></tr>
       </table>
@@ -435,25 +415,12 @@ function buildWelcomeHtmlEmail(prospect, textBody) {
 
     <!-- FOOTER -->
     <tr><td style="background:#F0ECE4;border-radius:0 0 16px 16px;padding:22px 36px;border-top:1px solid #E8E2D8;">
-      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-        <tr>
-          <td>
-            <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#3D3832;">Dursun — Créateur de ${ZENBAT_LINK}</p>
-            <p style="margin:0;font-size:12px;color:#9A9088;">Le Havre &nbsp;·&nbsp; <a href="https://zenbat.vercel.app" style="color:#C97B5C;text-decoration:none;">zenbat.vercel.app</a></p>
-          </td>
-          <td align="right" style="vertical-align:top;">
-            <div style="background:#1A1612;border-radius:4px;padding:4px 8px;">
-              <span style="font-size:11px;font-weight:800;color:#fff;">Z</span>
-            </div>
-          </td>
-        </tr>
-        <tr><td colspan="2" style="padding-top:14px;">
-          <p style="margin:0;font-size:11px;color:#B0A898;line-height:1.6;">
-            Vous recevez ce mail de bienvenue car vous avez activé votre compte Zenbat.<br>
-            Pour ne plus recevoir de communications, répondez « Désinscription » à ce mail.
-          </p>
-        </td></tr>
-      </table>
+      <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#3D3832;">${ZENBAT_LINK} — Devis &amp; Facturation IA</p>
+      <p style="margin:0;font-size:12px;color:#9A9088;">Le Havre &nbsp;·&nbsp; <a href="https://zenbat.vercel.app" style="color:#C97B5C;text-decoration:none;">zenbat.vercel.app</a></p>
+      <p style="margin:14px 0 0;font-size:11px;color:#B0A898;line-height:1.6;">
+        Vous recevez ce mail de bienvenue car vous avez activé votre compte Zenbat.<br>
+        Pour ne plus recevoir de communications, répondez « Désinscription » à ce mail.
+      </p>
     </td></tr>
 
   </table>
