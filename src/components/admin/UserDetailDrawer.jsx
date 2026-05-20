@@ -163,7 +163,10 @@ export default function UserDetailDrawer({
               <div style={{ background: "white", borderRadius: 10, padding: 12, fontSize: 11, color: "#6B6358", lineHeight: 1.7 }}>
                 <div><strong style={{ color: "#1A1612" }}>Inscrit :</strong> {fmtDT(data.user.created_at)}</div>
                 <div><strong style={{ color: "#1A1612" }}>Email confirmé :</strong> {data.user.confirmed_at ? fmtDT(data.user.confirmed_at) : "Non"}</div>
-                <div><strong style={{ color: "#1A1612" }}>Dernière connexion :</strong> {data.user.last_sign_in_at ? relTime(data.user.last_sign_in_at) : "—"}</div>
+                {/* activity[0] = entrée la plus récente (activity_log ordonné desc côté API).
+                    On préfère ce signal à last_sign_in_at qui ne bouge qu'à un vrai login
+                    et reste donc périmé pour les users PWA actifs au quotidien. */}
+                <div><strong style={{ color: "#1A1612" }}>Dernière activité :</strong> {data.activity?.[0]?.created_at ? relTime(data.activity[0].created_at) : (data.user.last_sign_in_at ? relTime(data.user.last_sign_in_at) : "—")}</div>
                 {data.profile?.company_name && <div><strong style={{ color: "#1A1612" }}>Société :</strong> {data.profile.company_name}</div>}
                 {data.profile?.brand_data?.trades?.length > 0 && (
                   <div><strong style={{ color: "#1A1612" }}>Métiers :</strong> {data.profile.brand_data.trades.join(", ")}</div>

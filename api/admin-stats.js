@@ -256,13 +256,30 @@ export default async function handler(req, res) {
     { data: authUsers, error: ae },
   ] = await Promise.all([
     admin.from('profiles').select('id, company_name, full_name, plan, ai_used, created_at, updated_at'),
-    admin.from('devis').select('id, owner_id, statut, montant_ht, created_at'),
+    // deleted_at IS NULL : sinon comptes / CA / byStatut sont gonflés
+    // par des devis supprimés (RGPD ou erreurs utilisateur).
+    admin.from('devis').select('id, owner_id, statut, montant_ht, created_at').is('deleted_at', null),
     admin.auth.admin.listUsers({ perPage: 1000 }).then(r => ({ data: r.data?.users || [], error: r.error })),
   ])
 
   if (pe) return res.status(500).json({ error: pe.message })
   if (de) return res.status(500).json({ error: de.message })
   if (ae) return res.status(500).json({ error: ae.message })
+
+  // Dernière activité réelle par owner (cf. migration 0051). Si la
+  // migration n'est pas appliquée, la RPC renvoie 42883 → on log et on
+  // continue sans cette donnée (l'UI tombe sur lastSignIn).
+  const lastActivityByOwner = new Map()
+  try {
+    const { data: actRows, error: actErr } = await admin.rpc('admin_last_activity_per_owner')
+    if (actErr) {
+      if (actErr.code !== '42883') console.warn('[admin-stats] rpc last_activity:', actErr.message)
+    } else {
+      for (const r of actRows || []) lastActivityByOwner.set(r.owner_id, r.last_activity_at)
+    }
+  } catch (e) {
+    console.warn('[admin-stats] rpc last_activity exception:', e?.message || e)
+  }
 
   const now         = new Date()
   const startMonth  = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -344,6 +361,12 @@ export default async function handler(req, res) {
       const stats   = statsByOwner[p.id] || { total: 0, accepte: 0, ca: 0, lastDevis: null }
       const metaFull = (auth?.user_metadata?.full_name || '').trim()
       const fullName = (p.full_name || metaFull || '').trim()
+      // lastActivity = signal réel d'usage (max activity_log). Fallback
+      // sur last_sign_in_at puis lastDevis si la RPC est indispo.
+      const lastActivity = lastActivityByOwner.get(p.id)
+        || auth?.last_sign_in_at
+        || stats.lastDevis
+        || null
       return {
         id:           p.id,
         name:         p.company_name || fullName || '—',
@@ -353,6 +376,7 @@ export default async function handler(req, res) {
         ai_used:      p.ai_used || 0,
         joined:       auth?.created_at || p.created_at,
         lastSignIn:   auth?.last_sign_in_at || null,
+        lastActivity,
         lastDevis:    stats.lastDevis,
         devisTotal:   stats.total,
         devisAccepte: stats.accepte,

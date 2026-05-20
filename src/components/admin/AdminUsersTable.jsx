@@ -135,7 +135,7 @@ export default function AdminUsersTable({ users, userSearch, setUserSearch, sort
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", fontSize: 10, color: "#9A8E82" }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               Inscrit <span style={{ color: "#6B6358", fontWeight: 600 }}>{fmtDT(u.joined)}</span>
-              {" · "}Vu <span style={{ color: "#6B6358", fontWeight: 600 }}>{relTime(u.lastSignIn)}</span>
+              {" · "}Actif <span style={{ color: "#6B6358", fontWeight: 600 }}>{relTime(u.lastActivity || u.lastSignIn)}</span>
               {u.lastDevis && <>{" · "}Devis <span style={{ color: "#6B6358", fontWeight: 600 }}>{relTime(u.lastDevis)}</span></>}
             </div>
             {u.devisTotal > 0 && (
