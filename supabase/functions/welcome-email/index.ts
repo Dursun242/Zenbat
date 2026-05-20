@@ -49,137 +49,187 @@ async function getUserEmail(userId: string): Promise<{ email: string; firstName:
   return { email: String(u?.email || "").trim(), firstName };
 }
 
-function escapeHtml(s: unknown): string {
-  return String(s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+const ZENBAT_LINK = `<a href="${APP_URL}" style="color:#C97B5C;text-decoration:none;font-weight:700;">Zenbat</a>`;
+
+function linkifyZenbat(html: string): string {
+  return html.replace(/Zenbat/g, ZENBAT_LINK);
 }
 
-// Template HTML — fond blanc, accent sur la proposition de valeur (IA,
-// temps, compétitivité, conformité, confiance client) via une grille
-// 2×2 en table HTML. Typo Syne + Playfair Display via Google Fonts CDN
-// avec fallbacks système pour les clients mail qui ne chargent pas les
-// webfonts (Outlook desktop, mobile basique).
-function welcomeHtml({ firstName, companyName }: { firstName: string; companyName: string }): string {
-  const greetingName = firstName ? `, ${escapeHtml(firstName)}` : "";
-  const introCompany = companyName
-    ? `Ravi de vous accompagner, vous et <strong style="color:#1A1612">${escapeHtml(companyName)}</strong>.`
-    : "Ravi de vous accompagner.";
+// Convertit texte plat (paragraphes, • listes, **gras**) en blocs HTML email.
+// Doit rester identique à src/pages/CRM.jsx pour cohérence avec le template
+// envoyé manuellement depuis le CRM.
+function textToHtmlBlocks(text: string): string {
+  const paragraphs = text.split(/\n\n+/);
+  return paragraphs.map((para) => {
+    const lines = para.split("\n");
+    const isList = lines.every((l) => l.trim().startsWith("•") || l.trim() === "");
+    if (isList) {
+      const items = lines.filter((l) => l.trim().startsWith("•")).map((l) => {
+        const content = l.replace(/^•\s*/, "").replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+        return `<tr>
+          <td style="padding:4px 0;vertical-align:top;color:#C97B5C;font-size:16px;padding-right:10px;">•</td>
+          <td style="padding:4px 0;font-size:15px;color:#3D3832;line-height:1.65;">${content}</td>
+        </tr>`;
+      }).join("");
+      return `<table cellpadding="0" cellspacing="0" style="margin:0 0 4px 0;">${items}</table>`;
+    }
+    const html = para.replace(/\*\*(.*?)\*\*/g, '<strong style="color:#1A1612;">$1</strong>');
+    return `<p style="margin:0 0 18px 0;font-size:15px;color:#3D3832;line-height:1.75;">${html.replace(/\n/g, "<br>")}</p>`;
+  }).join("");
+}
 
-  // 4 piliers présentés en grille 2×2.
-  const pillars = [
-    {
-      mark: "IA",
-      title: "L'agent IA qui structure",
-      desc:  "Dictez votre prestation en français. L'IA assemble le devis (lignes, unités, TVA, totaux) en quelques secondes — vous gardez la main sur tout.",
-    },
-    {
-      mark: "→",
-      title: "Gain de temps, compétitivité",
-      desc:  "Ce qui prenait 30 minutes prend 2 minutes. Vous répondez aux appels d'offres plus vite, vous remportez plus de chantiers.",
-    },
-    {
-      mark: "✓",
-      title: "Conformité 2026",
-      desc:  "Factur-X PDF/A-3 prêt pour la réforme de la facturation électronique B2B. Vos documents transiteront sans friction via le portail public et les PDP.",
-    },
-    {
-      mark: "✦",
-      title: "Confiance client",
-      desc:  "Signature électronique avec code OTP, audit trail légal (IP, horodatage, hash). Vos devis ont la valeur juridique d'un engagement signé.",
-    },
-  ];
+function buildWelcomeText(firstName: string): string {
+  const prenom = firstName.trim();
+  return `Bonjour ${prenom},
 
+Bienvenue sur **Zenbat** — et merci de nous faire confiance pour vos devis et factures.
+
+Pas envie de lire un manuel ? Pas besoin. **En 2 minutes chrono**, vous allez sortir votre premier devis. Voici la marche à suivre :
+
+**Étape 1 — Ajoutez votre premier client (15 secondes)**
+Onglet **Contacts** → **+ Nouveau contact**. Saisissez juste un nom et une ville. Vous compléterez le reste plus tard si besoin.
+Astuce : vous pouvez aussi prendre en photo une carte de visite, l'IA remplit tout pour vous.
+
+**Étape 2 — Lancez l'Agent IA (30 secondes)**
+Onglet **Agent IA** (le bouton vert au centre en bas). Décrivez votre chantier en langage naturel, comme si vous parliez à votre apprenti :
+• "Réfection toiture 80 m² ardoise + zinguerie + échafaudage"
+• "Salle de bain complète 6 m², carrelage mural et sol, douche italienne"
+L'IA structure les lignes, calcule la TVA et applique les bons taux automatiquement.
+
+**Étape 3 — Vérifiez et ajustez (45 secondes)**
+Relisez les lignes, ajustez les prix ou les quantités si besoin. Choisissez le client à l'étape précédente. Cliquez sur **Enregistrer**.
+
+**Étape 4 — Envoyez pour signature (20 secondes)**
+Bouton **Envoyer au client** → votre client reçoit un lien sécurisé, signe depuis son téléphone avec un code à 8 chiffres. Vous êtes notifié dès qu'il signe. Zéro impression, zéro renvoi par email.
+
+Et c'est tout. Vous venez de faire en 2 minutes ce qui vous prenait une demi-heure.
+
+**Quelques bonus que vous découvrirez vite :**
+• Conversion devis → facture en 1 clic
+• Factures Factur-X conformes 2026 (envoi DGFiP automatique)
+• Suivi des paiements et relances pré-rédigées
+• Statistiques CA / marge en temps réel
+
+Si vous bloquez quelque part, répondez simplement à ce mail ou utilisez le **chat support** intégré (bouton en bas à droite). On répond personnellement.
+
+Bonne route avec Zenbat,
+L'équipe Zenbat`;
+}
+
+// Template HTML — bandeau vert "Bienvenue", timeline 4 étapes chronométrées,
+// CTA unique "Ouvrir Zenbat". Strictement aligné avec le template envoyé
+// manuellement depuis le CRM (src/pages/CRM.jsx :: buildWelcomeHtmlEmail).
+function welcomeHtml({ firstName }: { firstName: string }): string {
+  const bodyHtml = linkifyZenbat(textToHtmlBlocks(buildWelcomeText(firstName || "")));
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Bienvenue sur Zenbat</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&family=Playfair+Display:ital,wght@1,400&display=swap" rel="stylesheet">
 </head>
-<body style="margin:0;padding:0;background:#ffffff;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;color:#1A1612;-webkit-font-smoothing:antialiased">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff">
-<tr><td align="center" style="padding:64px 24px">
-<table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%">
+<body style="margin:0;padding:0;background:#F0ECE4;font-family:Inter,Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#F0ECE4;">
+<tr><td align="center" style="padding:40px 16px;">
 
-  <!-- Wordmark -->
-  <tr><td style="padding:0 0 56px">
-    <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.5px;color:#1A1612">
-      <span style="color:#C97B5C">Zen</span>bat
-    </div>
-  </td></tr>
+  <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;width:100%;">
 
-  <!-- Hero -->
-  <tr><td style="padding:0 0 18px">
-    <h1 style="margin:0;font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:40px;font-weight:400;line-height:1.15;letter-spacing:-0.8px;color:#1A1612">
-      <em style="font-family:'Playfair Display',Georgia,serif;font-style:italic;font-weight:400;color:#C97B5C">Bienvenue</em>${greetingName}.
-    </h1>
-  </td></tr>
+    <!-- HEADER -->
+    <tr><td style="background:#FAF7F2;border-radius:16px 16px 0 0;padding:22px 36px;border-bottom:1px solid #E8E2D8;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td>
+            <span style="font-family:Arial,Helvetica,sans-serif;font-size:26px;font-weight:800;color:#1A1612;letter-spacing:-1px;">Zen<span style="color:#C97B5C;">bat</span></span>
+          </td>
+          <td align="right" style="vertical-align:middle;">
+            <span style="font-size:10px;color:#9A9088;letter-spacing:1px;text-transform:uppercase;font-weight:600;">Bienvenue à bord</span>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
 
-  <tr><td style="padding:0 0 48px">
-    <p style="margin:0;font-size:17px;line-height:1.6;color:#3D3028">
-      ${introCompany} Zenbat met l'IA au service de vos devis — pour que vous gagniez du <em style="font-family:'Playfair Display',Georgia,serif;font-style:italic;color:#C97B5C">temps</em>, des <em style="font-family:'Playfair Display',Georgia,serif;font-style:italic;color:#C97B5C">chantiers</em> et la <em style="font-family:'Playfair Display',Georgia,serif;font-style:italic;color:#C97B5C">confiance</em> de vos clients.
-    </p>
-  </td></tr>
+    <!-- WELCOME BANNER -->
+    <tr><td style="background:#16a34a;padding:18px 36px;text-align:center;">
+      <p style="margin:0;font-size:13px;color:#fff;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;">
+        🎉&nbsp; Votre compte est prêt &nbsp;·&nbsp; Premier devis en 2 minutes
+      </p>
+    </td></tr>
 
-  <!-- Grille 2×2 des piliers de valeur -->
-  <tr><td style="padding:0 0 48px">
-    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
-      <tr>
-        <td width="50%" valign="top" style="border:1px solid #E8E2D8;padding:24px 22px">
-          <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;color:#C97B5C;letter-spacing:1.5px;margin-bottom:10px">${pillars[0].mark}</div>
-          <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:17px;font-weight:600;color:#1A1612;letter-spacing:-0.3px;margin-bottom:8px;line-height:1.3">${pillars[0].title}</div>
-          <div style="font-size:13.5px;color:#6B6358;line-height:1.6">${pillars[0].desc}</div>
-        </td>
-        <td width="50%" valign="top" style="border:1px solid #E8E2D8;border-left:none;padding:24px 22px">
-          <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;color:#C97B5C;letter-spacing:1.5px;margin-bottom:10px">${pillars[1].mark}</div>
-          <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:17px;font-weight:600;color:#1A1612;letter-spacing:-0.3px;margin-bottom:8px;line-height:1.3">${pillars[1].title}</div>
-          <div style="font-size:13.5px;color:#6B6358;line-height:1.6">${pillars[1].desc}</div>
-        </td>
-      </tr>
-      <tr>
-        <td width="50%" valign="top" style="border:1px solid #E8E2D8;border-top:none;padding:24px 22px">
-          <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;color:#C97B5C;letter-spacing:1.5px;margin-bottom:10px">${pillars[2].mark}</div>
-          <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:17px;font-weight:600;color:#1A1612;letter-spacing:-0.3px;margin-bottom:8px;line-height:1.3">${pillars[2].title}</div>
-          <div style="font-size:13.5px;color:#6B6358;line-height:1.6">${pillars[2].desc}</div>
-        </td>
-        <td width="50%" valign="top" style="border:1px solid #E8E2D8;border-top:none;border-left:none;padding:24px 22px">
-          <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;color:#C97B5C;letter-spacing:1.5px;margin-bottom:10px">${pillars[3].mark}</div>
-          <div style="font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:17px;font-weight:600;color:#1A1612;letter-spacing:-0.3px;margin-bottom:8px;line-height:1.3">${pillars[3].title}</div>
-          <div style="font-size:13.5px;color:#6B6358;line-height:1.6">${pillars[3].desc}</div>
-        </td>
-      </tr>
-    </table>
-  </td></tr>
+    <!-- BODY -->
+    <tr><td style="background:#FFFCF7;padding:40px 36px 24px;">
 
-  <!-- CTA -->
-  <tr><td style="padding:0 0 56px">
-    <a href="${APP_URL}" style="display:inline-block;background:#1A1612;color:#ffffff;text-decoration:none;padding:16px 30px;border-radius:4px;font-size:15px;font-weight:600;letter-spacing:-0.2px;font-family:'Syne','Helvetica Neue',Helvetica,Arial,sans-serif">
-      Créer mon premier devis →
-    </a>
-  </td></tr>
+      ${bodyHtml}
 
-  <!-- Footer -->
-  <tr><td style="padding:48px 0 0;border-top:1px solid #E8E2D8">
-    <p style="margin:0 0 4px;font-size:13px;color:#6B6358;line-height:1.65">
-      Une question ? Répondez à cet email — nous lisons tout.
-    </p>
-    <p style="margin:0;font-size:12px;color:#9A8E82;line-height:1.65">
-      Zenbat · SaaS de devis &amp; facturation pour artisans français.
-    </p>
-  </td></tr>
+      <!-- STEPS TIMELINE -->
+      <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;margin:32px 0 8px;border-radius:12px;overflow:hidden;border:1px solid #E8E2D8;">
+        <tr><td style="background:#FAF7F2;padding:16px 20px;border-bottom:1px solid #E8E2D8;">
+          <p style="margin:0;font-size:11px;font-weight:700;color:#6B6358;letter-spacing:1px;text-transform:uppercase;">⏱ Récapitulatif — 2 minutes chrono</p>
+        </td></tr>
+        ${[
+          ["1", "Ajouter un client",          "15 sec", "Onglet Contacts → + Nouveau contact"],
+          ["2", "Lancer l'Agent IA",          "30 sec", "Décrivez le chantier en langage naturel"],
+          ["3", "Vérifier & ajuster",         "45 sec", "Relisez, ajustez les prix, enregistrez"],
+          ["4", "Envoyer pour signature",     "20 sec", "Le client signe depuis son téléphone"],
+        ].map(([num, title, duration, desc]) => `
+        <tr><td style="padding:16px 20px;border-bottom:1px solid #F0ECE4;">
+          <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
+            <tr>
+              <td style="width:38px;vertical-align:top;padding-right:14px;">
+                <div style="width:32px;height:32px;border-radius:50%;background:#C97B5C;color:#fff;font-size:14px;font-weight:800;text-align:center;line-height:32px;font-family:Arial,Helvetica,sans-serif;">${num}</div>
+              </td>
+              <td>
+                <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
+                  <tr>
+                    <td><p style="margin:0;font-size:14px;font-weight:700;color:#1A1612;">${title}</p></td>
+                    <td align="right" style="white-space:nowrap;"><span style="font-size:11px;background:#F0ECE4;color:#6B6358;padding:2px 8px;border-radius:10px;font-weight:600;">${duration}</span></td>
+                  </tr>
+                </table>
+                <p style="margin:4px 0 0;font-size:13px;color:#6B6358;line-height:1.5;">${desc}</p>
+              </td>
+            </tr>
+          </table>
+        </td></tr>`).join("")}
+      </table>
 
-</table>
+      <!-- PRIMARY CTA -->
+      <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;margin:28px 0 8px;">
+        <tr><td align="center">
+          <a href="${APP_URL}" style="display:inline-block;background:#C97B5C;color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;padding:16px 40px;border-radius:10px;width:300px;text-align:center;">
+            🚀 Ouvrir Zenbat et démarrer →
+          </a>
+          <p style="margin:8px 0 0;font-size:11px;color:#9A9088;">Pas besoin de mot de passe — vous êtes déjà connecté</p>
+        </td></tr>
+      </table>
+
+      <!-- SUPPORT NOTE -->
+      <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;margin:28px 0 0;background:#FAF7F2;border-radius:10px;border-left:3px solid #C97B5C;">
+        <tr><td style="padding:14px 18px;">
+          <p style="margin:0;font-size:12px;color:#6B6358;line-height:1.6;">
+            <strong style="color:#1A1612;">Besoin d'aide ?</strong> Répondez à ce mail ou utilisez le chat support en bas à droite de l'app. On répond personnellement, en français, dans la journée.
+          </p>
+        </td></tr>
+      </table>
+
+    </td></tr>
+
+    <!-- FOOTER -->
+    <tr><td style="background:#F0ECE4;border-radius:0 0 16px 16px;padding:22px 36px;border-top:1px solid #E8E2D8;">
+      <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#3D3832;">${ZENBAT_LINK} — Devis &amp; Facturation IA</p>
+      <p style="margin:0;font-size:12px;color:#9A9088;">Le Havre &nbsp;·&nbsp; <a href="${APP_URL}" style="color:#C97B5C;text-decoration:none;">zenbat.vercel.app</a></p>
+      <p style="margin:14px 0 0;font-size:11px;color:#B0A898;line-height:1.6;">
+        Vous recevez ce mail de bienvenue car vous avez activé votre compte Zenbat.<br>
+        Pour ne plus recevoir de communications, répondez « Désinscription » à ce mail.
+      </p>
+    </td></tr>
+
+  </table>
 </td></tr>
 </table>
 </body>
 </html>`;
 }
 
-async function sendWelcome(email: string, firstName: string, companyName: string): Promise<{ ok: boolean; error?: string }> {
+async function sendWelcome(email: string, firstName: string): Promise<{ ok: boolean; error?: string }> {
   if (!RESEND_API_KEY) {
     console.error("[welcome-email] RESEND_API_KEY missing in env");
     return { ok: false, error: "RESEND_API_KEY missing" };
@@ -194,8 +244,8 @@ async function sendWelcome(email: string, firstName: string, companyName: string
     body: JSON.stringify({
       from: RESEND_FROM,
       to: [email],
-      subject: "Bienvenue chez Zenbat — voici par où commencer",
-      html: welcomeHtml({ firstName, companyName }),
+      subject: "Bienvenue sur Zenbat — votre premier devis en 2 minutes ⚡",
+      html: welcomeHtml({ firstName }),
     }),
   });
   if (!res.ok) {
@@ -236,9 +286,8 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const profileId   = String(payload.record?.id || "");
-  const companyName = String(payload.record?.company_name || "");
-  const fullName    = String(payload.record?.full_name || "");
+  const profileId = String(payload.record?.id || "");
+  const fullName  = String(payload.record?.full_name || "");
   if (!profileId) {
     return new Response(JSON.stringify({ error: "Missing profile.id" }), {
       status: 400,
@@ -257,7 +306,7 @@ Deno.serve(async (req: Request) => {
   // Fallback firstName : sur le profile.full_name si pas en metadata auth
   const firstName = auth.firstName || fullName.split(/\s+/)[0] || "";
 
-  const result = await sendWelcome(auth.email, firstName, companyName);
+  const result = await sendWelcome(auth.email, firstName);
   return new Response(JSON.stringify(result), {
     status: result.ok ? 200 : 502,
     headers: { "Content-Type": "application/json" },
