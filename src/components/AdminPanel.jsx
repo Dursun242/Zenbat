@@ -13,6 +13,9 @@ import AdminCoherenceStats from "./admin/AdminCoherenceStats.jsx"
 import AdminFeedback       from "./admin/AdminFeedback.jsx"
 import AdminAgentBenchmark from "./admin/AdminAgentBenchmark.jsx"
 import AdminQuotesSent    from "./admin/AdminQuotesSent.jsx"
+import AdminRetention     from "./admin/AdminRetention.jsx"
+import AdminStripeHealth  from "./admin/AdminStripeHealth.jsx"
+import AdminTokenStats    from "./admin/AdminTokenStats.jsx"
 import Collapsible        from "./admin/Collapsible.jsx"
 import DeleteUserModal    from "./admin/DeleteUserModal.jsx"
 import UserDetailDrawer  from "./admin/UserDetailDrawer.jsx"
@@ -37,6 +40,12 @@ export default function AdminPanel({ onBack }) {
   const [feedbackLoading,  setFeedbackLoading]  = useState(false)
   const [quotesSent,       setQuotesSent]       = useState(null)
   const [quotesSentLoading,setQuotesSentLoading]= useState(false)
+  const [retention,        setRetention]        = useState(null)
+  const [retentionLoading, setRetentionLoading] = useState(false)
+  const [stripeHealth,     setStripeHealth]     = useState(null)
+  const [stripeHealthLoading,setStripeHealthLoading]= useState(false)
+  const [tokens,           setTokens]           = useState(null)
+  const [tokensLoading,    setTokensLoading]    = useState(false)
   const [openConvUser, setOpenConvUser] = useState(null)
   const [convSearch,   setConvSearch]   = useState("")
   const [userSearch,   setUserSearch]   = useState("")
@@ -65,6 +74,7 @@ export default function AdminPanel({ onBack }) {
   useEffect(() => {
     setStats(null); setIaLogs(null); setIaNegs(null); setIaConvs(null)
     setNewsletter(null); setCoherence(null); setFeedback(null); setQuotesSent(null)
+    setRetention(null); setStripeHealth(null); setTokens(null)
     setOpenConvUser(null); setDetailUser(null); setDetailData(null)
   }, [currentUser?.id])
 
@@ -161,6 +171,37 @@ export default function AdminPanel({ onBack }) {
       const data = await res.json()
       if (res.ok) setQuotesSent(data.quotes_sent || [])
     } catch {} finally { setQuotesSentLoading(false) }
+  }
+
+  const loadRetention = async () => {
+    setRetentionLoading(true)
+    try {
+      const token = await getToken()
+      const res  = await fetch("/api/admin-stats?type=retention", { headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json()
+      if (res.ok) setRetention(data)
+    } catch {} finally { setRetentionLoading(false) }
+  }
+
+  const loadStripeHealth = async () => {
+    setStripeHealthLoading(true)
+    try {
+      const token = await getToken()
+      const res  = await fetch("/api/admin-stats?type=stripe_health", { headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json()
+      if (res.ok) setStripeHealth(data)
+      else        setStripeHealth({ error: data?.error || "Erreur Stripe" })
+    } catch {} finally { setStripeHealthLoading(false) }
+  }
+
+  const loadTokens = async () => {
+    setTokensLoading(true)
+    try {
+      const token = await getToken()
+      const res  = await fetch("/api/admin-stats?type=tokens", { headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json()
+      if (res.ok) setTokens(data)
+    } catch {} finally { setTokensLoading(false) }
   }
 
   const openDelete = (u) => { setDeleteMode("delete"); setDeleteTarget(u); setConfirmInput(""); setDeleteError(null) }
@@ -328,6 +369,25 @@ export default function AdminPanel({ onBack }) {
             currentUserId={currentUser?.id}
             onOpenDetail={openDetail}  onOpenDelete={openDelete}
           />
+
+          {/* Sections business-critical — au-dessus du reste */}
+          <Collapsible title="Rétention & churn" subtitle="Comptes dormants + cohortes d'inscription"
+            count={retention?.dormants?.length} loaded={retention !== null} onExpand={loadRetention}>
+            <AdminRetention data={retention} loading={retentionLoading} onRefresh={loadRetention} embedded />
+          </Collapsible>
+
+          <Collapsible title="Santé revenue Stripe" subtitle="Past due, churns à venir, MRR live"
+            count={(stripeHealth?.summary?.pastDueCount || 0) + (stripeHealth?.summary?.cancelingCount || 0)}
+            loaded={stripeHealth !== null} onExpand={loadStripeHealth}>
+            {stripeHealth?.error
+              ? <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: 12, color: "#b91c1c", fontSize: 12 }}>❌ {stripeHealth.error}</div>
+              : <AdminStripeHealth data={stripeHealth} loading={stripeHealthLoading} onRefresh={loadStripeHealth} embedded />}
+          </Collapsible>
+
+          <Collapsible title="Coût Claude API" subtitle="Tokens consommés, coût mensuel par modèle"
+            count={tokens?.total?.calls} loaded={tokens !== null} onExpand={loadTokens}>
+            <AdminTokenStats data={tokens} loading={tokensLoading} onRefresh={loadTokens} />
+          </Collapsible>
 
           {/* Sections secondaires repliables — chargées seulement à l'ouverture */}
           <Collapsible title="Devis envoyés"   subtitle="Historique des envois email aux clients"

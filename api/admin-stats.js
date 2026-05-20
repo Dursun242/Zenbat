@@ -9,6 +9,8 @@ const parseBrand = b => { if (!b) return {}; if (typeof b === 'string') { try { 
 //   ?type=coherence           → validations cohérence
 //   ?type=feedback            → feedbacks 👍/👎
 //   ?type=tokens              → tokens consommés + coûts par modèle
+//   ?type=retention           → dormants + cohortes (depuis activity_log)
+//   ?type=stripe_health       → past_due + canceled (depuis Stripe API live)
 
 // Prix USD par million de tokens (Anthropic, mai 2026)
 const MODEL_PRICING = {
@@ -247,7 +249,217 @@ export default async function handler(req, res) {
     return res.status(200).json({ quotes_sent: enriched, generatedAt: new Date().toISOString() })
   }
 
-  if (type) return res.status(400).json({ error: "Paramètre 'type' invalide (conversations | logs | negatives | newsletter | coherence | feedback | tokens | quotes_sent)" })
+  // ── Rétention : dormants + cohortes ─────────────────────────────────
+  // Pourquoi : on voyait les inscriptions mais pas qui s'éteint. La RPC
+  // 0051 (admin_last_activity_per_owner) nous donne la dernière vraie
+  // activité par owner. On en dérive 3 vues :
+  //   - dormants : users qui ont déjà créé un devis mais sans activité
+  //     depuis ≥ 14 jours (vrais churns silencieux à relancer, pas les
+  //     comptes test jamais ouverts).
+  //   - cohorte mensuelle : par mois d'inscription, quel % est encore
+  //     actif (au moins 1 entrée activity_log dans les 30 derniers jours).
+  //   - distribution d'âge des comptes dormants.
+  if (type === 'retention') {
+    const DORMANT_DAYS_THRESHOLD = 14
+    const ACTIVE_WINDOW_DAYS     = 30
+    const now      = Date.now()
+    const dormantCutoff = now - DORMANT_DAYS_THRESHOLD * 86400000
+    const activeCutoff  = now - ACTIVE_WINDOW_DAYS     * 86400000
+
+    const [
+      { data: profiles },
+      { data: authUsers },
+      { data: devisCounts },
+    ] = await Promise.all([
+      admin.from('profiles').select('id, company_name, full_name, plan, created_at'),
+      admin.auth.admin.listUsers({ perPage: 1000 }).then(r => ({ data: r.data?.users || [] })),
+      admin.from('devis').select('owner_id').is('deleted_at', null),
+    ])
+
+    // Map last activity (RPC 0051). Fallback graceful si migration absente.
+    const lastActByOwner = new Map()
+    try {
+      const { data: actRows, error: actErr } = await admin.rpc('admin_last_activity_per_owner')
+      if (!actErr) for (const r of actRows || []) lastActByOwner.set(r.owner_id, r.last_activity_at)
+    } catch {}
+
+    const authById  = new Map((authUsers || []).map(u => [u.id, u]))
+    const devisByOwner = new Map()
+    for (const d of devisCounts || []) devisByOwner.set(d.owner_id, (devisByOwner.get(d.owner_id) || 0) + 1)
+
+    // ── Liste des dormants ──────────────────────────────────────────────
+    const dormants = []
+    for (const p of profiles || []) {
+      const devisCount = devisByOwner.get(p.id) || 0
+      if (devisCount === 0) continue // on filtre les comptes jamais utilisés (tests, faux comptes)
+      const lastActStr = lastActByOwner.get(p.id) || authById.get(p.id)?.last_sign_in_at
+      const lastActTs  = lastActStr ? new Date(lastActStr).getTime() : 0
+      if (lastActTs >= dormantCutoff) continue
+      const a = authById.get(p.id)
+      dormants.push({
+        id:           p.id,
+        name:         p.company_name || p.full_name || a?.email || '—',
+        email:        a?.email || '—',
+        plan:         p.plan || 'free',
+        joinedAt:     a?.created_at || p.created_at,
+        lastActivity: lastActStr || null,
+        daysSince:    lastActTs ? Math.floor((now - lastActTs) / 86400000) : null,
+        devisTotal:   devisCount,
+      })
+    }
+    dormants.sort((a, b) => (b.daysSince ?? Infinity) - (a.daysSince ?? Infinity))
+
+    // ── Cohortes d'inscription (12 derniers mois) ───────────────────────
+    const cohortByMonth = new Map() // 'YYYY-MM' → { signups: [], stillActive: 0 }
+    for (const p of profiles || []) {
+      const created = p.created_at?.slice(0, 7)
+      if (!created) continue
+      if (!cohortByMonth.has(created)) cohortByMonth.set(created, { signups: 0, stillActive: 0 })
+      const c = cohortByMonth.get(created)
+      c.signups++
+      const lastActStr = lastActByOwner.get(p.id) || authById.get(p.id)?.last_sign_in_at
+      if (lastActStr && new Date(lastActStr).getTime() >= activeCutoff) c.stillActive++
+    }
+    const cohorts = [...cohortByMonth.entries()]
+      .sort(([a], [b]) => b.localeCompare(a))
+      .slice(0, 12)
+      .map(([month, v]) => ({
+        month,
+        signups:      v.signups,
+        stillActive:  v.stillActive,
+        retentionPct: v.signups ? Math.round((v.stillActive / v.signups) * 100) : 0,
+      }))
+
+    return res.status(200).json({
+      dormants,
+      cohorts,
+      meta: {
+        dormantThresholdDays: DORMANT_DAYS_THRESHOLD,
+        activeWindowDays:     ACTIVE_WINDOW_DAYS,
+        rpcMissing:           lastActByOwner.size === 0,
+      },
+      generatedAt: new Date().toISOString(),
+    })
+  }
+
+  // ── Santé revenue Stripe (live API) ─────────────────────────────────
+  // On interroge Stripe directement plutôt qu'une table DB : signal
+  // toujours frais même si un webhook a raté, et pas de migration à
+  // appliquer côté Supabase. Trade-off : 1 à 2 secondes de latence
+  // (acceptable pour un panel admin chargé sur demande).
+  if (type === 'stripe_health') {
+    const stripeKey = (process.env.STRIPE_SECRET_KEY || '').trim()
+    if (!stripeKey) return res.status(503).json({ error: 'STRIPE_SECRET_KEY non configurée' })
+
+    let stripe
+    try {
+      const Stripe = (await import('stripe')).default
+      stripe = new Stripe(stripeKey, { apiVersion: '2024-06-20' })
+    } catch (e) {
+      return res.status(500).json({ error: `Init Stripe échouée : ${e.message || e}` })
+    }
+
+    // Pagination Stripe : on remonte tout (un SaaS B2B early-stage tient
+    // largement dans 200 subs). Limite stricte si ça explose.
+    async function listAll(status) {
+      const out = []
+      let starting_after
+      for (let i = 0; i < 5; i++) {
+        const page = await stripe.subscriptions.list({ status, limit: 100, starting_after })
+        out.push(...page.data)
+        if (!page.has_more) break
+        starting_after = page.data[page.data.length - 1].id
+      }
+      return out
+    }
+
+    let allActive, allPastDue, allCanceled
+    try {
+      ;[allActive, allPastDue, allCanceled] = await Promise.all([
+        listAll('active'),
+        listAll('past_due'),
+        // 'canceled' inclut TOUT l'historique → on filtre ensuite sur 90 jours
+        listAll('canceled'),
+      ])
+    } catch (e) {
+      return res.status(502).json({ error: `Stripe API échoue : ${e.message || e}` })
+    }
+
+    // Hydrate avec les profils Zenbat (lien via stripe_customer_id)
+    const customerIds = [...new Set([
+      ...allActive,   ...allPastDue, ...allCanceled,
+    ].map(s => typeof s.customer === 'string' ? s.customer : s.customer?.id).filter(Boolean))]
+
+    const [{ data: profiles }, { data: authUsers }] = customerIds.length === 0
+      ? [{ data: [] }, { data: [] }]
+      : await Promise.all([
+        admin.from('profiles').select('id, company_name, full_name, stripe_customer_id').in('stripe_customer_id', customerIds),
+        admin.auth.admin.listUsers({ perPage: 1000 }).then(r => ({ data: r.data?.users || [] })),
+      ])
+    const profByCustomer = new Map((profiles || []).map(p => [p.stripe_customer_id, p]))
+    const authById       = new Map((authUsers || []).map(u => [u.id, u]))
+
+    const enrich = (sub) => {
+      const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id
+      const p = profByCustomer.get(customerId)
+      const a = p ? authById.get(p.id) : null
+      const amount = sub.items?.data?.[0]?.price?.unit_amount
+      return {
+        id:                sub.id,
+        status:            sub.status,
+        cancel_at_period_end: !!sub.cancel_at_period_end,
+        current_period_end:sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
+        canceled_at:       sub.canceled_at        ? new Date(sub.canceled_at * 1000).toISOString()        : null,
+        amount_monthly:    typeof amount === 'number' ? amount / 100 : null,
+        interval:          sub.items?.data?.[0]?.price?.recurring?.interval || null,
+        profile_id:        p?.id || null,
+        name:              p?.company_name || p?.full_name || a?.email || '—',
+        email:             a?.email || sub.customer_email || null,
+        zenbat_link:       !!p,
+      }
+    }
+
+    // Bucket "à churner bientôt" = actifs avec cancel_at_period_end
+    const cancelingActive = allActive.filter(s => s.cancel_at_period_end).map(enrich)
+    const pastDue         = allPastDue.map(enrich)
+    const ninetyDaysAgo   = Date.now() - 90 * 86400000
+    const recentlyCanceled = allCanceled
+      .filter(s => (s.canceled_at || 0) * 1000 >= ninetyDaysAgo)
+      .map(enrich)
+      .sort((a, b) => (b.canceled_at || '').localeCompare(a.canceled_at || ''))
+
+    // MRR live = sum des subs 'active' (hors past_due hors canceled).
+    // Plus précis que `pro × 19€` de admin-stats global (qui ne distingue
+    // pas les Pro temporairement en past_due).
+    const mrrCents = allActive.reduce((s, sub) => {
+      const amount = sub.items?.data?.[0]?.price?.unit_amount || 0
+      const interval = sub.items?.data?.[0]?.price?.recurring?.interval
+      // Ramène biannual à mensuel
+      return s + (interval === 'year' ? amount / 12 : amount)
+    }, 0)
+
+    // Churn ce mois = subs canceled dont canceled_at >= début du mois courant.
+    const nowDate = new Date()
+    const monthStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1).getTime() / 1000
+    const churnThisMonth = allCanceled.filter(s => (s.canceled_at || 0) >= monthStart).length
+
+    return res.status(200).json({
+      summary: {
+        activeCount:        allActive.length,
+        pastDueCount:       pastDue.length,
+        cancelingCount:     cancelingActive.length,
+        recentlyCanceled90d:recentlyCanceled.length,
+        churnThisMonth,
+        mrrEur:             Math.round(mrrCents / 100),
+      },
+      pastDue,
+      cancelingActive,
+      recentlyCanceled,
+      generatedAt: new Date().toISOString(),
+    })
+  }
+
+  if (type) return res.status(400).json({ error: "Paramètre 'type' invalide (conversations | logs | negatives | newsletter | coherence | feedback | tokens | quotes_sent | retention | stripe_health)" })
 
   // ── Récupération des données ─────────────────────────────────────────
   const [
