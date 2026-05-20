@@ -56,6 +56,59 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, plan: data.plan })
     }
 
+    // Correction admin de la fiche profil (brand_data) — utile quand un
+    // utilisateur a mal renseigné son email/téléphone/adresse au moment de
+    // l'onboarding. Aucune notification n'est envoyée à l'utilisateur :
+    // c'est un coup de tampon silencieux, comme set_plan.
+    if (action === 'update_brand_data') {
+      const patch = body.patch
+      if (!patch || typeof patch !== 'object' || Array.isArray(patch))
+        return res.status(400).json({ error: 'patch invalide' })
+
+      // Whitelist des champs éditables. On exclut logo / color / fontStyle
+      // (besoin d'UI dédiée) et trades (array, format à part). Les valeurs
+      // booléennes et numériques sont autorisées pour devisGratuit /
+      // validityDays.
+      const ALLOWED = new Set([
+        'companyName', 'siret', 'tva', 'vatNumber', 'vatRegime',
+        'firstName', 'lastName',
+        'address', 'postalCode', 'city', 'phone', 'email', 'website',
+        'paymentTerms', 'validityDays', 'rib', 'iban', 'bic',
+        'mentionsLegales', 'btpMention', 'rgpdMention',
+        'devisGratuit', 'devisTarif', 'travelFees',
+        'legalForm', 'rcs', 'capital',
+        'paymentPenalties', 'escompte',
+      ])
+      const cleanPatch = {}
+      for (const [k, v] of Object.entries(patch)) {
+        if (ALLOWED.has(k)) cleanPatch[k] = typeof v === 'string' ? v.trim() : v
+      }
+      if (Object.keys(cleanPatch).length === 0)
+        return res.status(400).json({ error: 'aucun champ valide à mettre à jour' })
+
+      const { data: current, error: readErr } = await admin
+        .from('profiles')
+        .select('brand_data')
+        .eq('id', userId)
+        .maybeSingle()
+      if (readErr) return res.status(500).json({ error: readErr.message || String(readErr) })
+      if (!current) return res.status(404).json({ error: 'Profil introuvable' })
+
+      const newBrandData = { ...(current.brand_data || {}), ...cleanPatch }
+
+      const { data, error } = await admin
+        .from('profiles')
+        .update({ brand_data: newBrandData })
+        .eq('id', userId)
+        .select('id, brand_data')
+        .maybeSingle()
+      if (error) return res.status(500).json({ error: error.message || String(error) })
+      if (!data) return res.status(404).json({ error: 'Profil introuvable' })
+
+      console.log(`[admin-user-detail] update_brand_data: user ${userId} (by admin ${auth.user.email}, fields: ${Object.keys(cleanPatch).join(', ')})`)
+      return res.status(200).json({ ok: true, brand_data: data.brand_data })
+    }
+
     return res.status(400).json({ error: `action inconnue: ${action}` })
   }
 

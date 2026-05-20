@@ -52,6 +52,7 @@ export default function AdminPanel({ onBack }) {
   const [detailError,  setDetailError]  = useState(null)
   const [detailTab,    setDetailTab]    = useState("overview")
   const [planToggling, setPlanToggling] = useState(false)
+  const [brandSaving,  setBrandSaving]  = useState(false)
 
   useEffect(() => { if (session) { load() } }, [session?.access_token])
 
@@ -206,6 +207,33 @@ export default function AdminPanel({ onBack }) {
       setPlanToggling(false)
     }
   }
+  // Correction admin de la fiche brand_data d'un utilisateur (email mal
+  // renseigné, téléphone, etc.). Aucun email/notification ne part vers
+  // l'utilisateur : c'est une écriture DB directe via service_role.
+  // Renvoie true en cas de succès pour que le drawer puisse refermer son
+  // mode édition.
+  const updateUserBrandData = async (patch) => {
+    if (!detailUser || brandSaving) return false
+    setBrandSaving(true)
+    try {
+      const token = await getToken()
+      const res   = await fetch("/api/admin-user-detail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: "update_brand_data", userId: detailUser.id, patch }),
+      })
+      const data = await res.json()
+      if (!res.ok) { alert(data?.error || "Échec de la mise à jour"); return false }
+      setDetailData(prev => prev ? { ...prev, profile: { ...(prev.profile || {}), brand_data: data.brand_data } } : prev)
+      return true
+    } catch (e) {
+      alert(e?.message || "Erreur réseau")
+      return false
+    } finally {
+      setBrandSaving(false)
+    }
+  }
+
   const closeDelete = () => { if (deleting) return; setDeleteTarget(null); setConfirmInput(""); setDeleteError(null) }
 
   const confirmDelete = async () => {
@@ -360,6 +388,8 @@ export default function AdminPanel({ onBack }) {
           onRequestReset={() => { openReset(detailUser); }}
           onTogglePlan={toggleUserPlan}
           planToggling={planToggling}
+          onUpdateBrandData={updateUserBrandData}
+          brandSaving={brandSaving}
           currentUserId={currentUser?.id}
         />
       )}

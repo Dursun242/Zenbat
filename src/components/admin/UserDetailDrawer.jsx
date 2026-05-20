@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { fmtEur, fmtDT, relTime, SC, SL } from "../../lib/admin/format.js";
 import { useModalGuard } from "../../hooks/useModalGuard.js";
 
@@ -7,10 +8,68 @@ export default function UserDetailDrawer({
   user, data, loading, error, tab, onTabChange, onClose,
   onRequestDelete, onRequestReset, currentUserId,
   onTogglePlan, planToggling = false,
+  onUpdateBrandData, brandSaving = false,
 }) {
   useModalGuard(true, onClose);
   const currentPlan = data?.profile?.plan || user.plan || "free";
   const isPro       = currentPlan === "pro";
+
+  // Mode édition de l'onglet Profil — permet à l'admin de corriger
+  // silencieusement les champs brand_data mal renseignés par l'utilisateur
+  // (typique : email avec un espace, casse erronée, etc.). Sortie d'édition
+  // automatique quand on change d'onglet ou de user.
+  const [editing,    setEditing]    = useState(false);
+  const [formValues, setFormValues] = useState({});
+  useEffect(() => { setEditing(false); }, [user?.id, tab]);
+  const startEdit = () => {
+    const bd = data?.profile?.brand_data || {};
+    setFormValues({
+      companyName: bd.companyName || "",
+      siret:       bd.siret       || "",
+      vatNumber:   bd.vatNumber   || bd.tva || "",
+      vatRegime:   bd.vatRegime   || "normal",
+      address:     bd.address     || "",
+      postalCode:  bd.postalCode  || "",
+      city:        bd.city        || "",
+      phone:       bd.phone       || "",
+      email:       bd.email       || "",
+      website:     bd.website     || "",
+      paymentTerms:bd.paymentTerms|| "",
+    });
+    setEditing(true);
+  };
+  const cancelEdit = () => { setEditing(false); setFormValues({}); };
+  const saveEdit = async () => {
+    if (!onUpdateBrandData) return;
+    const bd = data?.profile?.brand_data || {};
+    // Patch = uniquement les champs dont la valeur a changé. Permet à
+    // l'API d'écrire le minimum nécessaire et garde la trace dans les
+    // logs Vercel claire (`fields: email` plutôt que tous les champs).
+    const patch = {};
+    for (const [k, v] of Object.entries(formValues)) {
+      const prev = (k === "vatNumber" ? (bd.vatNumber ?? bd.tva) : bd[k]) ?? "";
+      if (String(v).trim() !== String(prev).trim()) patch[k] = v;
+    }
+    if (Object.keys(patch).length === 0) { setEditing(false); return; }
+    const ok = await onUpdateBrandData(patch);
+    if (ok) setEditing(false);
+  };
+  const setField = (k) => (e) => setFormValues(v => ({ ...v, [k]: e.target.value }));
+  const inputStyle = { width: "100%", border: "1px solid #E8E2D8", borderRadius: 6, padding: "6px 8px", fontSize: 12, color: "#2A231C", background: "white", fontFamily: "inherit" };
+  const editRow = (label, key, opts = {}) => (
+    <div key={label} style={{ display: "flex", gap: 8, padding: "6px 0", borderBottom: "1px solid #F0EBE3", fontSize: 12, alignItems: "center" }}>
+      <span style={{ width: 130, flexShrink: 0, color: "#9A8E82", fontWeight: 600 }}>{label}</span>
+      {opts.type === "select" ? (
+        <select value={formValues[key] || ""} onChange={setField(key)} style={inputStyle}>
+          {opts.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      ) : opts.type === "textarea" ? (
+        <textarea value={formValues[key] || ""} onChange={setField(key)} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
+      ) : (
+        <input type={opts.type || "text"} value={formValues[key] || ""} onChange={setField(key)} placeholder={opts.placeholder} style={inputStyle} />
+      )}
+    </div>
+  );
   return (
     <div onClick={onClose}
       style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.65)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 90, animation: "fadeUp .15s ease both" }}>
@@ -241,41 +300,99 @@ export default function UserDetailDrawer({
             ) : null;
             return (
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {/* Barre d'action édition — silencieux côté utilisateur (modif DB directe). */}
+                {onUpdateBrandData && (
+                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                    {!editing ? (
+                      <button onClick={startEdit}
+                        style={{ background: "#1A1612", border: "none", color: "white", borderRadius: 8, padding: "7px 14px", fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                        ✎ Corriger la fiche
+                      </button>
+                    ) : (
+                      <>
+                        <button onClick={cancelEdit} disabled={brandSaving}
+                          style={{ background: "white", border: "1px solid #E8E2D8", color: "#6B6358", borderRadius: 8, padding: "7px 14px", fontSize: 11, fontWeight: 700, cursor: brandSaving ? "default" : "pointer", opacity: brandSaving ? 0.6 : 1 }}>
+                          Annuler
+                        </button>
+                        <button onClick={saveEdit} disabled={brandSaving}
+                          style={{ background: "#22c55e", border: "none", color: "white", borderRadius: 8, padding: "7px 14px", fontSize: 11, fontWeight: 700, cursor: brandSaving ? "default" : "pointer", opacity: brandSaving ? 0.6 : 1 }}>
+                          {brandSaving ? "Enregistrement…" : "Enregistrer"}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+
                 <div style={{ background: "white", borderRadius: 10, padding: "12px 14px", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: "#9A8E82", letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>Identité</div>
-                  {row("Société", bd.companyName)}
-                  {row("SIRET", bd.siret)}
-                  {row("N° TVA", bd.vatNumber)}
-                  {row("Régime TVA", bd.vatRegime === "franchise" ? "Franchise en base" : bd.vatRegime === "normal" ? "Régime normal" : bd.vatRegime)}
-                  {row("Métiers", Array.isArray(bd.trades) ? bd.trades.join(", ") : null)}
+                  {editing ? (
+                    <>
+                      {editRow("Société", "companyName")}
+                      {editRow("SIRET", "siret")}
+                      {editRow("N° TVA", "vatNumber")}
+                      {editRow("Régime TVA", "vatRegime", { type: "select", options: [
+                        { value: "normal",     label: "Régime normal" },
+                        { value: "franchise",  label: "Franchise en base" },
+                      ] })}
+                    </>
+                  ) : (
+                    <>
+                      {row("Société", bd.companyName)}
+                      {row("SIRET", bd.siret)}
+                      {row("N° TVA", bd.vatNumber)}
+                      {row("Régime TVA", bd.vatRegime === "franchise" ? "Franchise en base" : bd.vatRegime === "normal" ? "Régime normal" : bd.vatRegime)}
+                      {row("Métiers", Array.isArray(bd.trades) ? bd.trades.join(", ") : null)}
+                    </>
+                  )}
                 </div>
                 <div style={{ background: "white", borderRadius: 10, padding: "12px 14px", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: "#9A8E82", letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>Coordonnées</div>
-                  {row("Adresse", bd.address)}
-                  {row("CP / Ville", [bd.postalCode, bd.city].filter(Boolean).join(" "))}
-                  {row("Téléphone", bd.phone)}
-                  {row("Email", bd.email)}
-                  {row("Site web", bd.website)}
-                </div>
-                <div style={{ background: "white", borderRadius: 10, padding: "12px 14px", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#9A8E82", letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>Apparence PDF</div>
-                  {bd.color && (
-                    <div style={{ display: "flex", gap: 8, padding: "6px 0", borderBottom: "1px solid #F0EBE3", fontSize: 12, alignItems: "center" }}>
-                      <span style={{ width: 130, flexShrink: 0, color: "#9A8E82", fontWeight: 600 }}>Couleur</span>
-                      <span style={{ width: 18, height: 18, borderRadius: 4, background: bd.color, border: "1px solid #E8E2D8", flexShrink: 0 }}/>
-                      <span style={{ color: "#2A231C" }}>{bd.color}</span>
-                    </div>
+                  {editing ? (
+                    <>
+                      {editRow("Adresse", "address")}
+                      {editRow("Code postal", "postalCode")}
+                      {editRow("Ville", "city")}
+                      {editRow("Téléphone", "phone", { type: "tel" })}
+                      {editRow("Email", "email", { type: "email" })}
+                      {editRow("Site web", "website", { type: "url" })}
+                    </>
+                  ) : (
+                    <>
+                      {row("Adresse", bd.address)}
+                      {row("CP / Ville", [bd.postalCode, bd.city].filter(Boolean).join(" "))}
+                      {row("Téléphone", bd.phone)}
+                      {row("Email", bd.email)}
+                      {row("Site web", bd.website)}
+                    </>
                   )}
-                  {row("Police", bd.fontStyle)}
-                  {bd.logo && <div style={{ padding: "6px 0", borderBottom: "1px solid #F0EBE3" }}><img src={bd.logo} alt="logo" style={{ maxHeight: 48, maxWidth: 160, objectFit: "contain", borderRadius: 4, border: "1px solid #E8E2D8" }}/></div>}
                 </div>
+                {!editing && (
+                  <div style={{ background: "white", borderRadius: 10, padding: "12px 14px", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#9A8E82", letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>Apparence PDF</div>
+                    {bd.color && (
+                      <div style={{ display: "flex", gap: 8, padding: "6px 0", borderBottom: "1px solid #F0EBE3", fontSize: 12, alignItems: "center" }}>
+                        <span style={{ width: 130, flexShrink: 0, color: "#9A8E82", fontWeight: 600 }}>Couleur</span>
+                        <span style={{ width: 18, height: 18, borderRadius: 4, background: bd.color, border: "1px solid #E8E2D8", flexShrink: 0 }}/>
+                        <span style={{ color: "#2A231C" }}>{bd.color}</span>
+                      </div>
+                    )}
+                    {row("Police", bd.fontStyle)}
+                    {bd.logo && <div style={{ padding: "6px 0", borderBottom: "1px solid #F0EBE3" }}><img src={bd.logo} alt="logo" style={{ maxHeight: 48, maxWidth: 160, objectFit: "contain", borderRadius: 4, border: "1px solid #E8E2D8" }}/></div>}
+                  </div>
+                )}
                 <div style={{ background: "white", borderRadius: 10, padding: "12px 14px", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: "#9A8E82", letterSpacing: "1px", textTransform: "uppercase", marginBottom: 8 }}>Paiement & mentions</div>
-                  {row("Conditions règlement", bd.paymentTerms)}
-                  {row("Coordonnées bancaires", bd.bankDetails)}
-                  {row("Mentions légales", bd.legalMentions)}
-                  {row("Mention BTP", bd.btpMention)}
-                  {row("Mention RGPD", bd.rgpdMention)}
+                  {editing ? (
+                    editRow("Conditions règlement", "paymentTerms", { type: "textarea" })
+                  ) : (
+                    <>
+                      {row("Conditions règlement", bd.paymentTerms)}
+                      {row("Coordonnées bancaires", bd.bankDetails)}
+                      {row("Mentions légales", bd.legalMentions)}
+                      {row("Mention BTP", bd.btpMention)}
+                      {row("Mention RGPD", bd.rgpdMention)}
+                    </>
+                  )}
                 </div>
               </div>
             );
