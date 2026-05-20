@@ -99,6 +99,7 @@ function contactToProspectPayload(c, url) {
 }
 
 const DEFAULT_SUJET = 'Ce que vous faisiez en 2h, Zenbat le fait en 5 minutes'
+const WELCOME_SUJET = 'Bienvenue sur Zenbat — votre premier devis en 2 minutes ⚡'
 
 function buildTemplate(prospect) {
   const prenom = (prospect.nom || '').split(' ')[0] || prospect.nom || ''
@@ -298,6 +299,187 @@ function buildHtmlEmail(prospect, textBody) {
 </html>`
 }
 
+// ── Template Bienvenue + mini-tuto premier devis ──────────────────────────
+
+function buildWelcomeTemplate(prospect) {
+  const prenom = (prospect.nom || '').split(' ')[0] || prospect.nom || ''
+  return `Bonjour ${prenom},
+
+Bienvenue sur **Zenbat** — et merci de me faire confiance pour vos devis et factures.
+
+Pas envie de lire un manuel ? Pas besoin. **En 2 minutes chrono**, vous allez sortir votre premier devis. Voici la marche à suivre :
+
+**Étape 1 — Ajoutez votre premier client (15 secondes)**
+Onglet **Contacts** → **+ Nouveau contact**. Saisissez juste un nom et une ville. Vous compléterez le reste plus tard si besoin.
+Astuce : vous pouvez aussi prendre en photo une carte de visite, l'IA remplit tout pour vous.
+
+**Étape 2 — Lancez l'Agent IA (30 secondes)**
+Onglet **Agent IA** (le bouton vert au centre en bas). Décrivez votre chantier en langage naturel, comme si vous parliez à votre apprenti :
+• "Réfection toiture 80 m² ardoise + zinguerie + échafaudage"
+• "Salle de bain complète 6 m², carrelage mural et sol, douche italienne"
+L'IA structure les lignes, calcule la TVA et applique les bons taux automatiquement.
+
+**Étape 3 — Vérifiez et ajustez (45 secondes)**
+Relisez les lignes, ajustez les prix ou les quantités si besoin. Choisissez le client à l'étape précédente. Cliquez sur **Enregistrer**.
+
+**Étape 4 — Envoyez pour signature (20 secondes)**
+Bouton **Envoyer au client** → votre client reçoit un lien sécurisé, signe depuis son téléphone avec un code à 8 chiffres. Vous êtes notifié dès qu'il signe. Zéro impression, zéro renvoi par email.
+
+Et c'est tout. Vous venez de faire en 2 minutes ce qui vous prenait une demi-heure.
+
+**Quelques bonus que vous découvrirez vite :**
+• Conversion devis → facture en 1 clic
+• Factures Factur-X conformes 2026 (envoi DGFiP automatique)
+• Suivi des paiements et relances pré-rédigées
+• Statistiques CA / marge en temps réel
+
+Si vous bloquez quelque part, répondez simplement à ce mail ou utilisez le **chat support** intégré (bouton en bas à droite). Je réponds personnellement.
+
+Bonne route avec Zenbat,
+Dursun
+Créateur de Zenbat · Le Havre`
+}
+
+function buildWelcomeHtmlEmail(prospect, textBody) {
+  const bodyHtml = linkifyZenbat(textToHtmlBlocks(textBody))
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bienvenue sur Zenbat</title>
+</head>
+<body style="margin:0;padding:0;background:#F0ECE4;font-family:Inter,Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#F0ECE4;">
+<tr><td align="center" style="padding:40px 16px;">
+
+  <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;width:100%;">
+
+    <!-- HEADER -->
+    <tr><td style="background:#FAF7F2;border-radius:16px 16px 0 0;padding:22px 36px;border-bottom:1px solid #E8E2D8;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td>
+            <span style="font-family:Arial,Helvetica,sans-serif;font-size:26px;font-weight:800;color:#1A1612;letter-spacing:-1px;">Zen<span style="color:#C97B5C;">bat</span></span>
+          </td>
+          <td align="right" style="vertical-align:middle;">
+            <span style="font-size:10px;color:#9A9088;letter-spacing:1px;text-transform:uppercase;font-weight:600;">Bienvenue à bord</span>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+
+    <!-- WELCOME BANNER -->
+    <tr><td style="background:#16a34a;padding:18px 36px;text-align:center;">
+      <p style="margin:0;font-size:13px;color:#fff;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;">
+        🎉&nbsp; Votre compte est prêt &nbsp;·&nbsp; Premier devis en 2 minutes
+      </p>
+    </td></tr>
+
+    <!-- BODY -->
+    <tr><td style="background:#FFFCF7;padding:40px 36px 24px;">
+
+      ${bodyHtml}
+
+      <!-- STEPS TIMELINE -->
+      <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;margin:32px 0 8px;border-radius:12px;overflow:hidden;border:1px solid #E8E2D8;">
+        <tr><td style="background:#FAF7F2;padding:16px 20px;border-bottom:1px solid #E8E2D8;">
+          <p style="margin:0;font-size:11px;font-weight:700;color:#6B6358;letter-spacing:1px;text-transform:uppercase;">⏱ Récapitulatif — 2 minutes chrono</p>
+        </td></tr>
+        ${[
+          ['1', 'Ajouter un client',         '15 sec',  'Onglet Contacts → + Nouveau contact'],
+          ['2', 'Lancer l\'Agent IA',         '30 sec',  'Décrivez le chantier en langage naturel'],
+          ['3', 'Vérifier & ajuster',         '45 sec',  'Relisez, ajustez les prix, enregistrez'],
+          ['4', 'Envoyer pour signature',     '20 sec',  'Le client signe depuis son téléphone'],
+        ].map(([num, title, duration, desc]) => `
+        <tr><td style="padding:16px 20px;border-bottom:1px solid #F0ECE4;">
+          <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
+            <tr>
+              <td style="width:38px;vertical-align:top;padding-right:14px;">
+                <div style="width:32px;height:32px;border-radius:50%;background:#C97B5C;color:#fff;font-size:14px;font-weight:800;text-align:center;line-height:32px;font-family:Arial,Helvetica,sans-serif;">${num}</div>
+              </td>
+              <td>
+                <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
+                  <tr>
+                    <td><p style="margin:0;font-size:14px;font-weight:700;color:#1A1612;">${title}</p></td>
+                    <td align="right" style="white-space:nowrap;"><span style="font-size:11px;background:#F0ECE4;color:#6B6358;padding:2px 8px;border-radius:10px;font-weight:600;">${duration}</span></td>
+                  </tr>
+                </table>
+                <p style="margin:4px 0 0;font-size:13px;color:#6B6358;line-height:1.5;">${desc}</p>
+              </td>
+            </tr>
+          </table>
+        </td></tr>`).join('')}
+      </table>
+
+      <!-- PRIMARY CTA -->
+      <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;margin:28px 0 8px;">
+        <tr><td align="center">
+          <a href="https://zenbat.vercel.app" style="display:inline-block;background:#C97B5C;color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;padding:16px 40px;border-radius:10px;width:300px;text-align:center;">
+            🚀 Ouvrir Zenbat et démarrer →
+          </a>
+          <p style="margin:8px 0 0;font-size:11px;color:#9A9088;">Pas besoin de mot de passe — vous êtes déjà connecté</p>
+        </td></tr>
+      </table>
+
+      <!-- SUPPORT NOTE -->
+      <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;margin:28px 0 0;background:#FAF7F2;border-radius:10px;border-left:3px solid #C97B5C;">
+        <tr><td style="padding:14px 18px;">
+          <p style="margin:0;font-size:12px;color:#6B6358;line-height:1.6;">
+            <strong style="color:#1A1612;">Besoin d'aide ?</strong> Répondez à ce mail ou utilisez le chat support en bas à droite de l'app. Je réponds personnellement, en français, dans la journée.
+          </p>
+        </td></tr>
+      </table>
+
+    </td></tr>
+
+    <!-- FOOTER -->
+    <tr><td style="background:#F0ECE4;border-radius:0 0 16px 16px;padding:22px 36px;border-top:1px solid #E8E2D8;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td>
+            <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#3D3832;">Dursun — Créateur de ${ZENBAT_LINK}</p>
+            <p style="margin:0;font-size:12px;color:#9A9088;">Le Havre &nbsp;·&nbsp; <a href="https://zenbat.vercel.app" style="color:#C97B5C;text-decoration:none;">zenbat.vercel.app</a></p>
+          </td>
+          <td align="right" style="vertical-align:top;">
+            <div style="background:#1A1612;border-radius:4px;padding:4px 8px;">
+              <span style="font-size:11px;font-weight:800;color:#fff;">Z</span>
+            </div>
+          </td>
+        </tr>
+        <tr><td colspan="2" style="padding-top:14px;">
+          <p style="margin:0;font-size:11px;color:#B0A898;line-height:1.6;">
+            Vous recevez ce mail de bienvenue car vous avez activé votre compte Zenbat.<br>
+            Pour ne plus recevoir de communications, répondez « Désinscription » à ce mail.
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+
+  </table>
+</td></tr>
+</table>
+</body>
+</html>`
+}
+
+// Registre des templates email — utilisé par ProspectDetail pour switcher
+// entre prospection (mail froid) et bienvenue (mini-tuto onboarding).
+const EMAIL_TEMPLATES = {
+  prospection: {
+    label:     'Prospection',
+    sujet:     DEFAULT_SUJET,
+    build:     buildTemplate,
+    buildHtml: buildHtmlEmail,
+  },
+  welcome: {
+    label:     'Bienvenue + tuto',
+    sujet:     WELCOME_SUJET,
+    build:     buildWelcomeTemplate,
+    buildHtml: buildWelcomeHtmlEmail,
+  },
+}
+
 // ── Composants UI légers ───────────────────────────────────────────────────
 
 function Badge({ statut }) {
@@ -439,6 +621,7 @@ function ProspectDetail({ prospectId, onUpdate, onDelete }) {
   const [data, setData]           = useState(null)
   const [tab, setTab]             = useState('emails') // 'emails' | 'composer'
   const [composerView, setComposerView] = useState('edit') // 'edit' | 'preview'
+  const [template, setTemplate]   = useState('prospection') // clé de EMAIL_TEMPLATES
   const [loading, setLoading]     = useState(true)
   const [sujet, setSujet]         = useState('')
   const [corps, setCorps]         = useState('')
@@ -461,18 +644,20 @@ function ProspectDetail({ prospectId, onUpdate, onDelete }) {
 
   useEffect(() => {
     if (data?.prospect) {
-      setSujet(DEFAULT_SUJET)
-      setCorps(buildTemplate(data.prospect))
+      const tpl = EMAIL_TEMPLATES[template] || EMAIL_TEMPLATES.prospection
+      setSujet(tpl.sujet)
+      setCorps(tpl.build(data.prospect))
       setSendOk(false)
       setSendErr('')
     }
-  }, [data?.prospect?.id])
+  }, [data?.prospect?.id, template])
 
   const handleSend = async () => {
     if (!sujet.trim() || !corps.trim()) { setSendErr('Sujet et corps requis.'); return }
     setSending(true); setSendErr(''); setSendOk(false)
     try {
-      const corps_html = buildHtmlEmail(data.prospect, corps)
+      const tpl = EMAIL_TEMPLATES[template] || EMAIL_TEMPLATES.prospection
+      const corps_html = tpl.buildHtml(data.prospect, corps)
       await api('POST', { action: 'send_email', id: prospectId, sujet, corps, corps_html })
       setSendOk(true)
       // Rafraîchir l'historique + statut
@@ -613,6 +798,26 @@ function ProspectDetail({ prospectId, onUpdate, onDelete }) {
               </div>
             )}
 
+            {/* Sélecteur de template */}
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6358',
+                marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Template</label>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {Object.entries(EMAIL_TEMPLATES).map(([key, tpl]) => {
+                  const active = template === key
+                  return (
+                    <button key={key} onClick={() => setTemplate(key)}
+                      style={{ padding: '8px 14px', border: `1.5px solid ${active ? '#1A1612' : '#E8E2D8'}`,
+                        borderRadius: 8, background: active ? '#1A1612' : '#FAF7F2',
+                        color: active ? '#fff' : '#6B6358', fontSize: 12,
+                        fontWeight: active ? 700 : 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      {key === 'welcome' ? '🎉 ' : '📨 '}{tpl.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
             {/* Objet */}
             <div style={{ marginBottom: 12 }}>
               <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#6B6358',
@@ -672,7 +877,7 @@ function ProspectDetail({ prospectId, onUpdate, onDelete }) {
                   ref={iframeRef}
                   style={{ width: '100%', height: 680, border: 'none', display: 'block' }}
                   title="preview"
-                  srcDoc={buildHtmlEmail(prospect, corps)}
+                  srcDoc={(EMAIL_TEMPLATES[template] || EMAIL_TEMPLATES.prospection).buildHtml(prospect, corps)}
                   sandbox="allow-same-origin"
                 />
               </div>
@@ -687,7 +892,12 @@ function ProspectDetail({ prospectId, onUpdate, onDelete }) {
                   opacity: sending ? 0.6 : 1, letterSpacing: '0.1px' }}>
                 {sending ? 'Envoi en cours…' : `Envoyer à ${prospect.email} →`}
               </button>
-              <button onClick={() => { setCorps(buildTemplate(prospect)); setComposerView('edit') }}
+              <button onClick={() => {
+                  const tpl = EMAIL_TEMPLATES[template] || EMAIL_TEMPLATES.prospection
+                  setSujet(tpl.sujet)
+                  setCorps(tpl.build(prospect))
+                  setComposerView('edit')
+                }}
                 style={{ padding: '11px 16px', border: '1px solid #E8E2D8', borderRadius: 8,
                   background: '#FAF7F2', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', color: '#6B6358' }}>
                 Réinitialiser
