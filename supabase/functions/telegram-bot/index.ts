@@ -73,6 +73,29 @@ function fmtDate(d: unknown): string {
   return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+// Format relatif type "aujourd'hui 14:32", "hier 09:12", "il y a 4 jours",
+// "il y a 2 mois". Plus parlant que "06/05/2026" pour évaluer si un user
+// est actif ou en sommeil.
+function fmtRelTime(d: unknown): string {
+  if (!d) return "—";
+  const date = new Date(String(d));
+  if (Number.isNaN(date.getTime())) return "—";
+  const now      = Date.now();
+  const diffMs   = now - date.getTime();
+  const diffMin  = Math.floor(diffMs / 60_000);
+  const diffH    = Math.floor(diffMs / 3_600_000);
+  const diffD    = Math.floor(diffMs / 86_400_000);
+  const hhmm     = date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  if (diffMin < 1)   return "à l'instant";
+  if (diffMin < 60)  return `il y a ${diffMin} min`;
+  if (diffH   < 24 && date.toDateString() === new Date(now).toDateString())
+                     return `aujourd'hui ${hhmm}`;
+  if (diffD   < 2)   return `hier ${hhmm}`;
+  if (diffD   < 30)  return `il y a ${diffD} jours`;
+  if (diffD   < 365) return `il y a ${Math.floor(diffD / 30)} mois`;
+  return fmtDate(d);
+}
+
 async function sendMessage(chatId: string | number, text: string): Promise<void> {
   if (!text.trim()) return;
   // Telegram limite à 4096 caractères par message — on tronque proprement.
@@ -132,19 +155,37 @@ async function cmdStats(sb: Sb): Promise<string> {
   todayStart.setUTCHours(0, 0, 0, 0);
   const since = todayStart.toISOString();
 
-  const [signups, devis, invoices, openTickets, awaitingTickets] = await Promise.all([
+  // - deleted_at IS NULL : on ne compte pas les devis/factures supprimés
+  //   le même jour (sinon le chiffre est gonflé par des tests/erreurs).
+  // - Factures "émises" = locked=true (la facture a quitté le statut
+  //   brouillon, cf. trigger migration 0009). Une facture en brouillon
+  //   n'est pas encore envoyée au client.
+  // - "Devis envoyés/signés" : on remonte aussi un signal d'activité commerciale
+  //   réelle, pas juste de la frappe en brouillon.
+  const [signups, devisCreated, devisSent, invoicesIssued, openTickets, awaitingTickets, activeUsers] = await Promise.all([
     sb.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", since),
-    sb.from("devis").select("id", { count: "exact", head: true }).gte("created_at", since),
-    sb.from("invoices").select("id", { count: "exact", head: true }).gte("created_at", since),
+    sb.from("devis").select("id", { count: "exact", head: true })
+      .gte("created_at", since).is("deleted_at", null),
+    sb.from("devis").select("id", { count: "exact", head: true })
+      .gte("created_at", since).is("deleted_at", null).in("statut", ["envoye", "en_signature", "accepte"]),
+    sb.from("invoices").select("id", { count: "exact", head: true })
+      .gte("created_at", since).is("deleted_at", null).eq("locked", true),
     sb.from("support_tickets").select("id", { count: "exact", head: true }).eq("status", "open"),
     sb.from("support_tickets").select("id", { count: "exact", head: true }).eq("status", "awaiting_admin"),
+    // Utilisateurs réellement actifs aujourd'hui (distinct owners avec
+    // au moins une écriture en DB). Plus parlant que "signups" pour
+    // sentir la santé du SaaS au jour le jour.
+    sb.from("activity_log").select("owner_id").gte("created_at", since),
   ]);
+
+  const dau = new Set((activeUsers.data || []).map((r: { owner_id: string | null }) => r.owner_id).filter(Boolean)).size;
 
   return [
     "📊 <b>Résumé du jour</b>",
     `Inscriptions : <b>${signups.count ?? 0}</b>`,
-    `Devis créés : <b>${devis.count ?? 0}</b>`,
-    `Factures émises : <b>${invoices.count ?? 0}</b>`,
+    `Utilisateurs actifs : <b>${dau}</b>`,
+    `Devis créés : <b>${devisCreated.count ?? 0}</b> (dont <b>${devisSent.count ?? 0}</b> envoyés)`,
+    `Factures émises : <b>${invoicesIssued.count ?? 0}</b>`,
     "",
     "🎫 <b>Support</b>",
     `Tickets ouverts : <b>${openTickets.count ?? 0}</b>`,
@@ -162,19 +203,34 @@ async function cmdUser(sb: Sb, args: string): Promise<string> {
   if (!authUser) return `Utilisateur introuvable : <code>${escapeHtml(email)}</code>`;
 
   const { data: profile } = await sb.from("profiles").select("*").eq("id", authUser.id).maybeSingle();
-  const [devis, invoices] = await Promise.all([
-    sb.from("devis").select("id", { count: "exact", head: true }).eq("owner_id", authUser.id),
-    sb.from("invoices").select("id", { count: "exact", head: true }).eq("owner_id", authUser.id),
+  // - deleted_at IS NULL → on ne compte pas les devis/factures supprimés
+  //   (sinon le compteur ne correspond pas à ce que l'utilisateur voit dans son app).
+  // - Dernière activité = max(activity_log.created_at). Plus fiable que
+  //   `auth.users.last_sign_in_at` qui ne bouge qu'à un vrai login alors
+  //   que les sessions PWA tiennent des semaines via refresh tokens.
+  const [devis, invoices, lastAct, issued] = await Promise.all([
+    sb.from("devis").select("id", { count: "exact", head: true })
+      .eq("owner_id", authUser.id).is("deleted_at", null),
+    sb.from("invoices").select("id", { count: "exact", head: true })
+      .eq("owner_id", authUser.id).is("deleted_at", null),
+    sb.from("activity_log").select("created_at")
+      .eq("owner_id", authUser.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    sb.from("invoices").select("id", { count: "exact", head: true })
+      .eq("owner_id", authUser.id).is("deleted_at", null).eq("locked", true),
   ]);
+
+  // Fallback : si activity_log est vide (compte tout récent ou avant
+  // migration 0012), on retombe sur le last_sign_in_at auth.
+  const lastActivityAt = lastAct?.data?.created_at || authUser.last_sign_in_at;
 
   const lines = [
     `👤 <b>${escapeHtml(email)}</b>`,
     profile?.company_name ? `Entreprise : ${escapeHtml(profile.company_name)}` : "",
     `Plan : <b>${escapeHtml(profile?.plan ?? "free")}</b>`,
     `Inscrit le : ${fmtDate(authUser.created_at)}`,
-    `Dernière connexion : ${fmtDate(authUser.last_sign_in_at)}`,
+    `Dernière activité : <b>${fmtRelTime(lastActivityAt)}</b>`,
     "",
-    `Devis : <b>${devis.count ?? 0}</b>  ·  Factures : <b>${invoices.count ?? 0}</b>`,
+    `Devis : <b>${devis.count ?? 0}</b>  ·  Factures : <b>${issued.count ?? 0}</b> émises / <b>${invoices.count ?? 0}</b> total`,
   ];
   return lines.filter(Boolean).join("\n");
 }
