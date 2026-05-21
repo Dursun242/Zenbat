@@ -11,6 +11,12 @@ const parseBrand = b => { if (!b) return {}; if (typeof b === 'string') { try { 
 //   ?type=tokens              → tokens consommés + coûts par modèle
 //   ?type=retention           → dormants + cohortes (depuis activity_log)
 //   ?type=stripe_health       → past_due + canceled (depuis Stripe API live)
+//   ?type=onboarding_targets  → comptes inscrits sans aucun devis (relance tuto)
+//
+// POST endpoints :
+//   {action:'send_welcome_tuto', user_id} → renvoie le mail tuto à 1 user
+//                                            via la Edge Function welcome-email,
+//                                            puis met à jour profiles.welcome_tuto_resent_at
 
 // Prix USD par million de tokens (Anthropic, mai 2026)
 const MODEL_PRICING = {
@@ -23,13 +29,85 @@ import { cors } from "./_cors.js"
 import { authenticate } from "./_withAuth.js"
 
 export default async function handler(req, res) {
-  cors(req, res, { methods: "GET, OPTIONS" })
+  cors(req, res, { methods: "GET, POST, OPTIONS" })
   if (req.method === 'OPTIONS') return res.status(204).end()
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
+  if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const auth = await authenticate(req, res, { adminOnly: true })
   if (!auth) return
   const { admin } = auth
+
+  // ── POST : actions admin (envoi de mails, etc.) ─────────────────────
+  if (req.method === 'POST') {
+    const action = String(req.body?.action || '').trim()
+
+    // Relance manuelle du mail tuto de bienvenue.
+    // Délègue l'assemblage HTML + l'envoi Resend à la Edge Function Supabase
+    // welcome-email/ — qui sert déjà le même mail à l'inscription. On lui
+    // envoie un payload mimétique de DB Webhook (INSERT profiles) avec le
+    // service_role en Bearer pour passer verify_jwt:true.
+    if (action === 'send_welcome_tuto') {
+      const userId = String(req.body?.user_id || '').trim()
+      if (!userId) return res.status(400).json({ error: 'user_id requis' })
+
+      // On charge le profil pour disposer du full_name (utilisé par la Edge
+      // Function pour personnaliser le mail) et vérifier qu'il existe.
+      const { data: profile, error: pe } = await admin
+        .from('profiles')
+        .select('id, full_name, company_name, welcome_tuto_resent_at')
+        .eq('id', userId)
+        .maybeSingle()
+      if (pe)       return res.status(500).json({ error: pe.message })
+      if (!profile) return res.status(404).json({ error: 'Profil introuvable' })
+
+      const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+      const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
+      if (!supabaseUrl || !serviceKey) {
+        return res.status(500).json({ error: 'SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY non configurés' })
+      }
+
+      const fnUrl = `${supabaseUrl.replace(/\/$/, '')}/functions/v1/welcome-email`
+      let edgeResp, edgeText
+      try {
+        const r = await fetch(fnUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            Authorization:   `Bearer ${serviceKey}`,
+          },
+          body: JSON.stringify({
+            type:   'INSERT',
+            table:  'profiles',
+            schema: 'public',
+            record: {
+              id:           profile.id,
+              full_name:    profile.full_name,
+              company_name: profile.company_name,
+            },
+            old_record: null,
+          }),
+        })
+        edgeText = await r.text().catch(() => '')
+        edgeResp = r
+      } catch (e) {
+        return res.status(502).json({ error: `welcome-email injoignable : ${e.message || e}` })
+      }
+      if (!edgeResp.ok) {
+        return res.status(502).json({ error: `welcome-email HTTP ${edgeResp.status}: ${edgeText.slice(0, 300)}` })
+      }
+
+      // Trace l'envoi pour empêcher les renvois multiples côté UI. On ignore
+      // une éventuelle erreur de cette mise à jour (mail déjà parti, on ne va
+      // pas le renvoyer pour ça — le pire scénario c'est un re-envoi possible).
+      const sentAt = new Date().toISOString()
+      await admin.from('profiles').update({ welcome_tuto_resent_at: sentAt }).eq('id', userId)
+        .then(() => {}).catch(() => {})
+
+      return res.status(200).json({ ok: true, sent_at: sentAt })
+    }
+
+    return res.status(400).json({ error: 'action inconnue' })
+  }
 
   // ── Données IA : routage par ?type= ─────────────────────────────────
   const type = (req.query.type || '').toString().trim()
@@ -259,6 +337,48 @@ export default async function handler(req, res) {
   //   - cohorte mensuelle : par mois d'inscription, quel % est encore
   //     actif (au moins 1 entrée activity_log dans les 30 derniers jours).
   //   - distribution d'âge des comptes dormants.
+
+  // ── Onboarding : comptes inscrits sans aucun devis ──────────────────
+  // Pendant que `retention` filtre justement ces comptes (considérés comme
+  // tests/faux comptes), c'est exactement la cible du mail tuto de relance :
+  // quelqu'un qui a créé un compte mais n'a pas encore franchi l'étape du
+  // premier devis. On les liste pour permettre à l'admin de leur renvoyer
+  // manuellement le mail tutoriel depuis le panel.
+  if (type === 'onboarding_targets') {
+    const [
+      { data: profiles },
+      { data: authUsers },
+      { data: devisRows },
+    ] = await Promise.all([
+      admin.from('profiles').select('id, company_name, full_name, plan, welcome_tuto_resent_at, created_at'),
+      admin.auth.admin.listUsers({ perPage: 1000 }).then(r => ({ data: r.data?.users || [] })),
+      admin.from('devis').select('owner_id').is('deleted_at', null),
+    ])
+
+    const authById = new Map((authUsers || []).map(u => [u.id, u]))
+    const hasDevis = new Set((devisRows || []).map(d => d.owner_id))
+
+    const targets = []
+    for (const p of profiles || []) {
+      if (hasDevis.has(p.id)) continue
+      const a = authById.get(p.id)
+      if (!a?.email) continue // pas d'email = on ne peut rien envoyer
+      targets.push({
+        id:                  p.id,
+        email:               a.email,
+        name:                p.company_name || p.full_name || a.email,
+        plan:                p.plan || 'free',
+        joinedAt:            a.created_at || p.created_at,
+        lastSignInAt:        a.last_sign_in_at || null,
+        welcomeTutoResentAt: p.welcome_tuto_resent_at || null,
+      })
+    }
+    // Du plus ancien inscrit (le plus "stale") au plus récent.
+    targets.sort((a, b) => new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime())
+
+    return res.status(200).json({ targets, generatedAt: new Date().toISOString() })
+  }
+
   if (type === 'retention') {
     const DORMANT_DAYS_THRESHOLD = 14
     const ACTIVE_WINDOW_DAYS     = 30
@@ -459,7 +579,7 @@ export default async function handler(req, res) {
     })
   }
 
-  if (type) return res.status(400).json({ error: "Paramètre 'type' invalide (conversations | logs | negatives | newsletter | coherence | feedback | tokens | quotes_sent | retention | stripe_health)" })
+  if (type) return res.status(400).json({ error: "Paramètre 'type' invalide (conversations | logs | negatives | newsletter | coherence | feedback | tokens | quotes_sent | retention | stripe_health | onboarding_targets)" })
 
   // ── Récupération des données ─────────────────────────────────────────
   const [

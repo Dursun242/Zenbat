@@ -14,6 +14,7 @@ import AdminFeedback       from "./admin/AdminFeedback.jsx"
 import AdminAgentBenchmark from "./admin/AdminAgentBenchmark.jsx"
 import AdminQuotesSent    from "./admin/AdminQuotesSent.jsx"
 import AdminRetention     from "./admin/AdminRetention.jsx"
+import AdminOnboardingTargets from "./admin/AdminOnboardingTargets.jsx"
 import AdminStripeHealth  from "./admin/AdminStripeHealth.jsx"
 import AdminTokenStats    from "./admin/AdminTokenStats.jsx"
 import Collapsible        from "./admin/Collapsible.jsx"
@@ -42,6 +43,8 @@ export default function AdminPanel({ onBack }) {
   const [quotesSentLoading,setQuotesSentLoading]= useState(false)
   const [retention,        setRetention]        = useState(null)
   const [retentionLoading, setRetentionLoading] = useState(false)
+  const [onboardingTargets,        setOnboardingTargets]        = useState(null)
+  const [onboardingTargetsLoading, setOnboardingTargetsLoading] = useState(false)
   const [stripeHealth,     setStripeHealth]     = useState(null)
   const [stripeHealthLoading,setStripeHealthLoading]= useState(false)
   const [tokens,           setTokens]           = useState(null)
@@ -74,7 +77,7 @@ export default function AdminPanel({ onBack }) {
   useEffect(() => {
     setStats(null); setIaLogs(null); setIaNegs(null); setIaConvs(null)
     setNewsletter(null); setCoherence(null); setFeedback(null); setQuotesSent(null)
-    setRetention(null); setStripeHealth(null); setTokens(null)
+    setRetention(null); setOnboardingTargets(null); setStripeHealth(null); setTokens(null)
     setOpenConvUser(null); setDetailUser(null); setDetailData(null)
   }, [currentUser?.id])
 
@@ -181,6 +184,16 @@ export default function AdminPanel({ onBack }) {
       const data = await res.json()
       if (res.ok) setRetention(data)
     } catch {} finally { setRetentionLoading(false) }
+  }
+
+  const loadOnboardingTargets = async () => {
+    setOnboardingTargetsLoading(true)
+    try {
+      const token = await getToken()
+      const res  = await fetch("/api/admin-stats?type=onboarding_targets", { headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json()
+      if (res.ok) setOnboardingTargets(data)
+    } catch {} finally { setOnboardingTargetsLoading(false) }
   }
 
   const loadStripeHealth = async () => {
@@ -374,6 +387,11 @@ export default function AdminPanel({ onBack }) {
           <Collapsible title="Rétention & churn" subtitle="Comptes dormants + cohortes d'inscription"
             count={retention?.dormants?.length} loaded={retention !== null} onExpand={loadRetention}>
             <AdminRetention data={retention} loading={retentionLoading} onRefresh={loadRetention} embedded />
+          </Collapsible>
+
+          <Collapsible title="Onboarding — comptes sans devis" subtitle="Relance manuelle du mail tuto de bienvenue"
+            count={onboardingTargets?.targets?.length} loaded={onboardingTargets !== null} onExpand={loadOnboardingTargets}>
+            <AdminOnboardingTargets data={onboardingTargets} loading={onboardingTargetsLoading} onRefresh={loadOnboardingTargets} embedded />
           </Collapsible>
 
           <Collapsible title="Santé revenue Stripe" subtitle="Past due, churns à venir, MRR live"
