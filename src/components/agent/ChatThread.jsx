@@ -9,6 +9,8 @@
 // présentationnel : il appelle setFeedback / saveFeedback / send aux moments
 // opportuns.
 
+import { useState, useEffect } from "react";
+
 const REASON_TAGS = ["Trop de questions", "Mauvais métier", "Prix incorrects", "Trop générique", "Hors sujet"]
 
 function MessageFeedback({ idx, fb, ac, setFeedback, saveFeedback }) {
@@ -124,12 +126,92 @@ function QuickStarts({ items, ac, onPick }) {
   )
 }
 
+// Messages rotatifs affichés pendant que l'IA réfléchit — donnent à
+// l'utilisateur quelque chose à lire et l'impression que le travail
+// progresse, plutôt qu'un curseur abstrait. Honnêtes sur ce que Claude
+// fait sous le capot (lecture du contexte historique, génération du
+// devis, mise en forme). L'ordre suit grosso modo le pipeline réel.
+const TYPING_MESSAGES = [
+  "Analyse de votre demande…",
+  "Recherche dans vos prestations habituelles…",
+  "Calcul des quantités et tarifs cohérents…",
+  "Mise en forme du devis…",
+  "Vérification de la cohérence des lignes…",
+  "Plus que quelques secondes…",
+]
+
 function TypingIndicator({ ac }) {
+  const [seconds, setSeconds] = useState(0)
+  const [msgIdx,  setMsgIdx]  = useState(0)
+
+  useEffect(() => {
+    const tick   = setInterval(() => setSeconds(s => s + 1), 1000)
+    const rotate = setInterval(() => setMsgIdx(i => i + 1), 2800)
+    return () => { clearInterval(tick); clearInterval(rotate) }
+  }, [])
+
+  const currentMsg    = TYPING_MESSAGES[Math.min(msgIdx, TYPING_MESSAGES.length - 1)]
+  const showStayHint  = seconds >= 8          // Après 8s : message rassurant explicite.
+  const showStillHere = seconds >= 18         // Après 18s : on commence à se rapprocher du timeout 28s.
+
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 6 }}>
-      <div style={{ width: 24, height: 24, borderRadius: "50%", background: ac + "22", border: `1px solid ${ac}44`, display: "flex", alignItems: "center", justifyContent: "center", color: ac, fontSize: 12 }}>✦</div>
-      <div style={{ background: "white", border: "1px solid #F0EBE3", borderRadius: "16px 16px 16px 3px", padding: "10px 14px", display: "flex", gap: 4, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
-        {[0, 140, 280].map(d => <div key={d} style={{ width: 6, height: 6, borderRadius: "50%", background: ac, animation: `bounce 1s ease ${d}ms infinite` }}/>)}
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 8, animation: "slideIn .3s ease both" }}>
+      <div style={{
+        width: 28, height: 28, borderRadius: "50%",
+        background: ac + "22", border: `1px solid ${ac}44`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: ac, fontSize: 14, flexShrink: 0,
+        animation: "iaPulse 1.8s ease infinite",
+      }}>✦</div>
+
+      <div style={{
+        background: "white", border: "1px solid #F0EBE3",
+        borderRadius: "16px 16px 16px 3px",
+        padding: "12px 16px",
+        boxShadow: "0 1px 4px rgba(0,0,0,.07)",
+        flex: 1, maxWidth: "85%",
+      }}>
+        {/* Ligne 1 : titre + 3 points bounce historiques (préservés) */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#1A1612" }}>L'agent réfléchit</span>
+          <div style={{ display: "flex", gap: 3 }}>
+            {[0, 140, 280].map(d => (
+              <div key={d} style={{ width: 5, height: 5, borderRadius: "50%", background: ac, animation: `bounce 1s ease ${d}ms infinite` }}/>
+            ))}
+          </div>
+          <span style={{ marginLeft: "auto", fontSize: 10, color: "#9A8E82", fontVariantNumeric: "tabular-nums" }}>
+            {seconds}s
+          </span>
+        </div>
+
+        {/* Ligne 2 : message rotatif — key={currentMsg} force le remount → animation fadeMsg rejouée */}
+        <div key={currentMsg} style={{
+          fontSize: 12, color: "#6B6358", lineHeight: 1.4,
+          animation: "fadeMsg .4s ease both",
+        }}>
+          {currentMsg}
+        </div>
+
+        {/* Barre shimmer = progression "vivante" sans fausse promesse de % */}
+        <div style={{ marginTop: 10, height: 3, background: "#F0EBE3", borderRadius: 2, overflow: "hidden" }}>
+          <div style={{
+            height: "100%", width: "35%",
+            background: `linear-gradient(90deg, transparent, ${ac}, transparent)`,
+            animation: "shimmer 1.6s linear infinite",
+          }}/>
+        </div>
+
+        {/* Rassurance progressive — n'apparaît qu'après 8s pour ne pas
+            polluer les réponses rapides (~2-3s en mode Haiku). */}
+        {showStayHint && (
+          <div style={{
+            marginTop: 10, fontSize: 11, color: "#9A8E82",
+            borderTop: "1px dashed #F0EBE3", paddingTop: 8,
+            animation: "fadeMsg .4s ease both",
+          }}>
+            💡 <b>Ne quittez pas l'application</b> — la génération peut prendre {showStillHere ? "encore quelques secondes" : "jusqu'à 30 secondes"} pour un devis complexe. Votre demande est en cours de traitement.
+          </div>
+        )}
       </div>
     </div>
   )

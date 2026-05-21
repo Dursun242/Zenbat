@@ -441,6 +441,9 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
         @keyframes slideIn{from{opacity:0;transform:translateX(-14px) scale(.97)}to{opacity:1;transform:translateX(0) scale(1)}}
         @keyframes rowPop{0%{opacity:0;transform:translateY(6px) scaleY(.85)}100%{opacity:1;transform:translateY(0) scaleY(1)}}
         @keyframes totalCount{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
+        @keyframes iaPulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(34,197,94,.35)}50%{transform:scale(1.08);box-shadow:0 0 0 6px rgba(34,197,94,0)}}
+        @keyframes fadeMsg{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes shimmer{0%{transform:translateX(-120%)}100%{transform:translateX(380%)}}
       `}</style>
 
       {/* ═══ HAUT : aperçu devis en cours ═══════════════════ */}
