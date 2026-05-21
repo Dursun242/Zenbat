@@ -5,7 +5,20 @@ import { getToken } from "../lib/getToken.js";
 
 const MAX_URLS = 5;
 
-// Une carte de résultat scrape : soit erreur, soit contact extrait éditable.
+// Format compact pour décrire le prospect existant qui collisionne — le parent
+// passe l'objet brut, on en extrait l'identifiant lisible le plus pertinent.
+function describeExisting(p) {
+  if (!p) return "";
+  return (
+    String(p.entreprise || p.raison_sociale || "").trim() ||
+    [p.prenom, p.nom].filter(Boolean).join(" ").trim() ||
+    String(p.email || p.telephone || "").trim() ||
+    "contact existant"
+  );
+}
+
+// Une carte de résultat scrape : soit erreur, soit doublon détecté, soit
+// contact extrait éditable. Les doublons sont jaunes, sans checkbox active.
 function ResultCard({ result, included, onToggle, onEdit, canEdit }) {
   if (result.error) {
     return (
@@ -18,17 +31,39 @@ function ResultCard({ result, included, onToggle, onEdit, canEdit }) {
     );
   }
   const c = result.contact;
+  const dup = result.duplicate;
   const name = displayName(c);
   const subtitle = [c.email, c.telephone].filter(Boolean).join(" · ");
   const loc = [c.code_postal, c.ville].filter(Boolean).join(" ");
+  const borderColor = dup ? "#f59e0b" : (included ? "#22c55e" : "#E8E2D8");
+  const bgColor     = dup ? "#fffbeb" : "white";
   return (
-    <div style={{ background: "white", border: `1.5px solid ${included ? "#22c55e" : "#E8E2D8"}`, borderRadius: 12, padding: 12, display: "flex", alignItems: "flex-start", gap: 10 }}>
-      <input type="checkbox" checked={included} onChange={onToggle}
-        style={{ marginTop: 2, width: 18, height: 18, accentColor: "#22c55e", cursor: "pointer", flexShrink: 0 }}/>
+    <div style={{ background: bgColor, border: `1.5px solid ${borderColor}`, borderRadius: 12, padding: 12, display: "flex", alignItems: "flex-start", gap: 10 }}>
+      <input
+        type="checkbox"
+        checked={included && !dup}
+        disabled={!!dup}
+        onChange={dup ? undefined : onToggle}
+        style={{ marginTop: 2, width: 18, height: 18, accentColor: "#22c55e",
+          cursor: dup ? "not-allowed" : "pointer", flexShrink: 0, opacity: dup ? 0.4 : 1 }}
+      />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1612", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {name === "—" ? <span style={{ color: "#9A8E82", fontStyle: "italic" }}>Sans nom (à compléter)</span> : name}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#1A1612", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {name === "—" ? <span style={{ color: "#9A8E82", fontStyle: "italic" }}>Sans nom (à compléter)</span> : name}
+          </span>
+          {dup && (
+            <span style={{ fontSize: 10, fontWeight: 700, background: "#f59e0b", color: "white",
+              padding: "2px 7px", borderRadius: 10, letterSpacing: "0.3px", textTransform: "uppercase" }}>
+              Déjà existant
+            </span>
+          )}
         </div>
+        {dup && (
+          <div style={{ fontSize: 11, color: "#92400e", marginTop: 4, fontWeight: 600 }}>
+            ⚠ Doublon ignoré — déjà dans le CRM : {describeExisting(dup)}
+          </div>
+        )}
         {c.activite && (
           <div style={{ fontSize: 11, color: "#6B6358", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {c.activite}
@@ -42,7 +77,7 @@ function ResultCard({ result, included, onToggle, onEdit, canEdit }) {
           {result.url}
         </div>
       </div>
-      {canEdit && (
+      {canEdit && !dup && (
         <button onClick={onEdit}
           style={{ background: "#F0EBE3", border: "none", borderRadius: 8, padding: "6px 10px", fontSize: 11, fontWeight: 600, color: "#6B6358", cursor: "pointer", flexShrink: 0 }}>
           ✏️
@@ -52,7 +87,7 @@ function ResultCard({ result, included, onToggle, onEdit, canEdit }) {
   );
 }
 
-export default function WebScraperModal({ onSave, onClose, onEditOne }) {
+export default function WebScraperModal({ onSave, onClose, onEditOne, findDuplicate }) {
   const [phase, setPhase] = useState("input"); // input | loading | review
   const [urlsText, setUrlsText] = useState("");
   const [results, setResults] = useState([]);
@@ -79,12 +114,19 @@ export default function WebScraperModal({ onSave, onClose, onEditOne }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Erreur scrape");
-      const arr = Array.isArray(data?.results) ? data.results : [];
+      const raw = Array.isArray(data?.results) ? data.results : [];
+      // Annote chaque résultat avec son doublon éventuel (parent décide via findDuplicate).
+      const arr = raw.map(r => {
+        if (r.error) return r;
+        const duplicate = findDuplicate ? findDuplicate(r.contact) : null;
+        return duplicate ? { ...r, duplicate } : r;
+      });
       setResults(arr);
-      // Coche par défaut tous les résultats sans erreur qui ont au moins un champ utile
+      // Par défaut : cocher les résultats sans erreur, avec au moins un champ utile,
+      // ET qui ne sont PAS un doublon (les doublons sont impossibles à cocher).
       const inc = {};
       arr.forEach(r => {
-        if (!r.error) {
+        if (!r.error && !r.duplicate) {
           const c = r.contact || {};
           const hasAny = c.raison_sociale || c.nom || c.prenom || c.email || c.telephone;
           inc[r.url] = !!hasAny;
@@ -100,7 +142,9 @@ export default function WebScraperModal({ onSave, onClose, onEditOne }) {
 
   const onCreate = async () => {
     setCreating(true);
-    const toCreate = results.filter(r => !r.error && included[r.url]);
+    // Ceinture + bretelles : on filtre aussi les doublons côté soumission au cas
+    // où l'état `included` aurait été désynchronisé par un rerender.
+    const toCreate = results.filter(r => !r.error && !r.duplicate && included[r.url]);
     try {
       for (const r of toCreate) {
         // Le parent reçoit le contact brut + l'URL source et décide du mapping
@@ -114,8 +158,9 @@ export default function WebScraperModal({ onSave, onClose, onEditOne }) {
     }
   };
 
-  const includedCount = results.filter(r => !r.error && included[r.url]).length;
-  const errorCount    = results.filter(r => r.error).length;
+  const includedCount  = results.filter(r => !r.error && !r.duplicate && included[r.url]).length;
+  const errorCount     = results.filter(r => r.error).length;
+  const duplicateCount = results.filter(r => r.duplicate).length;
 
   return createPortal(
     <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(15,23,42,.7)", zIndex: 9999, fontFamily: "'DM Sans',sans-serif" }}>
@@ -134,7 +179,11 @@ export default function WebScraperModal({ onSave, onClose, onEditOne }) {
             </div>
             <div style={{ fontSize: 11, color: "#9A8E82", marginTop: 2 }}>
               {phase === "review"
-                ? `${includedCount} sélectionné${includedCount > 1 ? "s" : ""}${errorCount ? ` · ${errorCount} échec${errorCount > 1 ? "s" : ""}` : ""}`
+                ? [
+                    `${includedCount} sélectionné${includedCount > 1 ? "s" : ""}`,
+                    duplicateCount && `${duplicateCount} doublon${duplicateCount > 1 ? "s" : ""} ignoré${duplicateCount > 1 ? "s" : ""}`,
+                    errorCount     && `${errorCount} échec${errorCount > 1 ? "s" : ""}`,
+                  ].filter(Boolean).join(" · ")
                 : `Colle jusqu'à ${MAX_URLS} URLs (une par ligne)`}
             </div>
           </div>

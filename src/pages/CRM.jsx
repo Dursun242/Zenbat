@@ -98,6 +98,51 @@ function contactToProspectPayload(c, url) {
   }
 }
 
+// Normalise un numéro français pour comparaison : enlève espaces/ponctuation,
+// convertit +33/0033 → 0. Permet de matcher "+33 6 12 34 56 78" et "0612345678".
+function normalizePhone(raw) {
+  const digits = String(raw || '').replace(/\D/g, '')
+  if (!digits) return ''
+  if (digits.startsWith('33') && digits.length === 11) return '0' + digits.slice(2)
+  if (digits.startsWith('0033'))                       return '0' + digits.slice(4)
+  return digits
+}
+
+// Cherche un prospect existant qui match le contact scrapé. Cascade :
+// 1) email identique (le plus fiable)
+// 2) téléphone normalisé identique (mobile ou fixe)
+// 3) nom d'entreprise + ville identiques (fallback si pas de contact direct)
+// Retourne le prospect existant ou null. Utilisé par la WebScraperModal pour
+// afficher un badge "Déjà dans le CRM" et empêcher la création de doublons.
+function findProspectDuplicate(prospects, c) {
+  if (!c) return null
+  const email   = String(c.email || '').trim().toLowerCase()
+  const tel1    = normalizePhone(c.telephone)
+  const tel2    = normalizePhone(c.telephone_fixe)
+  const company = String(c.raison_sociale || '').trim().toLowerCase()
+  const ville   = String(c.ville || '').trim().toLowerCase()
+
+  if (email) {
+    const m = prospects.find(p => String(p.email || '').trim().toLowerCase() === email)
+    if (m) return m
+  }
+  if (tel1 || tel2) {
+    const m = prospects.find(p => {
+      const pt = normalizePhone(p.telephone)
+      return pt && (pt === tel1 || pt === tel2)
+    })
+    if (m) return m
+  }
+  if (company && ville) {
+    const m = prospects.find(p =>
+      String(p.entreprise || '').trim().toLowerCase() === company &&
+      String(p.ville      || '').trim().toLowerCase() === ville
+    )
+    if (m) return m
+  }
+  return null
+}
+
 const DEFAULT_SUJET = 'Ce que vous faisiez en 2h, Zenbat le fait en 5 minutes'
 const WELCOME_SUJET = 'Bienvenue sur Zenbat — votre premier devis en 2 minutes ⚡'
 
@@ -2222,6 +2267,7 @@ export default function CRM() {
         <WebScraperModal
           onSave={handleScrapedProspect}
           onClose={() => setScraperOpen(false)}
+          findDuplicate={c => findProspectDuplicate(prospects, c)}
         />
       )}
 
