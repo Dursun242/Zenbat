@@ -447,6 +447,11 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       `}</style>
 
       {/* ═══ HAUT : aperçu devis en cours ═══════════════════ */}
+      {/* Masqué tant qu'aucune ligne n'a été générée : le chat occupe
+          alors 100% de l'écran (boutons "Démarrage rapide" et message
+          de bienvenue remontent above-the-fold sur mobile). Le bandeau
+          réapparaît dès la 1ère ligne, avec son animation habituelle. */}
+      {lignes.length > 0 && (
       <div style={{ flexShrink: 0, background: "white", borderBottom: "2px solid #F0EBE3", minHeight: 110, maxHeight: "45%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
         {/* En-tête branding */}
@@ -642,6 +647,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
           </div>
         )}
       </div>
+      )}
 
       {/* ═══ BAS : chat ══════════════════════════════════════ */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>

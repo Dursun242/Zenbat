@@ -151,7 +151,7 @@ export const TX = {
   clearQuote:      "🗑 Effacer",
   inputPlaceholder:"Décris ta demande dans ta langue — réponse en français",
   inputHint:       "Entrée pour envoyer · les lignes s'ajoutent en direct",
-  agentGreeting:   "Bonjour 👋 Décrivez-moi votre besoin ligne par ligne, dans la langue de votre choix (français, arabe, darija, espagnol, anglais, portugais…). Je rédige systématiquement le devis en français professionnel.",
+  agentGreeting:   "Bonjour 👋 Décrivez votre besoin — toutes langues acceptées, devis rédigé en français.",
   errNetwork:      "Pas de connexion internet. Vérifiez votre réseau et réessayez.",
   errApi:          "L'assistant IA ne répond pas. Réessayez dans quelques secondes.",
   errGeneral:      "Quelque chose s'est mal passé. Réessayez.",
