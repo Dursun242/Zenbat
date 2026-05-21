@@ -292,5 +292,5 @@ export const buildAgentGreeting = (brand) => {
   const sectors = detectSectors(tradeNames, brand?.companyName || "");
   const { expertDomain } = buildSectorContext(sectors, brand?.vatRegime);
   const example = SECTOR_GREETING_EXAMPLE[sectors[0]] || SECTOR_GREETING_EXAMPLE.general;
-  return `Bonjour 👋 Je suis votre assistant spécialisé en **${expertDomain}**.\n\nDécrivez votre besoin ligne par ligne, dans la langue de votre choix (français, arabe, darija, espagnol, anglais, portugais…). Je rédige le devis en français professionnel.\n\n${example}`;
+  return `Bonjour 👋 Spécialiste **${expertDomain}** — décrivez votre besoin, toutes langues acceptées, devis rédigé en français.\n\n${example}`;
 };
