@@ -114,7 +114,7 @@ function PhaseEmail({ data, onVerified }) {
                 type="email" value={email} onChange={e => setEmail(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && email && requestOtp()}
                 placeholder="votre@email.fr" autoFocus
-                style={{ width: '100%', padding: '11px 14px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 14, outline: 'none', boxSizing: 'border-box', marginBottom: 12 }}
+                style={{ width: '100%', padding: '11px 14px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 16, outline: 'none', boxSizing: 'border-box', marginBottom: 12 }}
               />
               <button onClick={requestOtp} disabled={!email || busy}
                 style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: accent, color: 'white', fontWeight: 700, fontSize: 14, cursor: !email || busy ? 'default' : 'pointer', opacity: !email || busy ? 0.6 : 1 }}>
@@ -224,7 +224,7 @@ function NegotiateMode({ lignes, token, sessionId, accent, onDone, onCancel }) {
                     <span style={{ fontSize: 12, color: '#777' }}>Qté</span>
                     <input type="number" min={0.1} step={0.1} value={qty}
                       onChange={e => setQtys(q => ({ ...q, [l.id]: e.target.value }))}
-                      style={{ width: 64, padding: '4px 8px', borderRadius: 6, border: '1px solid #ddd', fontSize: 13, textAlign: 'right' }} />
+                      style={{ width: 72, padding: '4px 8px', borderRadius: 6, border: '1px solid #ddd', fontSize: 16, textAlign: 'right' }} />
                     <span style={{ fontSize: 12, color: '#aaa' }}>{l.unite}</span>
                     <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 700, color: '#111' }}>
                       {fmtEur(Number(qty) * (l.prix_unitaire || 0))}
@@ -233,7 +233,7 @@ function NegotiateMode({ lignes, token, sessionId, accent, onDone, onCancel }) {
                 )}
                 <input value={comments[l.id] || ''} onChange={e => setComments(c => ({ ...c, [l.id]: e.target.value }))}
                   placeholder={removed ? 'Précisez pourquoi (optionnel)' : 'Commentaire (optionnel)'}
-                  style={{ width: '100%', marginTop: 8, padding: '5px 8px', borderRadius: 6, border: '1px solid #ddd', fontSize: 12, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', marginTop: 8, padding: '7px 10px', borderRadius: 6, border: '1px solid #ddd', fontSize: 16, boxSizing: 'border-box' }} />
               </div>
             </div>
           </div>
@@ -244,14 +244,14 @@ function NegotiateMode({ lignes, token, sessionId, accent, onDone, onCancel }) {
         <label style={{ fontSize: 12, fontWeight: 600, color: '#555', display: 'block', marginBottom: 8 }}>Budget cible <span style={{ fontWeight: 400, color: '#aaa' }}>(optionnel)</span></label>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <input type="number" value={budget} onChange={e => setBudget(e.target.value)} placeholder="Ex : 7 000"
-            style={{ flex: 1, padding: '9px 12px', borderRadius: 6, border: '1px solid #ddd', fontSize: 14, outline: 'none' }} />
+            style={{ flex: 1, padding: '9px 12px', borderRadius: 6, border: '1px solid #ddd', fontSize: 16, outline: 'none' }} />
           <span style={{ fontSize: 13, color: '#777' }}>€ HT</span>
         </div>
       </div>
 
       <textarea value={message} onChange={e => setMessage(e.target.value)} rows={3}
         placeholder="Message pour l'artisan…"
-        style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, resize: 'vertical', boxSizing: 'border-box', marginBottom: 14, fontFamily: 'inherit' }} />
+        style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 16, resize: 'vertical', boxSizing: 'border-box', marginBottom: 14, fontFamily: 'inherit' }} />
 
       <div style={{ background: '#fafafa', borderRadius: 8, padding: '12px 14px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: 13, color: '#555' }}>Nouveau total estimé</span>
@@ -466,12 +466,12 @@ export default function DevisPublicPage({ token }) {
   }
 
   if (phase === 'loading') {
-    return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#f5f5f5', color: '#aaa', fontSize: 14 }}>Chargement…</div>
+    return <div style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', background: '#f5f5f5', color: '#aaa', fontSize: 14 }}>Chargement…</div>
   }
 
   if (phase === 'error') {
     return (
-      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#f5f5f5', padding: 20 }}>
+      <div style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', background: '#f5f5f5', padding: 20 }}>
         <div style={{ textAlign: 'center', color: '#555' }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>—</div>
           <h2 style={{ margin: '0 0 8px', color: '#111' }}>Lien introuvable</h2>
@@ -483,7 +483,7 @@ export default function DevisPublicPage({ token }) {
 
   if (phase === 'verify') {
     return (
-      <div style={{ minHeight: '100vh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+      <div style={{ minHeight: '100dvh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
         <Header artisan={data?.artisan} />
         <PhaseEmail data={data} onVerified={id => { setSessionId(id); writePersistedSessionId(token, id); load(id) }} />
       </div>
@@ -492,7 +492,7 @@ export default function DevisPublicPage({ token }) {
 
   if (phase === 'signing') {
     return (
-      <div style={{ minHeight: '100vh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+      <div style={{ minHeight: '100dvh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
         <style>{`@keyframes dp-spin { to { transform: rotate(360deg) } }`}</style>
         <Header artisan={data?.artisan} />
         <div style={{ maxWidth: 480, margin: '48px auto', padding: '0 20px', textAlign: 'center' }}>
@@ -517,7 +517,7 @@ export default function DevisPublicPage({ token }) {
 
   if (phase === 'accepted') {
     return (
-      <div style={{ minHeight: '100vh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+      <div style={{ minHeight: '100dvh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
         <Header artisan={data?.artisan} />
         <div style={{ maxWidth: 480, margin: '48px auto', padding: '0 20px', textAlign: 'center' }}>
           <div style={{ background: 'white', borderRadius: 12, padding: '40px 32px', border: '1px solid #e5e5e5' }}>
@@ -553,7 +553,7 @@ export default function DevisPublicPage({ token }) {
 
   if (phase === 'refused') {
     return (
-      <div style={{ minHeight: '100vh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+      <div style={{ minHeight: '100dvh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
         <Header artisan={data?.artisan} />
         <div style={{ maxWidth: 480, margin: '48px auto', padding: '0 20px', textAlign: 'center' }}>
           <div style={{ background: 'white', borderRadius: 12, padding: '40px 32px', border: '1px solid #e5e5e5' }}>
@@ -580,7 +580,7 @@ export default function DevisPublicPage({ token }) {
   const enNeg    = data?.statut === 'en_negociation'
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', paddingBottom: 60 }}>
+    <div style={{ minHeight: '100dvh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', paddingBottom: 60 }}>
       <style>{`* { box-sizing: border-box } input, textarea, button { font-family: inherit }`}</style>
       <Header artisan={data?.artisan} />
 
@@ -666,7 +666,7 @@ export default function DevisPublicPage({ token }) {
             </p>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 8 }}>Votre nom complet</label>
             <input value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Jean Dupont"
-              style={{ width: '100%', padding: '11px 14px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 14, marginBottom: 16, outline: 'none' }} />
+              style={{ width: '100%', padding: '11px 14px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 16, marginBottom: 16, outline: 'none' }} />
             <ErrBox msg={err} />
             <div style={{ display: 'flex', gap: 10, marginTop: err ? 12 : 0 }}>
               <button onClick={() => { setMode(null); setErr(null) }}
@@ -688,7 +688,7 @@ export default function DevisPublicPage({ token }) {
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 8 }}>Raison du refus</label>
             <textarea value={refuseReason} onChange={e => setRefuseReason(e.target.value)} rows={3}
               placeholder="Ex : Tarif trop élevé, j'ai eu une autre proposition…"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, resize: 'vertical', marginBottom: 16, outline: 'none' }} />
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 16, resize: 'vertical', marginBottom: 16, outline: 'none' }} />
             <ErrBox msg={err} />
             <div style={{ display: 'flex', gap: 10, marginTop: err ? 12 : 0 }}>
               <button onClick={() => { setMode(null); setErr(null) }}
