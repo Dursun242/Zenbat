@@ -2,7 +2,7 @@
 // - bandeau « mémoire active »
 // - bulle des messages (user / assistant)
 // - barre de feedback (👍 / 👎) sur chaque réponse contenant un devis
-// - puces de démarrage rapide sur le chat vierge
+// - mini tuto 3 étapes sur le chat vierge
 // - indicateur « ... » pendant le streaming
 //
 // Tout le state vit chez le parent (AgentIA) ; ce composant est purement
@@ -87,40 +87,37 @@ function ChatBubble({ m, ac }) {
   )
 }
 
-function QuickStarts({ items, ac, onPick }) {
+function MiniTuto({ ac }) {
+  const steps = [
+    { n: 1, t: "Décrivez votre besoin",        s: "À l'écrit ou à la voix, dans votre langue." },
+    { n: 2, t: "L'IA rédige le devis",         s: "Lignes, quantités, tarifs cohérents avec votre historique." },
+    { n: 3, t: "Vous validez et l'envoyez",    s: "PDF prêt, signature client en ligne." },
+  ]
   return (
     <div style={{ alignSelf: "flex-start", marginLeft: 30, marginTop: 4, maxWidth: "88%", animation: "fadeUp .25s ease both" }}>
-      <div style={{ fontSize: 11, color: ac, fontWeight: 700, letterSpacing: ".5px", textTransform: "uppercase", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}>
+      <div style={{ fontSize: 11, color: ac, fontWeight: 700, letterSpacing: ".5px", textTransform: "uppercase", marginBottom: 10, display: "flex", alignItems: "center", gap: 5 }}>
         <span style={{ fontSize: 13 }}>✨</span>
-        <span>Démarrage rapide — cliquez pour essayer</span>
+        <span>Comment ça marche</span>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {items.map((q) => (
-          <button key={q} onClick={() => onPick(q)}
-            style={{
-              display: "flex", alignItems: "center", gap: 8,
-              background: `linear-gradient(135deg, ${ac}18, ${ac}08)`,
-              border: `1px solid ${ac}44`,
-              color: "#1A1612",
-              borderRadius: 12,
-              padding: "11px 14px",
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: "pointer",
-              textAlign: "left",
-              lineHeight: 1.35,
-              width: "100%",
-              transition: "background .15s, transform .1s",
-            }}
-            onMouseOver={e => e.currentTarget.style.background = `linear-gradient(135deg, ${ac}28, ${ac}12)`}
-            onMouseOut={e => e.currentTarget.style.background = `linear-gradient(135deg, ${ac}18, ${ac}08)`}>
-            <div style={{ flex: 1, color: "#2A231C" }}>{q}</div>
-            <span style={{ color: ac, fontSize: 16, flexShrink: 0, fontWeight: 700 }}>→</span>
-          </button>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {steps.map(({ n, t, s }) => (
+          <div key={n} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+            <div style={{
+              flexShrink: 0, width: 24, height: 24, borderRadius: "50%",
+              background: ac, color: "white",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 12, fontWeight: 800, fontVariantNumeric: "tabular-nums",
+            }}>{n}</div>
+            <div style={{ flex: 1, paddingTop: 2 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1612", lineHeight: 1.3 }}>{t}</div>
+              <div style={{ fontSize: 12, color: "#6B6358", marginTop: 2, lineHeight: 1.4 }}>{s}</div>
+            </div>
+          </div>
         ))}
       </div>
-      <div style={{ fontSize: 11, color: "#9A8E82", marginTop: 8, marginLeft: 4 }}>
-        Ou décrivez votre besoin ci-dessous (écrit ou vocal).
+      <div style={{ fontSize: 12, color: ac, fontWeight: 600, marginTop: 14, marginLeft: 4, display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ fontSize: 14 }}>↓</span>
+        <span>Décrivez votre besoin ci-dessous</span>
       </div>
     </div>
   )
@@ -223,8 +220,8 @@ export default function ChatThread({
   quickStarts, lignes, send,
   bottomPad = 12,
 }) {
-  const showQuickStarts = msgs.length === 1 && lignes.length === 0 && !loading && quickStarts.length > 0
-  const showTyping      = loading && msgs[msgs.length - 1]?.role !== "assistant"
+  const showMiniTuto = msgs.length === 1 && lignes.length === 0 && !loading
+  const showTyping   = loading && msgs[msgs.length - 1]?.role !== "assistant"
 
   return (
     <div ref={chatRef} style={{ flex: 1, overflowY: "auto", paddingTop: 12, paddingLeft: 14, paddingRight: 14, paddingBottom: bottomPad, display: "flex", flexDirection: "column", gap: 8 }}>
@@ -250,8 +247,8 @@ export default function ChatThread({
         )
       })}
 
-      {showQuickStarts && <QuickStarts items={quickStarts} ac={ac} onPick={send}/>}
-      {showTyping      && <TypingIndicator ac={ac}/>}
+      {showMiniTuto && <MiniTuto ac={ac}/>}
+      {showTyping   && <TypingIndicator ac={ac}/>}
     </div>
   )
 }
