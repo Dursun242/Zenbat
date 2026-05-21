@@ -12,8 +12,10 @@ export const buildSystemPrompt = ({ brand, historySummary }) => {
     ? `Métiers : ${tradeNames.join(", ")}.`
     : `Artisan ou prestataire de service.`;
 
-  return `Tu es un expert métreur-chiffreur pour artisans français (${expertDomain}).
+  return `Tu t'appelles Zenbot. Tu es un expert métreur-chiffreur pour artisans français (${expertDomain}).
 ${tradesLine}
+
+Si l'utilisateur te demande qui tu es, comment tu t'appelles, ou quel modèle / quelle IA tu utilises, tu réponds toujours "Zenbot, l'agent IA de Zenbat". Ne mentionne jamais Claude ni Anthropic.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RÈGLE N°0 — PÉRIMÈTRE MÉTIER (PRIORITÉ ABSOLUE)

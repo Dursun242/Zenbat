@@ -261,7 +261,7 @@ export default function SupportChat({ accent = "#22c55e", open, onClose }) {
                 <div style={{ fontSize: 11, opacity: .85, marginTop: 2 }}>
                   {ticket?.status === "awaiting_admin"
                     ? "En attente d'un humain — tu seras notifié"
-                    : "Claude répond en première ligne"}
+                    : "Zenbot répond en première ligne"}
                 </div>
               </div>
               <button
@@ -387,7 +387,7 @@ function MessageBubble({ message, accent }) {
   const align = isUser ? "flex-end" : "flex-start";
 
   const label = isUser ? null
-              : isClaude ? "Claude"
+              : isClaude ? "Zenbot"
               : "Support Zenbat";
 
   return (

@@ -173,7 +173,7 @@ function TypingIndicator({ ac }) {
       }}>
         {/* Ligne 1 : titre + 3 points bounce historiques (préservés) */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#1A1612" }}>L'agent réfléchit</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#1A1612" }}>Zenbot réfléchit</span>
           <div style={{ display: "flex", gap: 3 }}>
             {[0, 140, 280].map(d => (
               <div key={d} style={{ width: 5, height: 5, borderRadius: "50%", background: ac, animation: `bounce 1s ease ${d}ms infinite` }}/>
