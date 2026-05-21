@@ -2,13 +2,17 @@
 
 /* Caveat — police manuscrite servie depuis /public/fonts pour que l'aperçu
    HTML du devis utilise exactement la même police que le PDF généré côté
-   client par jsPDF (cf. src/lib/pdfBuilder.js). */
+   client par jsPDF (cf. src/lib/pdfBuilder.js). Le WOFF2 (~100 Ko) couvre
+   tous les navigateurs depuis 2015 ; le TTF reste référencé en fallback —
+   et il est de toute façon servi via fetch() par pdfBuilder.js qui ne
+   sait pas lire le WOFF2. */
 @font-face {
   font-family: 'Caveat';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('/fonts/Caveat-Regular.ttf') format('truetype');
+  src: url('/fonts/Caveat-Regular.woff2') format('woff2'),
+       url('/fonts/Caveat-Regular.ttf')   format('truetype');
 }
 
 @tailwind base;
