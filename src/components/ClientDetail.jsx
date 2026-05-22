@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { displayName } from "../lib/utils.js";
 import { fmt } from "../lib/utils.js";
+import { saveContactToPhone } from "../lib/vcard.js";
 import { I } from "./ui/icons.jsx";
 import Badge from "./ui/Badge.jsx";
 import ContactEditor from "./ContactEditor.jsx";
@@ -48,8 +49,13 @@ export default function ClientDetail({ c, clientDevis, onBack, goDevis, onUpdate
           </div>
         ))}
 
+        <button onClick={() => saveContactToPhone(c)}
+          style={{ marginTop: 12, width: "100%", background: "#1A1612", color: "white", border: "none", borderRadius: 10, padding: 10, fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          📇 Ajouter à mon répertoire
+        </button>
+
         <button onClick={() => { if (window.confirm("Supprimer définitivement ce contact ?")) onDelete(); }}
-          style={{ marginTop: 12, width: "100%", background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", borderRadius: 10, padding: 10, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+          style={{ marginTop: 8, width: "100%", background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", borderRadius: 10, padding: 10, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
           🗑️ Supprimer le contact
         </button>
       </div>
