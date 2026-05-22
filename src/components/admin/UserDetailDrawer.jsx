@@ -9,11 +9,14 @@ export default function UserDetailDrawer({
   user, data, loading, error, tab, onTabChange, onClose,
   onRequestDelete, onRequestReset, currentUserId,
   onTogglePlan, planToggling = false,
+  onGrantTrial, trialGranting = false,
   onUpdateBrandData, brandSaving = false,
 }) {
   useModalGuard(true, onClose);
   const currentPlan = data?.profile?.plan || user.plan || "free";
   const isPro       = currentPlan === "pro";
+  const proUntil    = data?.profile?.pro_until || null;
+  const proUntilLabel = proUntil ? new Date(proUntil).toLocaleDateString("fr-FR") : null;
 
   // Mode édition de l'onglet Profil — permet à l'admin de corriger
   // silencieusement les champs brand_data mal renseignés par l'utilisateur
@@ -110,7 +113,7 @@ export default function UserDetailDrawer({
             <div style={{ color: "#6B6358", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</div>
           </div>
           <span style={{ fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: isPro ? "rgba(34,197,94,.18)" : "rgba(148,163,184,.18)", color: isPro ? "#4ade80" : "#9A8E82", flexShrink: 0 }}>
-            {isPro ? "PRO" : "FREE"}
+            {isPro ? (proUntil ? "PRO ⏳" : "PRO") : "FREE"}
           </span>
         </div>
 
@@ -194,6 +197,28 @@ export default function UserDetailDrawer({
                     : isPro
                       ? "↓ Repasser ce compte en Free"
                       : "↑ Passer ce compte en Pro"}
+                </button>
+              )}
+              {isPro && proUntilLabel && (
+                <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "8px 12px", fontSize: 11, fontWeight: 600, color: "#92400e" }}>
+                  🎁 Essai Pro en cours — expire le {proUntilLabel}
+                </div>
+              )}
+              {onGrantTrial && currentPlan === "free" && (
+                <button onClick={() => onGrantTrial(30)}
+                  disabled={trialGranting}
+                  style={{
+                    background:   "rgba(34,197,94,.10)",
+                    border:       "1px solid rgba(34,197,94,.35)",
+                    color:        "#15803d",
+                    borderRadius: 10,
+                    padding:      "10px",
+                    fontSize:     12,
+                    fontWeight:   700,
+                    cursor:       trialGranting ? "default" : "pointer",
+                    opacity:      trialGranting ? 0.6 : 1,
+                  }}>
+                  {trialGranting ? "…" : "🎁 Offrir 1 mois Pro (essai)"}
                 </button>
               )}
               {onRequestReset && (data.stats.devisTotal > 0 || data.stats.invoicesTotal > 0) && (

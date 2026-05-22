@@ -63,8 +63,9 @@ export default function AdminPanel({ onBack }) {
   const [detailLoading,setDetailLoading]= useState(false)
   const [detailError,  setDetailError]  = useState(null)
   const [detailTab,    setDetailTab]    = useState("overview")
-  const [planToggling, setPlanToggling] = useState(false)
-  const [brandSaving,  setBrandSaving]  = useState(false)
+  const [planToggling,  setPlanToggling]  = useState(false)
+  const [brandSaving,   setBrandSaving]   = useState(false)
+  const [trialGranting, setTrialGranting] = useState(false)
 
   useEffect(() => { if (session) { load() } }, [session?.access_token])
 
@@ -288,6 +289,28 @@ export default function AdminPanel({ onBack }) {
     }
   }
 
+  // Offre un essai Pro daté (1 mois par défaut). Le compte repasse seul en
+  // Free à l'échéance via le job pg_cron expire_pro_trials (migration 0053).
+  const grantProTrial = async (days = 30) => {
+    if (!detailUser || trialGranting) return
+    setTrialGranting(true)
+    try {
+      const token = await getToken()
+      const res   = await fetch("/api/admin-user-detail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: "grant_pro_trial", userId: detailUser.id, days }),
+      })
+      const data = await res.json()
+      if (!res.ok) { alert(data?.error || "Échec de l'attribution de l'essai"); return }
+      setDetailData(prev => prev ? { ...prev, profile: { ...(prev.profile || {}), plan: data.plan, pro_until: data.pro_until } } : prev)
+    } catch (e) {
+      alert(e?.message || "Erreur réseau")
+    } finally {
+      setTrialGranting(false)
+    }
+  }
+
   const closeDelete = () => { if (deleting) return; setDeleteTarget(null); setConfirmInput(""); setDeleteError(null) }
 
   const confirmDelete = async () => {
@@ -466,6 +489,8 @@ export default function AdminPanel({ onBack }) {
           onRequestReset={() => { openReset(detailUser); }}
           onTogglePlan={toggleUserPlan}
           planToggling={planToggling}
+          onGrantTrial={grantProTrial}
+          trialGranting={trialGranting}
           onUpdateBrandData={updateUserBrandData}
           brandSaving={brandSaving}
           currentUserId={currentUser?.id}

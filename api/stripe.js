@@ -112,11 +112,22 @@ async function handleWebhook(req, res, rawBody) {
       return res.status(200).json({ received: true })
     }
 
-    await admin.from('profiles').update({
+    // pro_until = null : un abonnement Stripe payant ne doit jamais être
+    // rétrogradé par le job expire_pro_trials. Indispensable si le client
+    // souscrit pendant un essai Pro offert (pro_until était daté).
+    const proUpdate = {
       plan:                   'pro',
       billing_cycle:          plan === 'biannual' ? 'biannual' : 'monthly',
       stripe_subscription_id: subscriptionId,
-    }).eq('id', profile.id)
+      pro_until:              null,
+    }
+    const { error: upErr } = await admin.from('profiles').update(proUpdate).eq('id', profile.id)
+    // Fallback si la migration 0053 n'est pas encore appliquée : on ne
+    // bloque jamais un paiement pour une colonne manquante.
+    if (upErr?.code === '42703') {
+      delete proUpdate.pro_until
+      await admin.from('profiles').update(proUpdate).eq('id', profile.id)
+    }
 
     if (plan === 'biannual') {
       await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true })
