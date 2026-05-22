@@ -107,7 +107,7 @@ export default function AuthScreen({ onEnter }) {
           </button>
 
           {mode === "signup" && (
-            <p style={{ textAlign: "center", fontSize: 11, color: "#9A8E82", marginTop: 14 }}>Essai 30 jours gratuit · puis 19€/mois HT</p>
+            <p style={{ textAlign: "center", fontSize: 11, color: "#9A8E82", marginTop: 14 }}>Gratuit à vie · 5 devis/semaine · Pro illimité 19€/mois HT</p>
           )}
         </div>
       </div>

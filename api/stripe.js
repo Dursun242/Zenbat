@@ -78,6 +78,7 @@ async function handleWebhook(req, res, rawBody) {
   // (23505) → déjà traité, on répond 200 sans rien refaire.
   // Si la table n'existe pas (migration 0042 non appliquée), on log et on
   // continue : la dédup est désactivée mais le webhook reste fonctionnel.
+  let dedupInserted = false
   const { error: dedupErr } = await admin
     .from('stripe_webhook_events')
     .insert({ event_id: event.id, type: event.type })
@@ -91,6 +92,20 @@ async function handleWebhook(req, res, rawBody) {
       // pour ne pas perdre le webhook (mieux vaut un doublon qu'une perte).
       console.warn('[stripe webhook] dedup insert failed:', dedupErr.message)
     }
+  } else {
+    dedupInserted = true
+  }
+
+  // En cas d'échec du traitement métier (UPDATE profil) : on retire la
+  // trace de dédup pour que le retry Stripe puisse re-traiter l'event
+  // (sinon il serait skippé par la garde 23505), et on renvoie 500 pour
+  // déclencher ce retry. Sans ça, un client peut payer sans passer Pro.
+  const abortForRetry = async (label, err) => {
+    console.error(`[stripe webhook] ${label}:`, err?.message || err)
+    if (dedupInserted) {
+      await admin.from('stripe_webhook_events').delete().eq('event_id', event.id)
+    }
+    return res.status(500).json({ error: 'Traitement échoué, retry attendu' })
   }
 
   if (event.type === 'checkout.session.completed') {
@@ -126,7 +141,10 @@ async function handleWebhook(req, res, rawBody) {
     // bloque jamais un paiement pour une colonne manquante.
     if (upErr?.code === '42703') {
       delete proUpdate.pro_until
-      await admin.from('profiles').update(proUpdate).eq('id', profile.id)
+      const { error: retryErr } = await admin.from('profiles').update(proUpdate).eq('id', profile.id)
+      if (retryErr) return abortForRetry('checkout.completed UPDATE profil échoué', retryErr)
+    } else if (upErr) {
+      return abortForRetry('checkout.completed UPDATE profil échoué', upErr)
     }
 
     if (plan === 'biannual') {
@@ -153,11 +171,12 @@ async function handleWebhook(req, res, rawBody) {
       .maybeSingle()
 
     if (profile) {
-      await admin.from('profiles').update({
+      const { error: upErr } = await admin.from('profiles').update({
         plan:                   'free',
         billing_cycle:          null,
         stripe_subscription_id: null,
       }).eq('id', profile.id)
+      if (upErr) return abortForRetry('subscription.deleted UPDATE profil échoué', upErr)
       console.log(`[stripe webhook] subscription.deleted → user ${profile.id} plan=free`)
 
       const { data: { user } = {} } = await admin.auth.admin.getUserById(profile.id)

@@ -16,6 +16,16 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
   const [clientPicker,   setClientPicker]   = useState(false);
   const [statutBusy,     setStatutBusy]     = useState(false);
 
+  // Filet de sécurité : onChange est synchrone et fire-and-forget. En cas
+  // de succès, d.statut change et les boutons disparaissent ; en cas
+  // d'échec serveur, le statut ne bouge pas — sans ce reset, les boutons
+  // resteraient figés (disabled) jusqu'au rechargement de la page.
+  useEffect(() => {
+    if (!statutBusy) return;
+    const t = setTimeout(() => setStatutBusy(false), 4000);
+    return () => clearTimeout(t);
+  }, [statutBusy]);
+
   // La modale acompte est rendue inline (pas un composant séparé) → on
   // gère son scroll-lock + bouton retour depuis le parent. clientPicker
   // est aussi piloté ici car ClientPickerModal n'est monté que quand le

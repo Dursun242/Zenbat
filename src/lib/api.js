@@ -559,8 +559,11 @@ export async function getDevisPdfUrl(devisId, expiresIn = 3600) {
 export async function saveCguAcceptance(version = "1.0") {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
-  await supabase.from("profiles")
+  // Le query builder supabase-js est un thenable, pas une Promise : il
+  // n'expose pas .catch(). On inspecte { error } plutôt (cas typique :
+  // migration 0008 cgu_* pas encore appliquée → on dégrade en silence).
+  const { error } = await supabase.from("profiles")
     .update({ cgu_accepted_at: new Date().toISOString(), cgu_version: version })
     .eq("id", user.id)
-    .catch(err => console.warn("[cgu] save error (migration 0008 peut-être pas encore appliquée) :", err.message))
+  if (error) console.warn("[cgu] save error (migration 0008 peut-être pas encore appliquée) :", error.message)
 }

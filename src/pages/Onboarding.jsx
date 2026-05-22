@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { brandCompleteness } from "../lib/brandCompleteness.js"
 import { isValidEmail } from "../lib/utils.js"
 import { useAuth } from "../lib/auth.jsx"
@@ -52,6 +52,20 @@ export default function Onboarding({ brand, setBrand, onDone }) {
   const [local, setLocal] = useState(() => readDraft(userId)?.local ?? { ...brand })
   const [tryNext, setTryNext] = useState(false)
   const set = (k, v) => setLocal(b => ({ ...b, [k]: v }))
+
+  // Au mount, user peut ne pas être encore résolu : les initialiseurs
+  // useState lisent alors le brouillon "anon" au lieu de celui de
+  // l'utilisateur. On re-hydrate une seule fois dès que userId arrive.
+  const hydratedRef = useRef(false)
+  useEffect(() => {
+    if (hydratedRef.current || !userId) return
+    hydratedRef.current = true
+    const draft = readDraft(userId)
+    if (draft) {
+      if (typeof draft.step === "number") setStep(draft.step)
+      if (draft.local) setLocal(draft.local)
+    }
+  }, [userId])
 
   // Sauvegarde à chaque modification de step ou local.
   useEffect(() => {

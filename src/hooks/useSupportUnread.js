@@ -49,10 +49,11 @@ export function useSupportUnread() {
       if (Date.now() - lastCheckRef.current < 5000) return; // throttle 5s
       check();
     };
-    window.addEventListener("visibilitychange", onVis);
+    // visibilitychange n'est dispatché que sur document, jamais sur window.
+    document.addEventListener("visibilitychange", onVis);
     window.addEventListener("focus", onVis);
     return () => {
-      window.removeEventListener("visibilitychange", onVis);
+      document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("focus", onVis);
     };
   }, [check]);

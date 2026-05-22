@@ -34,9 +34,9 @@ FAQ ZENBAT :
 - L'export Factur-X (PDF/A-3 avec XML CII embarqué) est disponible depuis le détail facture.
 
 ▸ Abonnement et paywall
-- L'essai gratuit est de 30 jours. Au-delà, il faut un abonnement Pro.
-- Pendant l'essai : maximum 5 devis par jour (limite quotidienne, pas une limite sur les 30 jours).
-  La limite se recharge chaque jour à minuit. En passant Pro, la création de devis est illimitée.
+- Le plan gratuit (freemium) est permanent — il n'y a pas d'essai limité dans le temps.
+- En plan gratuit : maximum 5 devis par semaine. Le compteur se réinitialise chaque lundi.
+  En passant Pro, la création de devis est illimitée.
 - Plans : Mensuel (19 €/mois) ou Semestriel (57 € pour 6 mois, sans renouvellement automatique).
 - Gestion via l'onglet "Mon compte" → "Abonnement". Le portail Stripe permet de mettre à jour
   la carte, télécharger les factures Stripe, ou annuler.
