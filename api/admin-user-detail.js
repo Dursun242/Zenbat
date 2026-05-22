@@ -43,17 +43,53 @@ export default async function handler(req, res) {
       if (plan !== 'free' && plan !== 'pro')
         return res.status(400).json({ error: "plan doit valoir 'free' ou 'pro'" })
 
-      const { data, error } = await admin
+      // pro_until: null → un override manuel de plan est permanent, pas un
+      // essai daté. On efface donc tout minuteur d'essai en cours.
+      let { data, error } = await admin
         .from('profiles')
-        .update({ plan })
+        .update({ plan, pro_until: null })
         .eq('id', userId)
         .select('id, plan')
         .maybeSingle()
+      // Fallback si la migration 0053 n'est pas appliquée : retente sans pro_until.
+      if (error?.code === '42703') {
+        ({ data, error } = await admin
+          .from('profiles')
+          .update({ plan })
+          .eq('id', userId)
+          .select('id, plan')
+          .maybeSingle())
+      }
       if (error)  return res.status(500).json({ error: error.message || String(error) })
       if (!data)  return res.status(404).json({ error: 'Profil introuvable' })
 
       console.log(`[admin-user-detail] set_plan: user ${userId} → ${plan} (by admin ${auth.user.email})`)
       return res.status(200).json({ ok: true, plan: data.plan })
+    }
+
+    // Offre un essai Pro daté : plan='pro' + pro_until = now + N jours
+    // (défaut 30). Le job pg_cron expire_pro_trials (migration 0053)
+    // repasse le compte en 'free' à l'échéance, sans intervention.
+    if (action === 'grant_pro_trial') {
+      const rawDays = Number(body.days)
+      const days = Number.isFinite(rawDays) && rawDays > 0 ? Math.min(365, Math.floor(rawDays)) : 30
+      const until = new Date(Date.now() + days * 86400000).toISOString()
+
+      const { data, error } = await admin
+        .from('profiles')
+        .update({ plan: 'pro', pro_until: until })
+        .eq('id', userId)
+        .select('id, plan, pro_until')
+        .maybeSingle()
+      if (error) {
+        if (error.code === '42703')
+          return res.status(400).json({ error: "Colonne pro_until absente — appliquez la migration 0053 dans Supabase." })
+        return res.status(500).json({ error: error.message || String(error) })
+      }
+      if (!data) return res.status(404).json({ error: 'Profil introuvable' })
+
+      console.log(`[admin-user-detail] grant_pro_trial: user ${userId} → pro until ${until} (${days}j, by admin ${auth.user.email})`)
+      return res.status(200).json({ ok: true, plan: data.plan, pro_until: data.pro_until })
     }
 
     // Correction admin de la fiche profil (brand_data) — utile quand un
