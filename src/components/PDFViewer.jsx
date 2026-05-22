@@ -13,22 +13,12 @@ const Ix = {
   x:    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
 }
 
-// Déclenche le téléchargement du PDF avec un nom de fichier propre.
-// Sur iOS Safari, <a download> n'enregistre pas vraiment le fichier — il
-// ouvre le PDF dans l'onglet courant. On préfère navigator.share quand
-// le navigateur supporte le partage de fichiers (iOS 15+) pour proposer
-// "Enregistrer dans Fichiers" via le share sheet natif. Sur desktop et
-// Android, on retombe sur <a download> qui télécharge directement.
-async function openPdfPreview(blob, filename = "document.pdf") {
-  try {
-    const file = new File([blob], filename, { type: "application/pdf" })
-    if (navigator.share && navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], title: filename })
-      return
-    }
-  } catch (e) {
-    if (e?.name === "AbortError") return
-  }
+// Ouvre le PDF généré. Le <a download> cliqué programmatiquement affiche
+// le PDF dans le visualiseur natif iOS (avec ses propres options
+// imprimer / partager / enregistrer) plutôt que d'ouvrir directement le
+// share sheet ; sur desktop il déclenche un téléchargement avec le bon
+// nom de fichier.
+function openPdfPreview(blob, filename = "document.pdf") {
   const url = URL.createObjectURL(blob)
   const a   = document.createElement("a")
   a.href     = url
@@ -403,7 +393,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
                     const { renderDataToPdf } = await import("../lib/pdf.js")
                     const filename = `${d.numero}.pdf`
                     const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename })
-                    await openPdfPreview(blob, filename)
+                    openPdfPreview(blob, filename)
                   } catch (e) {
                     if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
                       window.location.reload()
@@ -488,7 +478,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
                   const { renderDataToPdf } = await import("../lib/pdf.js")
                   const filename = `${d.numero}.pdf`
                   const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename })
-                  await openPdfPreview(blob, filename)
+                  openPdfPreview(blob, filename)
                 } catch (e) {
                   console.error("[pdf preview]", e)
                   if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
