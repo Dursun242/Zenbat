@@ -574,8 +574,13 @@ export default function DevisPublicPage({ token }) {
   const lignes   = data?.lignes || []
   const ouvrages = lignes.filter(l => l.type_ligne === 'ouvrage')
   const totalHT  = ouvrages.reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0), 0)
-  const tvaRate  = ouvrages[0]?.tva_rate ?? 20
-  const totalTTC = totalHT * (1 + tvaRate / 100)
+  // TVA calculée ligne par ligne : un devis peut mélanger plusieurs taux
+  // (ex. BTP 5,5 % rénovation + 10 % entretien). Appliquer le taux de la
+  // 1ère ligne à tout le HT fausserait le TTC — or il vaut engagement signé.
+  const totalTVA = ouvrages.reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0) * ((l.tva_rate ?? 20) / 100), 0)
+  const totalTTC = totalHT + totalTVA
+  const tauxTva  = [...new Set(ouvrages.map(l => l.tva_rate ?? 20))]
+  const tvaLabel = tauxTva.length <= 1 ? `TVA ${tauxTva[0] ?? 20}%` : 'TVA multitaux'
   const cloture  = ['accepte', 'refuse', 'remplace'].includes(data?.statut)
   const enNeg    = data?.statut === 'en_negociation'
 
@@ -599,7 +604,7 @@ export default function DevisPublicPage({ token }) {
             </div>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 28, fontWeight: 800, color: '#111', letterSpacing: '-0.5px', lineHeight: 1 }}>{fmtEur(totalHT)}</div>
-              <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>HT · TVA {tvaRate}%</div>
+              <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>HT · {tvaLabel}</div>
             </div>
           </div>
 

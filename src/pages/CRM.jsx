@@ -957,12 +957,7 @@ function BulkSendModal({ prospects, onClose }) {
       items[i] = { ...p, status: 'sending' }
       setResults([...items])
       try {
-        const personalCorps = buildTemplate(p).replace(
-          // Remplace uniquement le corps avec la version personnalisée
-          // (sujet reste identique, corps adapté par buildTemplate)
-          /Bonjour .+?,/, `Bonjour ${p.nom.split(' ')[0]},`
-        )
-        // On utilise le corps édité mais on personnalise le Bonjour
+        // On utilise le corps édité mais on personnalise le « Bonjour ».
         const finalCorps = corps.replace(/^Bonjour [^,]+,/, `Bonjour ${p.nom.split(' ')[0]},`)
         const corps_html = buildHtmlEmail(p, finalCorps)
         await api('POST', { action: 'send_email', id: p.id, sujet, corps: finalCorps, corps_html })
@@ -1610,7 +1605,7 @@ function DedupModal({ prospects, onDeleted, onClose }) {
   )
 }
 
-// ── Programmation d'envoi (10 emails/heure) ───────────────────────────────
+// ── Programmation d'envoi (5 emails/heure) ────────────────────────────────
 
 const RATE_PER_HOUR = 5
 const INTERVAL_MIN  = 60 / RATE_PER_HOUR // 12 minutes
@@ -2000,7 +1995,7 @@ export default function CRM() {
     if (filterStatut !== 'all' && !['with_email','without_email'].includes(filterStatut) && p.statut !== filterStatut) return false
     if (search.trim()) {
       const q = search.toLowerCase()
-      return (p.nom + p.entreprise + p.email + p.ville + p.secteur).toLowerCase().includes(q)
+      return [p.nom, p.entreprise, p.email, p.ville, p.secteur].filter(Boolean).join(' ').toLowerCase().includes(q)
     }
     return true
   })

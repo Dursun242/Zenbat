@@ -14,10 +14,11 @@
 // POST {action:'cancel_all_pending'}       → annuler tous les envois en attente
 // POST {action:'process_queue'}            → traiter la file (appelé par pg_cron, auth CRON_SECRET)
 
-import { cors }         from './_cors.js'
-import { authenticate } from './_withAuth.js'
-import { sendEmail }    from './_email.js'
-import { createClient } from '@supabase/supabase-js'
+import { cors }            from './_cors.js'
+import { authenticate }    from './_withAuth.js'
+import { sendEmail }       from './_email.js'
+import { assertPublicHost } from './_ssrf.js'
+import { createClient }    from '@supabase/supabase-js'
 
 async function processQueue(res) {
   const admin = createClient(
@@ -152,6 +153,15 @@ export default async function handler(req, res) {
         let base = rawUrl
         if (!base.startsWith('http')) base = 'https://' + base
         base = base.replace(/\/$/, '')
+
+        // Protection SSRF : refuse les hôtes internes ou résolvant vers une
+        // IP privée (metadata cloud, localhost, RFC1918…). Toutes les
+        // sous-pages scrapées partagent le même hôte que `base`.
+        let host
+        try { host = new URL(base).hostname }
+        catch { return res.status(400).json({ error: 'URL invalide' }) }
+        try { await assertPublicHost(host) }
+        catch { return res.status(400).json({ error: 'Domaine non autorisé' }) }
 
         await scrape(base)
         if (found.size === 0) await Promise.all([

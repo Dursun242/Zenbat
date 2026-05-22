@@ -80,7 +80,12 @@ export default async function handler(req, res) {
     </div>
   `
 
-  await sendEmail({ to: adminEmail, subject, html })
+  try {
+    await sendEmail({ to: adminEmail, subject, html })
+  } catch (e) {
+    console.error('[contact] envoi email échoué:', e?.message || e)
+    return res.status(502).json({ error: "L'envoi a échoué, réessayez dans un instant." })
+  }
 
   return res.status(200).json({ ok: true })
 }

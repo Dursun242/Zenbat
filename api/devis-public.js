@@ -815,6 +815,13 @@ export default async function handler(req, res) {
       const { signed_by, ...safe } = fullPatch
       ;({ error: ue } = await admin.from('devis').update(safe).eq('id', devis.id))
     }
+    // Une erreur d'UPDATE non-42703 (RLS, CHECK constraint, réseau) ne doit
+    // pas être avalée : sinon le client voit « accepté » alors que le statut
+    // DB n'a pas bougé. On échoue explicitement pour qu'il puisse réessayer.
+    if (ue) {
+      console.error('[devis-public/accept] UPDATE devis échoué:', ue.message || ue)
+      return res.status(500).json({ error: "L'acceptation n'a pas pu être enregistrée, réessayez." })
+    }
     await admin.from('devis_negotiations').update({ status: 'superseded' }).eq('devis_id', devis.id).eq('status', 'pending')
     await admin.from('devis_audit_log').insert({ devis_id: devis.id, event: 'accepted', from_party: 'client', meta: { client_name: clean, ip } })
     notifyTg('devis_accepted', { numero: devis.numero, objet: devis.objet, montant_ht: devis.montant_ht, client_name: clean })
@@ -826,7 +833,11 @@ export default async function handler(req, res) {
     const { reason } = body
     if (!reason?.trim()) return res.status(400).json({ error: 'La raison du refus est requise' })
 
-    await admin.from('devis').update({ statut: 'refuse', client_refused_at: new Date().toISOString(), client_refusal_reason: reason.trim() }).eq('id', devis.id)
+    const { error: re } = await admin.from('devis').update({ statut: 'refuse', client_refused_at: new Date().toISOString(), client_refusal_reason: reason.trim() }).eq('id', devis.id)
+    if (re) {
+      console.error('[devis-public/refuse] UPDATE devis échoué:', re.message || re)
+      return res.status(500).json({ error: "Le refus n'a pas pu être enregistré, réessayez." })
+    }
     await admin.from('devis_audit_log').insert({ devis_id: devis.id, event: 'refused', from_party: 'client', meta: { reason: reason.trim(), ip } })
     notifyTg('devis_refused', { numero: devis.numero, objet: devis.objet, reason: reason.trim() })
     return res.status(200).json({ ok: true })
