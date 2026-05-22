@@ -12,6 +12,7 @@ const parseBrand = b => { if (!b) return {}; if (typeof b === 'string') { try { 
 //   ?type=retention           → dormants + cohortes (depuis activity_log)
 //   ?type=stripe_health       → past_due + canceled (depuis Stripe API live)
 //   ?type=onboarding_targets  → comptes inscrits sans aucun devis (relance tuto)
+//   ?type=login_logs          → journal des connexions (IP) depuis auth.audit_log_entries
 //
 // POST endpoints :
 //   {action:'send_welcome_tuto', user_id} → renvoie le mail tuto à 1 user
@@ -120,6 +121,15 @@ export default async function handler(req, res) {
       .limit(1000)
     if (re) return res.status(500).json({ error: re.message })
     return res.status(200).json({ subscribers: rows || [], generatedAt: new Date().toISOString() })
+  }
+
+  if (type === 'login_logs') {
+    // Journal des connexions : événements `login` lus depuis
+    // auth.audit_log_entries via la fonction admin_login_history
+    // (migration 0054). IP + email + horodatage, déjà tracés par GoTrue.
+    const { data: rows, error: re } = await admin.rpc('admin_login_history', { limit_n: 500 })
+    if (re) return res.status(500).json({ error: re.message })
+    return res.status(200).json({ logins: rows || [], generatedAt: new Date().toISOString() })
   }
 
   if (type === 'coherence') {

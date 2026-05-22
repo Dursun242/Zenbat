@@ -9,6 +9,7 @@ import AdminErrorLogs    from "./admin/AdminErrorLogs.jsx"
 import AdminNegativeLogs from "./admin/AdminNegativeLogs.jsx"
 import AdminConversations from "./admin/AdminConversations.jsx"
 import AdminNewsletter    from "./admin/AdminNewsletter.jsx"
+import AdminLoginLogs     from "./admin/AdminLoginLogs.jsx"
 import AdminCoherenceStats from "./admin/AdminCoherenceStats.jsx"
 import AdminFeedback       from "./admin/AdminFeedback.jsx"
 import AdminAgentBenchmark from "./admin/AdminAgentBenchmark.jsx"
@@ -35,6 +36,8 @@ export default function AdminPanel({ onBack }) {
   const [convsLoading,     setConvsLoading]     = useState(false)
   const [newsletter,       setNewsletter]       = useState(null)
   const [newsletterLoading,setNewsletterLoading]= useState(false)
+  const [loginLogs,        setLoginLogs]        = useState(null)
+  const [loginLogsLoading, setLoginLogsLoading] = useState(false)
   const [coherence,        setCoherence]        = useState(null)
   const [coherenceLoading, setCoherenceLoading] = useState(false)
   const [feedback,         setFeedback]         = useState(null)
@@ -77,7 +80,7 @@ export default function AdminPanel({ onBack }) {
   // case de re-render asynchrone.
   useEffect(() => {
     setStats(null); setIaLogs(null); setIaNegs(null); setIaConvs(null)
-    setNewsletter(null); setCoherence(null); setFeedback(null); setQuotesSent(null)
+    setNewsletter(null); setLoginLogs(null); setCoherence(null); setFeedback(null); setQuotesSent(null)
     setRetention(null); setOnboardingTargets(null); setStripeHealth(null); setTokens(null)
     setOpenConvUser(null); setDetailUser(null); setDetailData(null)
   }, [currentUser?.id])
@@ -145,6 +148,16 @@ export default function AdminPanel({ onBack }) {
       const data = await res.json()
       if (res.ok) setNewsletter(data.subscribers || [])
     } catch {} finally { setNewsletterLoading(false) }
+  }
+
+  const loadLoginLogs = async () => {
+    setLoginLogsLoading(true)
+    try {
+      const token = await getToken()
+      const res  = await fetch("/api/admin-stats?type=login_logs", { headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json()
+      if (res.ok) setLoginLogs(data.logins || [])
+    } catch {} finally { setLoginLogsLoading(false) }
   }
 
   const loadCoherence = async () => {
@@ -458,6 +471,11 @@ export default function AdminPanel({ onBack }) {
           <Collapsible title="Newsletter"      subtitle="Inscrits depuis la landing page"
             count={newsletter?.length}         loaded={newsletter !== null} onExpand={loadNewsletter}>
             <AdminNewsletter subscribers={newsletter} loading={newsletterLoading} onRefresh={loadNewsletter} embedded />
+          </Collapsible>
+
+          <Collapsible title="Connexions"      subtitle="Journal des connexions (IP) — sécurité"
+            count={loginLogs?.length}          loaded={loginLogs !== null}  onExpand={loadLoginLogs}>
+            <AdminLoginLogs logins={loginLogs} loading={loginLogsLoading} onRefresh={loadLoginLogs} embedded />
           </Collapsible>
 
           <Collapsible title="Cohérence devis IA" subtitle="Détection automatique d'anomalies"
