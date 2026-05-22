@@ -730,6 +730,19 @@ export default async function handler(req, res) {
       .eq('devis_id', devis.id).eq('event', 'signed_pdf_sent')
     if (alreadySent && alreadySent > 0) return res.status(200).json({ ok: true, alreadySent: true })
 
+    // Verrou anti-race : on « claime » le log AVANT l'envoi. Avec l'index
+    // unique partiel (migration 0055), un 2e appel simultané échoue en
+    // 23505 → on sort sans ré-envoyer. Sans la migration, seul le SELECT
+    // count ci-dessus protège (cas séquentiel uniquement).
+    const { data: logRow, error: claimErr } = await admin.from('devis_audit_log')
+      .insert({ devis_id: devis.id, event: 'signed_pdf_sent', from_party: 'system', meta: { status: 'sending', ip } })
+      .select('id').single()
+    if (claimErr) {
+      if (claimErr.code === '23505') return res.status(200).json({ ok: true, alreadySent: true })
+      console.error('[devis-public/send_signed_pdf] claim log échoué:', claimErr.message || claimErr)
+      return res.status(500).json({ error: "L'envoi du PDF n'a pas pu démarrer, réessayez." })
+    }
+
     const { data: client } = await admin.from('clients')
       .select('raison_sociale, nom, prenom, email').eq('id', devis.client_id).maybeSingle()
     const { data: profile } = await admin.from('profiles')
@@ -786,10 +799,10 @@ export default async function handler(req, res) {
       } catch (e) { errors.push(`artisan: ${e?.message || 'erreur'}`) }
     }
 
-    await admin.from('devis_audit_log').insert({
-      devis_id: devis.id, event: 'signed_pdf_sent', from_party: 'system',
+    // Finalise le log claimé plus haut avec le résultat réel des envois.
+    await admin.from('devis_audit_log').update({
       meta: { to_client: !!client?.email, to_artisan: !!artisanEmail, errors: errors.length ? errors : null, ip },
-    })
+    }).eq('id', logRow.id)
     return res.status(200).json({ ok: true, sent: { client: !!client?.email && !errors.find(e => e.startsWith('client')), artisan: !!artisanEmail && !errors.find(e => e.startsWith('artisan')) }, errors: errors.length ? errors : undefined })
   }
 
