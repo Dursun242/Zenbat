@@ -59,13 +59,13 @@ export default function BrandingStep({ local, set, tryNext, setTryNext, step0Inv
           })}
         </div>
         {local.vatRegime === "franchise" && (
-          <div style={{fontSize:10,color:"#86efac",marginTop:6,lineHeight:1.4}}>💡 Tous les devis seront émis à TVA 0 % avec la mention "{`TVA non applicable, art. 293 B du CGI`}".</div>
+          <div style={{fontSize:10,color:"#86efac",marginTop:6,lineHeight:1.4}}>💡 Tous les devis seront émis à TVA 0 % avec la mention "{`TVA non applicable, art. 293 B du CGI`}". Plafond 2026 : 39 100 € de CA pour les prestations BTP.</div>
         )}
       </div>
 
       {local.vatRegime !== "franchise" && (
         <Field dark label="N° TVA intracommunautaire" val={local.tva} onChange={v=>set("tva",v)} placeholder="FR12345678901"
-          hint="Requis si vous êtes assujetti à la TVA."/>
+          hint="Format : FR + 2 chiffres + 9 chiffres SIREN. Disponible sur votre extrait Kbis ou via le-sirene.insee.fr."/>
       )}
     </div>
   )

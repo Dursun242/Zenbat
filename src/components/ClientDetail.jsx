@@ -9,16 +9,19 @@ import ContactEditor from "./ContactEditor.jsx";
 export default function ClientDetail({ c, clientDevis, onBack, goDevis, onUpdate, onDelete }) {
   const [editing, setEditing] = useState(false);
 
+  // Le 3e élément est un href : si défini, la valeur devient cliquable
+  // (tel: ouvre l'app téléphone, mailto: l'app mail).
+  const telHref = (n) => n ? `tel:${String(n).replace(/[^\d+]/g, "")}` : null;
   const fields = [
-    ["Email",         c.email],
-    ["Mobile",        c.telephone],
-    ["Fixe",          c.telephone_fixe],
-    ["Adresse",       [c.adresse, [c.code_postal, c.ville].filter(Boolean).join(" ")].filter(Boolean).join(" — ")],
-    ["SIRET",         c.siret],
-    ["TVA intracom.", c.tva_intra],
-    ["Code NAF",      c.naf],
-    ["Activité",      c.activite],
-    ["Notes",         c.notes],
+    ["Email",         c.email,          c.email ? `mailto:${c.email}` : null],
+    ["Mobile",        c.telephone,      telHref(c.telephone)],
+    ["Fixe",          c.telephone_fixe, telHref(c.telephone_fixe)],
+    ["Adresse",       [c.adresse, [c.code_postal, c.ville].filter(Boolean).join(" ")].filter(Boolean).join(" — "), null],
+    ["SIRET",         c.siret,          null],
+    ["TVA intracom.", c.tva_intra,      null],
+    ["Code NAF",      c.naf,            null],
+    ["Activité",      c.activite,       null],
+    ["Notes",         c.notes,          null],
   ].filter(([, v]) => v);
 
   return (
@@ -42,10 +45,14 @@ export default function ClientDetail({ c, clientDevis, onBack, goDevis, onUpdate
           <button onClick={() => setEditing(true)} style={{ background: "#F0EBE3", border: "none", borderRadius: 10, width: 36, height: 36, cursor: "pointer", fontSize: 15, color: "#6B6358" }} aria-label="Modifier">✏️</button>
         </div>
 
-        {fields.map(([k, v]) => (
+        {fields.map(([k, v, href]) => (
           <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "8px 0", borderTop: "1px solid #FAF7F2" }}>
             <span style={{ fontSize: 12, color: "#9A8E82", flexShrink: 0 }}>{k}</span>
-            <span style={{ fontSize: 12, color: "#1A1612", fontWeight: 500, textAlign: "right", wordBreak: "break-word" }}>{v}</span>
+            {href ? (
+              <a href={href} style={{ fontSize: 12, color: "#1d4ed8", fontWeight: 500, textAlign: "right", wordBreak: "break-word", textDecoration: "none" }}>{v}</a>
+            ) : (
+              <span style={{ fontSize: 12, color: "#1A1612", fontWeight: 500, textAlign: "right", wordBreak: "break-word" }}>{v}</span>
+            )}
           </div>
         ))}
 

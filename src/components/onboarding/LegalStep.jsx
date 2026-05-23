@@ -23,7 +23,7 @@ export default function LegalStep({ local, set }) {
         <textarea value={local.mentionsLegales} onChange={e=>set("mentionsLegales",e.target.value)} rows={4}
           placeholder="Ex : Assurance RC pro n°... — TVA non applicable art. 293B..."
           style={{width:"100%",background:"#2A231C",border:"1px solid #3D3028",borderRadius:12,padding:"10px 14px",fontSize:13,color:"white",outline:"none",resize:"none"}}/>
-        <div style={{fontSize:10,color:"#6B6358",marginTop:5,lineHeight:1.4}}>💡 L'assurance RC pro et le régime TVA sont obligatoires sur tous vos devis.</div>
+        <div style={{fontSize:10,color:"#6B6358",marginTop:5,lineHeight:1.4}}>💡 À inclure obligatoirement : n° de RC pro (responsabilité civile professionnelle) + n° de décennale si BTP (loi Spinetta 1978) + mention du régime TVA. Exemple : « Assurance RC pro MAAF n°12345 — Décennale AXA n°67890 ».</div>
       </div>
       <div>
         <label style={{display:"block",fontSize:11,fontWeight:600,color:"#9A8E82",marginBottom:6}}>VALIDITÉ DU DEVIS (jours)</label>

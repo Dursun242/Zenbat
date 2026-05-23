@@ -8,6 +8,23 @@ function clientName(c) {
   return c?.raison_sociale || `${c?.prenom || ""} ${c?.nom || ""}`.trim() || "—";
 }
 
+// Indicateur « envoyé il y a Xj » sur un devis envoyé en attente de réponse.
+// Vert ≤2j (récent), orange 3-7j (à surveiller), rouge >7j (à relancer).
+function sentSinceChip(sentAt, statut) {
+  if (!sentAt || !["envoye", "en_signature", "en_negociation"].includes(statut)) return null;
+  const days = Math.floor((Date.now() - new Date(sentAt).getTime()) / 86400000);
+  if (days < 0) return null;
+  const color = days <= 2 ? "#15803d" : days <= 7 ? "#b45309" : "#b91c1c";
+  const bg    = days <= 2 ? "#f0fdf4" : days <= 7 ? "#fffbeb" : "#fef2f2";
+  const label = days === 0 ? "envoyé aujourd'hui" : days === 1 ? "envoyé hier" : `envoyé il y a ${days} j`;
+  return (
+    <span style={{ fontSize: 10, fontWeight: 600, color, background: bg,
+      borderRadius: 4, padding: "1px 6px", marginLeft: 6 }}>
+      {label}
+    </span>
+  );
+}
+
 function IndiceChip({ indice }) {
   if (!indice) return <span style={{ fontSize: 10, color: "#9A8E82" }}>Initial</span>;
   return (
@@ -19,7 +36,7 @@ function IndiceChip({ indice }) {
 }
 
 // Carte pour un devis sans indice (affichage simple, identique à avant)
-function DevisRow({ d, cl, goDevis, onDelete, confirmDelete, setConfirmDelete }) {
+function DevisRow({ d, cl, goDevis, onDelete, onDuplicate, confirmDelete, setConfirmDelete }) {
   return (
     <div>
       <div
@@ -32,12 +49,22 @@ function DevisRow({ d, cl, goDevis, onDelete, confirmDelete, setConfirmDelete })
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {d.objet || "—"}
           </div>
-          <div style={{ fontSize: 11, color: "#9A8E82", marginTop: 2 }}>{clientName(cl)}</div>
+          <div style={{ fontSize: 11, color: "#9A8E82", marginTop: 2, display: "flex", alignItems: "center", flexWrap: "wrap" }}>
+            <span>{clientName(cl)}</span>
+            {sentSinceChip(d.sent_to_client_at, d.statut)}
+          </div>
         </div>
         <div style={{ textAlign: "right", marginLeft: 12, flexShrink: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1A1612" }}>{fmt(d.montant_ht)}</div>
           <div style={{ marginTop: 4 }}><Badge s={d.statut}/></div>
         </div>
+        {onDuplicate && (
+          <button onClick={e => { e.stopPropagation(); onDuplicate(d.id); }} title="Dupliquer ce devis"
+            style={{ marginLeft: 8, padding: "4px 8px", borderRadius: 6, border: "none",
+              background: "#F0EBE3", color: "#6B6358", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            📋
+          </button>
+        )}
         {d.statut === "brouillon" && onDelete && (
           confirmDelete === d.id ? (
             <>
@@ -64,7 +91,7 @@ function DevisRow({ d, cl, goDevis, onDelete, confirmDelete, setConfirmDelete })
 }
 
 // Carte dossier pour un groupe de versions
-function DossierCard({ versions, cl, goDevis, onDelete }) {
+function DossierCard({ versions, cl, goDevis, onDelete, onDuplicate }) {
   const [open, setOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
 
@@ -110,8 +137,9 @@ function DossierCard({ versions, cl, goDevis, onDelete }) {
             </span>
             <IndiceChip indice={active.indice}/>
           </div>
-          <div style={{ fontSize: 11, color: "#9A8E82" }}>
-            {clientName(cl)} · {versions.length} version{versions.length > 1 ? "s" : ""}
+          <div style={{ fontSize: 11, color: "#9A8E82", display: "flex", alignItems: "center", flexWrap: "wrap" }}>
+            <span>{clientName(cl)} · {versions.length} version{versions.length > 1 ? "s" : ""}</span>
+            {sentSinceChip(active.sent_to_client_at, active.statut)}
           </div>
         </div>
 
@@ -121,6 +149,14 @@ function DossierCard({ versions, cl, goDevis, onDelete }) {
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1A1612" }}>{fmt(active.montant_ht)}</div>
           <div style={{ marginTop: 4 }}><Badge s={active.statut}/></div>
         </div>
+
+        {/* 📋 dupliquer (sur la version active) */}
+        {onDuplicate && (
+          <button onClick={e => { e.stopPropagation(); onDuplicate(active.id); }} title="Dupliquer ce devis"
+            style={{ flexShrink: 0, padding: "3px 7px", borderRadius: 6, border: "none", background: "#F0EBE3", color: "#6B6358", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+            📋
+          </button>
+        )}
 
         {/* ✕ version active si brouillon */}
         {active.statut === "brouillon" && onDelete && (
@@ -160,7 +196,7 @@ function DossierCard({ versions, cl, goDevis, onDelete }) {
   );
 }
 
-export default function DevisList({ devis, clients, goDevis, setTab, onDelete }) {
+export default function DevisList({ devis, clients, goDevis, setTab, onDelete, onDuplicate }) {
   const [filtre, setFiltre]           = useState("tous");
   const [confirmDelete, setConfirmDelete] = useState(null);
 
@@ -266,11 +302,11 @@ export default function DevisList({ devis, clients, goDevis, setTab, onDelete })
         {filtered.map((item, i) => {
           if (item.type === "group") {
             const cl = clients.find(c => c.id === (item.versions.find(v => v.client_id)?.client_id));
-            return <DossierCard key={item.versions[0].id} versions={item.versions} cl={cl} goDevis={goDevis} onDelete={onDelete}/>;
+            return <DossierCard key={item.versions[0].id} versions={item.versions} cl={cl} goDevis={goDevis} onDelete={onDelete} onDuplicate={onDuplicate}/>;
           }
           const cl = clients.find(c => c.id === item.d.client_id);
           return (
-            <DevisRow key={item.d.id} d={item.d} cl={cl} goDevis={goDevis} onDelete={onDelete}
+            <DevisRow key={item.d.id} d={item.d} cl={cl} goDevis={goDevis} onDelete={onDelete} onDuplicate={onDuplicate}
               confirmDelete={confirmDelete} setConfirmDelete={setConfirmDelete}/>
           );
         })}

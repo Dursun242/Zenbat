@@ -220,7 +220,7 @@ export default function DevisClientActions({ devis, client, onChange, onCreateIn
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: '#9A8E82', textTransform: 'uppercase', letterSpacing: '0.5px', flexShrink: 0 }}>Suivi</span>
             {client?.email
-              ? <span style={{ fontSize: 12, color: '#6B6358', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>✉ {client.email}</span>
+              ? <a href={`mailto:${client.email}`} style={{ fontSize: 12, color: '#1d4ed8', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: 'none' }}>✉ {client.email}</a>
               : <span style={{ fontSize: 12, color: '#f97316' }}>⚠ Pas d'email</span>
             }
             {canSend && (

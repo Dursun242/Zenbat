@@ -554,7 +554,7 @@ export default function App() {
               onUpdate={onSaveClient}
               onDelete={async () => { await onDeleteClient(selC); setTab("clients"); }}/>
           )}
-          {tab === "devis"         && <DevisList devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} onDelete={onDeleteDevis}/>}
+          {tab === "devis"         && <DevisList devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} onDelete={onDeleteDevis} onDuplicate={onDuplicateDevis}/>}
           {tab === "devis_detail"  && selD && (() => {
             const cur = devis.find(x => x.id === selD);
             // Devis introuvable dans le state (ex. création bloquée par le quota freemium)
