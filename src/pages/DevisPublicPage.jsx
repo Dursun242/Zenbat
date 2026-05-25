@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 const fmtEur = n => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(n || 0)
 const fmtD   = d => d ? new Date(d).toLocaleDateString('fr-FR') : '—'
@@ -47,29 +47,41 @@ function Header({ artisan }) {
 // ── Phase OTP ──────────────────────────────────────────────────────────────
 
 function PhaseEmail({ data, onVerified }) {
-  // Hydratation depuis la session pré-vérification persistée : sur mobile,
-  // si l'onglet a été évincé pendant que le client lisait son email, on
-  // remonte directement sur l'écran de saisie du code.
-  const [email,  setEmail]  = useState(() => readPendingOtp(data?._token)?.email || '')
-  const [sessId, setSessId] = useState(() => readPendingOtp(data?._token)?.sid   || null)
+  // L'email du client est déjà connu côté serveur (data.emailHint) — c'est
+  // celui à qui l'artisan a envoyé le devis. On déclenche donc l'envoi de
+  // l'OTP automatiquement au chargement et on amène directement le client
+  // sur l'écran de saisie du code, sans lui faire ressaisir son email.
+  // Si l'onglet a été évincé pendant qu'il lisait son mail, la session
+  // pré-vérification persistée le ramène directement ici.
+  const [sessId, setSessId] = useState(() => readPendingOtp(data?._token)?.sid || null)
   const [sent,   setSent]   = useState(() => !!readPendingOtp(data?._token))
   const [code,   setCode]   = useState('')
   const [busy,   setBusy]   = useState(false)
   const [err,    setErr]    = useState(null)
+  const autoSentRef = useRef(false)
 
   const accent = data?.artisan?.color || '#111111'
+  const clientEmail = data?.emailHint || ''
 
-  const requestOtp = async () => {
+  const requestOtp = useCallback(async () => {
+    if (!clientEmail) { setErr("Aucun email enregistré pour ce devis. Contactez l'artisan."); return }
     setBusy(true); setErr(null)
     try {
       const res  = await fetch('/api/devis-public', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'request_otp', token: data._token, email }) })
+        body: JSON.stringify({ action: 'request_otp', token: data._token, email: clientEmail }) })
       const json = await res.json()
       if (!res.ok) { setErr(json.error); return }
       setSessId(json.session_id); setSent(true)
-      writePendingOtp(data._token, json.session_id, email)
+      writePendingOtp(data._token, json.session_id, clientEmail)
     } catch { setErr('Erreur réseau') } finally { setBusy(false) }
-  }
+  }, [clientEmail, data?._token])
+
+  // Auto-déclenchement au mount : un seul tir, sauf session déjà ouverte.
+  useEffect(() => {
+    if (autoSentRef.current || sent || !clientEmail) return
+    autoSentRef.current = true
+    requestOtp()
+  }, [clientEmail, sent, requestOtp])
 
   const verifyOtp = async () => {
     setBusy(true); setErr(null)
@@ -105,26 +117,18 @@ function PhaseEmail({ data, onVerified }) {
         </div>
 
         <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 24 }}>
-          {!sent ? (
-            <>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 8 }}>
-                Votre adresse email{data.emailHint ? <span style={{ fontWeight: 400, color: '#999' }}> — ex : {data.emailHint}</span> : ''}
-              </label>
-              <input
-                type="email" value={email} onChange={e => setEmail(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && email && requestOtp()}
-                placeholder="votre@email.fr" autoFocus
-                style={{ width: '100%', padding: '11px 14px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 16, outline: 'none', boxSizing: 'border-box', marginBottom: 12 }}
-              />
-              <button onClick={requestOtp} disabled={!email || busy}
-                style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: accent, color: 'white', fontWeight: 700, fontSize: 14, cursor: !email || busy ? 'default' : 'pointer', opacity: !email || busy ? 0.6 : 1 }}>
-                {busy ? 'Envoi en cours…' : 'Recevoir mon code d\'accès'}
-              </button>
-            </>
+          {!clientEmail ? (
+            <p style={{ fontSize: 13, color: '#b45309', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', margin: 0 }}>
+              ⚠ Aucun email n'est enregistré pour ce devis. Contactez l'artisan pour obtenir l'accès.
+            </p>
+          ) : !sent ? (
+            <p style={{ fontSize: 13, color: '#555', margin: 0, textAlign: 'center' }}>
+              {busy ? 'Envoi du code en cours…' : 'Préparation de l\'accès…'}
+            </p>
           ) : (
             <>
               <p style={{ fontSize: 13, color: '#555', marginBottom: 16 }}>
-                Code envoyé à <strong>{email}</strong>
+                Un code à 8 chiffres a été envoyé à <strong>{clientEmail}</strong>. Saisissez-le pour accéder au devis.
               </p>
               <input
                 type="text" inputMode="numeric" value={code}
@@ -137,9 +141,9 @@ function PhaseEmail({ data, onVerified }) {
                 style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: accent, color: 'white', fontWeight: 700, fontSize: 14, cursor: code.length !== 8 || busy ? 'default' : 'pointer', opacity: code.length !== 8 || busy ? 0.6 : 1 }}>
                 {busy ? 'Vérification…' : 'Accéder au devis'}
               </button>
-              <button onClick={() => { setSent(false); setCode(''); setErr(null); clearPendingOtp(data._token) }}
-                style={{ display: 'block', width: '100%', marginTop: 10, background: 'none', border: 'none', color: '#999', fontSize: 13, cursor: 'pointer' }}>
-                ← Modifier l'email
+              <button onClick={() => { setCode(''); setErr(null); requestOtp() }} disabled={busy}
+                style={{ display: 'block', width: '100%', marginTop: 10, background: 'none', border: 'none', color: '#999', fontSize: 13, cursor: busy ? 'default' : 'pointer' }}>
+                Renvoyer un code
               </button>
             </>
           )}
