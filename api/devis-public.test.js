@@ -207,10 +207,13 @@ describe('GET /api/devis-public', () => {
 })
 
 describe('POST request_otp', () => {
-  it('email manquant → 400', async () => {
+  it('email facultatif : sans email, n\'erreure pas en 400 — utilise l\'email DB', async () => {
+    // Depuis le passage au déclenchement auto, le front n'envoie plus
+    // l'email. Le serveur doit accepter et utiliser client.email en DB.
+    // Ici le devis est introuvable → 404, mais pas 400 « email manquant ».
     const r = res()
     await handler(req('POST', { action: 'request_otp', token: 'tok' }), r)
-    expect(r.statusCode).toBe(400)
+    expect(r.statusCode).toBe(404)
   })
 
   it('token manquant → 400', async () => {

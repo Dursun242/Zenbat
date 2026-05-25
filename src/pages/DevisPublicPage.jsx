@@ -67,8 +67,11 @@ function PhaseEmail({ data, onVerified }) {
     if (!clientEmail) { setErr("Aucun email enregistré pour ce devis. Contactez l'artisan."); return }
     setBusy(true); setErr(null)
     try {
+      // On n'envoie plus l'email au serveur : data.emailHint est masqué
+      // (« dur***@gmail.com »), ce n'est pas l'email réel. Le serveur lit
+      // l'email du client en DB et envoie l'OTP à cette adresse.
       const res  = await fetch('/api/devis-public', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'request_otp', token: data._token, email: clientEmail }) })
+        body: JSON.stringify({ action: 'request_otp', token: data._token }) })
       const json = await res.json()
       if (!res.ok) { setErr(json.error); return }
       setSessId(json.session_id); setSent(true)

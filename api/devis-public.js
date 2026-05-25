@@ -623,8 +623,11 @@ export default async function handler(req, res) {
     const rl = rateLimit(req, { windowMs: 15 * 60_000, max: 10, prefix: 'otp' })
     if (!rl.ok) return sendRateLimited(res, rl.retryAfterSec)
 
+    // email est facultatif : le front auto-déclenche désormais request_otp
+    // au chargement avec l'email du client déjà connu en DB (cf. flow
+    // PhaseEmail). On garde le champ pour compat avec un éventuel ancien
+    // client : s'il est fourni, on vérifie qu'il correspond.
     const { email } = body
-    if (!email) return res.status(400).json({ error: 'email manquant' })
 
     const { data: devis } = await admin.from('devis')
       .select('id, numero, statut, client_id').eq('public_token', token).maybeSingle()
@@ -634,8 +637,10 @@ export default async function handler(req, res) {
 
     const { data: client } = await admin.from('clients').select('email').eq('id', devis.client_id).maybeSingle()
     if (!client?.email) return res.status(400).json({ error: 'Client sans email' })
-    if (email.toLowerCase().trim() !== client.email.toLowerCase().trim())
+    if (email && email.toLowerCase().trim() !== client.email.toLowerCase().trim())
       return res.status(403).json({ error: 'Email non reconnu pour ce devis' })
+
+    const targetEmail = client.email
 
     const fifteenAgo = new Date(Date.now() - 15 * 60_000).toISOString()
     const { count } = await admin.from('devis_otp_sessions')
@@ -646,14 +651,14 @@ export default async function handler(req, res) {
     const otp = genOtp()
     const { data: sess, error: sessErr } = await admin.from('devis_otp_sessions').insert({
       public_token: token,
-      email_hash:   hashStr(email.toLowerCase().trim()),
+      email_hash:   hashStr(targetEmail.toLowerCase().trim()),
       otp_hash:     hashStr(otp),
       expires_at:   new Date(Date.now() + 15 * 60_000).toISOString(),
     }).select('id').single()
     if (sessErr || !sess) return res.status(500).json({ error: 'Erreur création session OTP — vérifiez que la migration 0032 est appliquée' })
 
     try {
-      await sendEmail({ to: email, subject: `${otp} — Code d'accès devis ${devis.numero}`, html: emailOtp({ otp, devis }) })
+      await sendEmail({ to: targetEmail, subject: `${otp} — Code d'accès devis ${devis.numero}`, html: emailOtp({ otp, devis }) })
     } catch (e) {
       console.error('[otp email]', e?.message)
       return res.status(502).json({ error: 'Échec envoi du code. Vérifiez votre adresse email ou réessayez.' })
