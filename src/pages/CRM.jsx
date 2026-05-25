@@ -1438,6 +1438,17 @@ function CsvImporter({ onImported, onClose }) {
 
 // ── Suppression des doublons ──────────────────────────────────────────────
 
+// Quand deux prospects sont en doublon, on préfère garder celui qui a déjà
+// un historique d'emails envoyés (has_emails) : supprimer un contact avec
+// lequel on a déjà échangé ferait perdre l'historique (le ON DELETE CASCADE
+// de prospect_emails efface aussi les échanges). À historique équivalent,
+// on garde le plus récent (logique d'origine).
+function preferKeep(a, b) {
+  if (a.has_emails && !b.has_emails) return -1
+  if (!a.has_emails && b.has_emails) return  1
+  return new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at)
+}
+
 function findDuplicateGroups(prospects) {
   const byEmail = {}
   const byName  = {}
@@ -1460,9 +1471,7 @@ function findDuplicateGroups(prospects) {
 
   Object.entries(byEmail).forEach(([email, members]) => {
     if (members.length < 2) return
-    const sorted = [...members].sort((a, b) =>
-      new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at)
-    )
+    const sorted = [...members].sort(preferKeep)
     groups.push({ label: `Email : ${email}`, keep: sorted[0], toDelete: sorted.slice(1) })
     members.forEach(m => usedIds.add(m.id))
   })
@@ -1471,9 +1480,7 @@ function findDuplicateGroups(prospects) {
     if (members.length < 2) return
     const fresh = members.filter(m => !usedIds.has(m.id))
     if (fresh.length < 2) return
-    const sorted = [...fresh].sort((a, b) =>
-      new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at)
-    )
+    const sorted = [...fresh].sort(preferKeep)
     groups.push({ label: `Nom : ${members[0].nom}`, keep: sorted[0], toDelete: sorted.slice(1) })
     fresh.forEach(m => usedIds.add(m.id))
   })
@@ -1538,7 +1545,7 @@ function DedupModal({ prospects, onDeleted, onClose }) {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <p style={{ fontSize: 13, color: '#6B6358', marginBottom: 4 }}>
-                Le prospect le plus récent est conservé. Les autres seront supprimés définitivement.
+                Priorité au contact qui a déjà un historique d'échanges 📧 ; sinon, on garde le plus récent. Les autres seront supprimés définitivement.
               </p>
               {groups.map((g, i) => (
                 <div key={i} style={{ border: '1px solid #E8E2D8', borderRadius: 10, overflow: 'hidden' }}>
@@ -1550,7 +1557,12 @@ function DedupModal({ prospects, onDeleted, onClose }) {
                     display: 'flex', alignItems: 'center', gap: 10, background: '#f0fdf4' }}>
                     <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 700, flexShrink: 0, width: 60 }}>✓ Gardé</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1612' }}>{g.keep.nom}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1612', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {g.keep.nom}
+                        {g.keep.has_emails && (
+                          <span title="Historique d'échanges existant" style={{ fontSize: 10, fontWeight: 700, color: '#15803d', background: '#dcfce7', borderRadius: 4, padding: '1px 6px' }}>📧 historique</span>
+                        )}
+                      </div>
                       <div style={{ fontSize: 11, color: '#9A9088' }}>
                         {[g.keep.email, g.keep.ville, g.keep.secteur].filter(Boolean).join(' · ')}
                       </div>

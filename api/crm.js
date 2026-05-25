@@ -98,12 +98,21 @@ export default async function handler(req, res) {
       const action = (req.query.action || 'list').toString()
 
       if (action === 'list') {
-        const { data, error } = await admin
-          .from('prospects')
-          .select('id, nom, entreprise, email, telephone, ville, secteur, statut, notes, google_business_url, created_at, updated_at')
-          .order('created_at', { ascending: false })
+        // Récupère en parallèle la liste des prospects ET les prospect_id
+        // ayant déjà des emails envoyés. Sert au dedup côté front pour
+        // préférer garder le contact qui a un historique d'échanges quand
+        // deux doublons sont détectés.
+        const [{ data, error }, { data: emails }] = await Promise.all([
+          admin
+            .from('prospects')
+            .select('id, nom, entreprise, email, telephone, ville, secteur, statut, notes, google_business_url, created_at, updated_at')
+            .order('created_at', { ascending: false }),
+          admin.from('prospect_emails').select('prospect_id'),
+        ])
         if (error) throw error
-        return res.status(200).json({ prospects: data })
+        const withEmails = new Set((emails || []).map(e => e.prospect_id))
+        const enriched = (data || []).map(p => ({ ...p, has_emails: withEmails.has(p.id) }))
+        return res.status(200).json({ prospects: enriched })
       }
 
       if (action === 'get') {
