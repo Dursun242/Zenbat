@@ -112,7 +112,7 @@ function emailDevis({ clientName, company, brand, devis, fmtEurFn, publicUrl, lo
       <tr>
         <td>
           ${logo
-            ? `<img src="${logo}" alt="${company || ''}" style="max-height:40px;max-width:160px;object-fit:contain;display:block">`
+            ? `<img src="${logo}" alt="${company || ''}" width="160" style="display:block;max-width:160px;max-height:48px;height:auto;border:0;outline:none;text-decoration:none">`
             : company
               ? `<span style="font-size:16px;font-weight:700;color:#111;letter-spacing:-0.3px">${company}</span>`
               : ''}
@@ -184,11 +184,15 @@ function emailDevis({ clientName, company, brand, devis, fmtEurFn, publicUrl, lo
 </html>`
 }
 
-function emailOtp({ otp, devis }) {
+function emailOtp({ otp, devis, company, brandColor }) {
+  const safe = (s) => String(s || '').replace(/[<>&"]/g, (c) => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]))
+  const header = safe(company) || 'Devis'
+  const accent = brandColor || '#22c55e'
   return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f5;font-family:Inter,system-ui,sans-serif">
 <div style="max-width:480px;margin:32px auto;background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
+  <div style="background:${accent};height:4px;font-size:0;line-height:0">&nbsp;</div>
   <div style="background:#1A1612;padding:24px 32px;text-align:center">
-    <div style="font-size:22px;font-weight:800;letter-spacing:-1px"><span style="color:#22c55e">Zen</span><span style="color:white">bat</span></div>
+    <div style="font-size:18px;font-weight:700;color:white;letter-spacing:-0.3px">${header}</div>
   </div>
   <div style="padding:32px;text-align:center">
     <p style="color:#6B6358;font-size:14px;margin:0 0 24px">Code d'accès pour le devis <strong>${devis.numero}</strong></p>
@@ -630,13 +634,19 @@ export default async function handler(req, res) {
     const { email } = body
 
     const { data: devis } = await admin.from('devis')
-      .select('id, numero, statut, client_id').eq('public_token', token).maybeSingle()
+      .select('id, numero, statut, client_id, owner_id').eq('public_token', token).maybeSingle()
     if (!devis) return res.status(404).json({ error: 'Devis introuvable' })
     if (['accepte', 'refuse', 'remplace'].includes(devis.statut))
       return res.status(400).json({ error: 'Ce devis est clôturé' })
 
-    const { data: client } = await admin.from('clients').select('email').eq('id', devis.client_id).maybeSingle()
+    const [{ data: client }, { data: profile }] = await Promise.all([
+      admin.from('clients').select('email').eq('id', devis.client_id).maybeSingle(),
+      admin.from('profiles').select('company_name, brand_data').eq('id', devis.owner_id).maybeSingle(),
+    ])
     if (!client?.email) return res.status(400).json({ error: 'Client sans email' })
+    const otpBrand   = (() => { const r = profile?.brand_data; if (!r) return {}; if (typeof r === 'string') { try { return JSON.parse(r) } catch { return {} } } return r })()
+    const otpCompany = profile?.company_name || otpBrand.companyName || ''
+    const otpColor   = otpBrand.color || '#22c55e'
     if (email && email.toLowerCase().trim() !== client.email.toLowerCase().trim())
       return res.status(403).json({ error: 'Email non reconnu pour ce devis' })
 
@@ -658,7 +668,7 @@ export default async function handler(req, res) {
     if (sessErr || !sess) return res.status(500).json({ error: 'Erreur création session OTP — vérifiez que la migration 0032 est appliquée' })
 
     try {
-      await sendEmail({ to: targetEmail, subject: `${otp} — Code d'accès devis ${devis.numero}`, html: emailOtp({ otp, devis }) })
+      await sendEmail({ to: targetEmail, subject: `${otp} — Code d'accès devis ${devis.numero}`, html: emailOtp({ otp, devis, company: otpCompany, brandColor: otpColor }) })
     } catch (e) {
       console.error('[otp email]', e?.message)
       return res.status(502).json({ error: 'Échec envoi du code. Vérifiez votre adresse email ou réessayez.' })
