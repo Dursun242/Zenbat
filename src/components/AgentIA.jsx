@@ -103,11 +103,12 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   }, []);
 
   const {
-    listening, micSupported, micError, currentLang,
+    listening, connecting, micSupported, micError, currentLang,
     langMenu, setLangMenu,
     toggleMic, pickLang, stopAndClear,
     langs,
   } = useSpeechRecognition({ input, setInput });
+  const micActive = listening || connecting;
 
   const ac         = brand.color || "#22c55e";
   const fontFamily = brand.fontStyle === "elegant" ? "Playfair Display" : brand.fontStyle === "tech" ? "Space Grotesk" : "DM Sans";
@@ -687,10 +688,10 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
         `}</style>
 
           {/* Champ texte + envoyer */}
-          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: "#FAF7F2", borderRadius: 14, border: `1.5px solid ${listening ? "#ef4444" : (input.trim() ? ac : "#E8E2D8")}`, padding: "8px 10px", transition: "border-color .2s" }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: "#FAF7F2", borderRadius: 14, border: `1.5px solid ${micActive ? "#ef4444" : (input.trim() ? ac : "#E8E2D8")}`, padding: "8px 10px", transition: "border-color .2s" }}>
             <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-              placeholder={listening ? "Écoute en cours…" : TX.inputPlaceholder}
+              placeholder={connecting ? "Connexion au micro…" : listening ? "Écoute en cours…" : TX.inputPlaceholder}
               rows={1} style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 16, color: "#2A231C", resize: "none", fontFamily: "inherit", lineHeight: 1.5, maxHeight: 120, overflowY: "auto" }}/>
             <button onClick={send} disabled={!input.trim() || loading}
               aria-label="Envoyer le message"
@@ -709,27 +710,28 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
               <span style={{ fontSize: 9, color: "#9A8E82" }}>▾</span>
             </button>
 
-            <span style={{ fontSize: 11, color: listening ? "#ef4444" : "#6B6358", fontWeight: 500 }}>
-              {listening ? "Parlez, je transcris…" : (micSupported ? "Appuyez pour dicter" : "Vocal indisponible")}
+            <span style={{ fontSize: 11, color: micActive ? "#ef4444" : "#6B6358", fontWeight: 500 }}>
+              {connecting ? "Connexion au micro…" : listening ? "Parlez, je transcris…" : (micSupported ? "Appuyez pour dicter" : "Vocal indisponible")}
             </span>
 
             <button
               onClick={toggleMic}
               disabled={!micSupported}
-              aria-label={micSupported ? (listening ? "Arrêter la dictée" : "Démarrer la dictée vocale") : "Dictée vocale non supportée"}
-              title={micSupported ? (listening ? "Appuyez pour arrêter" : "Appuyez pour parler") : "Non supporté par ce navigateur"}
+              aria-label={micSupported ? (micActive ? "Arrêter la dictée" : "Démarrer la dictée vocale") : "Dictée vocale non supportée"}
+              title={micSupported ? (micActive ? "Appuyez pour arrêter" : "Appuyez pour parler") : "Non supporté par ce navigateur — essayez Chrome ou Edge"}
               style={{
                 width: 44, height: 44, borderRadius: "50%",
-                background: listening ? "#ef4444" : (micSupported ? ac : "#cbd5e1"),
+                background: micActive ? "#ef4444" : (micSupported ? ac : "#cbd5e1"),
                 border: "none", cursor: micSupported ? "pointer" : "not-allowed",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 color: "white",
-                boxShadow: listening
+                boxShadow: micActive
                   ? "0 0 0 0 rgba(239,68,68,.55), 0 4px 12px rgba(239,68,68,.4)"
                   : `0 4px 12px ${ac}55`,
                 transition: "background .2s, transform .15s",
-                animation: listening ? "micPulse 1.4s ease-out infinite" : "none",
+                animation: listening ? "micPulse 1.4s ease-out infinite" : connecting ? "micPulse 0.9s ease-out infinite" : "none",
                 flexShrink: 0,
+                opacity: connecting ? 0.8 : 1,
               }}>
               {listening ? (
                 <div style={{ display: "flex", gap: 2, alignItems: "center", height: 16 }}>
@@ -737,6 +739,8 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
                     <div key={i} style={{ width: 2.5, height: 14, borderRadius: 2, background: "white", animation: `micWave .9s ease-in-out ${i * 0.12}s infinite` }}/>
                   ))}
                 </div>
+              ) : connecting ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" style={{ animation: "micWave .9s linear infinite" }}/></svg>
               ) : <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 003-3V5a3 3 0 00-6 0v6a3 3 0 003 3z"/><path d="M19 11a1 1 0 10-2 0 5 5 0 01-10 0 1 1 0 10-2 0 7 7 0 006 6.92V20H8a1 1 0 100 2h8a1 1 0 100-2h-3v-2.08A7 7 0 0019 11z"/></svg>}
             </button>
 
