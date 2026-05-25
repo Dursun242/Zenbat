@@ -68,6 +68,15 @@ export function useSpeechRecognition({ input, setInput }) {
     userStoppedRef.current = true
   }
 
+  // Edge desktop : l'API SpeechRecognition est exposée mais s'appuie sur
+  // un service cloud Microsoft notoirement instable (renvoie souvent
+  // `error: 'network'` même avec une connexion fonctionnelle, à cause du
+  // tracking prevention ou d'un proxy d'entreprise). On le détecte pour
+  // adapter le message de diagnostic.
+  const isEdgeDesktop = () => typeof navigator !== "undefined"
+    && /Edg\//i.test(navigator.userAgent)
+    && !/Mobile|Android|iPhone|iPad/i.test(navigator.userAgent)
+
   const explainError = (code) => {
     switch (code) {
       case "not-allowed":
@@ -79,7 +88,9 @@ export function useSpeechRecognition({ input, setInput }) {
       case "audio-capture":
         return "Aucun micro détecté sur cet appareil."
       case "network":
-        return "Pas de connexion internet — la dictée a besoin du réseau."
+        return isEdgeDesktop()
+          ? "Le service vocal de Edge est instable sur ordinateur. Essayez Chrome (la dictée y est nettement plus fiable)."
+          : "Service de reconnaissance vocale injoignable. Vérifiez votre connexion ou essayez un autre navigateur."
       case "language-not-supported":
         return "Langue non supportée par votre navigateur. Essayez Français."
       case "no-speech":
