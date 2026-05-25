@@ -360,14 +360,10 @@ export default function DevisPublicPage({ token }) {
         ? { ...data.artisan.brand, companyName: data.artisan.brand.companyName || data.artisan.company }
         : { companyName: data.artisan?.company, email: data.artisan?.email, phone: data.artisan?.phone, address: data.artisan?.address, color: data.artisan?.color, logo: data.artisan?.logo }
       const { blob } = await renderDataToPdf(d, cl, brand, 'devis', { filename: `${data.numero}.pdf` })
-      const filename = `${data.numero}.pdf`
-      const file = new File([blob], filename, { type: 'application/pdf' })
-      if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: filename, url: window.location.origin }) }
-        catch (se) { if (se?.name !== 'AbortError') window.open(URL.createObjectURL(blob), '_blank') }
-      } else {
-        window.open(URL.createObjectURL(blob), '_blank')
-      }
+      // Ouvre le PDF directement dans le visualiseur natif du navigateur
+      // / OS, au lieu d'afficher le menu de partage (cohérent avec le
+      // bouton équivalent côté artisan dans PDFViewer.jsx).
+      window.open(URL.createObjectURL(blob), '_blank')
     } catch (e) { console.error(e) } finally { setPdfLoading(false) }
   }
 
