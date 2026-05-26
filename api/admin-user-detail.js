@@ -22,7 +22,7 @@ async function safe(q) {
 }
 
 export default async function handler(req, res) {
-  cors(req, res, { methods: "GET, POST, OPTIONS" })
+  cors(req, res, { methods: "GET, POST, DELETE, OPTIONS" })
   if (req.method === 'OPTIONS') return res.status(204).end()
 
   // ── POST : actions admin sur un utilisateur (override plan, etc.) ───
@@ -161,6 +161,40 @@ export default async function handler(req, res) {
     }
 
     return res.status(400).json({ error: `action inconnue: ${action}` })
+  }
+
+  // ── DELETE : suppression d'une facture brouillon par l'admin ────────
+  // Hard-delete uniquement si statut='brouillon' ET locked=false.
+  // Une facture verrouillée / émise reste immuable (CGI art. 289,
+  // conservation 10 ans LPF art. L102 B) — on refuse. La table
+  // lignes_invoices CASCADE automatiquement (cf 0005).
+  if (req.method === 'DELETE') {
+    const auth = await authenticate(req, res, { adminOnly: true })
+    if (!auth) return
+    const { admin } = auth
+
+    const invoiceId = (req.query.invoiceId || '').toString().trim()
+    const userId    = (req.query.userId || '').toString().trim()
+    if (!invoiceId) return res.status(400).json({ error: 'invoiceId manquant' })
+
+    // Vérifie statut + ownership avant DELETE — défense en profondeur.
+    const { data: row, error: readErr } = await admin
+      .from('invoices')
+      .select('id, owner_id, statut, locked, numero')
+      .eq('id', invoiceId)
+      .maybeSingle()
+    if (readErr) return res.status(500).json({ error: readErr.message || String(readErr) })
+    if (!row)    return res.status(404).json({ error: 'Facture introuvable' })
+    if (userId && row.owner_id !== userId)
+      return res.status(400).json({ error: 'La facture n\'appartient pas à cet utilisateur' })
+    if (row.statut !== 'brouillon' || row.locked)
+      return res.status(403).json({ error: 'Seules les factures brouillon non verrouillées peuvent être supprimées' })
+
+    const { error: delErr } = await admin.from('invoices').delete().eq('id', invoiceId)
+    if (delErr) return res.status(500).json({ error: delErr.message || String(delErr) })
+
+    console.log(`[admin-user-detail] delete_invoice: ${row.numero} (${invoiceId}) owner=${row.owner_id} (by admin ${auth.user.email})`)
+    return res.status(200).json({ ok: true, deleted: invoiceId, numero: row.numero })
   }
 
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })

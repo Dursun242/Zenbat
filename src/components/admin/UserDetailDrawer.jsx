@@ -11,6 +11,7 @@ export default function UserDetailDrawer({
   onTogglePlan, planToggling = false,
   onGrantTrial, trialGranting = false,
   onUpdateBrandData, brandSaving = false,
+  onDeleteInvoice,
 }) {
   useModalGuard(true, onClose);
   const currentPlan = data?.profile?.plan || user.plan || "free";
@@ -278,13 +279,24 @@ export default function UserDetailDrawer({
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {data.invoices.length === 0
                 ? <div style={{ padding: 20, textAlign: "center", color: "#9A8E82", fontSize: 12 }}>Aucune facture.</div>
-                : data.invoices.map(inv => (
+                : data.invoices.map(inv => {
+                  const canDelete = !!onDeleteInvoice && inv.statut === "brouillon" && !inv.locked;
+                  return (
                   <div key={inv.id} style={{ background: "white", borderRadius: 10, padding: 12, boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
                       <div style={{ fontFamily: "monospace", fontSize: 11, color: "#6B6358" }}>{inv.numero}{inv.avoir_of_invoice_id ? " · avoir" : ""}</div>
-                      <div style={{ display: "flex", gap: 4 }}>
+                      <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                         {inv.locked && <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 20, background: "#fef3c7", color: "#92400e", fontWeight: 700 }}>🔒</span>}
                         <span style={{ fontSize: 9, padding: "1px 7px", borderRadius: 20, background: "#F0EBE3", color: "#6B6358", fontWeight: 700 }}>{inv.statut}</span>
+                        {canDelete && (
+                          <button
+                            onClick={() => onDeleteInvoice(inv.id, inv.numero)}
+                            title="Supprimer définitivement ce brouillon"
+                            style={{ background: "none", border: "none", padding: "2px 6px", borderRadius: 6, color: "#ef4444", fontSize: 13, cursor: "pointer", lineHeight: 1 }}
+                            aria-label={`Supprimer la facture ${inv.numero}`}>
+                            🗑
+                          </button>
+                        )}
                       </div>
                     </div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1612", marginTop: 4 }}>{inv.objet || "Sans objet"}</div>
@@ -293,7 +305,8 @@ export default function UserDetailDrawer({
                       <span style={{ fontWeight: 700, color: "#1A1612" }}>{fmtEur(inv.montant_ht)} HT · {fmtEur(inv.montant_ttc)} TTC</span>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
             </div>
           )}
 

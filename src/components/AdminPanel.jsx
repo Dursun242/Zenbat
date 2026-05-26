@@ -326,6 +326,38 @@ export default function AdminPanel({ onBack }) {
 
   const closeDelete = () => { if (deleting) return; setDeleteTarget(null); setConfirmInput(""); setDeleteError(null) }
 
+  // Suppression admin d'une facture brouillon d'un utilisateur (nettoyage des
+  // tests / copies parasites). Endpoint en DELETE plutôt qu'un nouvel `action`
+  // POST : sémantique HTTP correcte + ne crée pas de nouveau slot Vercel.
+  const deleteUserInvoice = async (invoiceId, numero) => {
+    if (!detailUser || !invoiceId) return false
+    const ok = window.confirm(`Supprimer définitivement la facture ${numero || invoiceId} ?\nIrréversible — seuls les brouillons non verrouillés sont supprimables.`)
+    if (!ok) return false
+    try {
+      const token = await getToken()
+      const url   = `/api/admin-user-detail?invoiceId=${encodeURIComponent(invoiceId)}&userId=${encodeURIComponent(detailUser.id)}`
+      const res   = await fetch(url, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (!res.ok) { alert(data?.error || "Échec de la suppression"); return false }
+      setDetailData(prev => {
+        if (!prev) return prev
+        const nextInvoices = prev.invoices.filter(i => i.id !== invoiceId)
+        return {
+          ...prev,
+          invoices: nextInvoices,
+          stats: { ...prev.stats, invoicesTotal: nextInvoices.length },
+        }
+      })
+      return true
+    } catch (e) {
+      alert(e?.message || "Erreur réseau")
+      return false
+    }
+  }
+
   const confirmDelete = async () => {
     if (!deleteTarget) return
     setDeleting(true); setDeleteError(null)
@@ -511,6 +543,7 @@ export default function AdminPanel({ onBack }) {
           trialGranting={trialGranting}
           onUpdateBrandData={updateUserBrandData}
           brandSaving={brandSaving}
+          onDeleteInvoice={deleteUserInvoice}
           currentUserId={currentUser?.id}
         />
       )}
