@@ -108,14 +108,22 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
         }
       }
 
-      setExportMsg(
-        (data.icc_applied
-          ? "✓ Factur-X EN 16931 / PDF-A3 téléchargé avec profil sRGB. Conformité PPF/PDP 2026 maximale."
-          : "✓ Factur-X EN 16931 téléchargé. Pour la conformité PDF/A-3 stricte, ajoutez public/icc/sRGB.icc — voir public/icc/README.md.")
-        + (isAvoir
-            ? " Avoir verrouillé (immuable)."
-            : " La facture est maintenant verrouillée (immuable).")
-      );
+      if (data.lock_warning) {
+        // Le serveur a renvoyé le PDF mais la transition brouillon → envoyée
+        // n'a pas été persistée (RLS, course concurrente, trigger…). On le
+        // dit honnêtement à l'utilisateur plutôt que d'afficher un succès.
+        console.error("[facturx/lock]", data.lock_warning);
+        setExportMsg("⚠ PDF Factur-X téléchargé, mais émission non finalisée : " + data.lock_warning + " Recliquez sur « Émettre » ou contactez le support.");
+      } else {
+        setExportMsg(
+          (data.icc_applied
+            ? "✓ Factur-X EN 16931 / PDF-A3 téléchargé avec profil sRGB. Conformité PPF/PDP 2026 maximale."
+            : "✓ Factur-X EN 16931 téléchargé. Pour la conformité PDF/A-3 stricte, ajoutez public/icc/sRGB.icc — voir public/icc/README.md.")
+          + (isAvoir
+              ? " Avoir verrouillé (immuable)."
+              : " La facture est maintenant verrouillée (immuable).")
+        );
+      }
     } catch (err) {
       console.error("[facturx]", err);
       // Erreur de chargement de chunk après redéploiement Vercel : on a

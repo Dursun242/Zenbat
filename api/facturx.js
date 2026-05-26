@@ -446,28 +446,54 @@ export default async function handler(req, res) {
     // serveur. Le .eq('statut','brouillon') rend l'opération idempotente.
     let lockedNow   = !!invoice.locked;
     let statutNow   = invoice.statut || null;
+    let lockWarn    = null;
     if (invoice.id) {
-      const { data: stateRow } = await admin
+      const { data: stateRow, error: stateErr } = await admin
         .from("invoices")
         .select("statut, locked")
         .eq("id", invoice.id)
         .eq("owner_id", user.id)
         .maybeSingle();
-      if (stateRow) {
+      if (stateErr) {
+        console.error("[facturx/lock-select]", stateErr);
+        lockWarn = `Lecture état facture impossible : ${stateErr.message}`;
+      } else if (stateRow) {
         statutNow = stateRow.statut;
         lockedNow = !!stateRow.locked;
         if (stateRow.statut === "brouillon" && !stateRow.locked) {
-          const { error: lockErr } = await admin
+          // .select() pour récupérer les lignes affectées : si l'UPDATE
+          // ne matche aucune ligne (RLS, trigger, race), supabase-js ne
+          // renvoie PAS d'erreur — on prétendrait à tort l'émission OK
+          // alors que la DB reste en brouillon. Le tableau retourné permet
+          // de détecter ce cas et de remonter l'échec au client.
+          const { data: updated, error: lockErr } = await admin
             .from("invoices")
             .update({ statut: "envoyee", locked: true })
             .eq("id", invoice.id)
             .eq("owner_id", user.id)
-            .eq("statut", "brouillon");
+            .eq("statut", "brouillon")
+            .select("statut, locked");
           if (lockErr) {
-            console.warn("[facturx/lock]", lockErr.message);
+            console.error("[facturx/lock-update]", lockErr);
+            lockWarn = `Verrouillage facture échoué : ${lockErr.message}`;
+          } else if (!updated?.length) {
+            // Aucune ligne modifiée : course concurrente ou contrainte
+            // implicite. On relit pour refléter l'état réel.
+            const { data: after } = await admin
+              .from("invoices")
+              .select("statut, locked")
+              .eq("id", invoice.id)
+              .eq("owner_id", user.id)
+              .maybeSingle();
+            statutNow = after?.statut ?? statutNow;
+            lockedNow = !!after?.locked;
+            if (statutNow === "brouillon" && !lockedNow) {
+              console.error("[facturx/lock-update] 0 rows updated, statut reste brouillon", { invoice_id: invoice.id });
+              lockWarn = "L'émission n'a pas pu être persistée (0 lignes modifiées) — la facture reste en brouillon.";
+            }
           } else {
-            statutNow = "envoyee";
-            lockedNow = true;
+            statutNow = updated[0].statut;
+            lockedNow = !!updated[0].locked;
           }
         }
       }
@@ -478,6 +504,7 @@ export default async function handler(req, res) {
       icc_applied: !!icc,
       locked:      lockedNow,
       statut:      statutNow,
+      ...(lockWarn ? { lock_warning: lockWarn } : {}),
     });
   } catch (err) {
     console.error("[facturx]", err);
