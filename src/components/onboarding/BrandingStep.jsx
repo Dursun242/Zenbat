@@ -1,5 +1,6 @@
 import { useRef } from "react"
 import { Iimg, Field } from "./shared.jsx"
+import { compressLogoFile } from "../../lib/compressLogo.js"
 
 // Étape « Branding » (step===0) : logo, raison sociale, identité, SIRET, TVA.
 //
@@ -9,52 +10,14 @@ import { Iimg, Field } from "./shared.jsx"
 export default function BrandingStep({ local, set, tryNext, setTryNext, step0Invalid }) {
   const fileRef = useRef(null)
 
-  // Compresse + redimensionne le logo à l'upload :
-  // - max 800×300 px (ratio préservé) → le PDF l'affiche à 50×14 mm, on
-  //   ne perd aucune qualité visible mais on évite de stocker une photo
-  //   iPhone 4000×3000 dans brand_data.
-  // - PNG si transparence présente (logos sur fond clair), JPEG sinon
-  //   (typique d'une photo iPhone uploadée par erreur en guise de logo).
-  // Sans ça, un logo de 3+ Mo faisait gonfler le PDF Factur-X au-dessus
-  // de la limite Vercel body 4,5 Mo → l'API /api/facturx était rejetée
-  // avant exécution, donc la facture ne s'émettait jamais.
-  const handleLogo = e => {
+  // Compresse + borne à 800×300 px max avant stockage dans brand_data.
+  // Sans ça, une photo iPhone non redimensionnée faisait gonfler chaque
+  // PDF Factur-X à 3+ Mo et l'émission échouait (limite body Vercel 4,5 Mo).
+  const handleLogo = async e => {
     const f = e.target.files[0]
     if (!f) return
-    const reader = new FileReader()
-    reader.onload = ev => {
-      const dataUrl = ev.target.result
-      const img = new Image()
-      img.onload = () => {
-        const MAX_W = 800, MAX_H = 300
-        const scale = Math.min(1, MAX_W / img.naturalWidth, MAX_H / img.naturalHeight)
-        const w = Math.max(1, Math.round(img.naturalWidth  * scale))
-        const h = Math.max(1, Math.round(img.naturalHeight * scale))
-        const canvas = document.createElement("canvas")
-        canvas.width = w; canvas.height = h
-        const ctx = canvas.getContext("2d")
-        ctx.imageSmoothingEnabled = true
-        ctx.imageSmoothingQuality = "high"
-        ctx.drawImage(img, 0, 0, w, h)
-        // Heuristique transparence : on échantillonne le canal alpha sur
-        // une grille 16×16 (256 pixels), évite toString DataURL inutile.
-        let hasAlpha = false
-        try {
-          const sample = ctx.getImageData(0, 0, w, h).data
-          const step = Math.max(1, Math.floor(sample.length / 4 / 256)) * 4
-          for (let i = 3; i < sample.length; i += step) {
-            if (sample[i] < 255) { hasAlpha = true; break }
-          }
-        } catch { /* canvas tainted (CORS), on retombe sur JPEG par défaut */ }
-        const out = hasAlpha
-          ? canvas.toDataURL("image/png")
-          : canvas.toDataURL("image/jpeg", 0.88)
-        set("logo", out)
-      }
-      img.onerror = () => set("logo", dataUrl) // fallback brut si décodage échoue
-      img.src = dataUrl
-    }
-    reader.readAsDataURL(f)
+    const out = await compressLogoFile(f)
+    if (out) set("logo", out)
   }
 
   return (

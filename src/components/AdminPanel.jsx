@@ -329,6 +329,31 @@ export default function AdminPanel({ onBack }) {
   // Suppression admin d'une facture brouillon d'un utilisateur (nettoyage des
   // tests / copies parasites). Endpoint en DELETE plutôt qu'un nouvel `action`
   // POST : sémantique HTTP correcte + ne crée pas de nouveau slot Vercel.
+  // Modification du logo d'un utilisateur depuis le drawer admin. Le logo
+  // reçu est déjà compressé par le composant via compressLogoFile (max
+  // 800×300 px). Passer `null` pour le retirer.
+  const updateUserBrandLogo = async (logoDataUrl) => {
+    if (!detailUser || brandSaving) return false
+    setBrandSaving(true)
+    try {
+      const token = await getToken()
+      const res   = await fetch("/api/admin-user-detail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: "update_brand_logo", userId: detailUser.id, logo: logoDataUrl }),
+      })
+      const data = await res.json()
+      if (!res.ok) { alert(data?.error || "Échec mise à jour du logo"); return false }
+      setDetailData(prev => prev ? { ...prev, profile: { ...(prev.profile || {}), brand_data: data.brand_data } } : prev)
+      return true
+    } catch (e) {
+      alert(e?.message || "Erreur réseau")
+      return false
+    } finally {
+      setBrandSaving(false)
+    }
+  }
+
   const deleteUserInvoice = async (invoiceId, numero) => {
     if (!detailUser || !invoiceId) return false
     const ok = window.confirm(`Supprimer définitivement la facture ${numero || invoiceId} ?\nIrréversible — seuls les brouillons non verrouillés sont supprimables.`)
@@ -542,6 +567,7 @@ export default function AdminPanel({ onBack }) {
           onGrantTrial={grantProTrial}
           trialGranting={trialGranting}
           onUpdateBrandData={updateUserBrandData}
+          onUpdateBrandLogo={updateUserBrandLogo}
           brandSaving={brandSaving}
           onDeleteInvoice={deleteUserInvoice}
           currentUserId={currentUser?.id}

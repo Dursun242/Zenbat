@@ -160,6 +160,47 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, brand_data: data.brand_data })
     }
 
+    // Modification du logo d'un utilisateur depuis le panel admin.
+    // Accepte un data URL (image/png, image/jpeg, image/webp) ou null pour
+    // retirer le logo. Pas de validation dimensionnelle stricte : on suppose
+    // que le client a déjà compressé via compressLogoDataUrl (max 800×300).
+    // En garde-fou, on borne la TAILLE du payload base64 à 600 Ko encodé
+    // (~450 Ko bruts) pour bloquer un upload accidentel non compressé.
+    if (action === 'update_brand_logo') {
+      const logo = body.logo // string (data URL) | null
+      const MAX_DATAURL_BYTES = 600 * 1024
+      if (logo !== null) {
+        if (typeof logo !== 'string')
+          return res.status(400).json({ error: 'logo doit être un data URL ou null' })
+        if (!/^data:image\/(png|jpeg|webp);base64,/.test(logo))
+          return res.status(400).json({ error: 'Format logo non supporté (PNG, JPEG, WebP attendus)' })
+        if (logo.length > MAX_DATAURL_BYTES)
+          return res.status(413).json({ error: `Logo trop volumineux (${Math.round(logo.length / 1024)} Ko, max ${Math.round(MAX_DATAURL_BYTES / 1024)} Ko) — recompressez avant envoi.` })
+      }
+
+      const { data: current, error: readErr } = await admin
+        .from('profiles')
+        .select('brand_data')
+        .eq('id', userId)
+        .maybeSingle()
+      if (readErr) return res.status(500).json({ error: readErr.message || String(readErr) })
+      if (!current) return res.status(404).json({ error: 'Profil introuvable' })
+
+      const newBrandData = { ...(current.brand_data || {}), logo: logo || null }
+
+      const { data, error } = await admin
+        .from('profiles')
+        .update({ brand_data: newBrandData })
+        .eq('id', userId)
+        .select('id, brand_data')
+        .maybeSingle()
+      if (error) return res.status(500).json({ error: error.message || String(error) })
+      if (!data) return res.status(404).json({ error: 'Profil introuvable' })
+
+      console.log(`[admin-user-detail] update_brand_logo: user ${userId} (${logo ? Math.round(logo.length / 1024) + ' Ko' : 'removed'}, by admin ${auth.user.email})`)
+      return res.status(200).json({ ok: true, brand_data: data.brand_data })
+    }
+
     return res.status(400).json({ error: `action inconnue: ${action}` })
   }
 

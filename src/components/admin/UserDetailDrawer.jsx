@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { fmtEur, fmtDT, relTime, SC, SL } from "../../lib/admin/format.js";
 import { sanitizeEmail, isValidEmail } from "../../lib/utils.js";
 import { useModalGuard } from "../../hooks/useModalGuard.js";
+import { compressLogoFile } from "../../lib/compressLogo.js";
 
 // Drawer de détail d'un utilisateur dans le panel admin.
 // Présentation pure : reçoit data + callbacks, n'effectue aucun appel réseau.
@@ -11,9 +12,24 @@ export default function UserDetailDrawer({
   onTogglePlan, planToggling = false,
   onGrantTrial, trialGranting = false,
   onUpdateBrandData, brandSaving = false,
+  onUpdateBrandLogo,
   onDeleteInvoice,
 }) {
   useModalGuard(true, onClose);
+  const logoFileRef = useRef(null);
+  const handlePickLogo = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f || !onUpdateBrandLogo) return;
+    const compressed = await compressLogoFile(f);
+    if (!compressed) { alert("Impossible de lire ce fichier image."); e.target.value = ""; return; }
+    await onUpdateBrandLogo(compressed);
+    e.target.value = ""; // permet de ré-uploader le même fichier
+  };
+  const handleRemoveLogo = async () => {
+    if (!onUpdateBrandLogo) return;
+    if (!window.confirm("Retirer le logo de cet utilisateur ?")) return;
+    await onUpdateBrandLogo(null);
+  };
   const currentPlan = data?.profile?.plan || user.plan || "free";
   const isPro       = currentPlan === "pro";
   const proUntil    = data?.profile?.pro_until || null;
@@ -441,7 +457,31 @@ export default function UserDetailDrawer({
                       </div>
                     )}
                     {row("Police", bd.fontStyle)}
-                    {bd.logo && <div style={{ padding: "6px 0", borderBottom: "1px solid #F0EBE3" }}><img src={bd.logo} alt="logo" style={{ maxHeight: 48, maxWidth: 160, objectFit: "contain", borderRadius: 4, border: "1px solid #E8E2D8" }}/></div>}
+                    {/* Logo : affichage + actions admin (remplacer / retirer). */}
+                    <div style={{ display: "flex", gap: 8, padding: "8px 0 4px", fontSize: 12, alignItems: "center", flexWrap: "wrap" }}>
+                      <span style={{ width: 130, flexShrink: 0, color: "#9A8E82", fontWeight: 600 }}>Logo</span>
+                      {bd.logo
+                        ? <img src={bd.logo} alt="logo" style={{ maxHeight: 48, maxWidth: 160, objectFit: "contain", borderRadius: 4, border: "1px solid #E8E2D8", background: "#FAF7F2" }}/>
+                        : <span style={{ color: "#9A8E82", fontStyle: "italic" }}>Aucun</span>
+                      }
+                      {onUpdateBrandLogo && (
+                        <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
+                          <input ref={logoFileRef} type="file" accept="image/png,image/jpeg,image/webp" style={{ display: "none" }} onChange={handlePickLogo}/>
+                          <button onClick={() => logoFileRef.current?.click()} disabled={brandSaving}
+                            title="Remplacer le logo (compressé à 800×300 max avant envoi)"
+                            style={{ background: "#1A1612", border: "none", color: "white", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 700, cursor: brandSaving ? "default" : "pointer", opacity: brandSaving ? 0.6 : 1 }}>
+                            {brandSaving ? "…" : (bd.logo ? "Remplacer" : "Uploader")}
+                          </button>
+                          {bd.logo && (
+                            <button onClick={handleRemoveLogo} disabled={brandSaving}
+                              title="Retirer le logo de ce compte"
+                              style={{ background: "white", border: "1px solid #fecaca", color: "#dc2626", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 700, cursor: brandSaving ? "default" : "pointer", opacity: brandSaving ? 0.6 : 1 }}>
+                              Retirer
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
                 <div style={{ background: "white", borderRadius: 10, padding: "12px 14px", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
