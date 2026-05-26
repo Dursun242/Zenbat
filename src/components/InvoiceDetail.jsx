@@ -5,6 +5,7 @@ import LignesEditor from "./LignesEditor.jsx";
 import PDFViewer from "./PDFViewer.jsx";
 import ClientPickerModal from "./app/ClientPickerModal.jsx";
 import { getToken } from "../lib/getToken.js";
+import { isChunkLoadError, tryReloadOnce } from "../lib/chunkReload.js";
 
 export default function InvoiceDetail({ invoice, client, clients = [], brand, invoices, onBack, onChange, onCreateAvoir, onDelete }) {
   const [showPDF,        setShowPDF]        = useState(false);
@@ -117,6 +118,10 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
       );
     } catch (err) {
       console.error("[facturx]", err);
+      // Erreur de chargement de chunk après redéploiement Vercel : on a
+      // attrapé l'erreur dans ce try/catch donc le listener global de
+      // main.jsx ne la verra jamais → on déclenche le reload nous-mêmes.
+      if (isChunkLoadError(err) && tryReloadOnce()) return;
       setExportMsg("❌ Erreur génération Factur-X : " + (err.message || err));
     } finally {
       setExporting(false);
