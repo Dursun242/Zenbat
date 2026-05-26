@@ -154,8 +154,19 @@ function need(pdf, y, h) {
 }
 
 // Charge n'importe quelle image (JPEG, PNG, WebP, SVG…) et la retourne
-// en PNG via canvas + dimensions naturelles pour respecter les proportions.
+// en PNG via canvas + dimensions natives bornées pour respecter les
+// proportions sans gonfler le PDF.
+//
+// IMPORTANT : on borne à 800×300 px max. Sans ça, un utilisateur qui
+// uploade une photo iPhone (4000×3000) en logo finissait avec un PDF de
+// 3+ Mo, qui dépassait la limite Vercel 4,5 Mo de body sur l'appel à
+// /api/facturx — la requête était rejetée avant exécution, donc l'UPDATE
+// brouillon → envoyée ne tournait jamais (cf. cas Kontelec). 800×300 px
+// suffit largement : le PDF affiche le logo à 50×14 mm soit ~591×165 px
+// à 300 DPI (qualité impression pro).
 async function loadImgAsPng(url) {
+  const MAX_W_PX = 800;
+  const MAX_H_PX = 300;
   try {
     const blob = await fetch(url, { mode: "cors" }).then(r => r.ok ? r.blob() : null);
     if (!blob) return null;
@@ -165,11 +176,20 @@ async function loadImgAsPng(url) {
       img.crossOrigin = "anonymous";
       img.onload = () => {
         try {
-          const w = img.naturalWidth  || img.width  || 180;
-          const h = img.naturalHeight || img.height || 60;
+          const srcW = img.naturalWidth  || img.width  || 180;
+          const srcH = img.naturalHeight || img.height || 60;
+          // Downscale en préservant le ratio si nécessaire.
+          const scale = Math.min(1, MAX_W_PX / srcW, MAX_H_PX / srcH);
+          const w = Math.max(1, Math.round(srcW * scale));
+          const h = Math.max(1, Math.round(srcH * scale));
           const canvas = document.createElement("canvas");
           canvas.width = w; canvas.height = h;
-          canvas.getContext("2d").drawImage(img, 0, 0);
+          const ctx = canvas.getContext("2d");
+          // imageSmoothingQuality 'high' = bicubique → meilleur rendu
+          // qu'un simple nearest-neighbor sur un gros downscale.
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
+          ctx.drawImage(img, 0, 0, w, h);
           resolve({ dataUrl: canvas.toDataURL("image/png"), w, h });
         } catch { resolve(null); }
         URL.revokeObjectURL(objectUrl);
