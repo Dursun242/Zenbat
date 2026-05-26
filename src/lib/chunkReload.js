@@ -30,14 +30,17 @@ export function isChunkLoadError(msg) {
 // client, c'est presque toujours un signe que le SW sert du JS périmé
 // → on tente le reload via tryReloadOnce (debounce 30s incluse).
 //
-// "The string did not match the expected pattern" était le message
-// renvoyé par atob() de WebKit (iOS Safari) sur l'ancien décodage
-// base64 du PDF Factur-X — corrigé en 9f06754 par fetch(data:URL).
-// Si un user voit encore ce message, son app n'a pas le fix → reload.
+// Patterns détectés :
+// - "The string did not match the expected pattern" : ancien atob() iOS
+//   Safari, supprimé en 9f06754. Plus présent dans le code courant.
+// - "i.metadata.Unicode.widths" / similaire : jsPDF qui crashe parce que
+//   les TTF sont arrivés en HTML d'erreur via fetch sans r.ok check. La
+//   validation TTF a été ajoutée — si on revoit cette stack, c'est que
+//   le client tourne une version antérieure à ce fix.
 export function isLegacyCacheError(msg) {
   if (!msg) return false
   const s = String(msg.message || msg)
-  return /The string did not match the expected pattern/i.test(s)
+  return /The string did not match the expected pattern|metadata\.Unicode\.widths|metadata\.Unicode is undefined/i.test(s)
 }
 
 export function tryReloadOnce() {

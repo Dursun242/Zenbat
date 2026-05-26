@@ -12,7 +12,25 @@ import { notifyAdminPdf } from "./telegramNotify.js";
 //   signataire dans le bloc "Bon pour accord". La valeur légale de la
 //   signature repose sur l'OTP + audit trail (IP, user-agent, hash) — pas sur
 //   le tracé du nom, qui reste purement décoratif.
+// Cache module-scoped : une fois les fonts chargées et validées, on les
+// réutilise pour tout buildPdf de la session. En cas d'échec, on reset le
+// cache pour que la tentative suivante refasse la requête (typique iOS
+// Safari qui timeout sur 4G lent).
 let _fontsPromise = null;
+
+// Magic bytes TTF/OTF en base64 — premiers 4 octets du fichier doivent
+// matcher l'une de ces signatures. Évite de passer du HTML d'erreur à
+// jsPDF qui le silently-accepte puis crash plus tard sur metadata.Unicode.
+const TTF_MAGIC_PREFIXES = [
+  "AAEAAA",   // 00 01 00 00 → TrueType
+  "T1RUTw",   // 4F 54 54 4F → OpenType (OTTO)
+  "dHJ1ZQ",   // 74 72 75 65 → true (Mac)
+];
+function looksLikeTtf(b64) {
+  if (!b64 || b64.length < 8) return false;
+  return TTF_MAGIC_PREFIXES.some(p => b64.startsWith(p));
+}
+
 async function loadFonts() {
   if (_fontsPromise) return _fontsPromise;
   _fontsPromise = (async () => {
@@ -25,12 +43,27 @@ async function loadFonts() {
       }
       return btoa(bin);
     };
-    const [reg, bold, sign] = await Promise.all([
-      fetch("/fonts/DejaVuSans.ttf").then(r => r.arrayBuffer()),
-      fetch("/fonts/DejaVuSans-Bold.ttf").then(r => r.arrayBuffer()),
-      fetch("/fonts/Caveat-Regular.ttf").then(r => r.arrayBuffer()),
+    // fetchFont : vérifie le code HTTP avant d'appeler arrayBuffer().
+    // Sans ce check, un 404 (page HTML) passerait silencieusement et
+    // jsPDF planterait plus tard sur metadata.Unicode.widths undefined.
+    async function fetchFont(path) {
+      const r = await fetch(path);
+      if (!r.ok) throw new Error(`Police ${path} indisponible (HTTP ${r.status})`);
+      const ct = r.headers.get("content-type") || "";
+      if (ct.includes("text/html"))
+        throw new Error(`Police ${path} : réponse HTML reçue (SW ou proxy) au lieu du TTF`);
+      const ab = await r.arrayBuffer();
+      const b64 = toBase64(ab);
+      if (!looksLikeTtf(b64))
+        throw new Error(`Police ${path} : signature TTF invalide (premier octets : ${b64.slice(0, 8)})`);
+      return b64;
+    }
+    const [regular, bold, sign] = await Promise.all([
+      fetchFont("/fonts/DejaVuSans.ttf"),
+      fetchFont("/fonts/DejaVuSans-Bold.ttf"),
+      fetchFont("/fonts/Caveat-Regular.ttf"),
     ]);
-    return { regular: toBase64(reg), bold: toBase64(bold), sign: toBase64(sign) };
+    return { regular, bold, sign };
   })().catch(err => { _fontsPromise = null; throw err; });
   return _fontsPromise;
 }

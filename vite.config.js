@@ -71,7 +71,13 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
+        // ttf inclus : les fonts DejaVuSans + Caveat sont chargées via
+        // fetch() par pdfBuilder.js pour embarquement dans jsPDF. Sans ce
+        // precache, sur iOS Safari avec 4G lent ou si le SW intercepte
+        // mal, fetch peut renvoyer un timeout / HTML d'erreur → jsPDF
+        // plante avec "metadata.Unicode.widths undefined" à la 1re
+        // émission. Precaché = servi depuis le cache local, instantané.
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2,ttf}'],
         // Pas de fallback SPA pour : /api/, /sitemap.xml, /robots.txt,
         // /google*.html (vérification GSC). Sans ça, le Service Worker
         // intercepte ces requêtes et renvoie /index.html, ce qui casse
