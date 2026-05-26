@@ -5,7 +5,25 @@ import LignesEditor from "./LignesEditor.jsx";
 import PDFViewer from "./PDFViewer.jsx";
 import ClientPickerModal from "./app/ClientPickerModal.jsx";
 import { getToken } from "../lib/getToken.js";
-import { isChunkLoadError, tryReloadOnce } from "../lib/chunkReload.js";
+import { isChunkLoadError, isLegacyCacheError, tryReloadOnce } from "../lib/chunkReload.js";
+
+// Si un nouveau Service Worker est en attente (déploiement Vercel récent),
+// on l'active de force et on recharge. Sert de "filet de sécurité" pour les
+// utilisateurs piégés sur l'ancien bundle quand le serveur a déjà la nouvelle
+// version : plutôt que de leur afficher un message d'erreur, on récupère
+// silencieusement la dernière version. updateSW est exposé sur window par
+// main.jsx (au montage du registerSW).
+function forcePendingSWUpdateOrReload() {
+  try {
+    const updateSW = window.__zenbatSWUpdate__;
+    if (window.__zenbatSWUpdateReady__ && typeof updateSW === "function") {
+      // skipWaiting + reload propre via vite-plugin-pwa
+      updateSW(true);
+      return true;
+    }
+  } catch { /* ignore */ }
+  return tryReloadOnce();
+}
 
 export default function InvoiceDetail({ invoice, client, clients = [], brand, invoices, onBack, onChange, onCreateAvoir, onDelete }) {
   const [showPDF,        setShowPDF]        = useState(false);
@@ -126,10 +144,15 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
       }
     } catch (err) {
       console.error("[facturx]", err);
-      // Erreur de chargement de chunk après redéploiement Vercel : on a
-      // attrapé l'erreur dans ce try/catch donc le listener global de
-      // main.jsx ne la verra jamais → on déclenche le reload nous-mêmes.
-      if (isChunkLoadError(err) && tryReloadOnce()) return;
+      // 1) Chunk JS introuvable après redéploiement (Vercel a changé les
+      //    hashes) → on recharge pour récupérer le nouveau index.html.
+      // 2) Erreur "vieux cache" (ex. atob iOS Safari) : on est sûr que ce
+      //    code path n'existe plus dans la version courante → reload.
+      // 3) Un nouveau SW est déjà prêt en arrière-plan → on l'active maintenant
+      //    sans rien demander à l'utilisateur (mieux qu'un toast d'erreur).
+      if (isChunkLoadError(err) || isLegacyCacheError(err) || window.__zenbatSWUpdateReady__) {
+        if (forcePendingSWUpdateOrReload()) return;
+      }
       setExportMsg("❌ Erreur génération Factur-X : " + (err.message || err));
     } finally {
       setExporting(false);

@@ -24,6 +24,22 @@ export function isChunkLoadError(msg) {
   return /Failed to fetch dynamically imported module|is not a valid JavaScript MIME type|Loading chunk .* failed|Importing a module script failed/i.test(s)
 }
 
+// Heuristique "vieux cache" : ces erreurs n'apparaissent jamais dans le
+// code en cours mais ont été émises par d'anciennes versions du bundle
+// que des utilisateurs gardent en cache PWA. Quand on les voit côté
+// client, c'est presque toujours un signe que le SW sert du JS périmé
+// → on tente le reload via tryReloadOnce (debounce 30s incluse).
+//
+// "The string did not match the expected pattern" était le message
+// renvoyé par atob() de WebKit (iOS Safari) sur l'ancien décodage
+// base64 du PDF Factur-X — corrigé en 9f06754 par fetch(data:URL).
+// Si un user voit encore ce message, son app n'a pas le fix → reload.
+export function isLegacyCacheError(msg) {
+  if (!msg) return false
+  const s = String(msg.message || msg)
+  return /The string did not match the expected pattern/i.test(s)
+}
+
 export function tryReloadOnce() {
   try {
     const last = Number(localStorage.getItem(CHUNK_RELOAD_FLAG) || 0)

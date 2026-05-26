@@ -36,14 +36,21 @@ window.__zenbatSWUpdate__ = updateSW
 // erreurs non attrapées ; pour les erreurs avalées par un try/catch côté
 // composant, le handler doit importer { isChunkLoadError, tryReloadOnce }
 // et déclencher le reload depuis son catch.
-import { isChunkLoadError, tryReloadOnce } from './lib/chunkReload.js'
+//
+// On déclenche aussi le reload sur isLegacyCacheError : ce sont des messages
+// d'erreur qui n'apparaissent que dans d'anciennes versions du bundle (ex.
+// atob() strict d'iOS Safari, corrigé en 9f06754) — leur présence chez un
+// user signifie quasi-certainement un cache PWA périmé.
+import { isChunkLoadError, isLegacyCacheError, tryReloadOnce } from './lib/chunkReload.js'
 window.addEventListener('error', (e) => {
-  if (isChunkLoadError(e?.message) || isChunkLoadError(e?.error?.message)) {
+  const msg = e?.message || e?.error?.message
+  if (isChunkLoadError(msg) || isLegacyCacheError(msg)) {
     tryReloadOnce()
   }
 })
 window.addEventListener('unhandledrejection', (e) => {
-  if (isChunkLoadError(e?.reason?.message) || isChunkLoadError(e?.reason)) {
+  const r = e?.reason
+  if (isChunkLoadError(r?.message || r) || isLegacyCacheError(r?.message || r)) {
     tryReloadOnce()
   }
 })
