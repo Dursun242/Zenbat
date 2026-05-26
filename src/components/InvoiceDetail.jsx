@@ -78,9 +78,15 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      if (!data?.pdf_base64) throw new Error("Réponse serveur incomplète (pdf_base64 manquant)");
 
-      const pdfBytes = Uint8Array.from(atob(data.pdf_base64), c => c.charCodeAt(0));
-      const blob     = new Blob([pdfBytes], { type: "application/pdf" });
+      // Décodage base64 → Blob via fetch(data:) : plus robuste que atob() qui,
+      // sur iOS Safari, rejette toute chaîne contenant des caractères hors
+      // alphabet base64 strict avec « The string did not match the expected
+      // pattern. ». fetch sur data: URL passe par le décodeur interne du
+      // navigateur, plus tolérant et sans la limite de taille de String.
+      const cleanB64 = String(data.pdf_base64).replace(/\s/g, "");
+      const blob = await fetch(`data:application/pdf;base64,${cleanB64}`).then(r => r.blob());
       downloadBlob(blob, `${invoice.numero}-facturx.pdf`);
 
       // Conformité : l'émission de la facture (transition brouillon → envoyee

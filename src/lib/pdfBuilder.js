@@ -572,5 +572,9 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
     filename,
   );
 
-  return { blob, base64: dataUri.split(",")[1] || "", filename };
+  // Strip whitespace défensivement — certains UAs (notamment iOS Safari)
+  // appliquent un atob() strict en aval qui rejette la moindre tabulation/
+  // retour à la ligne avec « The string did not match the expected pattern ».
+  const base64 = (dataUri.split(",")[1] || "").replace(/\s/g, "");
+  return { blob, base64, filename };
 }
