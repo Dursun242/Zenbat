@@ -361,7 +361,13 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       // Incrémente le compteur d'usage IA (best-effort, silencieux)
       supabase.rpc("increment_ai_used").then(() => {}, () => {});
     } catch (e) {
-      const detail = apiError || e.message || "unknown";
+      // Enrichit le message avec la durée (timeout vs blip réseau) et le
+      // nombre de tentatives — attaché par fetchWithNetworkRetry sur les
+      // erreurs TypeError / AbortError.
+      const meta = e?.durationMs != null
+        ? ` (après ${(e.durationMs / 1000).toFixed(1)}s · ${e.attempts || 1} tentative${(e.attempts || 1) > 1 ? "s" : ""})`
+        : "";
+      const detail = (apiError || e.message || "unknown") + meta;
       console.error("[AgentIA] send failed:", e, apiError);
       // Log côté serveur pour consultation admin (best-effort, silencieux).
       // Supabase ne rejette jamais .then() → on gère l'error dans onFulfilled

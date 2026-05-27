@@ -8,6 +8,35 @@ export class ClaudeApiError extends Error {
   }
 }
 
+// Wrapper fetch avec retry réseau silencieux sur TypeError « Failed to fetch »
+// ou AbortError. Ne retry QUE l'aller du fetch initial — pas le streaming
+// déjà commencé (on aurait alors un doublon de génération côté Anthropic).
+// Mesure la durée totale pour distinguer un timeout (long) d'un blip réseau
+// (instantané) dans les logs admin.
+async function fetchWithNetworkRetry(url, init, { retries = 1, retryDelayMs = 1200 } = {}) {
+  const t0 = Date.now();
+  let attempts = 0;
+  let lastErr;
+  for (let i = 0; i <= retries; i++) {
+    attempts += 1;
+    try {
+      const res = await fetch(url, init);
+      res._zb = { durationMs: Date.now() - t0, attempts };
+      return res;
+    } catch (err) {
+      lastErr = err;
+      const isNetwork = err?.name === "TypeError" || err?.name === "AbortError";
+      if (!isNetwork || i >= retries) break;
+      await new Promise(r => setTimeout(r, retryDelayMs));
+    }
+  }
+  if (lastErr) {
+    lastErr.durationMs = Date.now() - t0;
+    lastErr.attempts = attempts;
+  }
+  throw lastErr;
+}
+
 async function readApiError(res) {
   const detail = await res.json().catch(() => null);
   const errVal = detail?.error;
@@ -39,7 +68,7 @@ function readRetryAfterMs(res, fallbackSec = 5) {
 // Retry auto une fois sur rate limit Anthropic (cap tokens/min de l'org)
 // — sauf si c'est la limite journalière interne (irrécupérable).
 export async function streamClaude({ body, authHeaders, onTextDelta }) {
-  let res = await fetch("/api/claude", {
+  let res = await fetchWithNetworkRetry("/api/claude", {
     method:  "POST",
     headers: { "Content-Type": "application/json", ...authHeaders },
     body:    JSON.stringify({ ...body, stream: true }),
@@ -48,7 +77,7 @@ export async function streamClaude({ body, authHeaders, onTextDelta }) {
     const msg = await readApiError(res);
     if (isRateLimit(res.status, msg) && !/journalière/i.test(msg)) {
       await new Promise(r => setTimeout(r, readRetryAfterMs(res)));
-      res = await fetch("/api/claude", {
+      res = await fetchWithNetworkRetry("/api/claude", {
         method:  "POST",
         headers: { "Content-Type": "application/json", ...authHeaders },
         body:    JSON.stringify({ ...body, stream: true }),
@@ -97,7 +126,7 @@ export async function streamClaude({ body, authHeaders, onTextDelta }) {
 // échoue pour des raisons réseau/SSE, et pour la boucle de cohérence).
 // Retry auto une fois sur rate limit Anthropic — sauf limite journalière interne.
 export async function requestClaude({ body, authHeaders }) {
-  const doFetch = () => fetch("/api/claude", {
+  const doFetch = () => fetchWithNetworkRetry("/api/claude", {
     method:  "POST",
     headers: { "Content-Type": "application/json", ...authHeaders },
     body:    JSON.stringify(body),
