@@ -11,6 +11,7 @@
 import { cors }         from './_cors.js'
 import { authenticate } from './_withAuth.js'
 import { rateLimit, sendRateLimited } from './_rateLimit.js'
+import { logServerError } from './_serverLog.js'
 import { createHash, randomInt } from 'crypto'
 import { createClient } from '@supabase/supabase-js'
 
@@ -532,6 +533,7 @@ export default async function handler(req, res) {
       })
     } catch (e) {
       console.error('[send email]', e?.message)
+      await logServerError('devis-public/send-email', e, { devis_id: devis.id, to: client.email })
       return res.status(502).json({ error: "Échec de l'envoi email. Vérifiez la configuration GMAIL ou réessayez." })
     }
 
@@ -671,6 +673,7 @@ export default async function handler(req, res) {
       await sendEmail({ to: targetEmail, subject: `${otp} — Code d'accès devis ${devis.numero}`, html: emailOtp({ otp, devis, company: otpCompany, brandColor: otpColor }) })
     } catch (e) {
       console.error('[otp email]', e?.message)
+      await logServerError('devis-public/otp-email', e, { devis_id: devis.id })
       return res.status(502).json({ error: 'Échec envoi du code. Vérifiez votre adresse email ou réessayez.' })
     }
 
@@ -755,6 +758,7 @@ export default async function handler(req, res) {
     if (claimErr) {
       if (claimErr.code === '23505') return res.status(200).json({ ok: true, alreadySent: true })
       console.error('[devis-public/send_signed_pdf] claim log échoué:', claimErr.message || claimErr)
+      await logServerError('devis-public/send_signed_pdf-claim', claimErr, { devis_id: devis.id })
       return res.status(500).json({ error: "L'envoi du PDF n'a pas pu démarrer, réessayez." })
     }
 
@@ -848,6 +852,7 @@ export default async function handler(req, res) {
     // DB n'a pas bougé. On échoue explicitement pour qu'il puisse réessayer.
     if (ue) {
       console.error('[devis-public/accept] UPDATE devis échoué:', ue.message || ue)
+      await logServerError('devis-public/accept-update', ue, { devis_id: devis.id, client_name: clean })
       return res.status(500).json({ error: "L'acceptation n'a pas pu être enregistrée, réessayez." })
     }
     await admin.from('devis_negotiations').update({ status: 'superseded' }).eq('devis_id', devis.id).eq('status', 'pending')
@@ -864,6 +869,7 @@ export default async function handler(req, res) {
     const { error: re } = await admin.from('devis').update({ statut: 'refuse', client_refused_at: new Date().toISOString(), client_refusal_reason: reason.trim() }).eq('id', devis.id)
     if (re) {
       console.error('[devis-public/refuse] UPDATE devis échoué:', re.message || re)
+      await logServerError('devis-public/refuse-update', re, { devis_id: devis.id })
       return res.status(500).json({ error: "Le refus n'a pas pu être enregistré, réessayez." })
     }
     await admin.from('devis_audit_log').insert({ devis_id: devis.id, event: 'refused', from_party: 'client', meta: { reason: reason.trim(), ip } })

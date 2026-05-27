@@ -18,6 +18,7 @@ import { join } from "node:path";
 import { cors } from "./_cors.js"
 import { authenticate } from "./_withAuth.js"
 import { sendEmail } from "./_email.js"
+import { logServerError } from "./_serverLog.js"
 
 const XML_FILENAME    = "factur-x.xml";
 // Profil EN 16931 (norme européenne, obligatoire PPF/PDP à partir de 09/2026).
@@ -508,6 +509,7 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error("[facturx]", err);
+    await logServerError("facturx/generate", err, { invoice_id: invoice?.id, action: req.body?.action || "generate" });
     return res.status(500).json({ error: err.message || "Erreur génération Factur-X" });
   }
 }

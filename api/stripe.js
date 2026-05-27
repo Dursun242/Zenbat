@@ -11,6 +11,7 @@ import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
 import { cors } from './_cors.js'
 import { authenticate, notifyTelegram } from './_withAuth.js'
+import { logServerError } from './_serverLog.js'
 
 // Vercel doit recevoir le body brut pour vérifier la signature Stripe.
 // Pour les actions non-webhook on parse manuellement le JSON.
@@ -102,6 +103,7 @@ async function handleWebhook(req, res, rawBody) {
   // déclencher ce retry. Sans ça, un client peut payer sans passer Pro.
   const abortForRetry = async (label, err) => {
     console.error(`[stripe webhook] ${label}:`, err?.message || err)
+    await logServerError(`stripe-webhook/${label}`, err, { event_id: event.id, event_type: event.type })
     if (dedupInserted) {
       await admin.from('stripe_webhook_events').delete().eq('event_id', event.id)
     }
