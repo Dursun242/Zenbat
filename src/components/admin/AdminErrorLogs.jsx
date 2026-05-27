@@ -1,4 +1,5 @@
 import { fmtDT } from "../../lib/admin/format.js";
+import { ExportCsvButton } from "../../lib/exportCsv.jsx";
 
 export default function AdminErrorLogs({ iaLogs, loading, onRefresh }) {
   return (
@@ -7,6 +8,18 @@ export default function AdminErrorLogs({ iaLogs, loading, onRefresh }) {
         <div style={{ fontWeight: 700, fontSize: 13, color: "#1A1612", flex: 1 }}>
           Erreurs Agent IA {iaLogs ? `(${iaLogs.length})` : ""}
         </div>
+        <ExportCsvButton
+          disabled={!iaLogs || iaLogs.length === 0}
+          filename="zenbat-erreurs-ia.csv"
+          getRows={() => iaLogs || []}
+          columns={[
+            { key: "created_at",   label: "Date" },
+            { key: "user_id",      label: "User ID" },
+            { key: "error",        label: "Erreur" },
+            { key: "user_message", label: "Message utilisateur" },
+            { key: "model",        label: "Modèle" },
+          ]}
+        />
         <button onClick={onRefresh} disabled={loading}
           style={{ background: "#FAF7F2", border: "1px solid #E8E2D8", borderRadius: 8, padding: "4px 10px", fontSize: 11, color: "#6B6358", cursor: "pointer", fontWeight: 600 }}>
           {loading ? "…" : "↻"}

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { fmtDT, relTime } from "../../lib/admin/format.js";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
+import { ExportCsvButton } from "../../lib/exportCsv.jsx";
 
 export default function AdminConversations({ iaConvs, loading, convSearch, setConvSearch, openConvUser, setOpenConvUser, onRefresh }) {
   // Debounce + memo : avec plusieurs milliers de messages stockés, le
@@ -34,6 +35,19 @@ export default function AdminConversations({ iaConvs, loading, convSearch, setCo
         </div>
         <input value={convSearch} onChange={e => setConvSearch(e.target.value)} placeholder="Filtrer…"
           style={{ border: "1px solid #E8E2D8", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: "#1A1612", background: "#FAF7F2", width: 120 }}/>
+        <ExportCsvButton
+          disabled={!iaConvs || iaConvs.length === 0}
+          filename="zenbat-conversations-ia.csv"
+          getRows={() => iaConvs || []}
+          columns={[
+            { key: "created_at",   label: "Date" },
+            { key: "owner_id",     label: "User ID" },
+            { key: "email",        label: "Email" },
+            { key: "user_message", label: "Question utilisateur" },
+            { key: "ai_response",  label: "Réponse IA" },
+            { key: "had_devis",    label: "Devis généré" },
+          ]}
+        />
         <button onClick={onRefresh} disabled={loading}
           style={{ background: "#FAF7F2", border: "1px solid #E8E2D8", borderRadius: 8, padding: "4px 10px", fontSize: 11, color: "#6B6358", cursor: "pointer", fontWeight: 600 }}>
           {loading ? "…" : "↻"}

@@ -1,4 +1,5 @@
 import { fmtDT } from "../../lib/admin/format.js";
+import { ExportCsvButton } from "../../lib/exportCsv.jsx";
 
 export default function AdminNegativeLogs({ iaNegs, loading, negFilter, setNegFilter, onRefresh }) {
   const filtered = (iaNegs || []).filter(n => negFilter === "all" || n.kind === negFilter);
@@ -15,6 +16,18 @@ export default function AdminNegativeLogs({ iaNegs, loading, negFilter, setNegFi
           <option value="ai_refusal">Refus IA</option>
           <option value="user_negative">Mécontent</option>
         </select>
+        <ExportCsvButton
+          disabled={filtered.length === 0}
+          filename="zenbat-reponses-negatives.csv"
+          getRows={() => filtered}
+          columns={[
+            { key: "created_at",   label: "Date" },
+            { key: "kind",         label: "Type" },
+            { key: "user_id",      label: "User ID" },
+            { key: "user_message", label: "Message utilisateur" },
+            { key: "ai_response",  label: "Réponse IA" },
+          ]}
+        />
         <button onClick={onRefresh} disabled={loading}
           style={{ background: "#FAF7F2", border: "1px solid #E8E2D8", borderRadius: 8, padding: "4px 10px", fontSize: 11, color: "#6B6358", cursor: "pointer", fontWeight: 600 }}>
           {loading ? "…" : "↻"}
