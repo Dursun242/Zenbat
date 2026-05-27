@@ -36,7 +36,7 @@ function IndiceChip({ indice }) {
 }
 
 // Carte pour un devis sans indice (affichage simple, identique à avant)
-function DevisRow({ d, cl, goDevis, onDelete, onDuplicate, confirmDelete, setConfirmDelete }) {
+function DevisRow({ d, cl, goDevis, onDelete, onDuplicate, duplicating, confirmDelete, setConfirmDelete }) {
   return (
     <div>
       <div
@@ -59,10 +59,10 @@ function DevisRow({ d, cl, goDevis, onDelete, onDuplicate, confirmDelete, setCon
           <div style={{ marginTop: 4 }}><Badge s={d.statut}/></div>
         </div>
         {onDuplicate && (
-          <button onClick={e => { e.stopPropagation(); onDuplicate(d.id); }} title="Dupliquer ce devis"
+          <button onClick={e => { e.stopPropagation(); onDuplicate(d.id); }} disabled={duplicating} title="Dupliquer ce devis"
             style={{ marginLeft: 8, padding: "4px 8px", borderRadius: 6, border: "none",
-              background: "#F0EBE3", color: "#6B6358", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-            📋
+              background: "#F0EBE3", color: "#6B6358", fontSize: 13, fontWeight: 600, cursor: duplicating ? "default" : "pointer", opacity: duplicating ? 0.5 : 1 }}>
+            {duplicating ? "⏳" : "📋"}
           </button>
         )}
         {d.statut === "brouillon" && onDelete && (
@@ -91,7 +91,7 @@ function DevisRow({ d, cl, goDevis, onDelete, onDuplicate, confirmDelete, setCon
 }
 
 // Carte dossier pour un groupe de versions
-function DossierCard({ versions, cl, goDevis, onDelete, onDuplicate }) {
+function DossierCard({ versions, cl, goDevis, onDelete, onDuplicate, duplicatingIds }) {
   const [open, setOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
 
@@ -151,12 +151,15 @@ function DossierCard({ versions, cl, goDevis, onDelete, onDuplicate }) {
         </div>
 
         {/* 📋 dupliquer (sur la version active) */}
-        {onDuplicate && (
-          <button onClick={e => { e.stopPropagation(); onDuplicate(active.id); }} title="Dupliquer ce devis"
-            style={{ flexShrink: 0, padding: "3px 7px", borderRadius: 6, border: "none", background: "#F0EBE3", color: "#6B6358", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-            📋
-          </button>
-        )}
+        {onDuplicate && (() => {
+          const dup = duplicatingIds?.has(active.id);
+          return (
+            <button onClick={e => { e.stopPropagation(); onDuplicate(active.id); }} disabled={dup} title="Dupliquer ce devis"
+              style={{ flexShrink: 0, padding: "3px 7px", borderRadius: 6, border: "none", background: "#F0EBE3", color: "#6B6358", fontSize: 12, fontWeight: 600, cursor: dup ? "default" : "pointer", opacity: dup ? 0.5 : 1 }}>
+              {dup ? "⏳" : "📋"}
+            </button>
+          );
+        })()}
 
         {/* ✕ version active si brouillon */}
         {active.statut === "brouillon" && onDelete && (
@@ -199,6 +202,16 @@ function DossierCard({ versions, cl, goDevis, onDelete, onDuplicate }) {
 export default function DevisList({ devis, clients, goDevis, setTab, onDelete, onDuplicate }) {
   const [filtre, setFiltre]           = useState("tous");
   const [confirmDelete, setConfirmDelete] = useState(null);
+  // Track des devis en cours de duplication (Set d'IDs) : empêche un
+  // double-clic de créer deux copies du même devis pendant la latence
+  // réseau de l'API.
+  const [duplicatingIds, setDuplicatingIds] = useState(() => new Set());
+  const wrappedDuplicate = onDuplicate ? async (id) => {
+    if (duplicatingIds.has(id)) return;
+    setDuplicatingIds(prev => { const n = new Set(prev); n.add(id); return n; });
+    try { await onDuplicate(id); }
+    finally { setDuplicatingIds(prev => { const n = new Set(prev); n.delete(id); return n; }); }
+  } : null;
 
   // Groupement : root_devis_id ou enfants
   const childRoots = new Set(devis.filter(d => d.root_devis_id).map(d => d.root_devis_id));
@@ -302,11 +315,11 @@ export default function DevisList({ devis, clients, goDevis, setTab, onDelete, o
         {filtered.map((item, i) => {
           if (item.type === "group") {
             const cl = clients.find(c => c.id === (item.versions.find(v => v.client_id)?.client_id));
-            return <DossierCard key={item.versions[0].id} versions={item.versions} cl={cl} goDevis={goDevis} onDelete={onDelete} onDuplicate={onDuplicate}/>;
+            return <DossierCard key={item.versions[0].id} versions={item.versions} cl={cl} goDevis={goDevis} onDelete={onDelete} onDuplicate={wrappedDuplicate} duplicatingIds={duplicatingIds}/>;
           }
           const cl = clients.find(c => c.id === item.d.client_id);
           return (
-            <DevisRow key={item.d.id} d={item.d} cl={cl} goDevis={goDevis} onDelete={onDelete} onDuplicate={onDuplicate}
+            <DevisRow key={item.d.id} d={item.d} cl={cl} goDevis={goDevis} onDelete={onDelete} onDuplicate={wrappedDuplicate} duplicating={duplicatingIds.has(item.d.id)}
               confirmDelete={confirmDelete} setConfirmDelete={setConfirmDelete}/>
           );
         })}

@@ -29,6 +29,12 @@ export default function ContactEditor({ c, onSave, onClose }) {
   const [inseeLoading, setInseeLoading] = useState(false);
   const [inseeError, setInseeError] = useState(null);
   const [inseeOpen, setInseeOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const handleSave = async () => {
+    if (saving || !isValid) return;
+    setSaving(true);
+    try { await onSave(form); } finally { setSaving(false); }
+  };
   const abortRef = useRef(null);
 
   useEffect(() => {
@@ -199,9 +205,9 @@ export default function ContactEditor({ c, onSave, onClose }) {
             style={{ flex: 1, background: "white", border: "1px solid #E8E2D8", borderRadius: 12, padding: 12, fontSize: 13, fontWeight: 600, color: "#6B6358", cursor: "pointer" }}>
             Annuler
           </button>
-          <button onClick={() => isValid && onSave(form)} disabled={!isValid}
-            style={{ flex: 2, background: isValid ? "#22c55e" : "#cbd5e1", color: "white", border: "none", borderRadius: 12, padding: 12, fontSize: 13, fontWeight: 700, cursor: isValid ? "pointer" : "not-allowed" }}>
-            Enregistrer
+          <button onClick={handleSave} disabled={!isValid || saving}
+            style={{ flex: 2, background: (isValid && !saving) ? "#22c55e" : "#cbd5e1", color: "white", border: "none", borderRadius: 12, padding: 12, fontSize: 13, fontWeight: 700, cursor: (isValid && !saving) ? "pointer" : "not-allowed" }}>
+            {saving ? "Enregistrement…" : "Enregistrer"}
           </button>
         </div>
       </div>

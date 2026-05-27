@@ -17,6 +17,15 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
   const [acompteLoading, setAcompteLoading] = useState(false);
   const [clientPicker,   setClientPicker]   = useState(false);
   const [statutBusy,     setStatutBusy]     = useState(false);
+  // Protection anti-double-clic sur les actions qui créent une ressource
+  // (Dupliquer, Facturer, Nouvel indice). Un seul état partagé suffit :
+  // ces actions sont mutuellement exclusives côté UX.
+  const [actionBusy,     setActionBusy]     = useState(false);
+  const runAction = async (fn) => {
+    if (actionBusy || !fn) return;
+    setActionBusy(true);
+    try { await fn(); } finally { setActionBusy(false); }
+  };
 
   // Brouillon en cours d'édition persisté en localStorage : filet de
   // sécurité contre tout reload imprévu (cache PWA périmé géré par
@@ -243,9 +252,9 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
             {/* Actions compactes */}
             <div style={{ display: "flex", gap: 5, flexWrap: "wrap", justifyContent: "flex-end" }}>
               {onDuplicate && (
-                <button onClick={onDuplicate}
-                  style={{ background: "#FAF7F2", color: "#6B6358", border: "1px solid #E8E2D8", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-                  📋 Dupliquer
+                <button onClick={() => runAction(() => onDuplicate())} disabled={actionBusy}
+                  style={{ background: "#FAF7F2", color: "#6B6358", border: "1px solid #E8E2D8", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: actionBusy ? "default" : "pointer", whiteSpace: "nowrap", opacity: actionBusy ? 0.6 : 1 }}>
+                  {actionBusy ? "…" : "📋 Dupliquer"}
                 </button>
               )}
               {onConvertToInvoice && lignes.length > 0 && (
@@ -256,16 +265,16 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
                     📄 Facturer · Pro
                   </button>
                 ) : (
-                  <button onClick={onConvertToInvoice}
-                    style={{ background: "#FAF7F2", color: "#1A1612", border: "1px solid #E8E2D8", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-                    📄 Facturer
+                  <button onClick={() => runAction(() => onConvertToInvoice())} disabled={actionBusy}
+                    style={{ background: "#FAF7F2", color: "#1A1612", border: "1px solid #E8E2D8", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: actionBusy ? "default" : "pointer", whiteSpace: "nowrap", opacity: actionBusy ? 0.6 : 1 }}>
+                    {actionBusy ? "…" : "📄 Facturer"}
                   </button>
                 )
               )}
               {onCreateIndice && d.statut !== "accepte" && !isRemplace && (
-                <button onClick={onCreateIndice}
-                  style={{ background: "#f5f3ff", color: "#6b21a8", border: "1px solid #e9d5ff", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-                  ✦ Nouvel indice
+                <button onClick={() => runAction(() => onCreateIndice())} disabled={actionBusy}
+                  style={{ background: "#f5f3ff", color: "#6b21a8", border: "1px solid #e9d5ff", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: actionBusy ? "default" : "pointer", whiteSpace: "nowrap", opacity: actionBusy ? 0.6 : 1 }}>
+                  {actionBusy ? "…" : "✦ Nouvel indice"}
                 </button>
               )}
               {d.statut === "brouillon" && !isRemplace && (

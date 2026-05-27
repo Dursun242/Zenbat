@@ -92,6 +92,8 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   // calculer le padding-bottom du ChatThread (= permet de scroller le
   // dernier message au-dessus de la barre).
   const inputAreaRef = useRef(null);
+  // Verrou anti-double-clic sur la sauvegarde du devis (finalizeSave).
+  const savingDevisRef = useRef(false);
   const [inputAreaHeight, setInputAreaHeight] = useState(140);
   useEffect(() => {
     if (!inputAreaRef.current || typeof ResizeObserver === "undefined") return;
@@ -406,6 +408,13 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   };
 
   const finalizeSave = async (clientId) => {
+    // Garde anti-double-clic : si une sauvegarde est déjà en cours, on
+    // ignore le 2e appel — sinon le user qui clique deux fois sur le
+    // bouton final de ClientPickerModal pendant la latence réseau crée
+    // deux devis et consomme deux slots de son quota freemium.
+    if (savingDevisRef.current) return;
+    savingDevisRef.current = true;
+    try {
     const ht2     = lignes.filter(l => l.type_ligne === "ouvrage").reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0), 0);
     const picked  = clientId ? clients.find(c => c.id === clientId) : null;
     const newId   = uid();
@@ -431,6 +440,9 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     // le message de confirmation s'affiche, sans figer l'écran 2.5 s).
     if (onOpenDevisPDF) onOpenDevisPDF(newId);
     else setTimeout(() => setTab("devis"), 800);
+    } finally {
+      savingDevisRef.current = false;
+    }
   };
 
   const visibleLignes = lignes.slice(0, visibleCount);

@@ -17,6 +17,15 @@ export default function UserDetailDrawer({
 }) {
   useModalGuard(true, onClose);
   const logoFileRef = useRef(null);
+  // Set d'IDs de factures en cours de suppression — empêche un double-clic
+  // sur la corbeille de tenter deux DELETE successifs.
+  const [deletingInvoiceIds, setDeletingInvoiceIds] = useState(() => new Set());
+  const handleDeleteInvoice = async (id, numero) => {
+    if (!onDeleteInvoice || deletingInvoiceIds.has(id)) return;
+    setDeletingInvoiceIds(prev => { const n = new Set(prev); n.add(id); return n; });
+    try { await onDeleteInvoice(id, numero); }
+    finally { setDeletingInvoiceIds(prev => { const n = new Set(prev); n.delete(id); return n; }); }
+  };
   const handlePickLogo = async (e) => {
     const f = e.target.files?.[0];
     if (!f || !onUpdateBrandLogo) return;
@@ -306,9 +315,10 @@ export default function UserDetailDrawer({
                         <span style={{ fontSize: 9, padding: "1px 7px", borderRadius: 20, background: "#F0EBE3", color: "#6B6358", fontWeight: 700 }}>{inv.statut}</span>
                         {canDelete && (
                           <button
-                            onClick={() => onDeleteInvoice(inv.id, inv.numero)}
+                            onClick={() => handleDeleteInvoice(inv.id, inv.numero)}
+                            disabled={deletingInvoiceIds.has(inv.id)}
                             title="Supprimer définitivement ce brouillon"
-                            style={{ background: "none", border: "none", padding: "2px 6px", borderRadius: 6, color: "#ef4444", fontSize: 13, cursor: "pointer", lineHeight: 1 }}
+                            style={{ background: "none", border: "none", padding: "2px 6px", borderRadius: 6, color: "#ef4444", fontSize: 13, cursor: deletingInvoiceIds.has(inv.id) ? "default" : "pointer", lineHeight: 1, opacity: deletingInvoiceIds.has(inv.id) ? 0.4 : 1 }}
                             aria-label={`Supprimer la facture ${inv.numero}`}>
                             🗑
                           </button>

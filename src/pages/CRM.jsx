@@ -639,6 +639,7 @@ function ProspectDetail({ prospectId, onUpdate, onDelete }) {
   const [corps, setCorps]         = useState('')
   const [sending, setSending]     = useState(false)
   const [sendErr, setSendErr]     = useState('')
+  const [deletingProspect, setDeletingProspect] = useState(false)
   const [sendOk, setSendOk]       = useState(false)
   const [editModal, setEditModal] = useState(false)
   const iframeRef = useRef(null)
@@ -690,11 +691,17 @@ function ProspectDetail({ prospectId, onUpdate, onDelete }) {
   }
 
   const handleDelete = async () => {
+    if (deletingProspect) return
     if (!window.confirm('Supprimer ce prospect et tout son historique ?')) return
+    setDeletingProspect(true)
     try {
       await api('POST', { action: 'delete', id: prospectId })
       onDelete(prospectId)
-    } catch {}
+    } catch (e) {
+      console.error('[CRM delete prospect]', e)
+    } finally {
+      setDeletingProspect(false)
+    }
   }
 
   if (loading) return <Spinner />
@@ -744,10 +751,10 @@ function ProspectDetail({ prospectId, onUpdate, onDelete }) {
                 background: '#FAF7F2', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
               Modifier
             </button>
-            <button onClick={handleDelete}
+            <button onClick={handleDelete} disabled={deletingProspect}
               style={{ padding: '6px 12px', border: '1px solid #fecaca', borderRadius: 6,
-                background: '#fff', color: '#dc2626', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
-              Supprimer
+                background: '#fff', color: '#dc2626', fontSize: 12, cursor: deletingProspect ? 'default' : 'pointer', opacity: deletingProspect ? 0.6 : 1, fontFamily: 'inherit' }}>
+              {deletingProspect ? 'Suppression…' : 'Supprimer'}
             </button>
           </div>
         </div>
@@ -1967,6 +1974,7 @@ export default function CRM() {
   const [addModal, setAddModal]     = useState(false)
   const [csvOpen, setCsvOpen]       = useState(false)
   const [selected, setSelected]     = useState(new Set()) // IDs sélectionnés
+  const [bulkDeleting, setBulkDeleting] = useState(false)
   const [bulkOpen, setBulkOpen]     = useState(false)
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [queueOpen, setQueueOpen]   = useState(false)
@@ -2248,18 +2256,22 @@ export default function CRM() {
             📅 Programmer →
           </button>
           <button onClick={async () => {
+            if (bulkDeleting) return
             if (!window.confirm(`Supprimer ${selected.size} prospect${selected.size > 1 ? 's' : ''} définitivement ?`)) return
-            const ids = [...selected]
-            for (const id of ids) {
-              try { await api('POST', { action: 'delete', id }) } catch {}
-            }
-            setProspects(prev => prev.filter(p => !selected.has(p.id)))
-            if (selected.has(selId)) setSelId(null)
-            setSelected(new Set())
-          }}
+            setBulkDeleting(true)
+            try {
+              const ids = [...selected]
+              for (const id of ids) {
+                try { await api('POST', { action: 'delete', id }) } catch (e) { console.error('[CRM bulk delete]', e) }
+              }
+              setProspects(prev => prev.filter(p => !selected.has(p.id)))
+              if (selected.has(selId)) setSelId(null)
+              setSelected(new Set())
+            } finally { setBulkDeleting(false) }
+          }} disabled={bulkDeleting}
             style={{ padding: '8px 18px', background: '#dc2626', border: 'none', borderRadius: 8,
-              color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-            🗑 Supprimer
+              color: '#fff', fontSize: 13, fontWeight: 700, cursor: bulkDeleting ? 'default' : 'pointer', opacity: bulkDeleting ? 0.6 : 1, fontFamily: 'inherit' }}>
+            {bulkDeleting ? 'Suppression…' : '🗑 Supprimer'}
           </button>
           <button onClick={() => setSelected(new Set())}
             style={{ background: 'none', border: 'none', color: '#6B6358', fontSize: 18, cursor: 'pointer' }}>×</button>

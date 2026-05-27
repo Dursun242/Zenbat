@@ -34,6 +34,13 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
   const [sendMessage,    setSendMessage]    = useState("");
   const [sending,        setSending]        = useState(false);
   const [sendStatusMsg,  setSendStatusMsg]  = useState(null);
+  const [deleting,       setDeleting]       = useState(false);
+  const [creatingAvoir,  setCreatingAvoir]  = useState(false);
+  const safeDelete = async () => {
+    if (deleting || !onDelete) return;
+    setDeleting(true);
+    try { await onDelete(); } finally { setDeleting(false); }
+  };
   const ac = brand.color || "#22c55e";
 
   const lignes = invoice.lignes || [];
@@ -245,12 +252,12 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
           <div style={{ flex: 1 }}/>
           <div style={{ display: "flex", gap: 5 }}>
             {!isLocked ? (
-              <button onClick={onDelete}
-                style={{ background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-                🗑 Supprimer
+              <button onClick={safeDelete} disabled={deleting}
+                style={{ background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: deleting ? "default" : "pointer", whiteSpace: "nowrap", opacity: deleting ? 0.6 : 1 }}>
+                {deleting ? "Suppression…" : "🗑 Supprimer"}
               </button>
             ) : (
-              <button onClick={onDelete}
+              <button onClick={safeDelete} disabled={deleting}
                 title="Une facture émise ne peut être que masquée (conservée 10 ans en base, art. L102 B LPF)."
                 style={{ background: "#FAF7F2", color: "#6B6358", border: "1px solid #E8E2D8", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 Masquer
@@ -483,13 +490,16 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
         {isLocked && !isAvoir && onCreateAvoir && (
           <div style={{ marginTop: 10 }}>
             <button
-              onClick={() => {
+              onClick={async () => {
+                if (creatingAvoir) return;
                 if (!confirm(`Créer une facture d'avoir pour ${invoice.numero} ?\n\nUn nouveau brouillon sera créé avec les mêmes lignes. Vous pourrez ajuster les quantités avant émission.`)) return;
-                onCreateAvoir(invoice.id);
+                setCreatingAvoir(true);
+                try { await onCreateAvoir(invoice.id); } finally { setCreatingAvoir(false); }
               }}
+              disabled={creatingAvoir}
               title="Crée un avoir (facture rectificative) basé sur cette facture"
-              style={{ background: "#eef2ff", border: "1px solid #c7d2fe", color: "#4338ca", borderRadius: 12, padding: "12px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-              ↩ Créer un avoir
+              style={{ background: "#eef2ff", border: "1px solid #c7d2fe", color: "#4338ca", borderRadius: 12, padding: "12px 16px", fontSize: 12, fontWeight: 700, cursor: creatingAvoir ? "default" : "pointer", opacity: creatingAvoir ? 0.6 : 1 }}>
+              {creatingAvoir ? "Création de l'avoir…" : "↩ Créer un avoir"}
             </button>
           </div>
         )}

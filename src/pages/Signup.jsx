@@ -130,6 +130,7 @@ export default function Signup({ onSwitchToLogin, onBack }) {
 
   // ── Création du compte ────────────────────────────────────
   const submit = async () => {
+    if (loading) return
     setError(null); setLoading(true)
     try {
       const fullName = `${firstName.trim()} ${lastName.trim()}`.trim()

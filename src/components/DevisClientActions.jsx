@@ -27,6 +27,7 @@ export default function DevisClientActions({ devis, client, onChange, onCreateIn
   const [negLoading, setNegLoading] = useState(false)
   const [artMsg,     setArtMsg]     = useState('')
   const [responding, setResponding] = useState(false)
+  const [creatingIndice, setCreatingIndice] = useState(false)
   const [respErr,    setRespErr]    = useState(null)
   const [showLog,    setShowLog]    = useState(false)
 
@@ -204,9 +205,13 @@ export default function DevisClientActions({ devis, client, onChange, onCreateIn
               ✗ Refuser
             </button>
             {onCreateIndice && (
-              <button onClick={() => onCreateIndice(devis.id)} disabled={responding}
-                style={{ flex: 2, padding: '9px', borderRadius: 10, border: 'none', background: '#6b21a8', color: 'white', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
-                ✦ Créer un nouvel indice
+              <button onClick={async () => {
+                  if (creatingIndice || responding) return
+                  setCreatingIndice(true)
+                  try { await onCreateIndice(devis.id) } finally { setCreatingIndice(false) }
+                }} disabled={responding || creatingIndice}
+                style={{ flex: 2, padding: '9px', borderRadius: 10, border: 'none', background: '#6b21a8', color: 'white', fontWeight: 700, fontSize: 12, cursor: (responding || creatingIndice) ? 'default' : 'pointer', opacity: (responding || creatingIndice) ? 0.6 : 1 }}>
+                {creatingIndice ? '…' : '✦ Créer un nouvel indice'}
               </button>
             )}
           </div>
