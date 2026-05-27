@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { fmt } from "../lib/utils.js";
 import { I } from "./ui/icons.jsx";
 import Badge from "./ui/Badge.jsx";
@@ -7,6 +7,8 @@ import PDFViewer from "./PDFViewer.jsx";
 import ClientPickerModal from "./app/ClientPickerModal.jsx";
 import DevisClientActions from "./DevisClientActions.jsx";
 import { useModalGuard } from "../hooks/useModalGuard.js";
+import { useAuth } from "../lib/auth.jsx";
+import { devisDraftKey } from "../lib/devisDraft.js";
 
 export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChange, onConvertToInvoice, onCreateAcompte, onDuplicate, onCreateIndice, groupVersions = [], goDevis, loading, autoOpenPDF, onAutoOpenPDFConsumed, isFreemium = false, onPaywall = () => {} }) {
   const [showPDF,        setShowPDF]        = useState(false);
@@ -15,6 +17,64 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
   const [acompteLoading, setAcompteLoading] = useState(false);
   const [clientPicker,   setClientPicker]   = useState(false);
   const [statutBusy,     setStatutBusy]     = useState(false);
+
+  // Brouillon en cours d'édition persisté en localStorage : filet de
+  // sécurité contre tout reload imprévu (cache PWA périmé géré par
+  // chunkReload, crash JS, déconnexion intempestive, fermeture d'onglet
+  // accidentelle). Si à l'arrivée sur ce devis on trouve un brouillon
+  // plus récent que la version DB, on propose de le restaurer.
+  const { user } = useAuth();
+  const userId = user?.id;
+  const [restoreOffer, setRestoreOffer] = useState(null);
+  const restoreCheckedRef = useRef(false);
+  const lastPersistRef    = useRef(0);
+
+  // Au 1er rendu de ce devis : vérifie s'il y a un brouillon local plus
+  // récent que la version DB et propose la restauration. useDevis nettoie
+  // ce brouillon après chaque sauvegarde DB réussie, donc s'il en reste
+  // un, c'est qu'une frappe n'a jamais été sauvegardée.
+  useEffect(() => {
+    if (restoreCheckedRef.current || !d?.id) return;
+    restoreCheckedRef.current = true;
+    try {
+      const raw = localStorage.getItem(devisDraftKey(userId, d.id));
+      if (!raw) return;
+      const local = JSON.parse(raw);
+      const dbAt    = new Date(d.updated_at || d.created_at || 0).getTime();
+      const localAt = Number(local?.savedAt || 0);
+      // Tolérance 2 s : évite de proposer un brouillon qui est en fait la
+      // dernière sauvegarde DB déjà en place.
+      if (localAt > dbAt + 2000 && local?.d) {
+        setRestoreOffer(local);
+      } else {
+        localStorage.removeItem(devisDraftKey(userId, d.id));
+      }
+    } catch {}
+  }, [d?.id, d?.updated_at, userId]);
+
+  // Persiste le brouillon à chaque changement de d. Throttle 600 ms pour
+  // ne pas marteler localStorage à chaque frappe (la persistance DB a
+  // déjà son debounce 800 ms côté useDevis).
+  useEffect(() => {
+    if (!d?.id) return;
+    const now = Date.now();
+    if (now - lastPersistRef.current < 600) return;
+    lastPersistRef.current = now;
+    try {
+      localStorage.setItem(devisDraftKey(userId, d.id), JSON.stringify({ d, savedAt: now }));
+    } catch {}
+  }, [d, userId]);
+
+  const restoreDraft = () => {
+    if (!restoreOffer?.d || !onChange) return;
+    onChange(restoreOffer.d);
+    try { localStorage.removeItem(devisDraftKey(userId, d.id)); } catch {}
+    setRestoreOffer(null);
+  };
+  const dismissDraft = () => {
+    try { localStorage.removeItem(devisDraftKey(userId, d.id)); } catch {}
+    setRestoreOffer(null);
+  };
 
   // Filet de sécurité : onChange est synchrone et fire-and-forget. En cas
   // de succès, d.statut change et les boutons disparaissent ; en cas
@@ -155,6 +215,21 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
           onClose={() => setClientPicker(false)}/>
       )}
       <div className="detail-shell" style={{ minHeight: "100%", background: "#FAF7F2", display: "flex", flexDirection: "column" }}>
+        {restoreOffer && (
+          <div style={{ background: "#fffbeb", borderBottom: "1px solid #fde68a", padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13, color: "#92400e", flex: 1, lineHeight: 1.4 }}>
+              💾 Un brouillon non sauvegardé a été détecté pour ce devis.
+            </span>
+            <button onClick={restoreDraft}
+              style={{ background: "#1A1612", border: "none", color: "white", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+              Restaurer
+            </button>
+            <button onClick={dismissDraft}
+              style={{ background: "transparent", border: "1px solid #fde68a", color: "#92400e", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              Ignorer
+            </button>
+          </div>
+        )}
         <div className="detail-row" style={{ flex: 1, display: "flex" }}>
           <div className="detail-editor fu" style={{ flex: 1, minWidth: 0 }}>
         {/* En-tête */}

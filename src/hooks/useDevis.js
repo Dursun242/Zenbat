@@ -10,6 +10,7 @@ import {
 import { uid } from "../lib/utils.js";
 import { DEMO_DEVIS } from "../lib/constants.js";
 import { FREEMIUM_WEEKLY_DEVIS_LIMIT, countDevisThisWeek } from "../lib/appShell.js";
+import { clearDevisDraft } from "../lib/devisDraft.js";
 
 export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, setTab, effectivePlan, weekCount = 0, stickyDevisThisWeek = 0, onDevisCreated = () => {}, onQuotaReached = () => {}, isAdmin = false }) {
   const [devis,        setDevis]        = useState(DEMO_DEVIS);
@@ -38,6 +39,11 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
     if (!user) return;
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
+      // Garde-fou : si un save est en attente (debounce 800 ms pas encore
+      // flushé après une frappe utilisateur), un refetch écraserait la
+      // valeur locale avec l'ancienne version DB → frappe perdue. On
+      // diffère jusqu'au prochain focus quand la file est vide.
+      if (Object.keys(saveTimers.current).length > 0) return;
       listDevisWithLignes()
         .then(ds => { if (ds) setDevis(ds.length ? ds : []); })
         .catch(err => console.error("[refresh devis]", err));
@@ -59,6 +65,10 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
         await apiUpdateDevis(d.id, fields);
         if (saveLignes) await replaceLignes(d.id, (dl || []).map(({ id, created_at, ...l }) => l));
         markSaved();
+        // Sauvegarde DB confirmée : on peut nettoyer le brouillon localStorage
+        // posé par DevisDetail. Si l'utilisateur édite à nouveau, un nouveau
+        // brouillon sera réécrit.
+        clearDevisDraft(user?.id, d.id);
       } catch (err) { console.error("[save devis]", err); showErr("Impossible de sauvegarder le devis"); setSaveState("idle"); }
       finally {
         // Libère l'entrée du Map après run : sinon le Map grossit
