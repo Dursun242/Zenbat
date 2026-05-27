@@ -13,6 +13,7 @@ const parseBrand = b => { if (!b) return {}; if (typeof b === 'string') { try { 
 //   ?type=stripe_health       → past_due + canceled (depuis Stripe API live)
 //   ?type=onboarding_targets  → comptes inscrits sans aucun devis (relance tuto)
 //   ?type=login_logs          → journal des connexions (IP) depuis auth.audit_log_entries
+//   ?type=app_logs            → erreurs JS / crashes côté front (app_logs, AppLogger). Filtres ?level=error|warn|info&resolved=true|false
 //
 // POST endpoints :
 //   {action:'send_welcome_tuto', user_id} → renvoie le mail tuto à 1 user
@@ -107,6 +108,18 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, sent_at: sentAt })
     }
 
+    // Marque une entrée app_logs comme résolue (table app_logs.resolved).
+    if (action === 'resolve_log') {
+      const id = String(req.body?.id || '').trim()
+      if (!id) return res.status(400).json({ error: 'id requis' })
+      const { error: ue } = await admin
+        .from('app_logs')
+        .update({ resolved: true, resolved_at: new Date().toISOString(), resolved_by: auth.user.email })
+        .eq('id', id)
+      if (ue) return res.status(500).json({ error: ue.message })
+      return res.status(200).json({ ok: true })
+    }
+
     return res.status(400).json({ error: 'action inconnue' })
   }
 
@@ -130,6 +143,25 @@ export default async function handler(req, res) {
     const { data: rows, error: re } = await admin.rpc('admin_login_history', { limit_n: 500 })
     if (re) return res.status(500).json({ error: re.message })
     return res.status(200).json({ logins: rows || [], generatedAt: new Date().toISOString() })
+  }
+
+  if (type === 'app_logs') {
+    // Erreurs JS remontées par AppLogger (window.onerror, unhandledrejection,
+    // ErrorBoundary React, échecs de save dans les hooks, etc.).
+    // Migration 0017. Filtres optionnels : level, resolved.
+    const level    = (req.query.level || '').toString().trim()
+    const resolved = req.query.resolved
+    let q = admin
+      .from('app_logs')
+      .select('id, created_at, level, message, stack, context, resolved')
+      .order('created_at', { ascending: false })
+      .limit(500)
+    if (level && ['error', 'warn', 'info'].includes(level)) q = q.eq('level', level)
+    if (resolved === 'true')  q = q.eq('resolved', true)
+    if (resolved === 'false') q = q.eq('resolved', false)
+    const { data: rows, error: re } = await q
+    if (re) return res.status(500).json({ error: re.message })
+    return res.status(200).json({ logs: rows || [], generatedAt: new Date().toISOString() })
   }
 
   if (type === 'coherence') {

@@ -42,15 +42,25 @@ window.__zenbatSWUpdate__ = updateSW
 // atob() strict d'iOS Safari, corrigé en 9f06754) — leur présence chez un
 // user signifie quasi-certainement un cache PWA périmé.
 import { isChunkLoadError, isLegacyCacheError, tryReloadOnce } from './lib/chunkReload.js'
+// Trace l'incident en app_logs AVANT de tenter le reload — sinon
+// l'admin ne saurait jamais qu'un utilisateur a vécu ce reload (le
+// listener AppLogger d'index.html capture l'erreur originale mais sans
+// le contexte « chunk error / reload auto » qui aide au diagnostic).
+const logChunkErr = (msg, source) => {
+  try { window.AppLogger?.logError(`chunk reload: ${msg}`.slice(0, 200), null, { area: "chunk-reload", source }); } catch {}
+}
 window.addEventListener('error', (e) => {
   const msg = e?.message || e?.error?.message
   if (isChunkLoadError(msg) || isLegacyCacheError(msg)) {
+    logChunkErr(msg, "error")
     tryReloadOnce()
   }
 })
 window.addEventListener('unhandledrejection', (e) => {
   const r = e?.reason
-  if (isChunkLoadError(r?.message || r) || isLegacyCacheError(r?.message || r)) {
+  const m = r?.message || r
+  if (isChunkLoadError(m) || isLegacyCacheError(m)) {
+    logChunkErr(m, "unhandledrejection")
     tryReloadOnce()
   }
 })

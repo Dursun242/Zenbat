@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { calcInvoiceTotals } from "../lib/invoiceCalc.js";
+import { logError } from "../lib/logger.js";
 import {
   listInvoices,
   createInvoice as apiCreateInvoice,
@@ -69,7 +70,10 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
       : Promise.resolve();
     Promise.all([p1, p2]).then(
       () => markSaved(),
-      (e) => { console.error("[save invoice]", e); showErr("Impossible de sauvegarder la facture"); setSaveState("idle"); },
+      (e) => {
+        console.error("[save invoice]", e); showErr("Impossible de sauvegarder la facture"); setSaveState("idle");
+        logError("save invoice failed", e?.stack, { area: "invoice-save", invoice_id: inv.id, code: e?.code, msg: e?.message });
+      },
     );
   };
 
@@ -94,6 +98,7 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
       goInvoice(saved.id);
     } catch (err) {
       console.error("[create invoice from devis]", err);
+      logError("create invoice from devis failed", err?.stack, { area: "invoice-create-from-devis", devis_id: devisId, code: err?.code, msg: err?.message });
       showErr(err.message?.includes("does not exist") ? "Migration 0005 non appliquée côté Supabase" : "Impossible de créer la facture");
     }
   };
@@ -154,6 +159,7 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
       setTab("factures");
     } catch (e) {
       console.error("[delete invoice]", e);
+      logError("delete invoice failed", e?.stack, { area: "invoice-delete", invoice_id: id, code: e?.code, msg: e?.message });
       showErr(e?.message || "Impossible de supprimer la facture");
     }
   };

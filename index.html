@@ -97,15 +97,44 @@
           } catch (e) { /* ignore */ }
         }
 
+        // [APP_LOGGER] Throttle/dedup en mémoire — empêche un useEffect en
+        // boucle qui throw de noyer la table (et faire exploser le quota
+        // Supabase). Limite : 5 logs par message identique par minute, et
+        // 60 logs / session toutes catégories confondues (filet absolu).
+        var DEDUP_WINDOW_MS = 60_000;
+        var DEDUP_MAX_PER_MSG = 5;
+        var SESSION_MAX = 60;
+        var dedup = Object.create(null);
+        var sessionCount = 0;
+        function shouldDrop(message) {
+          if (sessionCount >= SESSION_MAX) return true;
+          var key = String(message).slice(0, 200);
+          var now = Date.now();
+          var bucket = dedup[key] || { count: 0, since: now };
+          if (now - bucket.since > DEDUP_WINDOW_MS) { bucket.count = 0; bucket.since = now; }
+          bucket.count += 1;
+          dedup[key] = bucket;
+          return bucket.count > DEDUP_MAX_PER_MSG;
+        }
+
+        // [APP_LOGGER] Masque les tokens de devis publics dans l'URL avant
+        // de la pousser en log (PII / risque de leak côté admin export CSV).
+        function sanitizeUrl(href) {
+          try { return String(href).replace(/(\/devis\/[^/?#]+)/g, '/devis/***'); }
+          catch (e) { return String(href || ''); }
+        }
+
         // [APP_LOGGER] Envoi effectif avec fallback
         function send(level, message, stack, context) {
           try {
+            if (level !== 'info' && shouldDrop(message)) return;
+            sessionCount += 1;
             var payload = {
               level: level,
               message: String(message).slice(0, 2000),
               stack: stack ? String(stack).slice(0, 5000) : null,
               context: Object.assign(
-                { session_id: SESSION_ID, url: location.href, ua: navigator.userAgent.slice(0, 200) },
+                { session_id: SESSION_ID, url: sanitizeUrl(location.href), ua: navigator.userAgent.slice(0, 200) },
                 context || {}
               ),
             };

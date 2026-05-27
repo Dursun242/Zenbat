@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import { SR_LANGS, MIC_LANG_KEY, pickInitialLang } from "../lib/agentIA/speech.js"
+import { logError } from "../lib/logger.js"
 
 // Encapsule l'API Web Speech (reconnaissance vocale) pour l'Agent IA.
 //
@@ -127,7 +128,19 @@ export function useSpeechRecognition({ input, setInput }) {
     }
     rec.onerror = (ev) => {
       const msg = explainError(ev.error)
-      if (msg) setError(msg)
+      if (msg) {
+        setError(msg)
+        // Trace en app_logs pour l'admin : les codes silencieux (no-speech,
+        // aborted) restent ignorés ; on ne loggue que les erreurs qui ont
+        // un message utilisateur. Permet de corréler "le micro marche pas"
+        // avec network / not-allowed / audio-capture chez l'utilisateur.
+        logError(`speech recognition: ${ev.error || "unknown"}`, null, {
+          area: "speech-recognition",
+          code: ev.error,
+          lang: micLang,
+          edge_desktop: isEdgeDesktop(),
+        })
+      }
       else {
         // no-speech / aborted : on ne montre pas d'erreur, mais on laisse
         // onend décider d'un éventuel auto-restart.

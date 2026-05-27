@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from './supabase'
+import { logError } from './logger.js'
 
 const AuthContext = createContext(null)
 
@@ -35,8 +36,12 @@ export function AuthProvider({ children }) {
             setSession(r.session)
             return
           }
+          // Refresh raté → vraie déconnexion. On loggue pour identifier
+          // les patterns (réseau coupé / Safari bfcache / token révoqué).
+          logError("auth signed_out after refresh retry", null, { area: "auth-signed-out", reason: error?.message || "no session" })
         } catch (e) {
           console.warn('[auth] refresh retry failed:', e?.message)
+          logError("auth refresh threw", e?.stack, { area: "auth-refresh", msg: e?.message })
         }
       }
       explicitSignOutRef.current = false

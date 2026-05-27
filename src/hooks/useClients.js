@@ -6,6 +6,7 @@ import {
   deleteClient as apiDeleteClient,
 } from "../lib/api";
 import { DEMO_CLIENTS } from "../lib/constants.js";
+import { logError } from "../lib/logger.js";
 
 export function useClients(user, { markSaving, markSaved, setSaveState, showErr }) {
   const [clients, setClients] = useState(DEMO_CLIENTS);
@@ -16,7 +17,10 @@ export function useClients(user, { markSaving, markSaved, setSaveState, showErr 
     listClients()
       .then(cs => { if (!cancelled) setClients(cs.length ? cs : []); })
       .catch(err => {
-        if (!cancelled) { console.error("[load clients]", err); showErr("Erreur de chargement — vérifiez votre connexion"); }
+        if (!cancelled) {
+          console.error("[load clients]", err); showErr("Erreur de chargement — vérifiez votre connexion");
+          logError("load clients failed", err?.stack, { area: "clients-load", code: err?.code, msg: err?.message });
+        }
       });
     return () => { cancelled = true; };
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -31,14 +35,20 @@ export function useClients(user, { markSaving, markSaved, setSaveState, showErr 
       if (isNew) await apiCreateClient(fields);
       else       await apiUpdateClient(c.id, fields);
       markSaved();
-    } catch (err) { console.error("[save client]", err); showErr("Impossible de sauvegarder le contact"); setSaveState("idle"); }
+    } catch (err) {
+      console.error("[save client]", err); showErr("Impossible de sauvegarder le contact"); setSaveState("idle");
+      logError("save client failed", err?.stack, { area: "client-save", client_id: c.id, isNew, code: err?.code, msg: err?.message });
+    }
   };
 
   const onDeleteClient = async (id) => {
     const victim = clients.find(x => x.id === id);
     const idx    = clients.findIndex(x => x.id === id);
     setClients(prev => prev.filter(x => x.id !== id));
-    if (user) apiDeleteClient(id).catch(e => { console.error("[delete client]", e); showErr("Impossible de supprimer le contact"); });
+    if (user) apiDeleteClient(id).catch(e => {
+      console.error("[delete client]", e); showErr("Impossible de supprimer le contact");
+      logError("delete client failed", e?.stack, { area: "client-delete", client_id: id, code: e?.code, msg: e?.message });
+    });
     return { victim, idx };
   };
 

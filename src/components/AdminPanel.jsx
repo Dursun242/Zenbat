@@ -10,6 +10,7 @@ import AdminNegativeLogs from "./admin/AdminNegativeLogs.jsx"
 import AdminConversations from "./admin/AdminConversations.jsx"
 import AdminNewsletter    from "./admin/AdminNewsletter.jsx"
 import AdminLoginLogs     from "./admin/AdminLoginLogs.jsx"
+import AdminAppLogs       from "./admin/AdminAppLogs.jsx"
 import AdminCoherenceStats from "./admin/AdminCoherenceStats.jsx"
 import AdminFeedback       from "./admin/AdminFeedback.jsx"
 import AdminAgentBenchmark from "./admin/AdminAgentBenchmark.jsx"
@@ -38,6 +39,10 @@ export default function AdminPanel({ onBack }) {
   const [newsletterLoading,setNewsletterLoading]= useState(false)
   const [loginLogs,        setLoginLogs]        = useState(null)
   const [loginLogsLoading, setLoginLogsLoading] = useState(false)
+  const [appLogs,          setAppLogs]          = useState(null)
+  const [appLogsLoading,   setAppLogsLoading]   = useState(false)
+  const [appLogsLevel,     setAppLogsLevel]     = useState("")
+  const [appLogsOnlyUnresolved, setAppLogsOnlyUnresolved] = useState(true)
   const [coherence,        setCoherence]        = useState(null)
   const [coherenceLoading, setCoherenceLoading] = useState(false)
   const [feedback,         setFeedback]         = useState(null)
@@ -158,6 +163,31 @@ export default function AdminPanel({ onBack }) {
       const data = await res.json()
       if (res.ok) setLoginLogs(data.logins || [])
     } catch {} finally { setLoginLogsLoading(false) }
+  }
+
+  const loadAppLogs = async () => {
+    setAppLogsLoading(true)
+    try {
+      const token = await getToken()
+      const params = new URLSearchParams({ type: "app_logs" })
+      if (appLogsLevel)       params.set("level", appLogsLevel)
+      if (appLogsOnlyUnresolved) params.set("resolved", "false")
+      const res  = await fetch(`/api/admin-stats?${params}`, { headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json()
+      if (res.ok) setAppLogs(data.logs || [])
+    } catch {} finally { setAppLogsLoading(false) }
+  }
+
+  const markLogResolved = async (id) => {
+    try {
+      const token = await getToken()
+      const res  = await fetch("/api/admin-stats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: "resolve_log", id }),
+      })
+      if (res.ok) setAppLogs(prev => prev?.filter(l => l.id !== id) || prev)
+    } catch {}
   }
 
   const loadCoherence = async () => {
@@ -533,6 +563,13 @@ export default function AdminPanel({ onBack }) {
           <Collapsible title="Connexions"      subtitle="Journal des connexions (IP) — sécurité"
             count={loginLogs?.length}          loaded={loginLogs !== null}  onExpand={loadLoginLogs}>
             <AdminLoginLogs logins={loginLogs} loading={loginLogsLoading} onRefresh={loadLoginLogs} embedded />
+          </Collapsible>
+
+          <Collapsible title="Erreurs application" subtitle="Crashes, échecs de sauvegarde, problèmes micro… remontés automatiquement"
+            count={appLogs?.length}              loaded={appLogs !== null}  onExpand={loadAppLogs}>
+            <AdminAppLogs logs={appLogs} loading={appLogsLoading} onRefresh={loadAppLogs} onMarkResolved={markLogResolved}
+              level={appLogsLevel} setLevel={l => { setAppLogsLevel(l); setTimeout(loadAppLogs, 50); }}
+              onlyUnresolved={appLogsOnlyUnresolved} setOnlyUnresolved={v => { setAppLogsOnlyUnresolved(v); setTimeout(loadAppLogs, 50); }}/>
           </Collapsible>
 
           <Collapsible title="Cohérence devis IA" subtitle="Détection automatique d'anomalies"

@@ -11,6 +11,7 @@ import { uid } from "../lib/utils.js";
 import { DEMO_DEVIS } from "../lib/constants.js";
 import { FREEMIUM_WEEKLY_DEVIS_LIMIT, countDevisThisWeek } from "../lib/appShell.js";
 import { clearDevisDraft } from "../lib/devisDraft.js";
+import { logError } from "../lib/logger.js";
 
 export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, setTab, effectivePlan, weekCount = 0, stickyDevisThisWeek = 0, onDevisCreated = () => {}, onQuotaReached = () => {}, isAdmin = false }) {
   const [devis,        setDevis]        = useState(DEMO_DEVIS);
@@ -25,7 +26,10 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
     listDevisWithLignes()
       .then(ds => { if (!cancelled) setDevis(ds.length ? ds : []); })
       .catch(err => {
-        if (!cancelled) { console.error("[load devis]", err); showErr("Erreur de chargement — vérifiez votre connexion"); }
+        if (!cancelled) {
+          console.error("[load devis]", err); showErr("Erreur de chargement — vérifiez votre connexion");
+          logError("load devis failed", err?.stack, { area: "devis-load", code: err?.code, msg: err?.message });
+        }
       });
     return () => { cancelled = true; };
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -69,7 +73,10 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
         // posé par DevisDetail. Si l'utilisateur édite à nouveau, un nouveau
         // brouillon sera réécrit.
         clearDevisDraft(user?.id, d.id);
-      } catch (err) { console.error("[save devis]", err); showErr("Impossible de sauvegarder le devis"); setSaveState("idle"); }
+      } catch (err) {
+        console.error("[save devis]", err); showErr("Impossible de sauvegarder le devis"); setSaveState("idle");
+        logError("save devis failed", err?.stack, { area: "devis-save", devis_id: d.id, code: err?.code, msg: err?.message });
+      }
       finally {
         // Libère l'entrée du Map après run : sinon le Map grossit
         // indéfiniment à mesure que l'utilisateur édite des devis
@@ -129,6 +136,7 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
       return true;
     } catch (err) {
       console.error("[create devis]", err);
+      logError("create devis failed", err?.stack, { area: "devis-create", devis_id: d.id, code: err?.code, msg: err?.message });
       // Rollback de l'ajout optimiste pour ne pas laisser un devis fantôme dans le state
       setDevis(prev => prev.filter(x => x.id !== d.id));
       const isRlsBlock = err?.code === "42501" || /row-level security|new row violates/i.test(err?.message || "");
@@ -208,6 +216,7 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
       goDevis(created.id);
     } catch (e) {
       console.error("[create indice]", e);
+      logError("create indice failed", e?.stack, { area: "devis-indice", code: e?.code, msg: e?.message });
       showErr(e?.message || "Impossible de créer l'indice");
     }
   };
@@ -219,6 +228,7 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
       setDevis(prev => prev.filter(x => x.id !== id));
     } catch (e) {
       console.error("[delete devis]", e);
+      logError("delete devis failed", e?.stack, { area: "devis-delete", devis_id: id, code: e?.code, msg: e?.message });
       showErr(e?.message || "Impossible de supprimer le devis");
     }
   };
