@@ -1,5 +1,6 @@
 import { Component } from 'react'
 import { logError } from '../lib/logger.js'
+import { isChunkLoadError, isLegacyCacheError, tryReloadOnce } from '../lib/chunkReload.js'
 
 export default class ErrorBoundary extends Component {
   state = { error: null }
@@ -10,11 +11,20 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error('[Zenbat] Crash React:', error, info?.componentStack)
+    const msg = error?.message || ''
+    const isChunkErr = isChunkLoadError(msg) || isLegacyCacheError(msg)
     logError(
       error.message || 'React crash',
       error.stack || null,
-      { type: 'react.componentDidCatch', componentStack: info?.componentStack?.slice(0, 1000) }
+      { type: 'react.componentDidCatch', chunk_error: isChunkErr, componentStack: info?.componentStack?.slice(0, 1000) }
     )
+    // Cache PWA périmé / chunk error attrapé ici (cas typique : un lazy
+    // import dans App.jsx ou un await import() dans un composant). Les
+    // listeners globaux de main.jsx ne le voient pas car React capture
+    // l'exception avant. On tente un reload silencieux : si le throttle
+    // 30s a déjà été déclenché, l'écran crash reste affiché et
+    // l'utilisateur garde la main via « Recharger l'application ».
+    if (isChunkErr) tryReloadOnce()
   }
 
   render() {
