@@ -118,7 +118,10 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
   const terra = brand?.color || "#C97B5C"
   const baseDate = d.date_emission ? new Date(d.date_emission) : new Date()
   const validUntil = isNaN(baseDate.getTime()) ? new Date() : baseDate
-  validUntil.setDate(validUntil.getDate() + (brand.validityDays || 30))
+  // Cast Number explicite : si brand.validityDays vient d'un input mal
+  // saisi (ex. "abc"), Number(...) || 30 retombe sur 30 au lieu d'un
+  // setDate(NaN) qui rendrait validUntil invalide pour tout le PDF.
+  validUntil.setDate(validUntil.getDate() + (Number(brand.validityDays) || 30))
   const clientName = cl?.raison_sociale || `${cl?.prenom||""}  ${cl?.nom||""}`.trim() || "—"
 
   const clientLines = [

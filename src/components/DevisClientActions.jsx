@@ -31,7 +31,10 @@ export default function DevisClientActions({ devis, client, onChange, onCreateIn
   const [respErr,    setRespErr]    = useState(null)
   const [showLog,    setShowLog]    = useState(false)
 
-  const baseUrl = `${window.location.origin}/d/${devis.public_token}`
+  // public_token est généré côté serveur à l'envoi : avant la 1ère envoi, il
+  // peut être null/undefined → on évite « .../d/undefined » qui mènerait
+  // nulle part. L'UI désactive les actions tant que baseUrl est vide.
+  const baseUrl = devis.public_token ? `${window.location.origin}/d/${devis.public_token}` : ""
 
   // Charge l'audit log et la négociation en cours depuis Supabase (RLS artisan).
   // try/catch englobant : si une des deux requêtes throw (réseau coupé, RLS

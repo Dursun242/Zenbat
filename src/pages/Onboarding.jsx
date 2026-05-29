@@ -67,10 +67,14 @@ export default function Onboarding({ brand, setBrand, onDone }) {
     }
   }, [userId])
 
-  // Sauvegarde à chaque modification de step ou local.
+  // Sauvegarde à chaque modification de step ou local — debounced 400 ms
+  // pour ne pas marteler localStorage à chaque frappe dans les inputs
+  // (sur Safari iOS, les writes localStorage peuvent être lents et
+  // bloquer brièvement le rendu).
   useEffect(() => {
     if (!userId) return
-    writeDraft(userId, step, local)
+    const t = setTimeout(() => writeDraft(userId, step, local), 400)
+    return () => clearTimeout(t)
   }, [userId, step, local])
 
   // Reset tryNext quand on change d'étape pour ne pas garder un état

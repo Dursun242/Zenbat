@@ -377,20 +377,30 @@ export default function DevisPublicPage({ token }) {
   const load = useCallback(async (sid) => {
     const id  = sid || sessionId
     const url = `/api/devis-public?token=${token}${id ? `&session_id=${id}` : ''}`
-    const res  = await fetch(url)
-    const json = await res.json()
-    if (!res.ok) {
-      // Session expirée / invalide : purge la session persistée pour ne pas
-      // boucler en erreur au reload suivant.
+    try {
+      const res  = await fetch(url)
+      const json = await res.json()
+      if (!res.ok) {
+        // Session expirée / invalide : purge la session persistée pour ne pas
+        // boucler en erreur au reload suivant.
+        if (id) clearPersistedSessionId(token)
+        setPhase('error'); return
+      }
+      json._token = token
+      setData(json)
+      if (json.statut === 'accepte') { clearPersistedSessionId(token); setPhase('accepted') }
+      else if (json.statut === 'refuse') { clearPersistedSessionId(token); setPhase('refused') }
+      else if (!json.verified) setPhase('verify')
+      else setPhase('view')
+    } catch (err) {
+      // res.json() throw si l'API renvoie HTML (502 Vercel, route mal
+      // configurée…) — sans ce catch, l'utilisateur reste coincé sur
+      // « Chargement… » indéfiniment. La page de signature client est
+      // l'écran le plus business-critique : on bascule en mode error
+      // pour qu'il puisse contacter l'artisan.
       if (id) clearPersistedSessionId(token)
-      setPhase('error'); return
+      setPhase('error')
     }
-    json._token = token
-    setData(json)
-    if (json.statut === 'accepte') { clearPersistedSessionId(token); setPhase('accepted') }
-    else if (json.statut === 'refuse') { clearPersistedSessionId(token); setPhase('refused') }
-    else if (!json.verified) setPhase('verify')
-    else setPhase('view')
   }, [token, sessionId])
 
   useEffect(() => { load() }, [])

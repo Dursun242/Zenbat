@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { fmtDT, relTime } from "../../lib/admin/format.js"
 import { getToken } from "../../lib/getToken.js"
 
@@ -14,6 +14,11 @@ export default function AdminOnboardingTargets({ data, loading, onRefresh, embed
   const [bulkRunning, setBulkRunning] = useState(false)
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0, fail: 0 })
   const [err, setErr]           = useState("")
+  // Flag d'unmount : si l'admin ferme/replie la section pendant un sendAll
+  // en cours, on stoppe la boucle pour éviter d'envoyer des mails au-delà
+  // de ce que l'admin pensait, et de setState sur composant démonté.
+  const mountedRef = useRef(true)
+  useEffect(() => () => { mountedRef.current = false }, [])
 
   const targets = data?.targets || []
 
@@ -52,14 +57,15 @@ export default function AdminOnboardingTargets({ data, loading, onRefresh, embed
     setBulkProgress({ done: 0, total: todo.length, fail: 0 })
     let done = 0, fail = 0
     for (const t of todo) {
+      if (!mountedRef.current) break  // section fermée → stop la boucle
       const success = await sendOne(t.id)
       done++
       if (!success) fail++
-      setBulkProgress({ done, total: todo.length, fail })
+      if (mountedRef.current) setBulkProgress({ done, total: todo.length, fail })
       // Petite pause pour ne pas saturer Resend / la Edge Function
       await new Promise(r => setTimeout(r, 300))
     }
-    setBulkRunning(false)
+    if (mountedRef.current) setBulkRunning(false)
   }
 
   const pendingCount = targets.filter(t => !isAlreadySent(t)).length

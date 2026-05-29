@@ -22,24 +22,31 @@ export function useSupportUnread() {
     if (!user?.id) { setHasUnread(false); return; }
     lastCheckRef.current = Date.now();
 
-    const { data: ticket } = await supabase
-      .from("support_tickets")
-      .select("id, user_last_seen_at, created_at")
-      .eq("user_id", user.id)
-      .neq("status", "resolved")
-      .order("last_message_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (!ticket) { setHasUnread(false); return; }
+    // try/catch global : supabase-js peut throw TypeError « Failed to fetch »
+    // si le réseau est totalement KO. Sans ce catch, l'unhandledrejection
+    // remonterait dans AppLogger à chaque retour de focus de l'utilisateur
+    // hors-ligne. On dégrade silencieusement : pas de badge plutôt qu'une
+    // alerte rouge dans le log à chaque check.
+    try {
+      const { data: ticket } = await supabase
+        .from("support_tickets")
+        .select("id, user_last_seen_at, created_at")
+        .eq("user_id", user.id)
+        .neq("status", "resolved")
+        .order("last_message_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!ticket) { setHasUnread(false); return; }
 
-    const since = ticket.user_last_seen_at || ticket.created_at;
-    const { count } = await supabase
-      .from("support_messages")
-      .select("id", { count: "exact", head: true })
-      .eq("ticket_id", ticket.id)
-      .in("role", ["claude", "admin"])
-      .gt("created_at", since);
-    setHasUnread((count ?? 0) > 0);
+      const since = ticket.user_last_seen_at || ticket.created_at;
+      const { count } = await supabase
+        .from("support_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("ticket_id", ticket.id)
+        .in("role", ["claude", "admin"])
+        .gt("created_at", since);
+      setHasUnread((count ?? 0) > 0);
+    } catch { /* hors-ligne / réseau coupé — on garde la dernière valeur */ }
   }, [user?.id]);
 
   useEffect(() => {

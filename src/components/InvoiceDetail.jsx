@@ -113,6 +113,11 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
       // navigateur, plus tolérant et sans la limite de taille de String.
       const cleanB64 = String(data.pdf_base64).replace(/\s/g, "");
       const blob = await fetch(`data:application/pdf;base64,${cleanB64}`).then(r => r.blob());
+      // Garde-fou : un PDF Factur-X conforme fait toujours plusieurs Ko. Sous
+      // 1 Ko, c'est forcément une troncature/corruption silencieuse — on
+      // préfère un message d'erreur qu'un téléchargement de fichier cassé
+      // que l'artisan ne remarquerait qu'en l'ouvrant.
+      if (blob.size < 1024) throw new Error("PDF reçu corrompu, réessayez l'émission.");
       downloadBlob(blob, `${invoice.numero}-facturx.pdf`);
 
       // Conformité : l'émission de la facture (transition brouillon → envoyee
