@@ -9,6 +9,7 @@ const { sendMailMock } = vi.hoisted(() => ({
 vi.mock('./_cors.js',     () => ({ cors: () => {} }))
 vi.mock('./_withAuth.js', () => ({
   authenticate: vi.fn(async () => ({ user: { id: 'artisan-1', email: 'artisan@test.fr' } })),
+  notifyTelegram: vi.fn(async () => {}),
 }))
 vi.mock('nodemailer', () => ({
   createTransport: () => ({ sendMail: sendMailMock }),
