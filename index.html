@@ -150,9 +150,33 @@
           sessionId: SESSION_ID,
         };
 
+        // [APP_LOGGER] Filtre les erreurs hors-scope (extensions navigateur,
+        // scripts tiers). « Script error. » sans détail = CORS sur un script
+        // externe, l'erreur ne vient pas de notre code. « inline is not
+        // defined », « __EXT_*_ » : injections d'extensions Chrome/Safari
+        // (uBlock, Honey, traducteurs, etc.). Filename hors notre origine =
+        // pareil. Filtrer ce bruit empêche de polluer le panel admin avec
+        // des erreurs sur lesquelles on ne peut rien faire.
+        function isExternalNoise(message, filename) {
+          var msg = String(message || '');
+          if (msg === 'Script error.' || msg === 'Script error') return true;
+          if (/^(inline|chrome|webkit|safari)\s+is not defined$/i.test(msg)) return true;
+          if (/extension:\/\/|moz-extension:\/\/|chrome-extension:\/\//i.test(msg)) return true;
+          if (filename) {
+            var f = String(filename);
+            if (/^(chrome|moz|safari|edge)-extension:/i.test(f)) return true;
+            // Filename vide ou différent de notre origine (souvent injection)
+            try {
+              if (f && f.indexOf(location.origin) !== 0 && !f.startsWith('/') && !f.startsWith('blob:')) return true;
+            } catch (e) {}
+          }
+          return false;
+        }
+
         // [APP_LOGGER] Capture automatique des erreurs JS non gérées
         window.addEventListener('error', function (e) {
           try {
+            if (isExternalNoise(e.message, e.filename)) return;
             window.AppLogger.logError(
               e.message || 'JS Error',
               e.error && e.error.stack ? e.error.stack : (e.filename + ':' + e.lineno),
@@ -165,8 +189,10 @@
         window.addEventListener('unhandledrejection', function (e) {
           try {
             var reason = e.reason || {};
+            var msg = reason.message || String(e.reason) || 'Unhandled rejection';
+            if (isExternalNoise(msg, reason.fileName || reason.filename)) return;
             window.AppLogger.logError(
-              reason.message || String(e.reason) || 'Unhandled rejection',
+              msg,
               reason.stack || null,
               { type: 'unhandledrejection' }
             );

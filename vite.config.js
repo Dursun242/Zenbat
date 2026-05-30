@@ -88,16 +88,26 @@ export default defineConfig({
           /^\/robots\.txt$/,
           /^\/google[a-z0-9]+\.html$/,
         ],
-        // ⚠ skipWaiting + clientsClaim désactivés volontairement.
-        // Avec ces deux flags + registerType:'autoUpdate', vite-plugin-pwa
-        // déclenche un window.location.reload() mid-session dès qu'un
-        // nouveau SW est déployé — l'utilisateur perd ce qu'il tape.
-        // Sans eux, le nouveau SW reste en "waiting" et s'active naturellement
-        // au prochain démarrage de l'app (fermeture/réouverture du PWA ou
-        // refresh manuel). La MAJ est appliquée silencieusement, jamais
-        // pendant qu'on est en train d'utiliser l'app.
-        // clientsClaim: true,
-        // skipWaiting: true,
+        // skipWaiting + clientsClaim ACTIVÉS : le nouveau SW prend la main
+        // immédiatement après installation, au lieu d'attendre la fermeture
+        // de tous les onglets (qui n'arrive jamais sur PWA mobile installée
+        // → l'utilisateur gardait l'ancien SW + ancien index.html pendant
+        // des jours/semaines, ce qui provoquait les chunk errors
+        // « Importing a module script failed » à chaque navigation vers un
+        // lazy import dont le hash a changé).
+        //
+        // Le trade-off historique (reload mid-session = perte de saisie)
+        // est désormais couvert par :
+        //   - autosave localStorage du devis (src/lib/devisDraft.js)
+        //   - auth résiliente avec refreshSession retry (auth.jsx)
+        //   - ErrorBoundary qui affiche « Mise à jour de l'application… »
+        //     au lieu de l'écran crash quand un chunk error survient
+        //   - mode nuke en 2e essai (chunkReload.js)
+        //
+        // Conclusion : on accepte le micro-reload pour supprimer 60 %+
+        // du bruit du panel d'erreurs et améliorer l'expérience perçue.
+        clientsClaim: true,
+        skipWaiting: true,
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
