@@ -36,9 +36,17 @@ export function AuthProvider({ children }) {
             setSession(r.session)
             return
           }
-          // Refresh raté → vraie déconnexion. On loggue pour identifier
-          // les patterns (réseau coupé / Safari bfcache / token révoqué).
-          logError("auth signed_out after refresh retry", null, { area: "auth-signed-out", reason: error?.message || "no session" })
+          // Refresh raté. Deux cas à distinguer :
+          //   - « Auth session missing! » : session déjà absente côté
+          //     supabase-js (utilisateur revient après expiration normale,
+          //     onglet inactif des heures). Ce n'est pas un bug, juste un
+          //     état → on ne pollue pas le panel d'erreurs.
+          //   - Autre raison : réseau coupé, token révoqué, bfcache Safari…
+          //     on garde le log error pour pouvoir analyser.
+          const reason = error?.message || 'no session'
+          if (!/Auth session missing/i.test(reason)) {
+            logError("auth signed_out after refresh retry", null, { area: "auth-signed-out", reason })
+          }
         } catch (e) {
           console.warn('[auth] refresh retry failed:', e?.message)
           logError("auth refresh threw", e?.stack, { area: "auth-refresh", msg: e?.message })

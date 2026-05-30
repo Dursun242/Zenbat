@@ -3,10 +3,12 @@ import { logError } from '../lib/logger.js'
 import { isChunkLoadError, isLegacyCacheError, tryReloadOnce } from '../lib/chunkReload.js'
 
 export default class ErrorBoundary extends Component {
-  state = { error: null }
+  state = { error: null, isChunkErr: false }
 
   static getDerivedStateFromError(error) {
-    return { error }
+    const msg = error?.message || ''
+    const isChunkErr = isChunkLoadError(msg) || isLegacyCacheError(msg)
+    return { error, isChunkErr }
   }
 
   componentDidCatch(error, info) {
@@ -29,6 +31,24 @@ export default class ErrorBoundary extends Component {
 
   render() {
     if (this.state.error) {
+      // Cas chunk error : on est en train de recharger automatiquement
+      // (cf. componentDidCatch + tryReloadOnce). Plutôt que le grand
+      // écran « Une erreur inattendue » qui inquiète, on affiche un
+      // simple « Mise à jour de l'application… » avec spinner.
+      if (this.state.isChunkErr) {
+        return (
+          <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, background: '#FAF7F2', fontFamily: 'system-ui, sans-serif', textAlign: 'center' }}>
+            <style>{`@keyframes zb-spin{to{transform:rotate(360deg)}}`}</style>
+            <div style={{ width: 44, height: 44, border: '3px solid #E8E2D8', borderTopColor: '#1A1612', borderRadius: '50%', animation: 'zb-spin .9s linear infinite', marginBottom: 24 }}/>
+            <h2 style={{ fontSize: 17, fontWeight: 600, color: '#1A1612', marginBottom: 6 }}>
+              Mise à jour de l'application…
+            </h2>
+            <p style={{ fontSize: 13, color: '#6B6358', maxWidth: 320 }}>
+              Une nouvelle version est disponible. Patientez quelques secondes.
+            </p>
+          </div>
+        )
+      }
       return (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, background: '#FAF7F2', fontFamily: 'system-ui, sans-serif', textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 20 }}>⚠️</div>
@@ -39,7 +59,7 @@ export default class ErrorBoundary extends Component {
             L'application a rencontré un problème. Vos données sont en sécurité.
           </p>
           <button
-            onClick={() => { this.setState({ error: null }); window.location.reload(); }}
+            onClick={() => { this.setState({ error: null, isChunkErr: false }); window.location.reload(); }}
             style={{ padding: '12px 24px', borderRadius: 10, border: 0, background: '#1A1612', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             Recharger l'application
           </button>
