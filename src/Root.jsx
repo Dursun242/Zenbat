@@ -10,10 +10,17 @@ import CGU from './pages/CGU.jsx'
 import DevisPublicPage from './pages/DevisPublicPage.jsx'
 import ContactPage from './pages/ContactPage.jsx'
 import EmailVerificationGate from './components/EmailVerificationGate.jsx'
+// CRM en import sync (utilisé par l'admin au quotidien — éliminer les
+// chunk errors prime sur les ~80 Ko de bundle initial supplémentaire).
+import CRM from './pages/CRM.jsx'
 
+// Pages SEO publiques uniquement — conservées en lazy car prerenderées
+// statiquement par vitePrerenderPlugin (un visiteur Google qui arrive
+// sur /villes/paris reçoit le HTML final pré-rendu, le JS n'est lazy
+// que pour l'hydratation côté navigateur). Un chunk error ici touche
+// uniquement le SEO, pas l'app principale.
 const VillesIndex = lazy(() => import('./pages/VillesIndex.jsx'))
 const VillePage   = lazy(() => import('./pages/VillePage.jsx'))
-const CRM         = lazy(() => import('./pages/CRM.jsx'))
 
 const loader = {
   wrap: { minHeight:'100vh', display:'grid', placeItems:'center', background:'#FAF7F2', color:'#6B6358', fontFamily:'system-ui,sans-serif' },

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect, useCallback, lazy, Suspense } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, Suspense } from "react";
 import { useAuth } from "./lib/auth.jsx";
 import { supabase } from "./lib/supabase.js";
 import { getMyProfile, getDevisWeekCount } from "./lib/api.js";
@@ -31,16 +31,22 @@ import SupportChat   from "./components/SupportChat.jsx";
 import SendToComptableModal from "./components/app/SendToComptableModal.jsx";
 import AuthScreen    from "./pages/AuthScreen.jsx";
 
-// Écrans lourds — chargés à la demande uniquement
-const DevisDetail        = lazy(() => import("./components/DevisDetail.jsx"))
-const InvoiceDetail      = lazy(() => import("./components/InvoiceDetail.jsx"))
-const AgentIA            = lazy(() => import("./components/AgentIA.jsx"))
-const AdminPanel         = lazy(() => import("./components/AdminPanel.jsx"))
-const Onboarding         = lazy(() => import("./pages/Onboarding.jsx"))
-const TradesQuickPicker  = lazy(() => import("./pages/TradesQuickPicker.jsx"))
-const PaywallScreen      = lazy(() => import("./pages/PaywallScreen.jsx"))
-const PWAInstallScreen   = lazy(() => import("./pages/PWAInstallScreen.jsx"))
-const SubscriptionScreen = lazy(() => import("./pages/SubscriptionScreen.jsx"))
+// Écrans principaux — imports synchrones (pas de lazy/import dynamique).
+// Historique : ces 9 écrans étaient lazy-loadés pour réduire le bundle
+// initial, mais ça générait des « Importing a module script failed »
+// dès qu'un utilisateur PWA avait l'ancien index.html en cache et que
+// le déploiement Vercel avait renommé les chunks. Trade-off accepté :
+// bundle initial ~25 % plus gros au boot (≈ 0,3 s sur 4G) contre ZÉRO
+// chunk error possible sur les écrans utilisés au quotidien.
+import DevisDetail        from "./components/DevisDetail.jsx"
+import InvoiceDetail      from "./components/InvoiceDetail.jsx"
+import AgentIA            from "./components/AgentIA.jsx"
+import AdminPanel         from "./components/AdminPanel.jsx"
+import Onboarding         from "./pages/Onboarding.jsx"
+import TradesQuickPicker  from "./pages/TradesQuickPicker.jsx"
+import PaywallScreen      from "./pages/PaywallScreen.jsx"
+import PWAInstallScreen   from "./pages/PWAInstallScreen.jsx"
+import SubscriptionScreen from "./pages/SubscriptionScreen.jsx"
 
 const ScreenLoader = () => (
   <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 200 }}>
