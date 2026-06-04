@@ -431,6 +431,44 @@ export async function createAcompteFromDevis(devis, montantHT, tvaRate = 20, vat
   return createInvoice(invoice, lignes)
 }
 
+export async function createSoldeFromDevis(devis, acompteInvoices = [], tvaRate = 20, vatRegime) {
+  const numero = await nextInvoiceNumber()
+  const effectiveRate = vatRegime === 'franchise' ? 0 : tvaRate
+  const devisHT = (devis.lignes || [])
+    .filter(l => l.type_ligne === 'ouvrage')
+    .reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0)
+  const totalAcompteHT = acompteInvoices.reduce((s, a) => s + (Number(a.montant_ht) || 0), 0)
+  const montantHT = Math.round((devisHT - totalAcompteHT) * 100) / 100
+  if (montantHT <= 0) throw new Error('Toutes les échéances ont déjà été facturées.')
+  const acompteRefs = acompteInvoices.map(a => a.numero).join(', ')
+  const designation = `Solde – devis ${devis.numero}${devis.objet ? ' – ' + devis.objet : ''}${acompteRefs ? ' (acomptes ' + acompteRefs + ')' : ''}`
+  const montant_tva = Math.round(montantHT * effectiveRate) / 100
+  const montant_ttc = montantHT + montant_tva
+  const lignes = [{
+    type_ligne:    'ouvrage',
+    designation,
+    unite:         'forfait',
+    quantite:      1,
+    prix_unitaire: montantHT,
+    tva_rate:      effectiveRate,
+  }]
+  const invoice = {
+    devis_id:       devis.id,
+    client_id:      devis.client_id,
+    numero,
+    objet:          `Solde – ${devis.objet || devis.numero}`,
+    operation_type: 'service',
+    statut:         'brouillon',
+    invoice_type:   'solde',
+    montant_ht:     montantHT,
+    montant_tva,
+    montant_ttc,
+    date_emission:  new Date().toISOString().split('T')[0],
+    date_echeance:  new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+  }
+  return createInvoice(invoice, lignes)
+}
+
 export async function createInvoice(invoice, lignes = []) {
   const { data: { user } } = await supabase.auth.getUser()
   const { data: inv, error } = await supabase

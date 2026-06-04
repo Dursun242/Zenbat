@@ -168,7 +168,7 @@ export default function App() {
   } = useDevis(user, { ...saveCallbacks, setTab, effectivePlan, weekCount, stickyDevisThisWeek, onDevisCreated, onQuotaReached, isAdmin });
   const {
     invoices, selI, onSaveInvoice, onCreateInvoiceFromDevis, onCreateEmptyInvoice,
-    onCreateAcompte, onCreateAvoir, onDeleteInvoice, goInvoice,
+    onCreateAcompte, onCreateSolde, onCreateAvoir, onDeleteInvoice, goInvoice,
   } = useInvoices(user, devis, brand, { ...saveCallbacks, setTab });
 
   useEffect(() => {
@@ -591,6 +591,8 @@ export default function App() {
                   onChange={onSaveDevis}
                   onConvertToInvoice={() => onCreateInvoiceFromDevis(selD)}
                   onCreateAcompte={onCreateAcompte}
+                  onCreateSolde={onCreateSolde}
+                  invoices={invoices}
                   onDuplicate={() => onDuplicateDevis(selD)}
                   onCreateIndice={() => onCreateIndice(selD)}
                   groupVersions={groupVersions}

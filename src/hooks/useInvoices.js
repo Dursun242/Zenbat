@@ -10,6 +10,7 @@ import {
   nextInvoiceNumber,
   createAvoirFromInvoice as apiCreateAvoir,
   createAcompteFromDevis as apiCreateAcompte,
+  createSoldeFromDevis   as apiCreateSolde,
 } from "../lib/api";
 
 export function useInvoices(user, devis, brand, { markSaving, markSaved, setSaveState, showErr, setTab }) {
@@ -138,6 +139,22 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
     }
   };
 
+  const onCreateSolde = async (devisId, acompteInvoices) => {
+    if (!user) { showErr("Vous devez être connecté."); return; }
+    try {
+      const found = devis.find(d => d.id === devisId);
+      if (!found) throw new Error("Devis introuvable");
+      const tvaRate = brand?.vatRegime === "franchise" ? 0 : 20;
+      const saved = await apiCreateSolde(found, acompteInvoices, tvaRate, brand?.vatRegime);
+      const fresh = await listInvoices();
+      setInvoices(fresh);
+      goInvoice(saved.id);
+    } catch (e) {
+      console.error("[create solde]", e);
+      showErr(e?.message || "Impossible de créer la facture de solde");
+    }
+  };
+
   const onCreateAvoir = async (invoiceId) => {
     if (!user) { showErr("Vous devez être connecté."); return; }
     try {
@@ -167,6 +184,6 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
   return {
     invoices, setInvoices, selI,
     onSaveInvoice, onCreateInvoiceFromDevis, onCreateEmptyInvoice,
-    onCreateAcompte, onCreateAvoir, onDeleteInvoice, goInvoice,
+    onCreateAcompte, onCreateSolde, onCreateAvoir, onDeleteInvoice, goInvoice,
   };
 }
