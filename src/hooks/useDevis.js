@@ -23,14 +23,21 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    listDevisWithLignes()
-      .then(ds => { if (!cancelled) setDevis(ds.length ? ds : []); })
-      .catch(err => {
-        if (!cancelled) {
+    const load = (retry = false) =>
+      listDevisWithLignes()
+        .then(ds => { if (!cancelled) setDevis(ds.length ? ds : []); })
+        .catch(err => {
+          if (cancelled) return;
+          // "Lock was stolen" : erreur transitoire du client Supabase JS sur
+          // iOS Safari (Web Locks API). On réessaie une fois après 800 ms.
+          if (!retry && err?.name === "AbortError" && err?.message?.includes("stolen")) {
+            setTimeout(() => { if (!cancelled) load(true); }, 800);
+            return;
+          }
           console.error("[load devis]", err); showErr("Erreur de chargement — vérifiez votre connexion");
           logError("load devis failed", err?.stack, { area: "devis-load", code: err?.code, msg: err?.message });
-        }
-      });
+        });
+    load();
     return () => { cancelled = true; };
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -50,7 +57,10 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
       if (Object.keys(saveTimers.current).length > 0) return;
       listDevisWithLignes()
         .then(ds => { if (ds) setDevis(ds.length ? ds : []); })
-        .catch(err => console.error("[refresh devis]", err));
+        .catch(err => {
+          if (err?.name === "AbortError" && err?.message?.includes("stolen")) return; // transitoire iOS Safari
+          console.error("[refresh devis]", err);
+        });
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
