@@ -10,11 +10,12 @@ import { useModalGuard } from "../hooks/useModalGuard.js";
 import { useAuth } from "../lib/auth.jsx";
 import { devisDraftKey } from "../lib/devisDraft.js";
 
-export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChange, onConvertToInvoice, onCreateAcompte, onDuplicate, onCreateIndice, groupVersions = [], goDevis, loading, autoOpenPDF, onAutoOpenPDFConsumed, isFreemium = false, onPaywall = () => {} }) {
+export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChange, onConvertToInvoice, onCreateAcompte, onCreateSolde, invoices = [], onDuplicate, onCreateIndice, groupVersions = [], goDevis, loading, autoOpenPDF, onAutoOpenPDFConsumed, isFreemium = false, onPaywall = () => {} }) {
   const [showPDF,        setShowPDF]        = useState(false);
   const [acompteModal,   setAcompteModal]   = useState(false);
   const [acomptePct,     setAcomptePct]     = useState(30);
   const [acompteLoading, setAcompteLoading] = useState(false);
+  const [soldeLoading,   setSoldeLoading]   = useState(false);
   const [clientPicker,   setClientPicker]   = useState(false);
   const [statutBusy,     setStatutBusy]     = useState(false);
   // Protection anti-double-clic sur les actions qui créent une ressource
@@ -130,9 +131,23 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
 
   const franchise  = brand?.vatRegime === "franchise";
   const tvaRate    = franchise ? 0 : (lignes.find(l => l.type_ligne === "ouvrage")?.tva_rate ?? 20);
-  const acompteHT  = Math.round(ht * acomptePct) / 100;
-  const acompteTTC = Math.round(acompteHT * (1 + tvaRate / 100) * 100) / 100;
   const canAcompte = onCreateAcompte && ht > 0 && ["envoye","en_signature","accepte"].includes(d.statut);
+
+  // Acomptes et solde déjà créés pour ce devis
+  const devisAcomptes = invoices.filter(inv =>
+    inv.devis_id === d.id && inv.invoice_type === "acompte" && inv.statut !== "annulee"
+  );
+  const devisHasSolde = invoices.some(inv =>
+    inv.devis_id === d.id && inv.invoice_type === "solde" && inv.statut !== "annulee"
+  );
+  const totalAcompteHT = devisAcomptes.reduce((s, a) => s + (Number(a.montant_ht) || 0), 0);
+  const remainingHT    = Math.max(0, Math.round((ht - totalAcompteHT) * 100) / 100);
+  const remainingPct   = ht > 0 ? Math.round(remainingHT / ht * 100) : 100;
+  const maxAcomptePct  = Math.max(1, remainingPct);
+  const clampedPct     = Math.min(acomptePct, maxAcomptePct);
+  const acompteHT      = Math.round(ht * clampedPct) / 100;
+  const acompteTTC     = Math.round(acompteHT * (1 + tvaRate / 100) * 100) / 100;
+  const soldeTTC       = Math.round(remainingHT * (1 + tvaRate / 100) * 100) / 100;
 
   const handleAcompte = async () => {
     if (!acompteHT || acompteLoading) return;
@@ -142,6 +157,17 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
       setAcompteModal(false);
     } finally {
       setAcompteLoading(false);
+    }
+  };
+
+  const handleSolde = async () => {
+    if (!onCreateSolde || soldeLoading || !remainingHT) return;
+    setSoldeLoading(true);
+    try {
+      await onCreateSolde(d.id, devisAcomptes);
+      setAcompteModal(false);
+    } finally {
+      setSoldeLoading(false);
     }
   };
 
@@ -166,53 +192,106 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
       {acompteModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 200, display: "flex", alignItems: "flex-end", justifyContent: "center" }}
           onClick={e => { if (e.target === e.currentTarget) setAcompteModal(false); }}>
-          <div style={{ background: "white", borderRadius: "20px 20px 0 0", padding: 24, width: "100%", maxWidth: 480 }}>
-            <div style={{ fontWeight: 700, fontSize: 16, color: "#1A1612", marginBottom: 4 }}>Facture d'acompte</div>
-            <div style={{ fontSize: 12, color: "#6B6358", marginBottom: 20 }}>Devis {d.numero} · Total HT {fmt(ht)}</div>
+          <div style={{ background: "white", borderRadius: "20px 20px 0 0", padding: 24, width: "100%", maxWidth: 480, maxHeight: "90vh", overflowY: "auto" }}>
+            <div style={{ fontWeight: 700, fontSize: 16, color: "#1A1612", marginBottom: 4 }}>Facturation par acomptes</div>
+            <div style={{ fontSize: 12, color: "#6B6358", marginBottom: 16 }}>Devis {d.numero} · Total HT {fmt(ht)}</div>
 
-            <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6358", display: "block", marginBottom: 8 }}>POURCENTAGE DE L'ACOMPTE</label>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-              <input type="range" min={1} max={100} value={acomptePct}
-                onChange={e => setAcomptePct(Number(e.target.value))}
-                style={{ flex: 1, accentColor: ac }}/>
-              <div style={{ display: "flex", alignItems: "center", gap: 4, border: "1px solid #E8E2D8", borderRadius: 10, padding: "6px 10px" }}>
-                <input type="number" min={1} max={100} value={acomptePct}
-                  onChange={e => setAcomptePct(Math.min(100, Math.max(1, Number(e.target.value))))}
-                  style={{ width: 48, border: "none", outline: "none", fontSize: 15, fontWeight: 700, textAlign: "right", fontFamily: "inherit", color: "#1A1612" }}/>
-                <span style={{ color: "#6B6358", fontSize: 14 }}>%</span>
-              </div>
-            </div>
-
-            <div style={{ background: "#FAF7F2", borderRadius: 14, padding: "14px 16px", marginBottom: 20 }}>
-              {franchise ? (
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 13, color: "#6B6358" }}>Montant (TVA non applicable)</span>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: ac }}>{fmt(acompteHT)}</span>
+            {/* Liste des acomptes déjà créés */}
+            {devisAcomptes.length > 0 && (
+              <div style={{ background: "#FAF7F2", borderRadius: 12, padding: "12px 14px", marginBottom: 16 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#9A8E82", marginBottom: 8, letterSpacing: "0.05em" }}>DÉJÀ FACTURÉ</div>
+                {devisAcomptes.map(a => (
+                  <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <div>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "#1A1612" }}>{a.numero}</span>
+                      <span style={{ fontSize: 11, color: "#9A8E82", marginLeft: 6 }}>
+                        {Math.round((Number(a.montant_ht) || 0) / ht * 100)}%
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#1A1612" }}>{fmt(Number(a.montant_ht) || 0)} HT</span>
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 6,
+                        background: a.statut === "envoyee" || a.statut === "payee" ? "#ecfdf5" : "#f1f5f9",
+                        color:      a.statut === "envoyee" || a.statut === "payee" ? "#065f46" : "#64748b",
+                        border:     `1px solid ${a.statut === "envoyee" || a.statut === "payee" ? "#bbf7d0" : "#e2e8f0"}`,
+                      }}>{a.statut === "envoyee" ? "Émis" : a.statut === "payee" ? "Payé" : "Brouillon"}</span>
+                    </div>
+                  </div>
+                ))}
+                <div style={{ borderTop: "1px solid #E8E2D8", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 12, color: "#6B6358" }}>Reste à facturer</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: remainingHT > 0 ? "#1A1612" : "#9A8E82" }}>
+                    {fmt(remainingHT)} HT ({remainingPct}%)
+                  </span>
                 </div>
-              ) : (
-                <>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                    <span style={{ fontSize: 13, color: "#6B6358" }}>Montant HT</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#1A1612" }}>{fmt(acompteHT)}</span>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ fontSize: 13, color: "#6B6358" }}>Montant TTC ({tvaRate}%)</span>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: ac }}>{fmt(acompteTTC)}</span>
-                  </div>
-                </>
-              )}
-            </div>
+              </div>
+            )}
 
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setAcompteModal(false)}
-                style={{ flex: 1, background: "#F0EBE3", border: "none", borderRadius: 14, padding: 14, fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#6B6358" }}>
-                Annuler
-              </button>
-              <button onClick={handleAcompte} disabled={acompteLoading}
-                style={{ flex: 2, background: acompteLoading ? "#9A8E82" : ac, border: "none", borderRadius: 14, padding: 14, fontSize: 14, fontWeight: 700, cursor: acompteLoading ? "not-allowed" : "pointer", color: "white" }}>
-                {acompteLoading ? "Création…" : `Créer l'acompte (${fmt(acompteTTC)} TTC)`}
-              </button>
-            </div>
+            {/* Facture de solde déjà créée */}
+            {devisHasSolde && (
+              <div style={{ background: "#ecfdf5", border: "1px solid #bbf7d0", borderRadius: 12, padding: "12px 14px", marginBottom: 16, fontSize: 12, color: "#065f46" }}>
+                ✓ Facture de solde déjà créée pour ce devis.
+              </div>
+            )}
+
+            {/* Acompte suivant — masqué si plus rien à facturer ou solde déjà créé */}
+            {remainingHT > 0 && !devisHasSolde && (
+              <>
+                <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6358", display: "block", marginBottom: 8 }}>
+                  {devisAcomptes.length > 0 ? "NOUVEL ACOMPTE" : "POURCENTAGE DE L'ACOMPTE"}
+                </label>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                  <input type="range" min={1} max={maxAcomptePct} value={clampedPct}
+                    onChange={e => setAcomptePct(Number(e.target.value))}
+                    style={{ flex: 1, accentColor: ac }}/>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, border: "1px solid #E8E2D8", borderRadius: 10, padding: "6px 10px" }}>
+                    <input type="number" min={1} max={maxAcomptePct} value={clampedPct}
+                      onChange={e => setAcomptePct(Math.min(maxAcomptePct, Math.max(1, Number(e.target.value))))}
+                      style={{ width: 48, border: "none", outline: "none", fontSize: 15, fontWeight: 700, textAlign: "right", fontFamily: "inherit", color: "#1A1612" }}/>
+                    <span style={{ color: "#6B6358", fontSize: 14 }}>%</span>
+                  </div>
+                </div>
+
+                <div style={{ background: "#FAF7F2", borderRadius: 14, padding: "14px 16px", marginBottom: 16 }}>
+                  {franchise ? (
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 13, color: "#6B6358" }}>Montant (TVA non applicable)</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: ac }}>{fmt(acompteHT)}</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                        <span style={{ fontSize: 13, color: "#6B6358" }}>Montant HT</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: "#1A1612" }}>{fmt(acompteHT)}</span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: 13, color: "#6B6358" }}>Montant TTC ({tvaRate}%)</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: ac }}>{fmt(acompteTTC)}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <button onClick={handleAcompte} disabled={acompteLoading}
+                  style={{ width: "100%", background: acompteLoading ? "#9A8E82" : ac, border: "none", borderRadius: 14, padding: 14, fontSize: 14, fontWeight: 700, cursor: acompteLoading ? "not-allowed" : "pointer", color: "white", marginBottom: devisAcomptes.length > 0 ? 10 : 0 }}>
+                  {acompteLoading ? "Création…" : `Créer l'acompte (${fmt(acompteTTC)} TTC)`}
+                </button>
+
+                {/* Bouton "Facture de solde" dès qu'il y a au moins un acompte */}
+                {devisAcomptes.length > 0 && onCreateSolde && (
+                  <button onClick={handleSolde} disabled={soldeLoading}
+                    style={{ width: "100%", background: "white", border: "1.5px solid #1A1612", borderRadius: 14, padding: 13, fontSize: 13, fontWeight: 700, cursor: soldeLoading ? "not-allowed" : "pointer", color: "#1A1612", opacity: soldeLoading ? 0.6 : 1 }}>
+                    {soldeLoading ? "Création…" : `Créer la facture de solde (${fmt(soldeTTC)} TTC · ${remainingPct}%)`}
+                  </button>
+                )}
+              </>
+            )}
+
+            <button onClick={() => setAcompteModal(false)}
+              style={{ width: "100%", background: "#F0EBE3", border: "none", borderRadius: 14, padding: 13, fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#6B6358", marginTop: 10 }}>
+              Fermer
+            </button>
           </div>
         </div>
       )}

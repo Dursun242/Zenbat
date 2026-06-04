@@ -280,6 +280,9 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
           {invoice.invoice_type === "acompte" && (
             <span style={{ fontSize: 9, fontWeight: 700, color: "#c2410c", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 6, padding: "2px 6px" }}>ACOMPTE</span>
           )}
+          {invoice.invoice_type === "solde" && (
+            <span style={{ fontSize: 9, fontWeight: 700, color: "#0e7490", background: "#ecfeff", border: "1px solid #a5f3fc", borderRadius: 6, padding: "2px 6px" }}>SOLDE</span>
+          )}
           <Badge s={invoice.statut} kind="facture"/>
         </div>
         {isAvoir && (
@@ -293,7 +296,13 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
         {invoice.invoice_type === "acompte" && (
           <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", color: "#c2410c", padding: "8px 10px", borderRadius: 10, fontSize: 11, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 14 }}>💰</span>
-            <span><strong>Facture d'acompte</strong> — sera déduite de la facture finale.</span>
+            <span><strong>Facture d'acompte</strong> — sera déduite de la facture de solde.</span>
+          </div>
+        )}
+        {invoice.invoice_type === "solde" && (
+          <div style={{ background: "#ecfeff", border: "1px solid #a5f3fc", color: "#0e7490", padding: "8px 10px", borderRadius: 10, fontSize: 11, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 14 }}>🏁</span>
+            <span><strong>Facture de solde</strong> — solde restant dû après déduction des acomptes précédents.</span>
           </div>
         )}
         {isLocked && !isAvoir && (
