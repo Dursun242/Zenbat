@@ -162,6 +162,15 @@
           if (msg === 'Script error.' || msg === 'Script error') return true;
           if (/^(inline|chrome|webkit|safari)\s+is not defined$/i.test(msg)) return true;
           if (/extension:\/\/|moz-extension:\/\/|chrome-extension:\/\//i.test(msg)) return true;
+          // « Object Not Found Matching Id:N, MethodName:update, ParamCount:N » :
+          // injection d'une extension navigateur / outil d'automatisation (RPA).
+          // Jamais émis par notre code — observé en masse en prod sans stack.
+          if (/Object Not Found Matching Id:\s*\d+/i.test(msg)) return true;
+          // Web Locks API de Supabase auth : quand un onglet/refresh prend le
+          // verrou de refresh token avec { steal: true }, l'opération en cours
+          // est avortée. Contention bénigne et par design (l'opération perdante
+          // est rejouée) — inutile de polluer le panel admin.
+          if (/Lock (was stolen by another request|broken by another request with the 'steal' option)/i.test(msg)) return true;
           if (filename) {
             var f = String(filename);
             if (/^(chrome|moz|safari|edge)-extension:/i.test(f)) return true;

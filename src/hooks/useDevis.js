@@ -13,6 +13,16 @@ import { FREEMIUM_WEEKLY_DEVIS_LIMIT, countDevisThisWeek } from "../lib/appShell
 import { clearDevisDraft } from "../lib/devisDraft.js";
 import { logError } from "../lib/logger.js";
 
+// Le Web Locks API de Supabase auth peut "voler" le verrou de refresh token
+// entre onglets / à la reprise d'onglet (iOS Safari notamment), ce qui avorte
+// le getSession() interne avec un AbortError transitoire. Les libellés varient
+// (« Lock was stolen by another request », « Lock broken by another request
+// with the 'steal' option ») — d'où ce matcher large plutôt qu'un simple
+// .includes("stolen") qui ratait la variante « 'steal' option ».
+const isLockAbort = (e) =>
+  e?.name === "AbortError" ||
+  /lock was stolen|'steal' option|lock broken/i.test(e?.message || "");
+
 export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, setTab, effectivePlan, weekCount = 0, stickyDevisThisWeek = 0, onDevisCreated = () => {}, onQuotaReached = () => {}, isAdmin = false }) {
   const [devis,        setDevis]        = useState(DEMO_DEVIS);
   const [selD,         setSelD]         = useState(null);
@@ -23,21 +33,26 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    const load = (retry = false) =>
-      listDevisWithLignes()
-        .then(ds => { if (!cancelled) setDevis(ds.length ? ds : []); })
-        .catch(err => {
-          if (cancelled) return;
-          // "Lock was stolen" : erreur transitoire du client Supabase JS sur
-          // iOS Safari (Web Locks API). On réessaie une fois après 800 ms.
-          if (!retry && err?.name === "AbortError" && err?.message?.includes("stolen")) {
-            setTimeout(() => { if (!cancelled) load(true); }, 800);
-            return;
-          }
-          console.error("[load devis]", err); showErr("Erreur de chargement — vérifiez votre connexion");
-          logError("load devis failed", err?.stack, { area: "devis-load", code: err?.code, msg: err?.message });
-        });
-    load();
+    // Retry une fois en silence si le verrou Supabase est volé (transitoire) —
+    // évite un faux « Erreur de chargement » + un log de bruit.
+    const loadWithRetry = async () => {
+      try {
+        return await listDevisWithLignes();
+      } catch (err) {
+        if (!isLockAbort(err)) throw err;
+        await new Promise(r => setTimeout(r, 800));
+        return await listDevisWithLignes();
+      }
+    };
+    loadWithRetry()
+      .then(ds => { if (!cancelled) setDevis(ds.length ? ds : []); })
+      .catch(err => {
+        if (cancelled) return;
+        // Verrou volé même après retry → bénin, ne pas alarmer l'utilisateur.
+        if (isLockAbort(err)) { console.warn("[load devis] lock volé, ignoré", err); return; }
+        console.error("[load devis]", err); showErr("Erreur de chargement — vérifiez votre connexion");
+        logError("load devis failed", err?.stack, { area: "devis-load", code: err?.code, msg: err?.message });
+      });
     return () => { cancelled = true; };
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -58,7 +73,7 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
       listDevisWithLignes()
         .then(ds => { if (ds) setDevis(ds.length ? ds : []); })
         .catch(err => {
-          if (err?.name === "AbortError" && err?.message?.includes("stolen")) return; // transitoire iOS Safari
+          if (isLockAbort(err)) return; // verrou Supabase volé — transitoire
           console.error("[refresh devis]", err);
         });
     };
