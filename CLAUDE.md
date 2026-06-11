@@ -30,10 +30,8 @@ L'ancienne URL externe (Stripe Dashboard `/api/stripe-checkout`, `/api/stripe-we
 Les fichiers dans `/supabase/migrations/` ne s'appliquent **pas automatiquement**.
 L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - Prévenir l'utilisateur à chaque nouvelle migration créée.
-- Dernière migration appliquée connue : `0042_stripe_webhook_idempotency.sql`.
+- Dernière migration appliquée connue : `0043_schema_migrations.sql` (+ `0041` appliquée le 2026-06-11 — le tracking `schema_migrations` est actif à partir de maintenant).
 - **Migrations en attente d'application** :
-  - `0041_fix_devis_week_count_null.sql` — fix critique qui empêche tout nouveau freemium de créer son tout premier devis (bug RLS sur la policy `devis_insert_freemium_weekly_limit`, cf. section Bugs connus).
-  - `0043_schema_migrations.sql` — crée la table de tracking (cf ci-dessous).
   - `0047_devis_negociation_status.sql` — étend la CHECK constraint `devis_statut_check` pour autoriser `'en_negociation'`. Sans cette migration, toute négociation client échoue silencieusement à mettre à jour le statut du devis (cf. section Bugs connus).
   - `0049_invoices_sent_to_client.sql` — ajoute `invoices.sent_to_client_at` + `sent_to_client_count` pour tracker l'envoi par email du PDF Factur-X au client (action `send` de `api/facturx.js`). `api/facturx.js` catche le 42703 si la migration n'est pas appliquée — l'email part quand même, seul le tracking en DB est sauté.
   - `0050_support_notif_purge.sql` — ajoute `support_tickets.user_last_seen_at` (badge "non lu" côté front, lu par `useSupportUnread`) + fonction `purge_old_support_tickets()` planifiée toutes les heures via pg_cron pour effacer les tickets dont `last_message_at` remonte à plus de 36h (CASCADE sur `support_messages`). ⚠ Prérequis : activer l'extension `pg_cron` côté Dashboard Supabase (Database → Extensions) avant d'appliquer la migration, sinon le `create extension` échoue. Diagnostic du job : `SELECT * FROM cron.job WHERE jobname = 'purge-support-tickets-36h';` et `SELECT * FROM cron.job_run_details WHERE jobname = 'purge-support-tickets-36h' ORDER BY start_time DESC LIMIT 10;`.
