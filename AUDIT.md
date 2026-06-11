@@ -1,257 +1,199 @@
 # Audit Zenbat — site & app
 
-> Audit complet réalisé le **2026-05-11** sur la branche `claude/audit-site-app-MUuwJ`.
-> Stack auditée : React + Vite · Vercel Serverless · Supabase · Claude API · Stripe · B2Brouter · Odoo Sign.
+> Audit complet réalisé le **2026-06-11** sur la branche `claude/application-audit-15sotd` (commit `8cfe447`).
+> Remplace l'audit du 2026-05-11. Stack auditée : React + Vite · Vercel Serverless · Supabase · Claude API · Stripe.
+> Méthodologie : 4 passes parallèles (sécurité API, frontend, migrations/RLS, config/deps), chaque finding critique re-vérifié manuellement dans le code — les faux positifs écartés sont listés en §7.
 
 ---
 
 ## 0. Synthèse exécutive
 
-| Domaine | État | Niveau de risque |
+| Domaine | État | Constat |
 |---|---|---|
-| Sécurité API | 🟠 | 4 critiques, 6 importants, 5 mineurs |
-| Base de données / RLS | 🟢 | Bien structurée, 2 critiques liés à la doc + PII |
-| Qualité de code front | 🟡 | 4 critiques (régression token, duplication), composants trop gros |
-| Performances / bundle | 🟠 | Dépendances mal placées, pas de pagination, deps obsolètes |
-| Documentation projet | 🔴 | CLAUDE.md décalé sur 2 points structurants |
+| Sécurité API | 🟡 | Bonne base (auth, OTP, idempotence, CORS), mais rate-limit contournable et durcissements manquants |
+| Migrations / DB | 🔴 | **Doublon de numéro 0053** + grosse pile de migrations critiques toujours « en attente » |
+| Frontend | 🟢 | Les bugs historiques (token, fu, 42703) sont corrigés ; reste duplication et localStorage non scopé |
+| Dépendances | 🟠 | 11 vulnérabilités npm (1 critical, 3 high) dont dompurify via jspdf |
+| Config Vercel | 🟠 | Aucun header de sécurité HTTP ; `crm.js` absent de `vercel.json` |
+| Tests | 🟠 | `stripe.js`, `facturx.js`, `account.js`, `contact.js` : zéro test |
+| Documentation (CLAUDE.md) | 🟠 | Décalée : 11/12 fonctions (pas 10), `crm.js` non documenté, migrations 0053-0055 absentes |
 
-**Top 3 actions urgentes**
+**Top 5 actions urgentes**
 
-1. **Régression token `getToken()`** : `Onboarding.jsx` est revenu à `session?.access_token` — bug connu re-introduit (voir CLAUDE.md §Token). À corriger en priorité.
-2. **Limite Vercel atteinte (12/12)** : ajouts de `contact.js` et `devis-public.js` non reflétés dans CLAUDE.md. Tout futur endpoint cassera le déploiement.
-3. **Migration `0039_freemium_weekly_limit.sql` non documentée** comme « en attente » ; si non appliquée, fragmentation côté DB entre l'ancien essai 30 j et le nouveau freemium hebdomadaire.
-
----
-
-## 1. Documentation projet décalée (à corriger immédiatement)
-
-### 1.1 Limite Vercel : 12/12 et non plus 10/12
-
-`CLAUDE.md` ligne ~25 indique « 10/12 ». Or l'état réel de `/api/` :
-
-```
-account.js  admin-delete-user.js  admin-stats.js  admin-user-detail.js
-b2brouter.js  claude.js  contact.js  devis-public.js  facturx.js
-newsletter.js  odoo-sign.js  stripe.js
-```
-
-→ **12 endpoints** + helpers `_cors.js`, `_email.js`, `_withAuth.js` (les `_*` ne comptent pas comme functions Vercel, OK).
-
-**Action** : mettre à jour CLAUDE.md pour refléter `12/12` et documenter le rôle de `contact.js`, `devis-public.js`, `_email.js`, `_withAuth.js` dans le tableau des endpoints.
-
-### 1.2 Migration `0039` orpheline
-
-`CLAUDE.md` ligne ~34 : « Dernière migration appliquée : `0038_invoice_auto_liquidation.sql` · Aucune migration en attente ». Or `supabase/migrations/0039_freemium_weekly_limit.sql` existe sur disque.
-
-**Risque** : si non appliquée, la table `devis_weekly_counters` et son trigger n'existent pas, alors que le front a probablement basculé sur un compteur hebdomadaire. Doublon possible avec l'ancien système `devis_daily_counters` (migrations 0036/0037) toujours en place.
-
-**Action** : confirmer si 0039 a été appliquée. Si oui, mettre à jour CLAUDE.md → « 0039 ». Si non, le rappeler à l'utilisateur et indiquer que la prochaine migration est `0040_`.
+1. **Renommer le doublon de migration `0053`** : `0053_invoice_type_solde.sql` et `0053_pro_trial_until.sql` coexistent → collision sur `schema_migrations(version)` (la 2ᵉ ne sera jamais trackée). Renommer `0053_pro_trial_until.sql` → `0056_pro_trial_until.sql` et corriger son INSERT idempotent.
+2. **Appliquer les migrations en attente** (0041, 0043, 0047, 0049, 0050, 0052, puis 0053-0055) — 0041 et 0047 corrigent des bugs bloquants documentés (1ᵉʳ devis freemium, négociation invisible).
+3. **`npm audit fix`** (+ test après mise à jour de jspdf) : dompurify ≤3.3.3 via jspdf (XSS, high), fast-uri (high), serialize-javascript (high), 1 critical Babel transitif.
+4. **Ajouter les headers de sécurité HTTP** dans `vercel.json` (CSP, X-Frame-Options, X-Content-Type-Options, HSTS, Referrer-Policy).
+5. **Mettre à jour CLAUDE.md** : 11/12 fonctions, documenter `crm.js`, `_serverLog.js`, `_ssrf.js`, migrations 0044-0046, 0048, 0051, 0053-0055, prochain préfixe = `0057_` (après renommage).
 
 ---
 
-## 2. Sécurité — API & helpers
+## 1. Migrations & base de données
 
-### 🔴 Critique
+### 1.1 🔴 Doublon de numéro 0053 (critique)
 
-| # | Fichier:ligne | Problème | Impact |
-|---|---|---|---|
-| S1 | `api/facturx.js:354-365` | Si le client envoie `pdf_base64` sans `invoice.id`, la vérification d'ownership est **contournée**. L'endpoint devient un proxy Factur-X non authentifié. | Tout utilisateur authentifié peut générer un Factur-X valide pour n'importe quel PDF. |
-| S2 | `api/claude.js` (admin bypass) | L'admin est exempté de toute limite journalière, et `profiles.ai_used` n'est pas incrémenté côté backend. | Coût Claude illimité si `ADMIN_EMAIL` est compromis. Aucune visibilité du coût réel par user. |
-| S3 | `api/devis-public.js` (OTP 6 chiffres) | OTP `Math.random()` + 6 chiffres = 10⁶ combinaisons. Rate-limit existant n'est que par token, pas par IP. | Brute-force OTP réaliste avec parallélisation. |
-| S4 | `api/devis-public.js` | Pas de validation longueur/format du `token` public ; pas de rate-limit par IP sur `request_otp`. | Énumération de tokens facilitée si la table grossit. |
-| S5 | `api/contact.js` + `api/newsletter.js` | Aucun rate-limiting. Honeypot seul sur contact.js. | Spam des emails admin / quota Brevo / coûts email. |
+Deux fichiers portent le préfixe `0053` :
+- `0053_invoice_type_solde.sql` (CHECK `invoice_type` + 'solde')
+- `0053_pro_trial_until.sql` (colonne `pro_trial_until` + job cron)
 
-### 🟠 Important
+Avec le tracking `schema_migrations` (PK sur `version`), les deux INSERT `values ('0053', ...)` entrent en collision : `on conflict do nothing` fait que **la seconde migration appliquée n'est jamais enregistrée**, et le diagnostic `SELECT ... FROM schema_migrations` devient mensonger.
 
-- `api/account.js:222` — regex email `/^\S+@\S+\.\S+$/` trop permissive sur `comptable_email`. Risque : redirection d'export vers email attaquant. Utiliser la regex `EMAIL_RE` stricte déjà présente dans `contact.js`/`newsletter.js`.
-- `api/stripe.js:261` — l'erreur Stripe brute (`err.code`, `message`) est renvoyée au client. Information disclosure sur la config Stripe.
-- `api/b2brouter.js` — accepte 2 noms de header (`x-b2b-signature` OU `x-b2brouter-signature`) ; à uniformiser.
-- `api/b2brouter.js:207-238` — ownership vérifiée sur `invoice.owner_id` mais pas sur le `client.owner_id` associé.
-- `api/odoo-sign.js:82-87` — message d'erreur expose les noms de variables d'env attendues.
-- `api/claude.js:115-132` — pas de backpressure sur le streaming : un client lent peut maintenir une fonction ouverte ~55 s.
+**Action** : renommer `0053_pro_trial_until.sql` → `0056_pro_trial_until.sql`, mettre à jour son INSERT (`'0056'`), et passer le « prochain préfixe » du CLAUDE.md à `0057_`.
 
-### 🟡 Mineur
+### 1.2 🔴 Pile de migrations « en attente » qui s'allonge
 
-- `api/_email.js:16` — fallback typo `GMAIL_APP_PASWORD` (rétrocompat). À documenter ou migrer.
-- `api/devis-public.js` — `client_name` accepté sans whitelist de caractères → risque XSS stocké si réaffiché côté admin sans escape.
-- `api/odoo-sign.js:330,334` — escaping HTML manuel ; centraliser ou utiliser une lib éprouvée.
+Le CLAUDE.md indique `0042` comme dernière appliquée, avec 0041/0043/0047/0049/0050/0052 en attente. Or les fichiers vont désormais jusqu'à `0055` (+ 0044-0046 CRM, 0048, 0051, 0053×2, 0054). Tant que ce n'est pas appliqué :
+- **0041** : tout nouveau freemium est bloqué sur son 1ᵉʳ devis (bug NULL documenté).
+- **0047** : toute négociation client laisse le devis figé à « Envoyé ».
+- **0050** : le badge support ne s'affiche jamais (cf. §1.3) et les tickets ne sont pas purgés.
+- **0055** : l'idempotence `send_signed_pdf` n'est protégée que séquentiellement (pas contre la race concurrente).
 
-### ✅ Points forts sécurité
+**Action** : séance d'application dans l'ordre 0043 → 0041 → 0044…0055 (activer `pg_cron` avant 0050), puis vérifier `SELECT version FROM schema_migrations ORDER BY version`.
 
-- HMAC en `timingSafeEqual` côté Stripe et B2Brouter.
-- CORS strict via `ALLOWED_ORIGINS` whitelist (pas de wildcard), `Vary: Origin` posé.
-- Helper `_withAuth.js` centralise auth + `adminOnly`.
-- Service role key réservée aux webhooks et endpoints admin.
-- `AbortController` + retry exponentiel sur appels Claude / Odoo / B2Brouter.
+### 1.3 🟠 `useSupportUnread.js` lit `user_last_seen_at` sans fallback 42703
+
+`src/hooks/useSupportUnread.js:33` sélectionne `user_last_seen_at` (colonne créée par `0050`, en attente). Si la colonne n'existe pas, le SELECT échoue, `maybeSingle()` renvoie `data` vide, le hook conclut « pas de ticket » et **le badge support ne s'affiche jamais — silencieusement**. C'est exactement le piège que la règle défensive 42703 du CLAUDE.md est censée éviter.
+
+**Action** : catcher 42703 et retenter le SELECT sans `user_last_seen_at` (fallback sur `created_at`).
+
+### 1.4 🟡 Divers DB
+
+- `0055_signed_pdf_idempotency.sql` : le DELETE de dédoublonnage est global (tous users). OK pour une exécution one-shot en prod, mais le documenter dans l'en-tête du fichier.
+- Migrations ≥ 0043 : toutes contiennent bien l'INSERT idempotent `schema_migrations` ✓. Pas de trou de numérotation (hors doublon 0053).
 
 ---
 
-## 3. Base de données & RLS
+## 2. Sécurité API (`/api` + Edge Functions)
 
-### 🔴 Critique
+Ce qui est **bien fait** (vérifié) : auth `authenticate()` systématique, `artisan_respond` vérifie `owner_id` (`devis-public.js:560`), OTP généré par `crypto.randomInt` + hashé, sessions OTP limitées (3 tentatives, 3 sessions/15 min), idempotence `send_signed_pdf` avec verrou anti-race, webhook Stripe signé (`constructEvent`) + table de dédup, secrets uniquement en variables d'env, `.env` non commité.
 
-- **`0039_freemium_weekly_limit.sql` non documentée comme en attente** (cf. §1.2).
-- **PII en clair** sur `profiles` (email, téléphone, SIRET, raison_sociale, adresse) et `clients`. RLS seule protège. Aucun chiffrement at-rest ni masquage logs. En cas de dump involontaire, exposition immédiate.
+### 2.1 🟠 Rate-limiter in-memory contournable
 
-### 🟠 Important
+`_rateLimit.js` ne vit qu'en mémoire d'instance : chaque recyclage Vercel (quelques minutes d'inactivité) remet les compteurs à zéro. Les protections de `contact.js`, `newsletter.js` et `request_otp`/`verify_otp` sont donc best-effort. Combiné à l'OTP : la fenêtre de bruteforce reste très insuffisante pour 10⁸ codes (≈81 essais/15 min), mais un attaquant patient n'est ralenti que par la DB (`devis_otp_sessions`), pas par IP.
 
-- **`devis_otp_sessions` (mig 0032)** — RLS activé mais **aucune policy explicite**. Sécurisé en pratique (PostgREST refuse implicitement), mais documenté par absence — confusion future. Ajouter une policy `for all to authenticated using (false)` explicite.
-- **Policies `app_logs` (mig 0017)** — dépendent de `current_setting('app.admin_email', true)`. Si la variable n'est jamais set côté Postgres, les policies admin tombent silencieusement.
-- **`coherence_validations` (mig 0024)** — INSERT avec `with check (true)` (pas d'owner). Trace IA non vérifiée.
-- **Rétention RGPD `ia_conversations` (mig 0011)** — purge 12 mois, mais textes libres peuvent contenir du PII (adresses clients prospects, SIRET…). Pas de masquage avant purge ; après `account.js` (suppression compte), les lignes restent jusqu'à la prochaine purge.
-- **Fragmentation freemium** — si 0039 pas appliquée, coexistence `devis_daily_counters` (0036/0037) + référence à `devis_weekly_counters` côté front possible. État incohérent.
+**Action** : déplacer le comptage des tentatives OTP et du anti-spam contact vers une table Supabase (ou Vercel KV) ; a minima logger les échecs `verify_otp` dans `app_logs` pour détecter une attaque.
 
-### 🟡 Mineur
+### 2.2 🟠 `send_signed_pdf` : contenu PDF non validé
 
-- **Indexes composites manquants** pour les requêtes fréquentes :
-  - `devis(owner_id, statut, created_at DESC)` — actuellement deux indexes séparés.
-  - `invoices(owner_id, statut, created_at DESC)`.
-  - `ia_conversations` : doublon entre `(owner_id, created_at)` et `(created_at)` — simplifier.
-- **`next_invoice_number()` (mig 0005)** — parsing regex `FAC-\d{4}-(\d+)` ; si un numéro est posé manuellement hors séquence, parsing silencieusement à 0. Pas de `UNIQUE` global (seulement par owner), deux artisans peuvent avoir `FAC-2026-0001` (ce qui est conforme à la loi, mais à documenter).
-- **`app_logs` sans purge** dans `run_retention_purge()` — croissance non bornée.
-- **Triggers BEFORE UPDATE sans ordre documenté** ; stable aujourd'hui mais fragile (cf. bug historique 0022 → 0035).
+`devis-public.js:740` accepte n'importe quel `pdf_base64` (≤5 Mo) depuis une session OTP client vérifiée et l'emaile comme « devis signé » au client **et à l'artisan**. Un client malveillant (ou un XSS sur la page publique) peut faire envoyer un PDF arbitraire estampillé du flux officiel. Pas un IDOR (la session OTP authentifie bien le destinataire du devis), mais un risque d'usurpation de contenu.
 
-### Migrations notables
+**Action** : vérifier au minimum le magic number `%PDF-` après décodage, et idéalement régénérer/contrôler les métadonnées côté serveur.
 
-| # | Rôle | Remarque |
+### 2.3 🟠 `crm.js` : `CRON_SECRET` comparé en `===`
+
+`crm.js:84` compare le Bearer au `CRON_SECRET` avec `===` (non timing-safe). Même remarque pour le secret Telegram dans `supabase/functions/telegram-bot/index.ts` (le header `X-Telegram-Bot-Api-Secret-Token` est bien vérifié + chat_id whitelisté ✓, mais comparaison non constante).
+
+**Action** : `crypto.timingSafeEqual` aux deux endroits. Bonus : `crm.js` n'a ni entrée dans `vercel.json > functions` (pas de `maxDuration` explicite) ni documentation CLAUDE.md.
+
+### 2.4 🟠 Webhook Stripe : suppression de la ligne de dédup en cas d'échec
+
+`stripe.js` supprime la ligne `stripe_webhook_events` pour forcer le retry Stripe quand le traitement métier échoue. Si deux livraisons du même event se chevauchent, un double traitement devient possible.
+
+**Action** : ne jamais supprimer la ligne de dédup ; rendre le traitement métier idempotent (UPDATE conditionnel) et laisser Stripe retenter sur 500.
+
+### 2.5 🟡 Divers sécurité
+
+- **Échappement HTML emails incomplet** : la plupart des templates utilisent `esc()`, mais quelques interpolations passent en brut — `devis.objet` et `clientName` dans `send_signed_pdf` (`devis-public.js:800,811-814`), `brand.phone` dans `emailDevis`. Données semi-fiables (saisies par l'artisan/le client), mais appliquer `esc()` partout par principe.
+- **`emailArtisanMsg` (`devis-public.js:220-229`) est du code mort** avec un `${message}` non échappé : à supprimer avant qu'un futur appel ne réintroduise l'injection.
+- **Validation Content-Length** : présente sur `facturx.js` ✓, absente sur `claude.js` et `stripe.js`.
+- **Headers de sécurité** absents des réponses API (cf. §5.1, à régler globalement via `vercel.json`).
+
+---
+
+## 3. Frontend (`/src`)
+
+### 3.1 ✅ Les règles critiques du CLAUDE.md sont respectées (vérifié)
+
+- **Token** : tous les appels passent par une session fraîche (`supabase.auth.getSession()` au moment du fetch), y compris `App.jsx:201-202/227-228`. La régression token signalée en mai est corrigée.
+- **42703** : fallbacks en place dans `src/lib/api.js` (4 occurrences) ✓ — sauf `useSupportUnread.js` (cf. §1.3).
+- **safe-area-inset**, **XSS** (`dangerouslySetInnerHTML` uniquement pour du JSON-LD stringifié), **cleanup des listeners** : propres.
+- **`className="fu"`** : les 5 usages restants (Dashboard, listes, ClientDetail) ne contiennent pas d'enfants `position:fixed` → conformes.
+
+### 3.2 🟠 localStorage non scopé par `user.id`
+
+Le bug « compteur hérité de l'utilisateur précédent » peut se reproduire avec :
+- `pending_checkout_plan` (`App.jsx:94,220,237`) — un plan de checkout en attente peut être hérité par un autre compte sur le même navigateur, et déclencher une **redirection Stripe pour le mauvais user**.
+- `zenbat_brand` (`src/hooks/useBrand.js:9,20,38`) — le branding (logo, coordonnées) du compte précédent peut fuiter visuellement vers le compte suivant.
+
+**Action** : préfixer ces clés par `user.id` (pattern existant dans `appShell.js:storageKey`).
+
+### 3.3 🟠 Erreurs supabase-js avalées
+
+Le piège qui a causé le bug « négociation invisible » existe encore à :
+- `src/lib/api.js:264` (insert `lignes_devis` sans inspection de `error`) et `:269` (update `statut='remplace'`),
+- `src/components/SupportChat.jsx:65,185` (`.then(()=>{},()=>{})` sans log).
+
+**Action** : `if (error) throw error` (api.js) / `console.warn` (SupportChat).
+
+### 3.4 🟡 Dette de structure
+
+- `CRM.jsx` : **2 328 lignes** ; `AgentIA.jsx` : 818 ; `AdminPanel.jsx` : 624 (+ 13 fonctions `load*()` copiées-collées à factoriser en `fetchAdminStat(type, setter)`).
+- `getToken()` redéfini localement dans `CRM.jsx`, `SubscriptionScreen.jsx`, `PaywallScreen.jsx`, `telegramNotify.js` — l'implémentation est correcte, mais importer `src/lib/getToken.js` éviterait une future divergence.
+- `AdminPanel.jsx:78` : dépendance d'effet `[session?.access_token]` → préférer `[user?.id]` (évite un reload à chaque refresh silencieux du JWT).
+
+---
+
+## 4. Dépendances & tests
+
+### 4.1 🟠 11 vulnérabilités npm (1 critical, 3 high)
+
+| Paquet | Via | Risque réel |
 |---|---|---|
-| 0009 | compliance locks | Lock immutabilité factures émises |
-| 0011 | rétention | Purge auto via pg_cron |
-| 0019 | indexes devis | Bon premier passage, à compléter (cf. ci-dessus) |
-| 0022→0035 | RLS invoices_update | Bug historique réglé ; **le commentaire du fix est exemplaire** |
-| 0024 | coherence engine | Policy INSERT trop ouverte |
-| 0027 | Stripe | Subscription + customer_id |
-| 0032 | devis public | Token + OTP + audit (manque policy explicite) |
-| 0039 | freemium hebdo | **Non documentée** |
+| `dompurify` ≤3.3.3 | `jspdf` | XSS (7 CVE). jspdf est utilisé pour *générer* des PDF, pas parser du HTML user → risque modéré mais à corriger. **Breaking change possible** : tester la génération PDF après mise à jour. |
+| `fast-uri` | transitif | Path traversal / host confusion — `npm audit fix` sans breaking |
+| `serialize-javascript` | rollup/terser (dev) | Build-time uniquement, risque faible |
+| Babel plugin (critical) | `@rollup/plugin-babel` (dev) | Build-time uniquement |
+| `esbuild`/`vite`, `ws`, `brace-expansion` | dev/transitif | Dev server uniquement |
 
-### ✅ Points forts DB
+**Action** : `npm audit fix`, puis évaluer `npm audit fix --force` (jspdf, vite) avec `npm run test` + test manuel de génération PDF.
 
-- RLS activé sur 21/21 tables.
-- Cascades FK propres → `account.js` (suppression compte) cascade nativement.
-- Soft-delete + lock conforme LPF (10 ans) et code civ. (5 ans).
-- `run_retention_purge()` planifiée via pg_cron.
-- Le fix de la migration 0035 documente précisément la régression — exemple à suivre.
+### 4.2 🟠 Zones critiques sans tests
+
+`devis-public.test.js` (~100 assertions) et `claude.test.js` sont solides ✓. En revanche **aucun test** pour : `stripe.js` (paiement + webhook + idempotence), `facturx.js` (facture légale, fallbacks 42703, action `send`), `account.js` (suppression de compte RGPD !), `contact.js`. Ce sont les endpoints où une régression coûte le plus cher.
 
 ---
 
-## 4. Qualité de code — Frontend
+## 5. Configuration Vercel & documentation
 
-### 🔴 Critique
+### 5.1 🟠 Aucun header de sécurité HTTP
 
-| # | Fichier:ligne | Problème |
+`vercel.json` ne définit ni CSP, ni `X-Frame-Options`, ni `X-Content-Type-Options`, ni HSTS, ni `Referrer-Policy`. Pour une app qui manipule factures et données clients, c'est le durcissement au meilleur ratio effort/gain.
+
+**Action** : ajouter une section `headers` globale (attention à la CSP : autoriser Supabase, Vercel, Trustpilot, fonts ; la tester en `Content-Security-Policy-Report-Only` d'abord).
+
+### 5.2 🟠 CLAUDE.md décalé de la réalité
+
+- **11/12 fonctions** Vercel (pas 10) : `crm.js` existe (338 lignes, prospection CRM admin) mais n'apparaît ni dans la liste, ni dans le tableau des endpoints, ni dans `vercel.json > functions`. **Il ne reste qu'un seul slot.**
+- Helpers `_serverLog.js` et `_ssrf.js` non documentés.
+- Migrations : fichiers jusqu'à 0055, CLAUDE.md s'arrête à 0052 et annonce `0053_` comme prochain préfixe (faux deux fois : 0053 est déjà pris… deux fois).
+- Variables caduques (B2B_*, ODOO_*) : toujours à purger côté Vercel (aucune référence dans le code ✓).
+
+---
+
+## 6. Plan d'action priorisé
+
+| # | Action | Effort |
 |---|---|---|
-| C1 | `src/pages/Onboarding.jsx:46, 74` | **Régression bug connu** : `session?.access_token` au lieu de `getToken()`. Cf. CLAUDE.md §« Token d'authentification Supabase ». |
-| C2 | `AgentIA.jsx`, `PDFViewer.jsx`, `InvoiceDetail.jsx`, `DevisDetail.jsx` | Calculs HT/TVA/TTC dupliqués 4 fois. Source unique manquante (`lib/computeAmounts.js`). |
-| C3 | Plusieurs fichiers | Headers `Authorization: Bearer ${token}` reconstruits inline 15+ fois. Pas de helper `fetchWithAuth()`. |
-| C4 | `AgentIA.jsx:~350` | `useEffect` sans dépendances ferme la `SpeechRecognition` ; risque de fuite si re-render. |
-
-### 🟠 Important
-
-- **`AgentIA.jsx` (914 lignes)** — monolithe à décomposer : hook `useSpeechRecognition`, sous-composants `<ChatRenderer>`, `<AgentModals>`.
-- **`Onboarding.jsx` (583 lignes, 6 étapes)** — extraire 1 composant par étape (`components/onboarding/StepN.jsx`), isoler le bloc RGPD.
-- **`DevisPublicPage.jsx` (582 lignes)** — page publique critique (signature client). Le poids du composant rend l'audit sécu plus difficile.
-- **Tests manquants** sur les composants critiques : `AgentIA`, `DevisDetail`, `InvoiceDetail`, `PDFViewer`, `DevisPublicPage` — aucun `*.test.jsx`. La couverture lib (~85 %) est très bonne en revanche.
-- **localStorage en `useState` initializer** dans `AgentIA.jsx:37-42` puis `useEffect` de sync → risque de flicker hydration + état perdu en silence si le catch attrape (ligne 93). Créer un `useLocalStorage()` hook.
-
-### 🟡 Mineur
-
-- **~302 styles inline `style={{…}}`** — vers une extraction en design tokens (`lib/styles.js`) pour préparer un thème sombre / cohérence.
-- **Routing maison via `window.location.pathname`** dans `Root.jsx` — pas de `<Link>`, navigation = reload complet. Soit migrer vers React Router, soit faire un `history.pushState` minimal pour les routes internes.
-- **Labels sans `htmlFor`** dans plusieurs formulaires (a11y) — créer un composant `<FormField>`.
-- **`console.log`** (~41 occurrences) — wrapper autour de `lib/logger.js` (existe déjà !) ; passer toutes les logs dessus pour activation conditionnelle prod.
-- **PDFViewer.jsx:50,57** — `setTimeout` 50 ms / 400 ms hardcodés ; extraire en constantes nommées.
-
-### ✅ Points forts code
-
-- `pdfBuilder.js` / `facturx.js` bien modularisés malgré leur taille (constantes nommées, logique fiscale centralisée).
-- 25 fichiers de tests (lib bien couverte).
-- Gestion d'erreur cohérente (retry, fallbacks, toasts).
-- Aucun `TODO/FIXME/HACK` traînant.
-- Mobile-first respecté (safe-area-inset, `dvh`).
+| 1 | Renommer `0053_pro_trial_until.sql` → `0056_` + corriger son INSERT | 5 min |
+| 2 | Appliquer les migrations en attente (0043, 0041, 0044→0055) + activer pg_cron | 30 min (manuel) |
+| 3 | `npm audit fix` (+ test PDF si `--force`) | 30 min |
+| 4 | Headers de sécurité dans `vercel.json` (CSP en report-only d'abord) | 1 h |
+| 5 | Fallback 42703 dans `useSupportUnread.js` | 15 min |
+| 6 | Scoper `pending_checkout_plan` et `zenbat_brand` par `user.id` | 30 min |
+| 7 | Vérifier `error` sur `api.js:264/269` + SupportChat ; supprimer `emailArtisanMsg` ; `esc()` manquants | 1 h |
+| 8 | `timingSafeEqual` (crm.js, telegram-bot) + magic number `%PDF-` sur `send_signed_pdf` | 1 h |
+| 9 | Mettre à jour CLAUDE.md (11/12, crm.js, helpers, migrations, prochain préfixe `0057_`) | 30 min |
+| 10 | Tests `stripe.js` et `facturx.js` (puis `account.js`, `contact.js`) | 1-2 j |
+| 11 | Rate-limit OTP persistant (table Supabase) + log des échecs | ½ j |
+| 12 | Découper `CRM.jsx` / factoriser `AdminPanel.jsx` | fond de tâche |
 
 ---
 
-## 5. Performances & bundle
+## 7. Faux positifs écartés pendant l'audit
 
-### 🔴 Critique
-
-- **`stripe` et `nodemailer` dans `dependencies`** (`package.json` lignes 21, 25) — backend-only, jamais utilisés en front mais embarqués dans le résolveur Vite. Risque +100–150 KB si jamais importés par erreur. → `optionalDependencies` ou repo séparé.
-- **Aucune pagination Supabase** (`src/lib/api.js`) — `listClients()`, `listDevis()`, `listInvoices()` font `select('*')` sans `.limit()`. Latence linéaire + coût billing Supabase. **Ajouter `.limit(50)` + curseur ou infinite scroll**.
-- **`lucide-react@^1.11.0`** (package.json:20) — version 2023, gelée par semver caret. La version actuelle de la lib est `0.x` (lignée différente). À reprendre.
-
-### 🟠 Important
-
-- **`vercel.json` : `maxDuration: 60` universel** — surcoût plan Hobby. `contact.js`, `newsletter.js`, `admin-stats.js`, `b2brouter.js` (sauf appels externes), `odoo-sign.js` (côté pull) peuvent vivre à 10–30 s.
-- **`framer-motion` sur la landing sans lazy load** — 6 composants `landing/*.jsx` l'importent ; charge ~12 KB + deps même pour un user déjà connecté.
-- **Pas de lazy route** au-delà du PDF — Dashboard / Clients / Devis / Invoices chargés immédiatement.
-
-### 🟡 Mineur
-
-- **SEO basique** — manque `og:image`, `twitter:card`, JSON-LD, `canonical`, preconnect Supabase/Stripe.
-- **Google Fonts** — 4 familles chargées ; `display=swap` ✓ mais à subset davantage par poids réellement utilisé.
-- **Vite `manualChunks`** limité à `vendor-react` + `vendor-supabase` ; ajouter `'pdf': ['pdf-lib', 'jspdf', '@pdf-lib/fontkit']` et `'landing': [...]`.
-- **Service worker** sans stratégie `stale-while-revalidate` pour images/fonts.
-
-### ✅ Points forts perf
-
-- PDF libs en `import()` dynamique → ne plombent pas le bundle initial.
-- `.vercelignore` exclut bien les tests.
-- Tailwind purge OK, content paths corrects.
-- Manifest PWA propre, icons générés via `@vite-pwa/assets-generator`.
-- `navigateFallbackDenylist: [/^\/api\//]` ✓.
-
----
-
-## 6. Quick wins (ordre ROI/effort)
-
-| Priorité | Action | Effort | Impact |
-|---|---|---|---|
-| 1 | Corriger la régression `getToken()` dans `Onboarding.jsx` | 5 min | Bug connu re-introduit |
-| 2 | Mettre à jour CLAUDE.md (12/12 functions + mig 0039) | 10 min | Cohérence doc |
-| 3 | `api/facturx.js` : rendre `invoice.id` obligatoire | 15 min | 🔴 sécurité |
-| 4 | Ajouter `.limit(50)` sur les 3 list*() | 20 min | Perfs + coûts |
-| 5 | Rate-limit IP sur `contact.js`, `newsletter.js`, `devis-public.js` | 1 h | Anti-spam / anti-bruteforce |
-| 6 | OTP 6 → 8 chiffres + délai exponentiel après 3 essais | 30 min | 🔴 sécurité |
-| 7 | Centraliser `fetchWithAuth()` + `computeAmounts()` | 2 h | Maintenabilité |
-| 8 | Lazy-load landing + chunks PDF | 1 h | LCP / cache |
-| 9 | `maxDuration` granulaire par endpoint | 30 min | Coûts Vercel |
-| 10 | Policy explicite sur `devis_otp_sessions` + index composites | 30 min | Lisibilité DB |
-
----
-
-## 7. Roadmap suggérée
-
-**Sprint 1 (urgent — 1 jour)**
-- Items 1, 2, 3, 4 du tableau ci-dessus.
-- Décider si mig 0039 doit être appliquée.
-
-**Sprint 2 (sécurité — 2-3 jours)**
-- Items 5, 6.
-- `facturx.js`/`b2brouter.js` : ownership check exhaustif.
-- Email regex strict sur `account.js`.
-
-**Sprint 3 (perf & dette — 1 semaine)**
-- Items 7, 8, 9.
-- Split `AgentIA.jsx` et `Onboarding.jsx`.
-- Tests sur `AgentIA` / `DevisDetail` / `DevisPublicPage`.
-
-**Sprint 4 (DB & doc — 2 jours)**
-- Item 10.
-- Indexes composites devis/invoices.
-- Documenter dépendances de triggers dans CLAUDE.md.
-- Ajouter purge `app_logs`.
-
----
-
-## 8. Métriques globales
-
-- **Taille code** : 16 124 lignes (sans node_modules, sans tests pour partie)
-- **Fichiers > 500 lignes** : 10 (AgentIA, devis-public test, devis-public, Onboarding, DevisPublicPage, api, pdfBuilder, PDFViewer)
-- **Fonctions Vercel** : 12/12 (limite atteinte)
-- **Migrations** : 39 (dernière sur disque = `0039_freemium_weekly_limit`)
-- **Tables avec RLS** : 21/21
-- **Couverture tests** : 25 fichiers `*.test.js` (lib bien couverte, composants UI quasi pas)
-
----
-
-*Audit généré automatiquement par Claude (Opus 4.7). Les sévérités sont indicatives — toute décision de fix doit être validée par l'équipe produit.*
+Pour mémoire (re-vérifiés manuellement, ne pas « corriger ») :
+- **« IDOR sur `send_signed_pdf` »** : non — toutes les actions client exigent une session OTP vérifiée (`devis-public.js:717`) et l'action est idempotente. Seul le contenu du PDF est non validé (§2.2).
+- **« Régression token `session?.access_token` »** : non — tous les usages relisent `getSession()` au moment de l'appel.
+- **« `className="fu"` piège des modales »** : non — les 5 composants concernés ne rendent pas d'enfants `position:fixed`.
+- **« `dangerouslySetInnerHTML` = XSS »** : non — JSON-LD stringifié, usage standard.
+- **« 25 dépendances UNMET »** : artefact de l'environnement d'audit (node_modules non installé), pas un problème du repo.
