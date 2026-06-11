@@ -333,7 +333,7 @@ export default function AdminPanel({ onBack }) {
   }
 
   // Offre un essai Pro daté (1 mois par défaut). Le compte repasse seul en
-  // Free à l'échéance via le job pg_cron expire_pro_trials (migration 0053).
+  // Free à l'échéance via le job pg_cron expire_pro_trials (migration 0056).
   const grantProTrial = async (days = 30) => {
     if (!detailUser || trialGranting) return
     setTrialGranting(true)

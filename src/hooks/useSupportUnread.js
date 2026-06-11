@@ -28,7 +28,7 @@ export function useSupportUnread() {
     // hors-ligne. On dégrade silencieusement : pas de badge plutôt qu'une
     // alerte rouge dans le log à chaque check.
     try {
-      const { data: ticket } = await supabase
+      let { data: ticket, error } = await supabase
         .from("support_tickets")
         .select("id, user_last_seen_at, created_at")
         .eq("user_id", user.id)
@@ -36,6 +36,19 @@ export function useSupportUnread() {
         .order("last_message_at", { ascending: false })
         .limit(1)
         .maybeSingle();
+      // Fallback 42703 : user_last_seen_at vient de la migration 0050. Tant
+      // qu'elle n'est pas appliquée, on retente sans la colonne (le "vu"
+      // tombe alors sur created_at — badge un peu plus bavard, jamais absent).
+      if (error?.code === "42703") {
+        ({ data: ticket } = await supabase
+          .from("support_tickets")
+          .select("id, created_at")
+          .eq("user_id", user.id)
+          .neq("status", "resolved")
+          .order("last_message_at", { ascending: false })
+          .limit(1)
+          .maybeSingle());
+      }
       if (!ticket) { setHasUnread(false); return; }
 
       const since = ticket.user_last_seen_at || ticket.created_at;

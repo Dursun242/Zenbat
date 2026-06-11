@@ -344,9 +344,18 @@ Deno.serve(async (req: Request) => {
     return new Response("misconfigured", { status: 200 });
   }
 
-  // Auth 1 : secret token Telegram (comparaison stricte, secret non-vide garanti ci-dessus).
+  // Auth 1 : secret token Telegram. Comparaison en temps constant : un ===
+  // court-circuite au premier caractère différent et fuite le secret par timing.
   const provided = req.headers.get("x-telegram-bot-api-secret-token") ?? "";
-  if (provided !== TELEGRAM_WEBHOOK_SECRET) {
+  const safeEqual = (a: string, b: string): boolean => {
+    const ea = new TextEncoder().encode(a);
+    const eb = new TextEncoder().encode(b);
+    if (ea.length !== eb.length) return false;
+    let diff = 0;
+    for (let i = 0; i < ea.length; i++) diff |= ea[i] ^ eb[i];
+    return diff === 0;
+  };
+  if (!safeEqual(provided, TELEGRAM_WEBHOOK_SECRET)) {
     console.warn("[telegram-bot] secret token invalide");
     return new Response("forbidden", { status: 403 });
   }

@@ -113,9 +113,9 @@ function emailDevis({ clientName, company, brand, devis, fmtEurFn, publicUrl, lo
       <tr>
         <td>
           ${logo
-            ? `<img src="${logo}" alt="${company || ''}" width="160" style="display:block;max-width:160px;max-height:48px;height:auto;border:0;outline:none;text-decoration:none">`
+            ? `<img src="${logo}" alt="${esc(company)}" width="160" style="display:block;max-width:160px;max-height:48px;height:auto;border:0;outline:none;text-decoration:none">`
             : company
-              ? `<span style="font-size:16px;font-weight:700;color:#111;letter-spacing:-0.3px">${company}</span>`
+              ? `<span style="font-size:16px;font-weight:700;color:#111;letter-spacing:-0.3px">${esc(company)}</span>`
               : ''}
         </td>
         <td align="right" style="font-size:11px;color:#999;font-weight:500;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap">Devis</td>
@@ -124,10 +124,10 @@ function emailDevis({ clientName, company, brand, devis, fmtEurFn, publicUrl, lo
 
     <!-- Accroche -->
     <p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#111;line-height:1.3">
-      Bonjour${clientName ? ' ' + clientName : ''},
+      Bonjour${clientName ? ' ' + esc(clientName) : ''},
     </p>
     <p style="margin:0 0 32px;font-size:15px;color:#555;line-height:1.6">
-      ${company ? company + ' vous ' : 'Vous '}a préparé un devis${devis.objet ? ` pour&nbsp;<strong style="color:#111">${devis.objet}</strong>` : ''}.<br>
+      ${company ? esc(company) + ' vous ' : 'Vous '}a préparé un devis${devis.objet ? ` pour&nbsp;<strong style="color:#111">${esc(devis.objet)}</strong>` : ''}.<br>
       Consultez-le, posez vos questions ou acceptez-le en ligne.
     </p>
 
@@ -164,8 +164,8 @@ function emailDevis({ clientName, company, brand, devis, fmtEurFn, publicUrl, lo
     <table width="100%" cellpadding="0" cellspacing="0">
       <tr><td style="border-top:1px solid #f0f0f0;padding-top:24px">
         <p style="margin:0;font-size:13px;color:#888">Une question ? Contactez-nous directement&nbsp;:
-          ${brand.phone ? `<br><strong style="color:#555">${brand.phone}</strong>` : ''}
-          ${brand.email ? `<br><a href="mailto:${brand.email}" style="color:${accent};text-decoration:none">${brand.email}</a>` : ''}
+          ${brand.phone ? `<br><strong style="color:#555">${esc(brand.phone)}</strong>` : ''}
+          ${brand.email ? `<br><a href="mailto:${esc(brand.email)}" style="color:${accent};text-decoration:none">${esc(brand.email)}</a>` : ''}
         </p>
       </td></tr>
     </table>` : ''}
@@ -211,19 +211,8 @@ function emailClientConfirm({ devis, clientName, newHt }) {
     <div style="color:white;font-size:18px;font-weight:700;margin-top:8px">Devis accepté</div>
   </div>
   <div style="padding:32px">
-    <p style="color:#1A1612;font-size:14px">Bonjour${clientName ? ' ' + clientName : ''},</p>
+    <p style="color:#1A1612;font-size:14px">Bonjour${clientName ? ' ' + esc(clientName) : ''},</p>
     <p style="color:#6B6358;font-size:14px;line-height:1.6">Le devis <strong>${devis.numero}</strong>${newHt ? ` (${fmtEur(newHt)} HT)` : ''} a bien été accepté avec vos modifications. L'artisan prendra contact avec vous pour la suite.</p>
-  </div>
-</div></body></html>`
-}
-
-function emailArtisanMsg({ devis, message }) {
-  return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f5;font-family:Inter,system-ui,sans-serif">
-<div style="max-width:480px;margin:32px auto;background:white;border-radius:16px;overflow:hidden">
-  <div style="background:#1A1612;padding:24px 32px"><div style="font-size:20px;font-weight:800"><span style="color:#22c55e">Zen</span><span style="color:white">bat</span></div></div>
-  <div style="padding:32px">
-    <p style="color:#6B6358;font-size:14px">Concernant le devis <strong>${devis.numero}</strong>, voici la réponse de l'artisan&nbsp;:</p>
-    <div style="background:#FAF7F2;border-radius:12px;padding:16px;font-size:14px;color:#1A1612;white-space:pre-wrap">${message}</div>
   </div>
 </div></body></html>`
 }
@@ -742,6 +731,13 @@ export default async function handler(req, res) {
     // Limite ~5 MB en base64 (≈3.75 MB binaire) — borne raisonnable pour
     // un devis, évite qu'on accepte des payloads abusifs.
     if (pdf_base64.length > 5 * 1024 * 1024) return res.status(413).json({ error: 'PDF trop volumineux' })
+    // Garde-fou contenu : on n'emaile que de vrais PDF. Le client contrôle le
+    // base64 (généré navigateur), un magic number évite de relayer n'importe
+    // quel fichier estampillé « devis signé ».
+    try {
+      const head = Buffer.from(pdf_base64.slice(0, 12).replace(/\s/g, ''), 'base64').toString('latin1')
+      if (!head.startsWith('%PDF-')) return res.status(400).json({ error: 'Fichier invalide (PDF attendu)' })
+    } catch { return res.status(400).json({ error: 'Fichier invalide (PDF attendu)' }) }
 
     const { count: alreadySent } = await admin.from('devis_audit_log')
       .select('id', { count: 'exact', head: true })
@@ -796,8 +792,8 @@ export default async function handler(req, res) {
           fromName: company || 'Devis signé',
           subject: `Votre devis ${devis.numero} signé`,
           html: emailHtml(
-            `Bonjour ${clientName || ''},`,
-            `Votre signature électronique du devis <strong>${devis.numero}</strong>${devis.objet ? ` (${devis.objet})` : ''} a bien été enregistrée.`,
+            `Bonjour ${esc(clientName)},`,
+            `Votre signature électronique du devis <strong>${esc(devis.numero)}</strong>${devis.objet ? ` (${esc(devis.objet)})` : ''} a bien été enregistrée.`,
           ),
           attachments,
         })
@@ -811,7 +807,7 @@ export default async function handler(req, res) {
           subject: `Devis ${devis.numero} signé par ${clientName || 'le client'}`,
           html: emailHtml(
             `Bonjour,`,
-            `Le devis <strong>${devis.numero}</strong>${devis.objet ? ` (${devis.objet})` : ''} a été signé électroniquement par <strong>${clientName || 'le client'}</strong>${client?.email ? ` (${client.email})` : ''}.`,
+            `Le devis <strong>${esc(devis.numero)}</strong>${devis.objet ? ` (${esc(devis.objet)})` : ''} a été signé électroniquement par <strong>${esc(clientName) || 'le client'}</strong>${client?.email ? ` (${esc(client.email)})` : ''}.`,
           ),
           attachments,
         })
