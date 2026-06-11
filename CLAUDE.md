@@ -9,12 +9,13 @@ Stack : React + Vite (frontend) · Vercel Serverless Functions (API) · Supabase
 
 ### Vercel : limite 12 fonctions serverless
 Le plan Hobby de Vercel autorise **maximum 12 fichiers** dans `/api/`.
-Fichiers actuels (10/12 — les helpers `_cors.js`, `_email.js`, `_rateLimit.js`, `_withAuth.js` ne comptent pas, `*.test.js` ignorés via `.vercelignore`, `fonts/` est un dossier d'assets) :
+Fichiers actuels (11/12 — les helpers `_cors.js`, `_email.js`, `_rateLimit.js`, `_serverLog.js`, `_ssrf.js`, `_withAuth.js` ne comptent pas, `*.test.js` ignorés via `.vercelignore`, `fonts/` est un dossier d'assets) :
 ```
 account.js             admin-delete-user.js   admin-stats.js     admin-user-detail.js
-claude.js              contact.js             devis-public.js    facturx.js
-newsletter.js          stripe.js
+claude.js              contact.js             crm.js             devis-public.js
+facturx.js             newsletter.js          stripe.js
 ```
+⚠ **Il ne reste qu'un seul slot.** Tout nouvel endpoint doit fusionner dans un fichier existant.
 → Avant tout nouvel endpoint : vérifier la marge restante et préférer fusionner par domaine (header de signature, paramètre `?route=`, champ `action` du body).
 
 **Convention de fusion** : quand on doit fusionner des endpoints, on regroupe par domaine dans un seul fichier qui route en interne :
@@ -29,15 +30,20 @@ L'ancienne URL externe (Stripe Dashboard `/api/stripe-checkout`, `/api/stripe-we
 Les fichiers dans `/supabase/migrations/` ne s'appliquent **pas automatiquement**.
 L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - Prévenir l'utilisateur à chaque nouvelle migration créée.
-- Dernière migration appliquée connue : `0042_stripe_webhook_idempotency.sql`.
+- Dernière migration appliquée connue : `0043_schema_migrations.sql` (+ `0041` appliquée le 2026-06-11 — le tracking `schema_migrations` est actif à partir de maintenant).
 - **Migrations en attente d'application** :
-  - `0041_fix_devis_week_count_null.sql` — fix critique qui empêche tout nouveau freemium de créer son tout premier devis (bug RLS sur la policy `devis_insert_freemium_weekly_limit`, cf. section Bugs connus).
-  - `0043_schema_migrations.sql` — crée la table de tracking (cf ci-dessous).
   - `0047_devis_negociation_status.sql` — étend la CHECK constraint `devis_statut_check` pour autoriser `'en_negociation'`. Sans cette migration, toute négociation client échoue silencieusement à mettre à jour le statut du devis (cf. section Bugs connus).
   - `0049_invoices_sent_to_client.sql` — ajoute `invoices.sent_to_client_at` + `sent_to_client_count` pour tracker l'envoi par email du PDF Factur-X au client (action `send` de `api/facturx.js`). `api/facturx.js` catche le 42703 si la migration n'est pas appliquée — l'email part quand même, seul le tracking en DB est sauté.
   - `0050_support_notif_purge.sql` — ajoute `support_tickets.user_last_seen_at` (badge "non lu" côté front, lu par `useSupportUnread`) + fonction `purge_old_support_tickets()` planifiée toutes les heures via pg_cron pour effacer les tickets dont `last_message_at` remonte à plus de 36h (CASCADE sur `support_messages`). ⚠ Prérequis : activer l'extension `pg_cron` côté Dashboard Supabase (Database → Extensions) avant d'appliquer la migration, sinon le `create extension` échoue. Diagnostic du job : `SELECT * FROM cron.job WHERE jobname = 'purge-support-tickets-36h';` et `SELECT * FROM cron.job_run_details WHERE jobname = 'purge-support-tickets-36h' ORDER BY start_time DESC LIMIT 10;`.
   - `0052_welcome_tuto_resent.sql` — ajoute `profiles.welcome_tuto_resent_at` pour tracker le renvoi manuel du mail tuto de bienvenue depuis le panel admin (section "Onboarding — comptes sans devis", composant `AdminOnboardingTargets`). Sans cette migration, l'UPDATE en fin de POST `send_welcome_tuto` (dans `admin-stats.js`) échoue silencieusement — le mail part quand même mais le bouton "✓ Envoyé" ne reste pas mémorisé entre les rechargements.
-- Prochaine migration à créer : préfixer avec `0053_`.
+  - `0044_crm_prospects.sql`, `0045_crm_google_business.sql`, `0046_scheduled_prospect_emails.sql` — tables du CRM de prospection admin (`api/crm.js`, page `CRM.jsx`).
+  - `0048_clients_naf.sql` — code NAF sur les clients.
+  - `0051_admin_last_activity_rpc.sql` — RPC dernière activité (panel admin).
+  - `0053_invoice_type_solde.sql` — étend la CHECK `invoice_type` pour la facturation par acomptes multiples + facture de solde.
+  - `0054_admin_login_history.sql` — RPC historique de connexions (panel admin).
+  - `0055_signed_pdf_idempotency.sql` — index unique partiel sur `devis_audit_log(event='signed_pdf_sent')` pour l'idempotence concurrente de l'action `send_signed_pdf`.
+  - `0056_pro_trial_until.sql` — colonne `profiles.pro_until` + job pg_cron `expire-pro-trials-daily` (essai Pro daté offert depuis le panel admin). ⚠ Anciennement numérotée `0053_pro_trial_until.sql` (collision avec `0053_invoice_type_solde.sql`) : si elle a été appliquée sous l'ancien numéro, corriger le tracking — `update public.schema_migrations set version='0056' where version='0053' and label='pro_trial_until';`.
+- Prochaine migration à créer : préfixer avec `0057_`.
 
 **Tracking depuis 0043** : la table `public.schema_migrations(version, label, applied_at)` est créée par la migration `0043`. À partir de là, chaque nouvelle migration **doit** se terminer par un INSERT idempotent qui s'auto-enregistre :
 ```sql
@@ -112,7 +118,9 @@ Helpers non déployés (préfixés `_`, importés par les endpoints) :
 - `_cors.js` — gestion CORS centralisée
 - `_email.js` — envoi email (Gmail SMTP via nodemailer, fallback Brevo)
 - `_withAuth.js` — middleware `authenticate(req, res, { adminOnly? })`
-- `_rateLimit.js` — rate-limiter in-memory par IP (utilisé sur `contact.js`, `newsletter.js`, `devis-public.js` action `request_otp`). Désactivé en env test (`VITEST`).
+- `_rateLimit.js` — rate-limiter in-memory par IP (utilisé sur `contact.js`, `newsletter.js`, `devis-public.js` action `request_otp`). Désactivé en env test (`VITEST`). ⚠ Best-effort : les compteurs sont remis à zéro à chaque recyclage d'instance Vercel.
+- `_serverLog.js` — log d'erreurs serveur vers la table `app_logs`.
+- `_ssrf.js` — `assertPublicHost()` : bloque les URLs internes/privées avant un fetch sortant (utilisé par `crm.js` pour le scraping).
 
 | Fichier | Rôle |
 |---------|------|
@@ -124,6 +132,7 @@ Helpers non déployés (préfixés `_`, importés par les endpoints) :
 | `contact.js` | Formulaire de contact public — POST avec honeypot anti-bot, envoie un email à l'admin |
 | `devis-public.js` | Endpoint public pour signature client de devis — token + OTP 8 chiffres + audit, multi-routes par `action` (`send`, `request_otp`, `verify_otp`, `accept`, `refuse`, `negotiate`, `artisan_respond`, `send_signed_pdf`). `send_signed_pdf` reçoit le PDF généré côté navigateur en base64 et l'email en pièce jointe au client + à l'artisan ; idempotence via audit log (`event = 'signed_pdf_sent'`). |
 | `facturx.js` | Génération PDF Factur-X (XML CII embarqué). Multi-actions par champ `action` du body : par défaut = assemble + uploade en Storage ; `action: 'send'` = télécharge le PDF depuis Storage et l'envoie par email au client (au nom de `brand.companyName`, avec Reply-To = `brand.email`), met à jour `invoices.sent_to_client_at`. |
+| `crm.js` | CRM de prospection admin — CRUD prospects, scraping d'email (protégé `_ssrf.js`), file d'envoi programmée. Multi-actions par `?action=` (GET) / `action` du body (POST). Action `process_queue` appelée par pg_cron, auth par `CRON_SECRET` (timing-safe) |
 | `newsletter.js` | Inscription newsletter |
 | `stripe.js` | Stripe checkout/portal/info (POST authentifié) + webhook (détection par header `stripe-signature`) |
 
@@ -183,6 +192,7 @@ RLS activé sur toutes les tables — les endpoints admin contournent via `SUPAB
 | `ALLOWED_ORIGINS` | Origines CORS autorisées (séparées par virgule) |
 | `STRIPE_SECRET_KEY` | Clé secrète Stripe (checkout / portal / abonnements) |
 | `STRIPE_WEBHOOK_SECRET` | Secret de signature webhook Stripe |
+| `CRON_SECRET` | Secret Bearer de l'action `process_queue` de `api/crm.js` (appelée par pg_cron) |
 
 > Variables d'env caduques (à supprimer côté Vercel) : `B2B_API_KEY`, `B2B_API_URL`, `B2B_WEBHOOK_SECRET`, `ODOO_URL`, `ODOO_DB`, `ODOO_USERNAME`, `ODOO_API_KEY`.
 

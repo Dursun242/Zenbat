@@ -139,7 +139,7 @@ async function handleWebhook(req, res, rawBody) {
       pro_until:              null,
     }
     const { error: upErr } = await admin.from('profiles').update(proUpdate).eq('id', profile.id)
-    // Fallback si la migration 0053 n'est pas encore appliquée : on ne
+    // Fallback si la migration 0056 n'est pas encore appliquée : on ne
     // bloque jamais un paiement pour une colonne manquante.
     if (upErr?.code === '42703') {
       delete proUpdate.pro_until

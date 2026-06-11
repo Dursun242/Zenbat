@@ -18,6 +18,7 @@ import { cors }            from './_cors.js'
 import { authenticate }    from './_withAuth.js'
 import { sendEmail }       from './_email.js'
 import { assertPublicHost } from './_ssrf.js'
+import { timingSafeEqual } from 'crypto'
 import { createClient }    from '@supabase/supabase-js'
 
 async function processQueue(res) {
@@ -82,7 +83,11 @@ export default async function handler(req, res) {
   if (req.method === 'POST' && req.body?.action === 'process_queue') {
     const cronSecret = process.env.CRON_SECRET
     const provided   = (req.headers.authorization || '').replace('Bearer ', '')
-    if (!cronSecret || provided !== cronSecret) {
+    // Comparaison en temps constant — un === court-circuite au premier
+    // caractère différent et permet de deviner le secret par timing.
+    const secretOk = !!cronSecret && provided.length === cronSecret.length &&
+      timingSafeEqual(Buffer.from(provided), Buffer.from(cronSecret))
+    if (!secretOk) {
       return res.status(401).json({ error: 'Non autorisé' })
     }
     try { return await processQueue(res) }

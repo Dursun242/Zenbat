@@ -261,15 +261,17 @@ export async function createIndiceDevis(source) {
       prix_unitaire:l.prix_unitaire ?? 0,
       tva_rate:     l.tva_rate ?? 20,
     }));
-    await supabase.from('lignes_devis').insert(rows);
+    const { error: lignesErr } = await supabase.from('lignes_devis').insert(rows);
+    if (lignesErr) throw lignesErr;
   }
 
   // Passe la version active précédente en "remplace"
-  await supabase
+  const { error: remplaceErr } = await supabase
     .from('devis')
     .update({ statut: 'remplace' })
     .eq('id', source.id)
     .neq('statut', 'remplace');
+  if (remplaceErr) throw remplaceErr;
 
   return { ...created, lignes: (source.lignes || []).map(l => ({ ...l })) };
 }

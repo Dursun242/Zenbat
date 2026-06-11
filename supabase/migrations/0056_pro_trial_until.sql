@@ -1,4 +1,10 @@
--- Migration 0053 : essai Pro à durée limitée (offre "1 mois Pro gratuit").
+-- Migration 0056 : essai Pro à durée limitée (offre "1 mois Pro gratuit").
+--
+-- ⚠ Renumérotée : ce fichier s'appelait 0053_pro_trial_until.sql et entrait
+-- en collision avec 0053_invoice_type_solde.sql. Si vous l'aviez déjà
+-- appliquée sous l'ancien numéro, corrigez le tracking :
+--   update public.schema_migrations set version = '0056'
+--    where version = '0053' and label = 'pro_trial_until';
 --
 -- Contexte : profiles.plan est binaire ('free' / 'pro') et n'a aucune
 -- notion de durée. Pour offrir un essai Pro daté à un prospect sans avoir
@@ -75,5 +81,5 @@ select cron.schedule(
 
 -- ─── Tracking ─────────────────────────────────────────────────────────────
 insert into public.schema_migrations (version, label, applied_at)
-values ('0053', 'pro_trial_until', now())
+values ('0056', 'pro_trial_until', now())
 on conflict (version) do nothing;

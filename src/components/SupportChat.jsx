@@ -64,7 +64,8 @@ export default function SupportChat({ accent = "#22c55e", open, onClose }) {
           .from("support_tickets")
           .update({ user_last_seen_at: new Date().toISOString() })
           .eq("id", existing[0].id)
-          .then(() => {}, () => {});
+          .then(({ error }) => { if (error) console.warn("[SupportChat] user_last_seen_at:", error.code, error.message) },
+                () => {});
       } else {
         setTicket(null);
         setMessages([]);
@@ -184,7 +185,8 @@ export default function SupportChat({ accent = "#22c55e", open, onClose }) {
           .from("support_tickets")
           .update({ user_last_seen_at: new Date().toISOString() })
           .eq("id", currentTicket.id)
-          .then(() => {}, () => {});
+          .then(({ error }) => { if (error) console.warn("[SupportChat] user_last_seen_at:", error.code, error.message) },
+                () => {});
       }
     } catch (err) {
       console.error("[SupportChat] send failed:", err);

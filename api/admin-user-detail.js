@@ -51,7 +51,7 @@ export default async function handler(req, res) {
         .eq('id', userId)
         .select('id, plan')
         .maybeSingle()
-      // Fallback si la migration 0053 n'est pas appliquée : retente sans pro_until.
+      // Fallback si la migration 0056 n'est pas appliquée : retente sans pro_until.
       if (error?.code === '42703') {
         ({ data, error } = await admin
           .from('profiles')
@@ -68,7 +68,7 @@ export default async function handler(req, res) {
     }
 
     // Offre un essai Pro daté : plan='pro' + pro_until = now + N jours
-    // (défaut 30). Le job pg_cron expire_pro_trials (migration 0053)
+    // (défaut 30). Le job pg_cron expire_pro_trials (migration 0056)
     // repasse le compte en 'free' à l'échéance, sans intervention.
     if (action === 'grant_pro_trial') {
       const rawDays = Number(body.days)
@@ -83,7 +83,7 @@ export default async function handler(req, res) {
         .maybeSingle()
       if (error) {
         if (error.code === '42703')
-          return res.status(400).json({ error: "Colonne pro_until absente — appliquez la migration 0053 dans Supabase." })
+          return res.status(400).json({ error: "Colonne pro_until absente — appliquez la migration 0056 dans Supabase." })
         return res.status(500).json({ error: error.message || String(error) })
       }
       if (!data) return res.status(404).json({ error: 'Profil introuvable' })
