@@ -7,6 +7,13 @@ import { fmt, uid } from "../lib/utils.js";
 
 export default function LignesEditor({ lignes, onChange, ac, vatRegime, readOnly = false }) {
   const [confirmRemoveId, setConfirmRemoveId] = useState(null);
+  // Glisser-déposer souris : la ligne n'est rendue `draggable` que lorsque la
+  // poignée est pressée (dragHandleId), sinon le drag piégerait la sélection de
+  // texte dans les champs <input>. draggingId = ligne en cours de déplacement,
+  // dragOverId = ligne actuellement survolée (pour le repère visuel de dépôt).
+  const [dragHandleId, setDragHandleId] = useState(null);
+  const [draggingId, setDraggingId] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
   const franchise = vatRegime === "franchise";
   // En lecture seule (devis remplacé), onChange peut être absent : toutes
   // les mutations sont court-circuitées pour éviter un appel à undefined.
@@ -22,6 +29,20 @@ export default function LignesEditor({ lignes, onChange, ac, vatRegime, readOnly
     [arr[i], arr[j]] = [arr[j], arr[i]];
     onChange(arr);
   };
+
+  // Déplace la ligne `fromId` à l'emplacement de `toId` (insertion à sa place).
+  const reorder = (fromId, toId) => {
+    if (readOnly || !fromId || fromId === toId) return;
+    const from = lignes.findIndex(l => l.id === fromId);
+    const to = lignes.findIndex(l => l.id === toId);
+    if (from < 0 || to < 0) return;
+    const arr = [...lignes];
+    const [moved] = arr.splice(from, 1);
+    arr.splice(to, 0, moved);
+    onChange(arr);
+  };
+
+  const resetDrag = () => { setDragHandleId(null); setDraggingId(null); setDragOverId(null); };
 
   const addOuvrage = () => {
     if (readOnly) return;
@@ -55,8 +76,29 @@ export default function LignesEditor({ lignes, onChange, ac, vatRegime, readOnly
       )}
 
       {lignes.map((l, idx) => (
-        <div key={l.id} style={{ padding: "10px 12px", borderBottom: "1px solid #FAF7F2", background: l.type_ligne === "lot" ? "#FAF7F2" : "white" }}>
+        <div
+          key={l.id}
+          draggable={!readOnly && dragHandleId === l.id}
+          onDragStart={(e) => { if (readOnly || dragHandleId !== l.id) { e.preventDefault(); return; } e.dataTransfer.effectAllowed = "move"; setDraggingId(l.id); }}
+          onDragOver={(e) => { if (readOnly || !draggingId) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (dragOverId !== l.id) setDragOverId(l.id); }}
+          onDrop={(e) => { if (readOnly) return; e.preventDefault(); reorder(draggingId, l.id); resetDrag(); }}
+          onDragEnd={resetDrag}
+          style={{
+            padding: "10px 12px",
+            borderBottom: "1px solid #FAF7F2",
+            background: l.type_ligne === "lot" ? "#FAF7F2" : "white",
+            opacity: draggingId === l.id ? 0.4 : 1,
+            boxShadow: dragOverId === l.id && draggingId && draggingId !== l.id ? `inset 0 2px 0 ${ac}` : "none",
+            transition: "box-shadow .1s",
+          }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+            {!readOnly && (
+              <span
+                onMouseDown={() => setDragHandleId(l.id)}
+                onMouseUp={() => { if (!draggingId) setDragHandleId(null); }}
+                title="Glisser pour réordonner"
+                style={{ cursor: draggingId === l.id ? "grabbing" : "grab", color: "#C4BAAE", fontSize: 13, lineHeight: 1, padding: "2px 2px", userSelect: "none" }}>⠿</span>
+            )}
             <span style={{ fontSize: 9, fontWeight: 700, color: l.type_ligne === "lot" ? ac : "#9A8E82", letterSpacing: .5, textTransform: "uppercase" }}>
               {l.type_ligne === "lot" ? "LOT" : `Ligne ${idx + 1}`}
             </span>
