@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState } from 'react'
 import { useAuth } from './lib/auth.jsx'
+import { isChunkLoadError, tryReloadOnce } from './lib/chunkReload.js'
 import App from './App.jsx'
 import Login from './pages/Login.jsx'
 import Signup from './pages/Signup.jsx'
@@ -17,10 +18,27 @@ import CRM from './pages/CRM.jsx'
 // Pages SEO publiques uniquement — conservées en lazy car prerenderées
 // statiquement par vitePrerenderPlugin (un visiteur Google qui arrive
 // sur /villes/paris reçoit le HTML final pré-rendu, le JS n'est lazy
-// que pour l'hydratation côté navigateur). Un chunk error ici touche
-// uniquement le SEO, pas l'app principale.
-const VillesIndex = lazy(() => import('./pages/VillesIndex.jsx'))
-const VillePage   = lazy(() => import('./pages/VillePage.jsx'))
+// que pour l'hydratation côté navigateur), et pour ne pas charger les
+// ~36 Ko de data/villes.js dans le bundle principal des artisans.
+//
+// lazyWithReload : ces deux imports restaient la dernière source possible
+// de « Failed to fetch dynamically imported module » (chunk périmé après
+// redéploiement Vercel chez un client au cache PWA obsolète). Plutôt que
+// laisser l'erreur remonter à l'ErrorBoundary (écran crash + log), on
+// l'attrape dans la factory : si c'est bien un chunk error, on déclenche
+// le reload via tryReloadOnce (debounce 30s + escalade nuke gérés là-bas)
+// et on renvoie une promesse pendante → le fallback Suspense s'affiche
+// pendant que la page recharge le nouvel index.html. Si tryReloadOnce a
+// déjà abandonné (false), on relance l'erreur pour laisser l'ErrorBoundary
+// proposer le reload manuel.
+function lazyWithReload(factory) {
+  return lazy(() => factory().catch(err => {
+    if (isChunkLoadError(err) && tryReloadOnce()) return new Promise(() => {})
+    throw err
+  }))
+}
+const VillesIndex = lazyWithReload(() => import('./pages/VillesIndex.jsx'))
+const VillePage   = lazyWithReload(() => import('./pages/VillePage.jsx'))
 
 const loader = {
   wrap: { minHeight:'100vh', display:'grid', placeItems:'center', background:'#FAF7F2', color:'#6B6358', fontFamily:'system-ui,sans-serif' },
