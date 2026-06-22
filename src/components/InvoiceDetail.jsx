@@ -36,6 +36,8 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
   const [sendStatusMsg,  setSendStatusMsg]  = useState(null);
   const [deleting,       setDeleting]       = useState(false);
   const [creatingAvoir,  setCreatingAvoir]  = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const [statusMsg,      setStatusMsg]      = useState(null);
   const safeDelete = async () => {
     if (deleting || !onDelete) return;
     setDeleting(true);
@@ -208,6 +210,40 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
     }
   };
 
+  // Statuts de paiement modifiables après émission. Le contenu reste
+  // verrouillé (CGI art. 289) — seul ce suivi évolue, persisté côté serveur
+  // via /api/facturx (service_role) car la RLS bloque tout UPDATE client sur
+  // une facture verrouillée.
+  const STATUS_OPTIONS = [
+    { value: "envoyee", label: "Émise (en attente)" },
+    { value: "payee",   label: "Payée" },
+    { value: "rejetee", label: "Rejetée / impayée" },
+    { value: "annulee", label: "Annulée" },
+  ];
+  const changeStatus = async (newStatut) => {
+    if (statusUpdating || newStatut === invoice.statut) return;
+    setStatusUpdating(true); setStatusMsg(null);
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/facturx", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { "Authorization": `Bearer ${token}` } : {}) },
+        body:    JSON.stringify({ action: "set_status", invoice_id: invoice.id, statut: newStatut }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      // skipPersist=true : la DB est déjà à jour (service_role). On synchronise
+      // le state local sans UPDATE client (rejeté par la RLS car verrouillée).
+      onChange({ ...invoice, statut: data.statut }, false, true);
+      setStatusMsg(`✓ Statut mis à jour : ${STATUS_OPTIONS.find(o => o.value === data.statut)?.label || data.statut}.`);
+    } catch (err) {
+      console.error("[invoice/set-status]", err);
+      setStatusMsg("❌ " + (err.message || "Erreur de changement de statut"));
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
+
   const formatSentAt = (iso) => {
     if (!iso) return "";
     try {
@@ -315,6 +351,37 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
           <div style={{ background: "#fef3c7", border: "1px solid #fde68a", color: "#92400e", padding: "8px 10px", borderRadius: 10, fontSize: 11, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 14 }}>🔒</span>
             <span><strong>Avoir verrouillé</strong> — émis et immuable.</span>
+          </div>
+        )}
+        {/* Statut de paiement — modifiable après émission (le contenu reste verrouillé) */}
+        {isLocked && !isAvoir && (
+          <div style={{ background: "white", border: "1px solid #E8E2D8", borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#1A1612" }}>Statut de paiement</span>
+              <div style={{ flex: 1 }}/>
+              <select
+                value={invoice.statut}
+                disabled={statusUpdating}
+                onChange={e => changeStatus(e.target.value)}
+                style={{ border: "1px solid #E8E2D8", borderRadius: 8, padding: "6px 8px", fontSize: 12, fontWeight: 600, color: "#1A1612", background: statusUpdating ? "#F0EBE3" : "white", cursor: statusUpdating ? "wait" : "pointer" }}>
+                {!STATUS_OPTIONS.some(o => o.value === invoice.statut) && (
+                  <option value={invoice.statut}>{invoice.statut}</option>
+                )}
+                {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div style={{ fontSize: 10, color: "#9A8E82", marginTop: 6, lineHeight: 1.4 }}>
+              Le contenu de la facture reste verrouillé (CGI art. 289) — seul le suivi de paiement change.
+            </div>
+            {statusMsg && (
+              <div style={{ marginTop: 8, fontSize: 11, padding: "6px 8px", borderRadius: 6,
+                background: statusMsg.startsWith("❌") ? "#fef2f2" : "#ecfdf5",
+                color:      statusMsg.startsWith("❌") ? "#991b1b" : "#065f46",
+                border:     `1px solid ${statusMsg.startsWith("❌") ? "#fecaca" : "#bbf7d0"}`,
+              }}>
+                {statusMsg}
+              </div>
+            )}
           </div>
         )}
         {/* Envoi par email au client — uniquement pour les factures émises non avoir */}

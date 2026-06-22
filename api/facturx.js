@@ -366,8 +366,10 @@ export default async function handler(req, res) {
   const { user, admin } = auth;
 
   // Routage par action : 'send' = email du Factur-X au client (depuis Storage),
+  // 'set_status' = change le statut de paiement d'une facture émise (verrouillée),
   // sinon flux historique = génère + assemble + uploade le Factur-X.
-  if (req.body?.action === "send") return handleSend(req, res, { user, admin });
+  if (req.body?.action === "send")       return handleSend(req, res, { user, admin });
+  if (req.body?.action === "set_status") return handleSetStatus(req, res, { user, admin });
 
   const { pdf_base64, invoice, client, brand, sourceInvoice } = req.body || {};
   if (!pdf_base64 || !invoice?.id) {
@@ -512,6 +514,56 @@ export default async function handler(req, res) {
     await logServerError("facturx/generate", err, { invoice_id: invoice?.id, action: req.body?.action || "generate" });
     return res.status(500).json({ error: err.message || "Erreur génération Factur-X" });
   }
+}
+
+// ── Action 'set_status' : change le statut de paiement d'une facture émise ──
+// Une facture émise est verrouillée (locked=true) : son CONTENU est immuable
+// (CGI art. 289) et la RLS `invoices_update_own` (USING not locked) rejette
+// tout UPDATE côté client. Mais le statut de PAIEMENT (payée, rejetée…) est un
+// suivi légitime qui évolue après émission. On le met donc à jour côté serveur
+// via admin (service_role), qui bypasse la RLS. Le trigger autolock_invoice_on_emission
+// (migration 0009) garde locked=true et refuse tout retour à 'brouillon', donc
+// on ne peut jamais dé-émettre ni modifier le contenu par ce biais.
+const ALLOWED_INVOICE_STATUSES = new Set(["envoyee", "recue", "payee", "rejetee", "annulee"]);
+
+async function handleSetStatus(req, res, { user, admin }) {
+  const { invoice_id, statut } = req.body || {};
+  if (!invoice_id || !statut) return res.status(400).json({ error: "invoice_id et statut requis" });
+  // 'brouillon' exclu volontairement : on ne dé-émet pas une facture.
+  if (!ALLOWED_INVOICE_STATUSES.has(statut)) {
+    return res.status(400).json({ error: "Statut non autorisé" });
+  }
+
+  const { data: invoice, error: selErr } = await admin
+    .from("invoices")
+    .select("id, statut, locked")
+    .eq("id", invoice_id)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (selErr) {
+    await logServerError("facturx/set-status-select", selErr, { invoice_id });
+    return res.status(500).json({ error: "Lecture facture impossible : " + selErr.message });
+  }
+  if (!invoice) return res.status(404).json({ error: "Facture introuvable" });
+  // Le changement de statut serveur est réservé aux factures émises. Les
+  // brouillons gardent le flux client habituel (RLS les autorise).
+  if (invoice.statut === "brouillon" || !invoice.locked) {
+    return res.status(400).json({ error: "Émettez d'abord la facture avant d'en changer le statut." });
+  }
+
+  const { data: updated, error: upErr } = await admin
+    .from("invoices")
+    .update({ statut })
+    .eq("id", invoice_id)
+    .eq("owner_id", user.id)
+    .select("statut, locked")
+    .maybeSingle();
+  if (upErr) {
+    await logServerError("facturx/set-status-update", upErr, { invoice_id, statut });
+    return res.status(500).json({ error: "Mise à jour du statut échouée : " + upErr.message });
+  }
+
+  return res.status(200).json({ ok: true, statut: updated?.statut ?? statut, locked: !!updated?.locked });
 }
 
 // ── Action 'send' : envoie le PDF Factur-X au client par email ──────────────
