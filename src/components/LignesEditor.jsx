@@ -148,15 +148,14 @@ export default function LignesEditor({ lignes, onChange, ac, vatRegime, readOnly
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6 }}>
                 <div>
                   <div style={{ fontSize: 9, color: "#9A8E82", marginBottom: 2 }}>Qté</div>
-                  <input type="number" inputMode="decimal" step="0.01" min="0" disabled={readOnly}
+                  <input type="number" inputMode="decimal" step="0.01" disabled={readOnly}
                     value={l.quantite ?? 0}
                     onChange={e => {
                       const v = Number(e.target.value);
-                      // Refuse les valeurs négatives : un devis avec quantité -5
-                      // produit un montant négatif sur le PDF et empoisonne les
-                      // KPIs (CA, marge). Les remises se font via une ligne
-                      // dédiée, pas une quantité négative.
-                      update(l.id, { quantite: Number.isFinite(v) && v >= 0 ? v : 0 });
+                      // Négatifs autorisés (ex. ligne de remise / avoir). On ne
+                      // garde que le filet anti-NaN : un champ vide ou non
+                      // numérique retombe à 0 plutôt que de casser les totaux.
+                      update(l.id, { quantite: Number.isFinite(v) ? v : 0 });
                     }}
                     style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 8px", fontSize: 12, color: "#1A1612", boxSizing: "border-box" }}/>
                 </div>
@@ -174,11 +173,12 @@ export default function LignesEditor({ lignes, onChange, ac, vatRegime, readOnly
                 </div>
                 <div>
                   <div style={{ fontSize: 9, color: "#9A8E82", marginBottom: 2 }}>PU HT</div>
-                  <input type="number" inputMode="decimal" step="0.01" min="0" disabled={readOnly}
+                  <input type="number" inputMode="decimal" step="0.01" disabled={readOnly}
                     value={l.prix_unitaire ?? 0}
                     onChange={e => {
                       const v = Number(e.target.value);
-                      update(l.id, { prix_unitaire: Number.isFinite(v) && v >= 0 ? v : 0 });
+                      // Négatifs autorisés (ex. remise/avoir). Filet anti-NaN seul.
+                      update(l.id, { prix_unitaire: Number.isFinite(v) ? v : 0 });
                     }}
                     style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 8px", fontSize: 12, color: "#1A1612", boxSizing: "border-box" }}/>
                 </div>
