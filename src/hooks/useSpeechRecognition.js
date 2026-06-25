@@ -46,6 +46,11 @@ export function useSpeechRecognition({ input, setInput }) {
   const restartCountRef      = useRef(0)
   const gotResultRef         = useRef(false)
   const permissionPrimedRef  = useRef(false)
+  // audio-capture sur iOS est le plus souvent transitoire (micro brièvement
+  // occupé, flux getUserMedia pas encore libéré). On autorise UN redémarrage
+  // silencieux avant d'afficher une erreur. Remis à 0 à chaque nouvelle
+  // session d'écoute et dès qu'on capte un résultat.
+  const audioCaptureRetryRef = useRef(0)
 
   useEffect(() => () => {
     const rec = recRef.current
@@ -87,7 +92,7 @@ export function useSpeechRecognition({ input, setInput }) {
           ? "La dictée vocale exige une connexion sécurisée (HTTPS)."
           : "Reconnaissance vocale indisponible sur ce navigateur ou ce réseau."
       case "audio-capture":
-        return "Aucun micro détecté sur cet appareil."
+        return "Micro indisponible : il est peut-être utilisé par une autre application ou un appel. Fermez-la, puis réessayez."
       case "network":
         return isEdgeDesktop()
           ? "Le service vocal de Edge est instable sur ordinateur. Essayez Chrome (la dictée y est nettement plus fiable)."
@@ -115,6 +120,7 @@ export function useSpeechRecognition({ input, setInput }) {
     rec.onresult = (e) => {
       gotResultRef.current = true
       restartCountRef.current = 0
+      audioCaptureRetryRef.current = 0
       let interim = "", final = ""
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const t = e.results[i][0].transcript
@@ -127,6 +133,21 @@ export function useSpeechRecognition({ input, setInput }) {
       setInput(next)
     }
     rec.onerror = (ev) => {
+      // audio-capture : tentative de récupération silencieuse (1 fois). On
+      // neutralise l'auto-restart de onend (via userStopped + onend=null) pour
+      // ne pas avoir deux redémarrages concurrents, puis on relance après un
+      // court délai laissant iOS libérer/réacquérir la session audio.
+      if (ev.error === "audio-capture" && audioCaptureRetryRef.current < 1) {
+        audioCaptureRetryRef.current += 1
+        userStoppedRef.current = true
+        try { if (recRef.current) recRef.current.onend = null } catch {}
+        setConnecting(true)
+        setTimeout(() => {
+          userStoppedRef.current = false
+          try { _attachAndStart() } catch { setError(explainError("audio-capture")) }
+        }, 500)
+        return
+      }
       const msg = explainError(ev.error)
       if (msg) {
         setError(msg)
@@ -210,6 +231,7 @@ export function useSpeechRecognition({ input, setInput }) {
     userStoppedRef.current = false
     restartCountRef.current = 0
     gotResultRef.current    = false
+    audioCaptureRetryRef.current = 0
 
     const ok = await primePermission()
     if (!ok) return
