@@ -169,7 +169,7 @@ export default function App() {
   const {
     invoices, selI, onSaveInvoice, onCreateInvoiceFromDevis, onCreateEmptyInvoice,
     onCreateAcompte, onCreateSolde, onCreateAvoir, onDeleteInvoice, goInvoice,
-  } = useInvoices(user, devis, brand, { ...saveCallbacks, setTab });
+  } = useInvoices(user, devis, brand, { ...saveCallbacks, setTab, clients });
 
   useEffect(() => {
     const handler = e => { e.preventDefault(); deferredPrompt.current = e; };

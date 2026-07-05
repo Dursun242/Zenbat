@@ -13,9 +13,25 @@ import {
   createSoldeFromDevis   as apiCreateSolde,
 } from "../lib/api";
 
-export function useInvoices(user, devis, brand, { markSaving, markSaved, setSaveState, showErr, setTab }) {
+export function useInvoices(user, devis, brand, { markSaving, markSaved, setSaveState, showErr, setTab, clients = [] }) {
   const [invoices, setInvoices] = useState([]);
   const [selI,     setSelI]     = useState(null);
+
+  // Génère le PDF (brouillon) d'une facture juste créée et le pousse en pièce
+  // jointe dans Telegram : buildPdf appelle notifyAdminPdf('pdf_generated') en
+  // interne. Best-effort et non bloquant — un échec de rendu ne doit jamais
+  // empêcher la création de la facture. Import dynamique de pdfBuilder pour ne
+  // pas alourdir le bundle initial.
+  const notifyCreationPdf = async (inv) => {
+    try {
+      if (!inv?.lignes?.length) return;
+      const cl = clients.find(c => c.id === inv.client_id) || null;
+      const { renderDataToPdf } = await import("../lib/pdf.js");
+      await renderDataToPdf({ ...inv, tva_rate: 20 }, cl, brand, "facture", { filename: `${inv.numero || "facture"}.pdf` });
+    } catch (e) {
+      console.warn("[invoice/creation-pdf]", e);
+    }
+  };
 
   // Ref synchronisée avec invoices : permet aux callbacks asynchrones (ex.
   // handleFacturX qui await pendant 5s puis appelle onSaveInvoice) de lire
@@ -97,6 +113,7 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
       );
       setInvoices(prev => [{ ...saved, lignes: d.lignes || [] }, ...prev]);
       goInvoice(saved.id);
+      notifyCreationPdf({ ...saved, lignes: d.lignes || [] });
     } catch (err) {
       console.error("[create invoice from devis]", err);
       logError("create invoice from devis failed", err?.stack, { area: "invoice-create-from-devis", devis_id: devisId, code: err?.code, msg: err?.message });
@@ -133,6 +150,7 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
       const fresh = await listInvoices();
       setInvoices(fresh);
       goInvoice(saved.id);
+      notifyCreationPdf(fresh.find(x => x.id === saved.id));
     } catch (e) {
       console.error("[create acompte]", e);
       showErr(e?.message || "Impossible de créer l'acompte");
@@ -149,6 +167,7 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
       const fresh = await listInvoices();
       setInvoices(fresh);
       goInvoice(saved.id);
+      notifyCreationPdf(fresh.find(x => x.id === saved.id));
     } catch (e) {
       console.error("[create solde]", e);
       showErr(e?.message || "Impossible de créer la facture de solde");
@@ -162,6 +181,7 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
       const fresh = await listInvoices();
       setInvoices(fresh);
       goInvoice(newId);
+      notifyCreationPdf(fresh.find(x => x.id === newId));
     } catch (e) {
       console.error("[create avoir]", e);
       showErr(e?.message || "Impossible de créer l'avoir");
