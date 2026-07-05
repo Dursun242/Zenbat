@@ -14,6 +14,10 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
   const [showPDF,        setShowPDF]        = useState(false);
   const [acompteModal,   setAcompteModal]   = useState(false);
   const [acomptePct,     setAcomptePct]     = useState(30);
+  // Mode de saisie de l'acompte : "pct" = curseur en %, "montant" = montant
+  // HT forfaitaire libre saisi en euros (plafonné au reste à facturer).
+  const [acompteMode,       setAcompteMode]       = useState("pct");
+  const [acompteMontantHT,  setAcompteMontantHT]  = useState("");
   const [acompteLoading, setAcompteLoading] = useState(false);
   const [soldeLoading,   setSoldeLoading]   = useState(false);
   const [clientPicker,   setClientPicker]   = useState(false);
@@ -145,7 +149,11 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
   const remainingPct   = ht > 0 ? Math.round(remainingHT / ht * 100) : 100;
   const maxAcomptePct  = Math.max(1, remainingPct);
   const clampedPct     = Math.min(acomptePct, maxAcomptePct);
-  const acompteHT      = Math.round(ht * clampedPct) / 100;
+  const pctHT          = Math.round(ht * clampedPct) / 100;
+  // Mode "montant" : montant HT libre, plafonné au reste à facturer (jamais négatif).
+  const freeHT         = Math.min(remainingHT, Math.max(0, Number(acompteMontantHT) || 0));
+  const acompteHT      = acompteMode === "montant" ? freeHT : pctHT;
+  const acompteEffPct  = ht > 0 ? Math.round(acompteHT / ht * 100) : 0;
   const acompteTTC     = Math.round(acompteHT * (1 + tvaRate / 100) * 100) / 100;
   const soldeTTC       = Math.round(remainingHT * (1 + tvaRate / 100) * 100) / 100;
 
@@ -239,19 +247,51 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
             {remainingHT > 0 && !devisHasSolde && (
               <>
                 <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6358", display: "block", marginBottom: 8 }}>
-                  {devisAcomptes.length > 0 ? "NOUVEL ACOMPTE" : "POURCENTAGE DE L'ACOMPTE"}
+                  {devisAcomptes.length > 0 ? "NOUVEL ACOMPTE" : "MONTANT DE L'ACOMPTE"}
                 </label>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-                  <input type="range" min={1} max={maxAcomptePct} value={clampedPct}
-                    onChange={e => setAcomptePct(Number(e.target.value))}
-                    style={{ flex: 1, accentColor: ac }}/>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4, border: "1px solid #E8E2D8", borderRadius: 10, padding: "6px 10px" }}>
-                    <input type="number" min={1} max={maxAcomptePct} value={clampedPct}
-                      onChange={e => setAcomptePct(Math.min(maxAcomptePct, Math.max(1, Number(e.target.value))))}
-                      style={{ width: 48, border: "none", outline: "none", fontSize: 15, fontWeight: 700, textAlign: "right", fontFamily: "inherit", color: "#1A1612" }}/>
-                    <span style={{ color: "#6B6358", fontSize: 14 }}>%</span>
-                  </div>
+                {/* Basculement pourcentage / montant forfaitaire libre */}
+                <div style={{ display: "flex", gap: 6, marginBottom: 12, background: "#F0EBE3", borderRadius: 10, padding: 3 }}>
+                  {[{ k: "pct", label: "En %" }, { k: "montant", label: "Montant libre (€)" }].map(opt => (
+                    <button key={opt.k} onClick={() => setAcompteMode(opt.k)}
+                      style={{ flex: 1, border: "none", borderRadius: 8, padding: "8px 0", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                        background: acompteMode === opt.k ? "white" : "transparent",
+                        color:      acompteMode === opt.k ? "#1A1612" : "#9A8E82",
+                        boxShadow:  acompteMode === opt.k ? "0 1px 3px rgba(0,0,0,.08)" : "none" }}>
+                      {opt.label}
+                    </button>
+                  ))}
                 </div>
+                {acompteMode === "pct" ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                    <input type="range" min={1} max={maxAcomptePct} value={clampedPct}
+                      onChange={e => setAcomptePct(Number(e.target.value))}
+                      style={{ flex: 1, accentColor: ac }}/>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, border: "1px solid #E8E2D8", borderRadius: 10, padding: "6px 10px" }}>
+                      <input type="number" min={1} max={maxAcomptePct} value={clampedPct}
+                        onChange={e => setAcomptePct(Math.min(maxAcomptePct, Math.max(1, Number(e.target.value))))}
+                        style={{ width: 48, border: "none", outline: "none", fontSize: 15, fontWeight: 700, textAlign: "right", fontFamily: "inherit", color: "#1A1612" }}/>
+                      <span style={{ color: "#6B6358", fontSize: 14 }}>%</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, border: "1px solid #E8E2D8", borderRadius: 10, padding: "10px 12px" }}>
+                      <input type="number" inputMode="decimal" min={0} max={remainingHT} step="0.01"
+                        value={acompteMontantHT}
+                        placeholder="0"
+                        onChange={e => setAcompteMontantHT(e.target.value)}
+                        style={{ flex: 1, minWidth: 0, border: "none", outline: "none", fontSize: 17, fontWeight: 700, fontFamily: "inherit", color: "#1A1612" }}/>
+                      <span style={{ color: "#6B6358", fontSize: 14, fontWeight: 600 }}>€ HT</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: "#9A8E82", marginTop: 6 }}>
+                      {Number(acompteMontantHT) > remainingHT
+                        ? <span style={{ color: "#c2410c", fontWeight: 600 }}>Plafonné à {fmt(remainingHT)} HT (reste à facturer)</span>
+                        : acompteHT > 0
+                          ? `Soit ${acompteEffPct}% du devis · max ${fmt(remainingHT)} HT`
+                          : `Maximum ${fmt(remainingHT)} HT`}
+                    </div>
+                  </div>
+                )}
 
                 <div style={{ background: "#FAF7F2", borderRadius: 14, padding: "14px 16px", marginBottom: 16 }}>
                   {franchise ? (
@@ -273,8 +313,8 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
                   )}
                 </div>
 
-                <button onClick={handleAcompte} disabled={acompteLoading}
-                  style={{ width: "100%", background: acompteLoading ? "#9A8E82" : ac, border: "none", borderRadius: 14, padding: 14, fontSize: 14, fontWeight: 700, cursor: acompteLoading ? "not-allowed" : "pointer", color: "white", marginBottom: devisAcomptes.length > 0 ? 10 : 0 }}>
+                <button onClick={handleAcompte} disabled={acompteLoading || !acompteHT}
+                  style={{ width: "100%", background: acompteLoading || !acompteHT ? "#9A8E82" : ac, border: "none", borderRadius: 14, padding: 14, fontSize: 14, fontWeight: 700, cursor: acompteLoading || !acompteHT ? "not-allowed" : "pointer", color: "white", marginBottom: devisAcomptes.length > 0 ? 10 : 0 }}>
                   {acompteLoading ? "Création…" : `Créer l'acompte (${fmt(acompteTTC)} TTC)`}
                 </button>
 
