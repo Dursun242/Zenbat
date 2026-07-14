@@ -83,9 +83,26 @@ export function useSpeechRecognition({ input, setInput }) {
     && /Edg\//i.test(navigator.userAgent)
     && !/Mobile|Android|iPhone|iPad/i.test(navigator.userAgent)
 
+  // iOS (iPhone/iPad) : la permission micro ne se gère PAS via une icône dans
+  // la barre d'adresse (ça, c'est desktop Chrome/Edge). D'où un message dédié.
+  // iPadOS 13+ se présente comme un Mac → on complète par le test tactile.
+  const isIOS = () => typeof navigator !== "undefined"
+    && (/iP(hone|ad|od)/.test(navigator.userAgent)
+        || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1))
+  // PWA installée sur l'écran d'accueil iOS : pas de menu « aA », il faut
+  // passer par les Réglages iOS.
+  const isStandalone = () => typeof window !== "undefined"
+    && (window.navigator?.standalone === true
+        || window.matchMedia?.("(display-mode: standalone)")?.matches)
+
   const explainError = (code) => {
     switch (code) {
       case "not-allowed":
+        if (isIOS()) {
+          return isStandalone()
+            ? "Micro bloqué. Ouvrez Réglages iOS → Zenbat → Microphone et autorisez-le, puis rouvrez l'app."
+            : "Micro bloqué. Touchez « aA » à gauche de la barre d'adresse → Réglages du site web → Microphone → Autoriser (ou Réglages iOS → Safari → Microphone)."
+        }
         return "Microphone bloqué. Autorisez-le via l'icône à gauche de la barre d'adresse."
       case "service-not-allowed":
         return typeof window !== "undefined" && !window.isSecureContext
