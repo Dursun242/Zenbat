@@ -236,9 +236,17 @@ async function loadImgAsPng(url) {
 // ─── Main builder ─────────────────────────────────────────────────────────────
 
 export async function buildPdf(d, cl, brand, kind = "devis", { filename = "document.pdf" } = {}) {
+  // Pro forma : document commercial NON fiscal (ne vaut pas facture, pas de
+  // valeur comptable). On réutilise intégralement la mise en page « facture »
+  // (montants, TVA, échéance, IBAN) mais on ne consomme pas de numéro légal,
+  // on ne verrouille rien, et on n'entre pas dans le flux Factur-X. Le libellé
+  // et une mention explicite le distinguent d'une vraie facture.
+  const isProforma = kind === "proforma";
+  if (isProforma) kind = "facture";
   const isAvoir   = kind === "facture" && !!d?.avoir_of_invoice_id;
   const isAcompte = kind === "facture" && d?.invoice_type === "acompte";
-  const docLabel  = isAvoir ? "FACTURE D'AVOIR" : isAcompte ? "FACTURE D'ACOMPTE" : kind === "facture" ? "FACTURE" : "DEVIS";
+  const docLabel  = isProforma ? "FACTURE PRO FORMA"
+    : isAvoir ? "FACTURE D'AVOIR" : isAcompte ? "FACTURE D'ACOMPTE" : kind === "facture" ? "FACTURE" : "DEVIS";
 
   // Couleur d'accent dérivée du profil utilisateur (brand.color), avec
   // fallback TERRA si invalide. Le fond d'accent est un mix 15% accent + 85%
@@ -582,6 +590,8 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
   y += 4;
 
   const footParts = [];
+  if (isProforma)
+    footParts.push("Facture pro forma — document sans valeur comptable ni fiscale. Ne vaut pas facture.");
   if (brand.vatRegime === "franchise" && !/(293\s*B|TVA\s+non\s+applicable)/i.test(brand.mentionsLegales || ""))
     footParts.push("TVA non applicable, art. 293 B du CGI");
   if (d?.auto_liquidation_btp)
@@ -609,7 +619,9 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
   const blob    = pdf.output("blob");
   const dataUri = pdf.output("datauristring");
 
-  notifyAdminPdf(
+  // Pas de notif Telegram pour une pro forma : ce n'est pas une facture émise,
+  // inutile de la remonter comme un document fiscal côté admin.
+  if (!isProforma) notifyAdminPdf(
     "pdf_generated",
     {
       kind,
