@@ -38,6 +38,7 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
   const [creatingAvoir,  setCreatingAvoir]  = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [statusMsg,      setStatusMsg]      = useState(null);
+  const [proformaBusy,   setProformaBusy]   = useState(false);
   const safeDelete = async () => {
     if (deleting || !onDelete) return;
     setDeleting(true);
@@ -173,6 +174,28 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
     }
   };
 
+  // Génère un PDF « facture pro forma » depuis le brouillon (document
+  // commercial sans valeur fiscale) — n'émet ni ne verrouille la facture.
+  const handleProforma = async () => {
+    if (proformaBusy || !lignes.length) return;
+    setProformaBusy(true);
+    try {
+      const [{ renderDataToPdf }, { downloadBlob }] = await Promise.all([
+        import("../lib/pdf.js"),
+        import("../lib/facturx.js"),
+      ]);
+      const safe = String(invoice.numero || "facture").replace(/[^a-zA-Z0-9._-]/g, "_");
+      const name = `Pro-forma-${safe}.pdf`;
+      const { blob } = await renderDataToPdf(asDevisShape, client, brand, "proforma", { filename: name });
+      downloadBlob(blob, name);
+    } catch (err) {
+      console.error("[proforma]", err);
+      setExportMsg("❌ Impossible de générer la pro forma : " + (err.message || err));
+    } finally {
+      setProformaBusy(false);
+    }
+  };
+
   const handleSend = async () => {
     setSending(true); setSendStatusMsg(null);
     try {
@@ -302,6 +325,13 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
                 title="Une facture émise ne peut être que masquée (conservée 10 ans en base, art. L102 B LPF)."
                 style={{ background: "#FAF7F2", color: "#6B6358", border: "1px solid #E8E2D8", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 Masquer
+              </button>
+            )}
+            {!isLocked && lignes.length > 0 && (
+              <button onClick={handleProforma} disabled={proformaBusy}
+                title="Générer une facture pro forma (PDF, sans valeur fiscale)"
+                style={{ background: "#FAF7F2", color: "#1A1612", border: "1px solid #E8E2D8", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: proformaBusy ? "default" : "pointer", whiteSpace: "nowrap", opacity: proformaBusy ? 0.6 : 1 }}>
+                {proformaBusy ? "…" : "🧾 Pro forma"}
               </button>
             )}
             <button onClick={handleFacturX} disabled={exporting || !lignes.length}

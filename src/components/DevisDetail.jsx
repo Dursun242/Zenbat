@@ -20,6 +20,7 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
   const [acompteMontantHT,  setAcompteMontantHT]  = useState("");
   const [acompteLoading, setAcompteLoading] = useState(false);
   const [soldeLoading,   setSoldeLoading]   = useState(false);
+  const [proformaBusy,   setProformaBusy]   = useState(false);
   const [clientPicker,   setClientPicker]   = useState(false);
   const [statutBusy,     setStatutBusy]     = useState(false);
   // Protection anti-double-clic sur les actions qui créent une ressource
@@ -156,6 +157,27 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
   const acompteEffPct  = ht > 0 ? Math.round(acompteHT / ht * 100) : 0;
   const acompteTTC     = Math.round(acompteHT * (1 + tvaRate / 100) * 100) / 100;
   const soldeTTC       = Math.round(remainingHT * (1 + tvaRate / 100) * 100) / 100;
+
+  // Génère un PDF « facture pro forma » à partir du devis (document commercial
+  // sans valeur fiscale). Aucun numéro légal consommé, aucun verrouillage.
+  const handleProforma = async () => {
+    if (proformaBusy || !lignes.length) return;
+    setProformaBusy(true);
+    try {
+      const [{ renderDataToPdf }, { downloadBlob }] = await Promise.all([
+        import("../lib/pdf.js"),
+        import("../lib/facturx.js"),
+      ]);
+      const safe = String(d.numero || "devis").replace(/[^a-zA-Z0-9._-]/g, "_");
+      const name = `Pro-forma-${safe}.pdf`;
+      const { blob } = await renderDataToPdf(d, cl, brand, "proforma", { filename: name });
+      downloadBlob(blob, name);
+    } catch (e) {
+      console.error("[proforma]", e);
+    } finally {
+      setProformaBusy(false);
+    }
+  };
 
   const handleAcompte = async () => {
     if (!acompteHT || acompteLoading) return;
@@ -389,6 +411,13 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
                     {actionBusy ? "…" : "📄 Facturer"}
                   </button>
                 )
+              )}
+              {lignes.length > 0 && (
+                <button onClick={handleProforma} disabled={proformaBusy}
+                  title="Générer une facture pro forma (PDF, sans valeur fiscale)"
+                  style={{ background: "#FAF7F2", color: "#1A1612", border: "1px solid #E8E2D8", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: proformaBusy ? "default" : "pointer", whiteSpace: "nowrap", opacity: proformaBusy ? 0.6 : 1 }}>
+                  {proformaBusy ? "…" : "🧾 Pro forma"}
+                </button>
               )}
               {onCreateIndice && d.statut !== "accepte" && !isRemplace && (
                 <button onClick={() => runAction(() => onCreateIndice())} disabled={actionBusy}
