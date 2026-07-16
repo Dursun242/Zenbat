@@ -168,16 +168,27 @@ export function useSpeechRecognition({ input, setInput }) {
       const msg = explainError(ev.error)
       if (msg) {
         setError(msg)
-        // Trace en app_logs pour l'admin : les codes silencieux (no-speech,
-        // aborted) restent ignorés ; on ne loggue que les erreurs qui ont
-        // un message utilisateur. Permet de corréler "le micro marche pas"
-        // avec network / not-allowed / audio-capture chez l'utilisateur.
-        logError(`speech recognition: ${ev.error || "unknown"}`, null, {
-          area: "speech-recognition",
-          code: ev.error,
-          lang: micLang,
-          edge_desktop: isEdgeDesktop(),
-        })
+        // On NE loggue PAS les codes environnementaux/non-actionnables : ce
+        // ne sont pas des bugs Zenbat mais des conditions côté utilisateur ou
+        // navigateur (permission micro refusée, service vocal cloud d'Edge
+        // instable — problème connu Microsoft, HTTPS, langue non supportée).
+        // L'utilisateur voit déjà un message ciblé ; les remonter en ERROR
+        // polluait le panel admin et faisait passer une limite d'environnement
+        // pour un plantage de l'app. On ne trace que les codes inattendus.
+        const NON_ACTIONABLE = new Set([
+          "not-allowed", "network", "audio-capture",
+          "service-not-allowed", "language-not-supported",
+        ])
+        if (!NON_ACTIONABLE.has(ev.error)) {
+          logError(`speech recognition: ${ev.error || "unknown"}`, null, {
+            area: "speech-recognition",
+            code: ev.error,
+            lang: micLang,
+            edge_desktop: isEdgeDesktop(),
+          })
+        } else {
+          console.warn(`[speech] ${ev.error} (non loggé — condition environnement)`)
+        }
       }
       else {
         // no-speech / aborted : on ne montre pas d'erreur, mais on laisse
