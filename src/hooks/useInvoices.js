@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { calcInvoiceTotals } from "../lib/invoiceCalc.js";
 import { logError } from "../lib/logger.js";
+import { isLockAbort } from "../lib/authLock.js";
 import {
   listInvoices,
   createInvoice as apiCreateInvoice,
@@ -81,17 +82,31 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
     //   devis DEV-...) — n'existe pas dans la table invoices, PostgREST 400.
     const { lignes: il, created_at, updated_at, devis_numero, ...fields } = inv;
     markSaving();
-    const p1 = apiUpdateInvoice(inv.id, fields);
-    const p2 = saveLignes
-      ? replaceInvoiceLignes(inv.id, (il || []).map(({ id, created_at, ...l }) => l))
-      : Promise.resolve();
-    Promise.all([p1, p2]).then(
-      () => markSaved(),
-      (e) => {
-        console.error("[save invoice]", e); showErr("Impossible de sauvegarder la facture"); setSaveState("idle");
-        logError("save invoice failed", e?.stack, { area: "invoice-save", invoice_id: inv.id, code: e?.code, msg: e?.message });
-      },
-    );
+    const persist = () => Promise.all([
+      apiUpdateInvoice(inv.id, fields),
+      saveLignes
+        ? replaceInvoiceLignes(inv.id, (il || []).map(({ id, created_at, ...l }) => l))
+        : Promise.resolve(),
+    ]);
+    // Retry une fois sur "verrou volé" du Web Locks Supabase (transitoire) :
+    // l'UPDATE est avorté quand une requête concurrente vole le verrou de
+    // refresh token. Un second essai aboutit presque toujours.
+    persist()
+      .catch(e => {
+        if (!isLockAbort(e)) throw e;
+        return new Promise(r => setTimeout(r, 800)).then(persist);
+      })
+      .then(
+        () => markSaved(),
+        (e) => {
+          setSaveState("idle");
+          // Verrou volé même après retry → bénin/transitoire : on n'alarme pas
+          // l'utilisateur et on ne pollue pas le panel admin.
+          if (isLockAbort(e)) { console.warn("[save invoice] lock volé, ignoré", e); return; }
+          console.error("[save invoice]", e); showErr("Impossible de sauvegarder la facture");
+          logError("save invoice failed", e?.stack, { area: "invoice-save", invoice_id: inv.id, code: e?.code, msg: e?.message });
+        },
+      );
   };
 
   const onCreateInvoiceFromDevis = async (devisId) => {

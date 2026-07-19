@@ -12,16 +12,7 @@ import { DEMO_DEVIS } from "../lib/constants.js";
 import { FREEMIUM_WEEKLY_DEVIS_LIMIT, countDevisThisWeek } from "../lib/appShell.js";
 import { clearDevisDraft } from "../lib/devisDraft.js";
 import { logError } from "../lib/logger.js";
-
-// Le Web Locks API de Supabase auth peut "voler" le verrou de refresh token
-// entre onglets / à la reprise d'onglet (iOS Safari notamment), ce qui avorte
-// le getSession() interne avec un AbortError transitoire. Les libellés varient
-// (« Lock was stolen by another request », « Lock broken by another request
-// with the 'steal' option ») — d'où ce matcher large plutôt qu'un simple
-// .includes("stolen") qui ratait la variante « 'steal' option ».
-const isLockAbort = (e) =>
-  e?.name === "AbortError" ||
-  /lock was stolen|'steal' option|lock broken/i.test(e?.message || "");
+import { isLockAbort } from "../lib/authLock.js";
 
 export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, setTab, effectivePlan, weekCount = 0, stickyDevisThisWeek = 0, onDevisCreated = () => {}, onQuotaReached = () => {}, isAdmin = false }) {
   const [devis,        setDevis]        = useState(DEMO_DEVIS);
@@ -89,18 +80,33 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
     if (!user) return;
     const run = async () => {
       markSaving();
-      try {
-        const { lignes: dl, client, created_at, updated_at, id: _id, ...fields } = d;
+      const { lignes: dl, client, created_at, updated_at, id: _id, ...fields } = d;
+      const persist = async () => {
         await apiUpdateDevis(d.id, fields);
         if (saveLignes) await replaceLignes(d.id, (dl || []).map(({ id, created_at, ...l }) => l));
+      };
+      try {
+        try {
+          await persist();
+        } catch (err) {
+          // Verrou Supabase volé (transitoire) → un second essai aboutit.
+          if (!isLockAbort(err)) throw err;
+          await new Promise(r => setTimeout(r, 800));
+          await persist();
+        }
         markSaved();
         // Sauvegarde DB confirmée : on peut nettoyer le brouillon localStorage
         // posé par DevisDetail. Si l'utilisateur édite à nouveau, un nouveau
         // brouillon sera réécrit.
         clearDevisDraft(user?.id, d.id);
       } catch (err) {
-        console.error("[save devis]", err); showErr("Impossible de sauvegarder le devis"); setSaveState("idle");
-        logError("save devis failed", err?.stack, { area: "devis-save", devis_id: d.id, code: err?.code, msg: err?.message });
+        setSaveState("idle");
+        // Verrou volé même après retry → bénin, on n'alarme pas et on ne loggue pas.
+        if (isLockAbort(err)) { console.warn("[save devis] lock volé, ignoré", err); }
+        else {
+          console.error("[save devis]", err); showErr("Impossible de sauvegarder le devis");
+          logError("save devis failed", err?.stack, { area: "devis-save", devis_id: d.id, code: err?.code, msg: err?.message });
+        }
       }
       finally {
         // Libère l'entrée du Map après run : sinon le Map grossit
