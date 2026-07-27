@@ -370,6 +370,7 @@ export default async function handler(req, res) {
   // sinon flux historique = génère + assemble + uploade le Factur-X.
   if (req.body?.action === "send")       return handleSend(req, res, { user, admin });
   if (req.body?.action === "set_status") return handleSetStatus(req, res, { user, admin });
+  if (req.body?.action === "hide")       return handleHide(req, res, { user, admin });
 
   const { pdf_base64, invoice, client, brand, sourceInvoice } = req.body || {};
   if (!pdf_base64 || !invoice?.id) {
@@ -564,6 +565,42 @@ async function handleSetStatus(req, res, { user, admin }) {
   }
 
   return res.status(200).json({ ok: true, statut: updated?.statut ?? statut, locked: !!updated?.locked });
+}
+
+// ── Action 'hide' : masque (soft-delete) une facture émise ──────────────────
+// Conformité : une facture émise est conservée 10 ans (LPF art. L102 B) et ne
+// peut être hard-supprimée. Mais l'artisan doit pouvoir la MASQUER de sa liste
+// active. Le soft-delete (deleted_at) garde la ligne et ses données en base —
+// la RLS (USING not locked) et l'ancienne RPC soft_delete_invoice refusant tout
+// UPDATE d'une facture verrouillée, on le fait ici via admin (service_role).
+// Idempotent : re-masquer une facture déjà masquée renvoie ok.
+async function handleHide(req, res, { user, admin }) {
+  const { invoice_id } = req.body || {};
+  if (!invoice_id) return res.status(400).json({ error: "invoice_id requis" });
+
+  const { data: inv, error: selErr } = await admin
+    .from("invoices")
+    .select("id")
+    .eq("id", invoice_id)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (selErr) {
+    await logServerError("facturx/hide-select", selErr, { invoice_id });
+    return res.status(500).json({ error: "Lecture facture impossible : " + selErr.message });
+  }
+  if (!inv) return res.status(404).json({ error: "Facture introuvable" });
+
+  const { error: upErr } = await admin
+    .from("invoices")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", invoice_id)
+    .eq("owner_id", user.id);
+  if (upErr) {
+    await logServerError("facturx/hide-update", upErr, { invoice_id });
+    return res.status(500).json({ error: "Masquage impossible : " + upErr.message });
+  }
+
+  return res.status(200).json({ ok: true });
 }
 
 // ── Action 'send' : envoie le PDF Factur-X au client par email ──────────────

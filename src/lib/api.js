@@ -558,9 +558,20 @@ export async function deleteInvoice(id) {
     return
   }
 
-  // Toute facture émise est immuable. On la masque (soft-delete) sans la purger.
-  const { error } = await supabase.rpc('soft_delete_invoice', { p_id: id })
-  if (error) throw error
+  // Toute facture émise est immuable : on la masque (soft-delete = deleted_at)
+  // sans la purger (conservation 10 ans). La RLS (USING not locked) et l'ancienne
+  // RPC soft_delete_invoice refusent ce soft-delete sur une ligne verrouillée
+  // (d'où l'erreur P0001 « ne peut pas être supprimée »). On passe donc par le
+  // serveur (service_role) qui bypasse la RLS.
+  const { getToken } = await import('./getToken.js')
+  const token = await getToken()
+  const res = await fetch('/api/facturx', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ action: 'hide', invoice_id: id }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data?.error || `Masquage impossible (HTTP ${res.status})`)
 }
 
 // Crée un avoir (brouillon, modifiable) à partir d'une facture verrouillée.
