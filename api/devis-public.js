@@ -102,25 +102,23 @@ function emailDevis({ clientName, company, brand, devis, fmtEurFn, publicUrl, lo
 <tr><td align="center">
 <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%">
 
-  <!-- Barre de marque -->
-  <tr><td style="background:${accent};height:4px;border-radius:4px 4px 0 0;font-size:0">&nbsp;</td></tr>
+  <!-- En-tête « espace client » -->
+  <tr><td style="background:${accent};padding:22px 32px;border-radius:8px 8px 0 0">
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      ${logo ? `<td width="60" valign="middle" style="padding-right:14px">
+        <table cellpadding="0" cellspacing="0"><tr><td style="background:#ffffff;border-radius:10px;padding:6px">
+          <img src="${logo}" alt="${esc(company)}" style="display:block;max-width:100px;max-height:36px;height:auto;border:0;outline:none">
+        </td></tr></table>
+      </td>` : ''}
+      <td valign="middle">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:rgba(255,255,255,0.85);text-transform:uppercase">Espace client</div>
+        ${company ? `<div style="font-size:17px;font-weight:800;color:#ffffff;letter-spacing:-0.3px;margin-top:2px">${esc(company)}</div>` : ''}
+      </td>
+    </tr></table>
+  </td></tr>
 
   <!-- Corps principal -->
-  <tr><td style="background:#ffffff;padding:40px 48px 32px;border-radius:0 0 4px 4px">
-
-    <!-- Logo / Nom entreprise -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:36px">
-      <tr>
-        <td>
-          ${logo
-            ? `<img src="${logo}" alt="${esc(company)}" width="160" style="display:block;max-width:160px;max-height:48px;height:auto;border:0;outline:none;text-decoration:none">`
-            : company
-              ? `<span style="font-size:16px;font-weight:700;color:#111;letter-spacing:-0.3px">${esc(company)}</span>`
-              : ''}
-        </td>
-        <td align="right" style="font-size:11px;color:#999;font-weight:500;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap">Devis</td>
-      </tr>
-    </table>
+  <tr><td style="background:#ffffff;padding:36px 40px 28px;border-radius:0 0 8px 8px">
 
     <!-- Accroche -->
     <p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#111;line-height:1.3">
@@ -149,12 +147,30 @@ function emailDevis({ clientName, company, brand, devis, fmtEurFn, publicUrl, lo
     </table>
 
     <!-- CTA -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px">
       <tr>
         <td align="center">
           <a href="${publicUrl}" style="display:inline-block;background:${accent};color:#fff;text-decoration:none;padding:14px 36px;border-radius:6px;font-size:15px;font-weight:700;letter-spacing:-0.2px">
-            Voir mon devis &rarr;
+            Consulter et signer mon devis &rarr;
           </a>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Comment ça marche -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px">
+      <tr>
+        <td width="33%" align="center" valign="top" style="padding:0 6px">
+          <div style="font-size:15px;font-weight:800;color:${accent}">1</div>
+          <div style="font-size:11px;color:#888;line-height:1.4;margin-top:2px">Consultez<br>votre devis</div>
+        </td>
+        <td width="33%" align="center" valign="top" style="padding:0 6px">
+          <div style="font-size:15px;font-weight:800;color:${accent}">2</div>
+          <div style="font-size:11px;color:#888;line-height:1.4;margin-top:2px">Signez<br>en ligne</div>
+        </td>
+        <td width="33%" align="center" valign="top" style="padding:0 6px">
+          <div style="font-size:15px;font-weight:800;color:${accent}">3</div>
+          <div style="font-size:11px;color:#888;line-height:1.4;margin-top:2px">C'est<br>validé</div>
         </td>
       </tr>
     </table>

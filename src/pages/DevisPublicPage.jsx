@@ -34,12 +34,54 @@ function Header({ artisan }) {
   const logo    = artisan?.logo
   const company = artisan?.company
 
+  // En-tête « espace client » : bandeau à la couleur de l'artisan, logo dans une
+  // pastille blanche (lisible même si le logo a un fond transparent/clair) +
+  // libellé « ESPACE CLIENT » et nom de l'entreprise.
   return (
-    <div style={{ background: accent, padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 56 }}>
-      {logo
-        ? <img src={logo} alt={company || ''} style={{ maxHeight: 36, maxWidth: 180, objectFit: 'contain', display: 'block' }} />
-        : <span style={{ fontSize: 17, fontWeight: 700, color: 'white', letterSpacing: '-0.3px' }}>{company || ''}</span>
-      }
+    <div style={{ background: accent, padding: '18px 20px 20px' }}>
+      <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 14 }}>
+        {logo && (
+          <div style={{ background: '#fff', borderRadius: 12, padding: 8, flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,.15)', lineHeight: 0 }}>
+            <img src={logo} alt={company || ''} style={{ height: 40, maxWidth: 120, objectFit: 'contain', display: 'block' }} />
+          </div>
+        )}
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '1.5px', color: 'rgba(255,255,255,.85)', textTransform: 'uppercase' }}>
+            Espace client
+          </div>
+          {company && (
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', letterSpacing: '-0.3px', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {company}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Bloc « Comment ça marche ? » — rassure le client sur les 3 étapes de la
+// signature en ligne, à la manière d'un espace client.
+function HowItWorks() {
+  const steps = [
+    { n: '1', t: 'Consultez', d: 'Parcourez le devis et son PDF.' },
+    { n: '2', t: 'Signez en ligne', d: 'Acceptez en un clic, ou demandez une modification.' },
+    { n: '3', t: "C'est validé", d: "L'artisan est notifié aussitôt." },
+  ]
+  return (
+    <div style={{ background: 'white', borderRadius: 12, padding: '16px 20px', marginBottom: 12, border: '1px solid #e5e5e5' }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>Comment ça marche ?</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {steps.map(s => (
+          <div key={s.n} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+            <div style={{ flexShrink: 0, width: 22, height: 22, borderRadius: '50%', background: '#f0f0f0', color: '#666', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{s.n}</div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#111' }}>{s.t}</div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 1 }}>{s.d}</div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -721,13 +763,16 @@ export default function DevisPublicPage({ token }) {
           </div>
         )}
 
+        {/* Comment ça marche ? — affiché tant que le client peut agir */}
+        {!cloture && mode === null && <HowItWorks />}
+
         {/* Boutons d'action */}
         {!cloture && mode === null && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {!enNeg && (
               <button onClick={() => setMode('accept')}
                 style={{ width: '100%', padding: '14px', borderRadius: 10, border: 'none', background: accent, color: 'white', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
-                Accepter ce devis
+                ✍️ Signer en ligne
               </button>
             )}
             {!enNeg && (
