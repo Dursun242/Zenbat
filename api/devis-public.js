@@ -424,6 +424,11 @@ export default async function handler(req, res) {
 
     const session = session_id ? await verifySession(admin, token, session_id) : null
 
+    const ligneList = (devis.lignes || []).sort((a, b) => (a.position || 0) - (b.position || 0))
+    // Consultation libre : depuis l'ouverture de la lecture sans OTP, les
+    // lignes, le client et les champs PDF DOIVENT être renvoyés même sans
+    // session — sinon la page (et le PDF) s'affichent vides / à 0 €. L'OTP
+    // reste exigé côté POST pour signer / refuser / négocier.
     const preview = {
       numero:    devis.numero,
       objet:     devis.objet,
@@ -437,7 +442,17 @@ export default async function handler(req, res) {
       client_accepted_at:   devis.client_accepted_at,
       client_refused_at:    devis.client_refused_at,
       client_refusal_reason: devis.client_refusal_reason,
+      lignes:    ligneList,
+      tva_rate:             devis.tva_rate,
+      auto_liquidation_btp: devis.auto_liquidation_btp,
+      signed_at:            devis.signed_at,
+      signed_by:            devis.signed_by,
+      client:    { name: (`${client?.prenom || ''} ${client?.nom || ''}`).trim() || client?.raison_sociale || '', email: client?.email },
+      clientFull: client || null,
     }
+    // Sans session : on renvoie déjà tout le nécessaire à la consultation.
+    // Les données secondaires (documents joints, historique, négociation en
+    // cours) restent réservées à une session vérifiée.
     if (!session) return res.status(200).json(preview)
 
     const { data: docs } = await admin.from('devis_documents')
@@ -453,21 +468,10 @@ export default async function handler(req, res) {
       .select('*').eq('devis_id', devis.id).eq('status', 'pending')
       .order('created_at', { ascending: false }).limit(1).maybeSingle()
 
+    // preview contient déjà lignes / client / clientFull / champs PDF.
+    // On ajoute ici les données réservées à une session vérifiée.
     return res.status(200).json({
       ...preview,
-      lignes:    (devis.lignes || []).sort((a, b) => (a.position || 0) - (b.position || 0)),
-      // Champs devis utilisés par pdfBuilder (côté navigateur) pour
-      // recalculer les totaux TVA et afficher la mention d'auto-liquidation.
-      tva_rate:             devis.tva_rate,
-      auto_liquidation_btp: devis.auto_liquidation_btp,
-      // Champs signature (déjà inclus en preview pour client_accepted_at,
-      // dupliqués ici pour cohérence avec ce que pdfBuilder attend).
-      signed_at:            devis.signed_at,
-      signed_by:            devis.signed_by,
-      // Vue résumée historique + vue complète (clientFull) pour le PDF
-      // signé généré côté navigateur sur la page publique.
-      client:    { name: (`${client?.prenom || ''} ${client?.nom || ''}`).trim() || client?.raison_sociale || '', email: client?.email },
-      clientFull: client || null,
       docs:      docs || [],
       auditLog:  auditLog || [],
       negotiation,
@@ -511,6 +515,16 @@ export default async function handler(req, res) {
     const company    = profile?.company_name || brand.companyName || ''
     const clientName = (`${client.prenom || ''} ${client.nom || ''}`).trim() || client.raison_sociale || ''
     const publicUrl  = `${process.env.VITE_PUBLIC_URL || 'https://zenbat.vercel.app'}/d/${publicToken}`
+
+    // Montant de l'email recalculé depuis les lignes plutôt que via la colonne
+    // montant_ht (qui peut rester à 0 sur un devis dupliqué ou jamais
+    // re-sauvegardé) → évite les emails affichant « 0 € ».
+    const { data: sendLignes } = await admin.from('lignes_devis')
+      .select('quantite, prix_unitaire, type_ligne').eq('devis_id', devis.id)
+    const computedHt = Math.round((sendLignes || [])
+      .filter(l => l.type_ligne === 'ouvrage')
+      .reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0) * 100) / 100
+    if (computedHt > 0) devis.montant_ht = computedHt
 
     // Si le logo est une data URL base64, le passer en inline attachment (évite le blocage client mail)
     let logoSrc = null
