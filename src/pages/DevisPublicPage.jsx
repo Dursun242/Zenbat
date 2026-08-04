@@ -88,7 +88,7 @@ function HowItWorks() {
 
 // ── Phase OTP ──────────────────────────────────────────────────────────────
 
-function PhaseEmail({ data, onVerified }) {
+function PhaseEmail({ data, onVerified, onCancel }) {
   // L'email du client est déjà connu côté serveur (data.emailHint) — c'est
   // celui à qui l'artisan a envoyé le devis. On déclenche donc l'envoi de
   // l'OTP automatiquement au chargement et on amène directement le client
@@ -149,7 +149,7 @@ function PhaseEmail({ data, onVerified }) {
             {data.artisan?.company || 'Devis'}
           </p>
           <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 700, color: '#111', lineHeight: 1.3 }}>
-            Accédez à votre devis
+            Confirmez votre identité
           </h2>
           {data.objet && (
             <p style={{ margin: '0 0 8px', fontSize: 14, color: '#555', lineHeight: 1.5 }}>{data.objet}</p>
@@ -173,7 +173,7 @@ function PhaseEmail({ data, onVerified }) {
           ) : (
             <>
               <p style={{ fontSize: 13, color: '#555', marginBottom: 16 }}>
-                Un code à 8 chiffres a été envoyé à <strong>{clientEmail}</strong>. Saisissez-le pour accéder au devis.
+                Pour signer en ligne en toute sécurité, saisissez le code à 8 chiffres envoyé à <strong>{clientEmail}</strong>.
               </p>
               <input
                 type="text" inputMode="numeric" value={code}
@@ -184,7 +184,7 @@ function PhaseEmail({ data, onVerified }) {
               />
               <button onClick={verifyOtp} disabled={code.length !== 8 || busy}
                 style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: accent, color: 'white', fontWeight: 700, fontSize: 14, cursor: code.length !== 8 || busy ? 'default' : 'pointer', opacity: code.length !== 8 || busy ? 0.6 : 1 }}>
-                {busy ? 'Vérification…' : 'Accéder au devis'}
+                {busy ? 'Vérification…' : 'Vérifier et continuer'}
               </button>
               <button onClick={() => { setCode(''); setErr(null); requestOtp() }} disabled={busy}
                 style={{ display: 'block', width: '100%', marginTop: 10, background: 'none', border: 'none', color: '#999', fontSize: 13, cursor: busy ? 'default' : 'pointer' }}>
@@ -193,6 +193,12 @@ function PhaseEmail({ data, onVerified }) {
             </>
           )}
           <ErrBox msg={err} />
+          {onCancel && (
+            <button onClick={onCancel} disabled={busy}
+              style={{ display: 'block', width: '100%', marginTop: 16, background: 'none', border: 'none', color: '#bbb', fontSize: 13, cursor: busy ? 'default' : 'pointer' }}>
+              ← Revenir au devis
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -395,6 +401,13 @@ export default function DevisPublicPage({ token }) {
   // tenté, { client: bool, artisan: bool } après la requête. Permet de
   // nuancer le message sur l'écran 'accepted' si un destinataire a raté.
   const [emailSent,    setEmailSent]    = useState(null)
+  // L'OTP n'est plus requis pour CONSULTER le devis (lecture libre via le lien
+  // personnel). Il n'est demandé qu'au moment d'une action engageante :
+  // signer / refuser / négocier (le serveur l'exige aussi côté API).
+  // `verified` = session OTP valide (24 h) ; `pendingAction` = l'action à
+  // rouvrir juste après la vérification.
+  const [verified,     setVerified]     = useState(false)
+  const [pendingAction, setPendingAction] = useState(null)
 
   const accent = data?.artisan?.color || '#111111'
 
@@ -432,8 +445,12 @@ export default function DevisPublicPage({ token }) {
       setData(json)
       if (json.statut === 'accepte') { clearPersistedSessionId(token); setPhase('accepted') }
       else if (json.statut === 'refuse') { clearPersistedSessionId(token); setPhase('refused') }
-      else if (!json.verified) setPhase('verify')
-      else setPhase('view')
+      else {
+        // Consultation libre : on affiche toujours le devis. La vérification
+        // par code n'intervient qu'au clic sur une action engageante.
+        setVerified(!!json.verified)
+        setPhase('view')
+      }
     } catch (err) {
       // res.json() throw si l'API renvoie HTML (502 Vercel, route mal
       // configurée…) — sans ce catch, l'utilisateur reste coincé sur
@@ -495,6 +512,16 @@ export default function DevisPublicPage({ token }) {
   // et l'envoi des emails. La phase 'accepted' n'est atteinte qu'une fois
   // les emails partis (ou définitivement en échec) — c'est ce qui rassure
   // l'utilisateur sur le fait que tout est bien parti.
+  // Ouvre une action engageante (signer / négocier / refuser). Si la session
+  // n'est pas encore vérifiée par OTP, on passe d'abord par l'écran code, en
+  // mémorisant l'action à rouvrir juste après.
+  const startAction = (m) => {
+    setErr(null)
+    if (verified) { setMode(m); return }
+    setPendingAction(m)
+    setPhase('verify')
+  }
+
   const handleAccept = async () => {
     // Garde anti-double-submit : si on est déjà en train de signer ou
     // si la phase finale est atteinte, on ne relance pas (sinon double
@@ -540,7 +567,15 @@ export default function DevisPublicPage({ token }) {
     return (
       <div style={{ minHeight: '100dvh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
         <Header artisan={data?.artisan} />
-        <PhaseEmail data={data} onVerified={id => { setSessionId(id); writePersistedSessionId(token, id); load(id) }} />
+        <PhaseEmail
+          data={data}
+          onCancel={() => { setPendingAction(null); setErr(null); setPhase('view') }}
+          onVerified={async id => {
+            setSessionId(id); writePersistedSessionId(token, id)
+            setVerified(true)
+            await load(id)
+            if (pendingAction) { setMode(pendingAction); setPendingAction(null) }
+          }} />
       </div>
     )
   }
@@ -770,18 +805,18 @@ export default function DevisPublicPage({ token }) {
         {!cloture && mode === null && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {!enNeg && (
-              <button onClick={() => setMode('accept')}
+              <button onClick={() => startAction('accept')}
                 style={{ width: '100%', padding: '14px', borderRadius: 10, border: 'none', background: accent, color: 'white', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
                 ✍️ Signer en ligne
               </button>
             )}
             {!enNeg && (
-              <button onClick={() => setMode('negotiate')}
+              <button onClick={() => startAction('negotiate')}
                 style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1px solid #ddd', background: 'white', color: '#555', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
                 Demander des modifications
               </button>
             )}
-            <button onClick={() => setMode('refuse')}
+            <button onClick={() => startAction('refuse')}
               style={{ width: '100%', padding: '11px', borderRadius: 10, border: 'none', background: 'transparent', color: '#bbb', fontWeight: 500, fontSize: 13, cursor: 'pointer' }}>
               Refuser
             </button>
