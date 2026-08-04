@@ -694,13 +694,31 @@ export default function DevisPublicPage({ token }) {
 
   return (
     <div style={{ minHeight: '100dvh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', paddingBottom: 60 }}>
-      <style>{`* { box-sizing: border-box } input, textarea, button { font-family: inherit }`}</style>
+      <style>{`
+        * { box-sizing: border-box } input, textarea, button { font-family: inherit }
+        /* Mobile : une seule colonne, ordre DOM = carte → PDF → actions. */
+        .ec-grid { max-width: 600px; margin: 0 auto; padding: 20px 16px 0; display: grid; grid-template-columns: 1fr; gap: 12px; }
+        .ec-footer { max-width: 600px; margin: 40px auto 0; }
+        /* Desktop : deux colonnes — PDF large à gauche, résumé + actions à
+           droite. Les zones nommées repositionnent sans toucher l'ordre DOM. */
+        @media (min-width: 900px) {
+          .ec-grid {
+            max-width: 1160px; gap: 16px; align-items: start;
+            grid-template-columns: minmax(0, 1.7fr) minmax(320px, 1fr);
+            grid-template-areas: "pdf card" "pdf actions";
+          }
+          .ec-card    { grid-area: card; }
+          .ec-pdf     { grid-area: pdf; }
+          .ec-actions { grid-area: actions; }
+          .ec-footer  { max-width: 1160px; }
+        }
+      `}</style>
       <Header artisan={data?.artisan} />
 
-      <div style={{ maxWidth: 600, margin: '0 auto', padding: '20px 16px 0' }}>
+      <div className="ec-grid">
 
         {/* Carte devis */}
-        <div style={{ background: 'white', borderRadius: 12, padding: '24px', marginBottom: 12, border: '1px solid #e5e5e5' }}>
+        <div className="ec-card" style={{ background: 'white', borderRadius: 12, padding: '24px', border: '1px solid #e5e5e5' }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#aaa', letterSpacing: '0.5px', marginBottom: 8 }}>{data.numero}</div>
           {data.objet && (
             <h2 style={{ margin: '0 0 12px', fontSize: 17, fontWeight: 700, color: '#111', lineHeight: 1.4 }}>{data.objet}</h2>
@@ -723,8 +741,8 @@ export default function DevisPublicPage({ token }) {
           )}
         </div>
 
-        {/* Aperçu PDF inline (façon espace client) */}
-        <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e5e5', overflow: 'hidden', marginBottom: 12 }}>
+        {/* Aperçu PDF inline (façon espace client) — colonne gauche sur desktop */}
+        <div className="ec-pdf" style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e5e5', overflow: 'hidden' }}>
           {pdfUrl ? (
             // #view=FitH + #zoom=page-width : le visualiseur PDF ajuste la page
             // à la LARGEUR du cadre (au lieu du zoom « page entière » qui la
@@ -741,6 +759,9 @@ export default function DevisPublicPage({ token }) {
             {pdfLoading ? 'Génération…' : '⤢ Ouvrir le PDF en plein écran'}
           </button>
         </div>
+
+        {/* Colonne droite sur desktop : résumé secondaire + actions */}
+        <div className="ec-actions">
 
         {/* Documents joints */}
         {data.docs?.length > 0 && (
@@ -854,10 +875,12 @@ export default function DevisPublicPage({ token }) {
           </div>
         )}
 
-        {/* Footer */}
-        <div style={{ textAlign: 'center', fontSize: 11, color: '#ccc', marginTop: 40 }}>
-          Propulsé par Zenbat · Lien personnel confidentiel
-        </div>
+        </div>{/* end ec-actions */}
+      </div>{/* end ec-grid */}
+
+      {/* Footer */}
+      <div className="ec-footer" style={{ textAlign: 'center', fontSize: 11, color: '#ccc' }}>
+        Propulsé par Zenbat · Lien personnel confidentiel
       </div>
     </div>
   )
