@@ -129,12 +129,13 @@ describe('GET /api/devis-public', () => {
     expect(r.statusCode).toBe(404)
   })
 
-  it('aperçu sans session OTP : pas de lignes ni client', async () => {
+  it('aperçu sans session OTP : lignes + client renvoyés (consultation libre)', async () => {
     const devisData = {
       id: 'd1', numero: 'DEV-001', objet: 'Test', montant_ht: 1000,
       statut: 'envoye', date_emission: '2026-01-01', date_validite: '2026-02-01',
       public_token: 'tok', client_id: 'c1', owner_id: 'a1',
       client_accepted_at: null, client_refused_at: null, client_refusal_reason: null,
+      lignes: [{ id: 'l1', type_ligne: 'ouvrage', quantite: 2, prix_unitaire: 500, position: 0 }],
     }
     const profileData = { company_name: 'Mon Entreprise', brand_data: { color: '#ff0000', logo: '' } }
     const clientData  = { raison_sociale: 'Client SA', nom: '', prenom: '', email: 'client@test.fr' }
@@ -152,7 +153,13 @@ describe('GET /api/devis-public', () => {
     expect(r.statusCode).toBe(200)
     expect(r.body.numero).toBe('DEV-001')
     expect(r.body.verified).toBe(false)
-    expect(r.body.lignes).toBeUndefined()
+    // Consultation libre : les lignes et le client sont désormais renvoyés
+    // sans OTP (l'OTP reste requis pour signer, imposé côté POST).
+    expect(Array.isArray(r.body.lignes)).toBe(true)
+    expect(r.body.lignes).toHaveLength(1)
+    expect(r.body.client?.name).toBe('Client SA')
+    // Les données secondaires restent réservées à une session vérifiée.
+    expect(r.body.docs).toBeUndefined()
   })
 
   it('aperçu avec session vérifiée → retourne lignes + client + docs', async () => {

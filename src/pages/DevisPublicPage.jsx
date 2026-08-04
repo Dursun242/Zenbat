@@ -410,24 +410,42 @@ export default function DevisPublicPage({ token }) {
   const [pendingAction, setPendingAction] = useState(null)
 
   const accent = data?.artisan?.color || '#111111'
+  // URL blob du PDF affiché en aperçu inline (généré au chargement de la vue).
+  const [pdfUrl, setPdfUrl] = useState(null)
+
+  // Construit le PDF du devis (jsPDF) à partir des données publiques.
+  const genPdfBlob = async () => {
+    const { renderDataToPdf } = await import('../lib/pdf.js')
+    const d  = { ...data, lignes: data.lignes || [] }
+    const cl = { raison_sociale: data.client?.name, email: data.client?.email }
+    const brand = data.artisan?.brand
+      ? { ...data.artisan.brand, companyName: data.artisan.brand.companyName || data.artisan.company }
+      : { companyName: data.artisan?.company, email: data.artisan?.email, phone: data.artisan?.phone, address: data.artisan?.address, color: data.artisan?.color, logo: data.artisan?.logo }
+    const { blob } = await renderDataToPdf(d, cl, brand, 'devis', { filename: `${data.numero}.pdf` })
+    return blob
+  }
 
   const openPdf = async () => {
     if (pdfLoading || !data) return
     setPdfLoading(true)
     try {
-      const { renderDataToPdf } = await import('../lib/pdf.js')
-      const d  = { ...data, lignes: data.lignes || [] }
-      const cl = { raison_sociale: data.client?.name, email: data.client?.email }
-      const brand = data.artisan?.brand
-        ? { ...data.artisan.brand, companyName: data.artisan.brand.companyName || data.artisan.company }
-        : { companyName: data.artisan?.company, email: data.artisan?.email, phone: data.artisan?.phone, address: data.artisan?.address, color: data.artisan?.color, logo: data.artisan?.logo }
-      const { blob } = await renderDataToPdf(d, cl, brand, 'devis', { filename: `${data.numero}.pdf` })
-      // Ouvre le PDF directement dans le visualiseur natif du navigateur
-      // / OS, au lieu d'afficher le menu de partage (cohérent avec le
-      // bouton équivalent côté artisan dans PDFViewer.jsx).
-      window.open(URL.createObjectURL(blob), '_blank')
+      // Ouvre le PDF dans le visualiseur natif du navigateur / OS.
+      window.open(pdfUrl || URL.createObjectURL(await genPdfBlob()), '_blank')
     } catch (e) { console.error(e) } finally { setPdfLoading(false) }
   }
+
+  // Aperçu PDF inline : dès que le devis est consultable (phase 'view' avec des
+  // lignes), on génère le PDF et on l'affiche directement dans la page, à la
+  // manière d'un « espace client ». Best-effort : en cas d'échec, le bouton
+  // « Ouvrir le PDF » reste le filet.
+  useEffect(() => {
+    if (phase !== 'view' || !data?.lignes?.length) return
+    let url = null, cancelled = false
+    genPdfBlob()
+      .then(blob => { if (!cancelled) { url = URL.createObjectURL(blob); setPdfUrl(url) } })
+      .catch(e => console.error('[pdf inline]', e))
+    return () => { cancelled = true; if (url) URL.revokeObjectURL(url) }
+  }, [phase, data]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = useCallback(async (sid) => {
     const id  = sid || sessionId
@@ -705,11 +723,21 @@ export default function DevisPublicPage({ token }) {
           )}
         </div>
 
-        {/* Bouton PDF */}
-        <button onClick={openPdf} disabled={pdfLoading}
-          style={{ width: '100%', background: accent, color: 'white', border: 'none', borderRadius: 10, padding: '14px 20px', fontSize: 14, fontWeight: 700, cursor: pdfLoading ? 'default' : 'pointer', marginBottom: 12, opacity: pdfLoading ? 0.7 : 1 }}>
-          {pdfLoading ? 'Génération…' : 'Voir le PDF du devis'}
-        </button>
+        {/* Aperçu PDF inline (façon espace client) */}
+        <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e5e5', overflow: 'hidden', marginBottom: 12 }}>
+          {pdfUrl ? (
+            <iframe title={`Devis ${data.numero}`} src={pdfUrl}
+              style={{ width: '100%', height: '72vh', minHeight: 420, border: 'none', display: 'block', background: '#f5f5f5' }} />
+          ) : (
+            <div style={{ padding: '40px 20px', textAlign: 'center', color: '#aaa', fontSize: 13 }}>
+              Préparation de l'aperçu du devis…
+            </div>
+          )}
+          <button onClick={openPdf} disabled={pdfLoading}
+            style={{ width: '100%', background: accent, color: 'white', border: 'none', padding: '13px 20px', fontSize: 14, fontWeight: 700, cursor: pdfLoading ? 'default' : 'pointer', opacity: pdfLoading ? 0.7 : 1 }}>
+            {pdfLoading ? 'Génération…' : '⤢ Ouvrir le PDF en plein écran'}
+          </button>
+        </div>
 
         {/* Documents joints */}
         {data.docs?.length > 0 && (
