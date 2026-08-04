@@ -200,6 +200,10 @@ export default function LignesEditor({ lignes, onChange, ac, vatRegime, readOnly
               <div style={{ textAlign: "right", fontSize: 11, color: "#6B6358" }}>
                 Total HT : <b style={{ color: ac }}>{fmt((l.quantite || 0) * (l.prix_unitaire || 0))}</b>
               </div>
+              {!readOnly && (
+                <PercentHelper ac={ac}
+                  onApply={(amount) => update(l.id, { quantite: 1, unite: "forfait", prix_unitaire: amount })} />
+              )}
             </div>
           )}
         </div>
@@ -217,6 +221,51 @@ export default function LignesEditor({ lignes, onChange, ac, vatRegime, readOnly
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// Calculateur « pourcentage d'un montant » pour une ligne — pratique en
+// maîtrise d'œuvre (honoraires = X % du montant du marché). On saisit le
+// montant de référence et le %, et on remplit la ligne en forfait au bon
+// total (ex. 1 % de 400 000 € → forfait 4 000 €), au lieu du contournement
+// qté 400000 × PU 0,01 qui s'affiche mal sur le PDF.
+function PercentHelper({ ac, onApply }) {
+  const [open, setOpen] = useState(false);
+  const [base, setBase] = useState("");
+  const [pct,  setPct]  = useState("");
+  const result = Math.round((Number(base) || 0) * (Number(pct) || 0) / 100 * 100) / 100;
+
+  if (!open) {
+    return (
+      <div style={{ textAlign: "right", marginTop: 4 }}>
+        <button type="button" onClick={() => setOpen(true)}
+          style={{ background: "none", border: "none", color: ac, fontSize: 10, fontWeight: 700, cursor: "pointer", padding: 0 }}>
+          % d'un montant
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div style={{ marginTop: 6, background: "#FAF7F2", border: "1px solid #E8E2D8", borderRadius: 8, padding: 8, display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 6 }}>
+      <div style={{ flex: 1, minWidth: 100 }}>
+        <div style={{ fontSize: 9, color: "#9A8E82", marginBottom: 2 }}>Montant de référence (€)</div>
+        <input type="number" inputMode="decimal" value={base} onChange={e => setBase(e.target.value)} placeholder="400000"
+          style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 6, padding: "6px 8px", fontSize: 12, boxSizing: "border-box" }} />
+      </div>
+      <div style={{ width: 62 }}>
+        <div style={{ fontSize: 9, color: "#9A8E82", marginBottom: 2 }}>%</div>
+        <input type="number" inputMode="decimal" step="0.01" value={pct} onChange={e => setPct(e.target.value)} placeholder="1"
+          style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 6, padding: "6px 8px", fontSize: 12, boxSizing: "border-box" }} />
+      </div>
+      <button type="button" disabled={!result}
+        onClick={() => { onApply(result); setOpen(false); setBase(""); setPct(""); }}
+        title="Applique un forfait au montant calculé"
+        style={{ background: result ? ac : "#cbd5e1", color: "white", border: "none", borderRadius: 6, padding: "7px 10px", fontSize: 11, fontWeight: 700, cursor: result ? "pointer" : "default", whiteSpace: "nowrap" }}>
+        = {fmt(result)}
+      </button>
+      <button type="button" onClick={() => setOpen(false)}
+        style={{ background: "none", border: "none", color: "#9A8E82", fontSize: 13, cursor: "pointer", padding: "4px 2px" }}>✕</button>
     </div>
   );
 }
