@@ -726,8 +726,11 @@ export default function DevisPublicPage({ token }) {
         {/* Aperçu PDF inline (façon espace client) */}
         <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e5e5', overflow: 'hidden', marginBottom: 12 }}>
           {pdfUrl ? (
-            <iframe title={`Devis ${data.numero}`} src={pdfUrl}
-              style={{ width: '100%', height: '72vh', minHeight: 420, border: 'none', display: 'block', background: '#f5f5f5' }} />
+            // #view=FitH + #zoom=page-width : le visualiseur PDF ajuste la page
+            // à la LARGEUR du cadre (au lieu du zoom « page entière » qui la
+            // rend minuscule). navpanes=0 masque le panneau latéral.
+            <iframe title={`Devis ${data.numero}`} src={`${pdfUrl}#view=FitH&zoom=page-width&navpanes=0`}
+              style={{ width: '100%', height: '82vh', minHeight: 520, border: 'none', display: 'block', background: '#f5f5f5' }} />
           ) : (
             <div style={{ padding: '40px 20px', textAlign: 'center', color: '#aaa', fontSize: 13 }}>
               Préparation de l'aperçu du devis…
