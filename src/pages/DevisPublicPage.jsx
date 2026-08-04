@@ -691,6 +691,13 @@ export default function DevisPublicPage({ token }) {
   const tvaLabel = tauxTva.length <= 1 ? `TVA ${tauxTva[0] ?? 20}%` : 'TVA multitaux'
   const cloture  = ['accepte', 'refuse', 'remplace'].includes(data?.statut)
   const enNeg    = data?.statut === 'en_negociation'
+  // Base HT par taux de TVA (pour le détail des totaux façon PDF).
+  const baseByRate = ouvrages.reduce((acc, l) => {
+    const r = l.tva_rate ?? 20
+    acc[r] = (acc[r] || 0) + (l.quantite || 0) * (l.prix_unitaire || 0)
+    return acc
+  }, {})
+  const fmtQty = n => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(n || 0)
 
   return (
     <div style={{ minHeight: '100dvh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', paddingBottom: 60 }}>
@@ -699,6 +706,9 @@ export default function DevisPublicPage({ token }) {
         /* Mobile : une seule colonne, ordre DOM = carte → PDF → actions. */
         .ec-grid { max-width: 600px; margin: 0 auto; padding: 20px 16px 0; display: grid; grid-template-columns: 1fr; gap: 12px; }
         .ec-footer { max-width: 600px; margin: 40px auto 0; }
+        /* Mobile : détail HTML responsive (l'iframe PDF déborde sur iOS). */
+        .ec-pdf-desktop { display: none; }
+        .ec-pdf-mobile  { display: block; }
         /* Desktop : deux colonnes — PDF large à gauche, résumé + actions à
            droite. Les zones nommées repositionnent sans toucher l'ordre DOM. */
         @media (min-width: 900px) {
@@ -711,6 +721,9 @@ export default function DevisPublicPage({ token }) {
           .ec-pdf     { grid-area: pdf; }
           .ec-actions { grid-area: actions; }
           .ec-footer  { max-width: 1160px; }
+          /* Desktop : on affiche l'iframe PDF, on masque le détail HTML. */
+          .ec-pdf-desktop { display: block; }
+          .ec-pdf-mobile  { display: none; }
         }
       `}</style>
       <Header artisan={data?.artisan} />
@@ -741,22 +754,68 @@ export default function DevisPublicPage({ token }) {
           )}
         </div>
 
-        {/* Aperçu PDF inline (façon espace client) — colonne gauche sur desktop */}
+        {/* Aperçu du devis — colonne gauche sur desktop */}
         <div className="ec-pdf" style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e5e5', overflow: 'hidden' }}>
-          {pdfUrl ? (
-            // #view=FitH + #zoom=page-width : le visualiseur PDF ajuste la page
-            // à la LARGEUR du cadre (au lieu du zoom « page entière » qui la
-            // rend minuscule). navpanes=0 masque le panneau latéral.
-            <iframe title={`Devis ${data.numero}`} src={`${pdfUrl}#view=FitH&zoom=page-width&navpanes=0`}
-              style={{ width: '100%', height: '82vh', minHeight: 520, border: 'none', display: 'block', background: '#f5f5f5' }} />
-          ) : (
-            <div style={{ padding: '40px 20px', textAlign: 'center', color: '#aaa', fontSize: 13 }}>
-              Préparation de l'aperçu du devis…
+
+          {/* Desktop : aperçu PDF intégré (iframe). #view=FitH&zoom=page-width
+              ajuste la page à la largeur sur Chrome/Firefox desktop. */}
+          <div className="ec-pdf-desktop">
+            {pdfUrl ? (
+              <iframe title={`Devis ${data.numero}`} src={`${pdfUrl}#view=FitH&zoom=page-width&navpanes=0`}
+                style={{ width: '100%', height: '82vh', minHeight: 520, border: 'none', display: 'block', background: '#f5f5f5' }} />
+            ) : (
+              <div style={{ padding: '40px 20px', textAlign: 'center', color: '#aaa', fontSize: 13 }}>
+                Préparation de l'aperçu du devis…
+              </div>
+            )}
+          </div>
+
+          {/* Mobile : détail du devis en HTML responsive (iOS affiche le PDF à
+              sa largeur A4 dans une iframe → débordement/coupure ; ce rendu
+              s'adapte à l'écran, sans scroll horizontal). */}
+          <div className="ec-pdf-mobile" style={{ padding: '4px 4px 8px' }}>
+            {lignes.map((l, i) => {
+              if (l.type_ligne === 'lot') {
+                return (
+                  <div key={l.id || i} style={{ fontSize: 11, fontWeight: 700, color: accent, textTransform: 'uppercase', letterSpacing: '0.5px', padding: '14px 12px 4px' }}>
+                    {l.designation}
+                  </div>
+                )
+              }
+              const lineHt = (l.quantite || 0) * (l.prix_unitaire || 0)
+              return (
+                <div key={l.id || i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '10px 12px', borderBottom: '1px solid #f5f5f5' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#111', lineHeight: 1.35 }}>{l.designation || '—'}</div>
+                    <div style={{ fontSize: 12, color: '#999', marginTop: 3 }}>
+                      {fmtQty(l.quantite)} {l.unite || ''} × {fmtEur(l.prix_unitaire)} · TVA {l.tva_rate ?? 20}%
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#111', whiteSpace: 'nowrap' }}>{fmtEur(lineHt)}</div>
+                </div>
+              )
+            })}
+
+            {/* Totaux */}
+            <div style={{ marginTop: 8, padding: '14px 12px', background: '#fafafa', borderRadius: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#555', marginBottom: 6 }}>
+                <span>Total HT</span><strong style={{ color: '#111' }}>{fmtEur(totalHT)}</strong>
+              </div>
+              {Object.entries(baseByRate).sort((a, b) => a[0] - b[0]).map(([rate, base]) => (
+                <div key={rate} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#888', marginBottom: 6 }}>
+                  <span>TVA {rate}% <span style={{ color: '#bbb' }}>(sur {fmtEur(base)})</span></span>
+                  <span>{fmtEur(base * Number(rate) / 100)}</span>
+                </div>
+              ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 800, color: accent, paddingTop: 8, borderTop: '1px solid #eee' }}>
+                <span>Total TTC</span><span>{fmtEur(totalTTC)}</span>
+              </div>
             </div>
-          )}
+          </div>
+
           <button onClick={openPdf} disabled={pdfLoading}
             style={{ width: '100%', background: accent, color: 'white', border: 'none', padding: '13px 20px', fontSize: 14, fontWeight: 700, cursor: pdfLoading ? 'default' : 'pointer', opacity: pdfLoading ? 0.7 : 1 }}>
-            {pdfLoading ? 'Génération…' : '⤢ Ouvrir le PDF en plein écran'}
+            {pdfLoading ? 'Génération…' : '⤢ Ouvrir le PDF (plein écran)'}
           </button>
         </div>
 
