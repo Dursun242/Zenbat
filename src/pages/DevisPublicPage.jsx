@@ -691,13 +691,6 @@ export default function DevisPublicPage({ token }) {
   const tvaLabel = tauxTva.length <= 1 ? `TVA ${tauxTva[0] ?? 20}%` : 'TVA multitaux'
   const cloture  = ['accepte', 'refuse', 'remplace'].includes(data?.statut)
   const enNeg    = data?.statut === 'en_negociation'
-  // Base HT par taux de TVA (pour le détail des totaux façon PDF).
-  const baseByRate = ouvrages.reduce((acc, l) => {
-    const r = l.tva_rate ?? 20
-    acc[r] = (acc[r] || 0) + (l.quantite || 0) * (l.prix_unitaire || 0)
-    return acc
-  }, {})
-  const fmtQty = n => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(n || 0)
 
   return (
     <div style={{ minHeight: '100dvh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', paddingBottom: 60 }}>
@@ -770,52 +763,17 @@ export default function DevisPublicPage({ token }) {
             )}
           </div>
 
-          {/* Mobile : détail du devis en HTML responsive (iOS affiche le PDF à
-              sa largeur A4 dans une iframe → débordement/coupure ; ce rendu
-              s'adapte à l'écran, sans scroll horizontal). */}
-          <div className="ec-pdf-mobile" style={{ padding: '4px 4px 8px' }}>
-            {lignes.map((l, i) => {
-              if (l.type_ligne === 'lot') {
-                return (
-                  <div key={l.id || i} style={{ fontSize: 11, fontWeight: 700, color: accent, textTransform: 'uppercase', letterSpacing: '0.5px', padding: '14px 12px 4px' }}>
-                    {l.designation}
-                  </div>
-                )
-              }
-              const lineHt = (l.quantite || 0) * (l.prix_unitaire || 0)
-              return (
-                <div key={l.id || i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '10px 12px', borderBottom: '1px solid #f5f5f5' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#111', lineHeight: 1.35 }}>{l.designation || '—'}</div>
-                    <div style={{ fontSize: 12, color: '#999', marginTop: 3 }}>
-                      {fmtQty(l.quantite)} {l.unite || ''} × {fmtEur(l.prix_unitaire)} · TVA {l.tva_rate ?? 20}%
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#111', whiteSpace: 'nowrap' }}>{fmtEur(lineHt)}</div>
-                </div>
-              )
-            })}
-
-            {/* Totaux */}
-            <div style={{ marginTop: 8, padding: '14px 12px', background: '#fafafa', borderRadius: 8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#555', marginBottom: 6 }}>
-                <span>Total HT</span><strong style={{ color: '#111' }}>{fmtEur(totalHT)}</strong>
-              </div>
-              {Object.entries(baseByRate).sort((a, b) => a[0] - b[0]).map(([rate, base]) => (
-                <div key={rate} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#888', marginBottom: 6 }}>
-                  <span>TVA {rate}% <span style={{ color: '#bbb' }}>(sur {fmtEur(base)})</span></span>
-                  <span>{fmtEur(base * Number(rate) / 100)}</span>
-                </div>
-              ))}
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 800, color: accent, paddingTop: 8, borderTop: '1px solid #eee' }}>
-                <span>Total TTC</span><span>{fmtEur(totalTTC)}</span>
-              </div>
-            </div>
+          {/* Mobile : pas d'aperçu inline (l'iframe PDF déborde sur iOS) — on
+              invite directement à ouvrir le PDF en plein écran. */}
+          <div className="ec-pdf-mobile" style={{ padding: '28px 20px 8px', textAlign: 'center' }}>
+            <div style={{ fontSize: 40, marginBottom: 10 }}>📄</div>
+            <div style={{ fontSize: 15, color: '#111', fontWeight: 600 }}>Votre devis {data.numero}</div>
+            <div style={{ fontSize: 13, color: '#999', marginTop: 4 }}>Appuyez ci-dessous pour l'ouvrir en PDF.</div>
           </div>
 
           <button onClick={openPdf} disabled={pdfLoading}
-            style={{ width: '100%', background: accent, color: 'white', border: 'none', padding: '13px 20px', fontSize: 14, fontWeight: 700, cursor: pdfLoading ? 'default' : 'pointer', opacity: pdfLoading ? 0.7 : 1 }}>
-            {pdfLoading ? 'Génération…' : '⤢ Ouvrir le PDF (plein écran)'}
+            style={{ width: '100%', background: accent, color: 'white', border: 'none', padding: '14px 20px', fontSize: 15, fontWeight: 700, cursor: pdfLoading ? 'default' : 'pointer', opacity: pdfLoading ? 0.7 : 1 }}>
+            {pdfLoading ? 'Génération…' : '⤢ Ouvrir le PDF'}
           </button>
         </div>
 
