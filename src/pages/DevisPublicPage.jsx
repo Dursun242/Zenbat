@@ -706,14 +706,14 @@ export default function DevisPublicPage({ token }) {
            droite. Les zones nommées repositionnent sans toucher l'ordre DOM. */
         @media (min-width: 900px) {
           .ec-grid {
-            max-width: 1160px; gap: 16px; align-items: start;
+            max-width: 1320px; gap: 16px; align-items: start;
             grid-template-columns: minmax(0, 1.7fr) minmax(320px, 1fr);
             grid-template-areas: "pdf card" "pdf actions";
           }
           .ec-card    { grid-area: card; }
           .ec-pdf     { grid-area: pdf; }
           .ec-actions { grid-area: actions; }
-          .ec-footer  { max-width: 1160px; }
+          .ec-footer  { max-width: 1320px; }
           /* Desktop : on affiche l'iframe PDF, on masque le détail HTML. */
           .ec-pdf-desktop { display: block; }
           .ec-pdf-mobile  { display: none; }
