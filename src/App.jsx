@@ -214,6 +214,39 @@ export default function App() {
     return () => { cancelled = true; };
   }, [user?.id, isAdminViaEnv]);
 
+  // Retour de Stripe Checkout (?stripe=success) : le webhook qui passe le
+  // profil en Pro peut arriver quelques secondes APRÈS la redirection.
+  // Sans resynchronisation, l'app garde le plan chargé au mount (souvent
+  // encore 'free') et continue d'afficher le paywall → l'utilisateur croit
+  // que son paiement n'a pas été pris en compte. On poll le profil jusqu'à
+  // voir 'pro' (max ~30 s), puis on s'arrête. L'URL est nettoyée d'emblée
+  // pour ne pas rejouer le poll à chaque refresh.
+  useEffect(() => {
+    if (!user) return;
+    let param = null;
+    try { param = new URLSearchParams(window.location.search).get('stripe') } catch {}
+    if (param !== 'success') return;
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('stripe');
+      window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+    } catch {}
+    let cancelled = false;
+    (async () => {
+      for (let i = 0; i < 10 && !cancelled; i++) {
+        try {
+          const p = await getMyProfile();
+          if (cancelled) return;
+          if (p?.plan === 'pro' || p?.plan === 'free') setPlan(p.plan);
+          if (p?.billing_cycle === 'monthly' || p?.billing_cycle === 'biannual') setBillingCycle(p.billing_cycle);
+          if (p?.plan === 'pro') return;
+        } catch { /* réseau — on retentera au tick suivant */ }
+        await new Promise(r => setTimeout(r, 3000));
+      }
+    })();
+    return () => { cancelled = true };
+  }, [user?.id]);
+
   useEffect(() => {
     if (!user || !checkoutPending) return;
     let pendingPlan;

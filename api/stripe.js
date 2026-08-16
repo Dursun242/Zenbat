@@ -116,16 +116,52 @@ async function handleWebhook(req, res, rawBody) {
 
     const customerId     = session.customer
     const subscriptionId = session.subscription
-    const plan           = session.metadata?.plan || 'monthly'
 
-    const { data: profile } = await admin
+    // Le plan est lu dans session.metadata (posé à la création de la session).
+    // Les sessions créées avant ce fix n'avaient de metadata QUE sur
+    // subscription_data → session.metadata était vide et tout paiement
+    // retombait sur 'monthly' (biannual jamais reconnu : cancel_at_period_end
+    // non posé, billing_cycle faux en DB). Fallback : metadata de l'abonnement.
+    let plan    = session.metadata?.plan || null
+    let subMeta = null
+    if (!plan && subscriptionId) {
+      try {
+        const sub = await stripe.subscriptions.retrieve(subscriptionId)
+        subMeta = sub?.metadata || null
+        plan    = subMeta?.plan || null
+      } catch (err) {
+        console.warn('[stripe webhook] retrieve subscription failed:', err?.message)
+      }
+    }
+    if (plan !== 'monthly' && plan !== 'biannual') plan = 'monthly'
+
+    let { data: profile } = await admin
       .from('profiles')
       .select('id')
       .eq('stripe_customer_id', customerId)
       .maybeSingle()
 
+    // Fallback : résolution par supabase_user_id (metadata) si le
+    // stripe_customer_id stocké sur le profil ne correspond plus (profil
+    // réinitialisé, customer recréé…). On répare le lien au passage.
     if (!profile) {
-      console.error('[stripe webhook] profil introuvable pour customer', customerId)
+      const uid = session.metadata?.supabase_user_id || subMeta?.supabase_user_id || null
+      if (uid) {
+        const { data: byId } = await admin.from('profiles').select('id').eq('id', uid).maybeSingle()
+        if (byId) {
+          profile = byId
+          await admin.from('profiles').update({ stripe_customer_id: customerId }).eq('id', byId.id)
+        }
+      }
+    }
+
+    if (!profile) {
+      // Paiement orphelin : un client a payé mais aucun profil ne matche.
+      // Visible côté admin (app_logs + notif Telegram) au lieu d'un simple
+      // console.error perdu dans les logs Vercel — à réconcilier à la main.
+      await logServerError('stripe-webhook/profil-introuvable',
+        new Error(`checkout.completed sans profil — customer ${customerId}`),
+        { event_id: event.id, customer_id: customerId, subscription_id: subscriptionId })
       return res.status(200).json({ received: true })
     }
 
@@ -292,6 +328,10 @@ async function handleAction(req, res, rawBody) {
       customer:             customerId,
       mode:                 'subscription',
       payment_method_types: ['card'],
+      // metadata au niveau session ET subscription : le webhook
+      // checkout.session.completed lit session.metadata — le poser
+      // uniquement sur subscription_data le laissait vide.
+      metadata: { plan, supabase_user_id: user.id },
       line_items: [{
         price_data: {
           currency:    'eur',
