@@ -48,7 +48,14 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
     let cancelled = false;
     listInvoices()
       .then(inv => { if (!cancelled) setInvoices(inv || []); })
-      .catch(err => { if (!cancelled) console.warn("[Zenbat] factures indisponibles :", err.message); });
+      .catch(err => {
+        if (cancelled) return;
+        console.warn("[Zenbat] factures indisponibles :", err.message);
+        // Avant : échec 100 % silencieux → l'utilisateur voyait une liste
+        // vide et croyait n'avoir aucune facture. On le prévient (listInvoices
+        // a déjà retenté 3× via withRetry — si on arrive ici c'est durable).
+        showErr("Factures momentanément indisponibles — vérifiez votre connexion");
+      });
     return () => { cancelled = true; };
   }, [user?.id]);
 
@@ -113,7 +120,10 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
     const d = devis.find(x => x.id === devisId);
     if (!d) { showErr("Devis introuvable"); return; }
     try {
-      const numero = await nextInvoiceNumber().catch(() => `FAC-${new Date().getFullYear()}-${String(invoices.length + 1).padStart(4, "0")}`);
+      // Plus de numéro « fabriqué » en fallback : si la RPC échoue (elle a
+      // déjà retenté 3×), on préfère un échec propre à un numéro potentiellement
+      // en collision ou hors séquence (conformité CGI art. 289).
+      const numero = await nextInvoiceNumber();
       const { ht, tva } = calcInvoiceTotals(d.lignes, brand.vatRegime);
       const saved = await apiCreateInvoice(
         {
@@ -138,7 +148,10 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
 
   const onCreateEmptyInvoice = async () => {
     try {
-      const numero = await nextInvoiceNumber().catch(() => `FAC-${new Date().getFullYear()}-${String(invoices.length + 1).padStart(4, "0")}`);
+      // Plus de numéro « fabriqué » en fallback : si la RPC échoue (elle a
+      // déjà retenté 3×), on préfère un échec propre à un numéro potentiellement
+      // en collision ou hors séquence (conformité CGI art. 289).
+      const numero = await nextInvoiceNumber();
       const saved = await apiCreateInvoice(
         {
           numero, objet: "Nouvelle facture", operation_type: "service", statut: "brouillon",

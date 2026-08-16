@@ -67,7 +67,13 @@ export function useBrand(user, setScreen) {
       .catch(err => {
         if (cancelled) return;
         console.warn("[brand load]", err);
-        hydrateFromMetadata(user, setBrand);
+        // Lecture du profil ÉCHOUÉE (réseau / Supabase saturé) : état DB
+        // inconnu. On hydrate uniquement l'AFFICHAGE (setBrandState), jamais
+        // via setBrand — qui armerait saveBrandData 600 ms plus tard et, sur
+        // un appareil sans cache local, écraserait le profil réel de
+        // l'artisan par DEFAULT_DEMO_BRAND (faux SIRET/IBAN « Maçonnerie
+        // Dupont »). Perte de données irréversible vécue en incident.
+        hydrateFromMetadata(user, (updater) => setBrandState(updater));
       });
     return () => { cancelled = true; };
     // setBrand est créé une seule fois via useCallback([]), il est stable

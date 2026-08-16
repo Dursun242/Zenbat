@@ -59,12 +59,16 @@ export async function getMyProfile() {
   if (_profileInflight) return _profileInflight
   _profileInflight = (async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .single()
-      if (error) throw error
-      return data
+      // withRetry : si ce chargement échoue (blip réseau / Supabase saturé),
+      // le plan resterait à 'free' et un client Pro verrait le paywall à tort.
+      return await withRetry(async () => {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .single()
+        if (error) throw error
+        return data
+      })
     } finally {
       setTimeout(() => { _profileInflight = null }, 200)
     }
@@ -168,29 +172,40 @@ export async function deleteClient(id) {
 // DEVIS (+ lignes)
 // =========================================================
 export async function listDevis() {
-  const { data, error } = await supabase
-    .from('devis')
-    .select('*, client:clients(*)')
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false })
-  if (error) throw error
-  return data
+  return withRetry(async () => {
+    const { data, error } = await supabase
+      .from('devis')
+      .select('*, client:clients(*)')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return data
+  })
 }
 
-// Liste les devis + leurs lignes en 2 requêtes (évite N+1)
+// Liste les devis + leurs lignes en 2 requêtes (évite N+1).
+// withRetry : c'est LE chargement initial de l'app — un blip réseau ou une
+// base saturée ne doit pas afficher « Erreur de chargement » au 1er essai
+// (cf. incident Supabase du 16/08 : « TypeError: Load failed » en masse).
 export async function listDevisWithLignes() {
-  const [{ data: ds, error: e1 }, { data: ls }] = await Promise.all([
-    supabase.from('devis').select('*').is('deleted_at', null).order('created_at', { ascending: false }),
-    supabase.from('lignes_devis').select('*').order('position', { ascending: true }),
-  ])
-  if (e1) throw e1
-  // Si lignes échouent (ex: colonne manquante), on retourne quand même les devis
-  const byDevis = new Map()
-  for (const l of ls || []) {
-    if (!byDevis.has(l.devis_id)) byDevis.set(l.devis_id, [])
-    byDevis.get(l.devis_id).push(l)
-  }
-  return (ds || []).map(d => ({ ...d, lignes: byDevis.get(d.id) || [] }))
+  return withRetry(async () => {
+    const [{ data: ds, error: e1 }, { data: ls, error: e2 }] = await Promise.all([
+      supabase.from('devis').select('*').is('deleted_at', null).order('created_at', { ascending: false }),
+      supabase.from('lignes_devis').select('*').order('position', { ascending: true }),
+    ])
+    if (e1) throw e1
+    // Échec du SELECT lignes : on ne retourne PLUS silencieusement des devis
+    // avec lignes: [] (l'aval interprétait « 0 lignes en DB » et pouvait
+    // déclencher une réécriture destructive). Seule tolérance conservée :
+    // 42703 = colonne manquante (migration pas appliquée), cas historique.
+    if (e2 && e2.code !== '42703') throw e2
+    const byDevis = new Map()
+    for (const l of ls || []) {
+      if (!byDevis.has(l.devis_id)) byDevis.set(l.devis_id, [])
+      byDevis.get(l.devis_id).push(l)
+    }
+    return (ds || []).map(d => ({ ...d, lignes: byDevis.get(d.id) || [] }))
+  })
 }
 
 export async function getDevis(id) {
@@ -398,9 +413,13 @@ export async function listInvoices() {
 }
 
 export async function nextInvoiceNumber() {
-  const { data, error } = await supabase.rpc('next_invoice_number')
-  if (error) throw error
-  return data
+  // withRetry sûr : la RPC est un pur SELECT (max+1), sans effet de bord —
+  // aucun risque de trou dans la séquence de numérotation.
+  return withRetry(async () => {
+    const { data, error } = await supabase.rpc('next_invoice_number')
+    if (error) throw error
+    return data
+  })
 }
 
 export async function createAcompteFromDevis(devis, montantHT, tvaRate = 20, vatRegime) {

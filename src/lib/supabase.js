@@ -17,4 +17,17 @@ export const supabase = createClient(url, anonKey, {
     detectSessionInUrl: true,
     flowType: 'pkce',
   },
+  // Deadline globale : sans elle, une base saturée laisse chaque requête
+  // pendre jusqu'au timeout TCP du navigateur (~90 s) et l'UI reste bloquée
+  // sur « Chargement… » (incident Supabase 16/08). 30 s laisse de la marge
+  // aux uploads Storage lents (logo, PDF) tout en bornant le pire cas.
+  // Garde de compatibilité : AbortSignal.timeout absent → fetch standard.
+  global: {
+    fetch: (input, init = {}) => {
+      if (typeof AbortSignal === 'undefined' || !AbortSignal.timeout || init.signal) {
+        return fetch(input, init)
+      }
+      return fetch(input, { ...init, signal: AbortSignal.timeout(30_000) })
+    },
+  },
 })
