@@ -171,6 +171,14 @@
           // est avortée. Contention bénigne et par design (l'opération perdante
           // est rejouée) — inutile de polluer le panel admin.
           if (/Lock (was stolen by another request|broken by another request with the 'steal' option)/i.test(msg)) return true;
+          // Échec réseau transitoire (promesse rejetée non gérée pendant un
+          // blip / une saturation Supabase) : « Failed to fetch » (Chrome),
+          // « Load failed » (Safari), « NetworkError … » (Firefox). Pas un bug
+          // applicatif — et pendant une panne, chaque log est un INSERT de
+          // plus sur la base déjà saturée. Exclusion PRÉCISE en début de
+          // message : ne masque pas les chunk errors (« Failed to fetch
+          // dynamically imported module »), gérés à part par chunkReload.
+          if (/^(TypeError: )?(Failed to fetch|Load failed|NetworkError)\b/.test(msg) && !/dynamically imported/i.test(msg)) return true;
           if (filename) {
             var f = String(filename);
             if (/^(chrome|moz|safari|edge)-extension:/i.test(f)) return true;

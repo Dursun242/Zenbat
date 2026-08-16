@@ -35,6 +35,10 @@ export default function SendToComptableModal({ user, onClose }) {
     supabase.from('profiles')
       .select('comptable_email').eq('id', user?.id).maybeSingle()
       .then(({ data }) => { if (!cancel && data?.comptable_email) setEmail(data.comptable_email) })
+      // Sans ce catch, un blip réseau produisait un unhandledrejection
+      // « Failed to fetch » qui finissait en app_logs. Préremplissage
+      // best-effort : l'utilisateur peut toujours saisir l'email à la main.
+      .catch(() => {})
     return () => { cancel = true }
   }, [user?.id])
 

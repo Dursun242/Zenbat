@@ -189,12 +189,16 @@ export async function listDevis() {
 // (cf. incident Supabase du 16/08 : « TypeError: Load failed » en masse).
 export async function listDevisWithLignes() {
   return withRetry(async () => {
-    const [{ data: ds, error: e1 }, { data: ls }] = await Promise.all([
+    const [{ data: ds, error: e1 }, { data: ls, error: e2 }] = await Promise.all([
       supabase.from('devis').select('*').is('deleted_at', null).order('created_at', { ascending: false }),
       supabase.from('lignes_devis').select('*').order('position', { ascending: true }),
     ])
     if (e1) throw e1
-    // Si lignes échouent (ex: colonne manquante), on retourne quand même les devis
+    // Échec du SELECT lignes : on ne retourne PLUS silencieusement des devis
+    // avec lignes: [] (l'aval interprétait « 0 lignes en DB » et pouvait
+    // déclencher une réécriture destructive). Seule tolérance conservée :
+    // 42703 = colonne manquante (migration pas appliquée), cas historique.
+    if (e2 && e2.code !== '42703') throw e2
     const byDevis = new Map()
     for (const l of ls || []) {
       if (!byDevis.has(l.devis_id)) byDevis.set(l.devis_id, [])

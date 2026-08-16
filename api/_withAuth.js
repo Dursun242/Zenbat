@@ -19,7 +19,21 @@ export async function authenticate(req, res, { adminOnly = false } = {}) {
   const admin = makeAdmin()
   if (!admin) { res.status(500).json({ error: 'Supabase non configuré' }); return null }
 
-  const { data: { user }, error } = await admin.auth.getUser(token)
+  let user = null, error = null
+  try {
+    ({ data: { user }, error } = await admin.auth.getUser(token))
+  } catch (e) { error = e }
+  // Panne réseau / Supabase Auth saturé ≠ token invalide. Renvoyer 401 dans
+  // ce cas faisait croire au front (CRM, admin) que l'utilisateur avait
+  // perdu ses droits pendant un incident infra. → 503, le client réessaie.
+  const isNetworkFail = error && (
+    error.name === 'AuthRetryableFetchError' ||
+    error.status === 0 || error.status === undefined && !user && /fetch|network|timeout|terminat|ECONN|abort/i.test(String(error.message || ''))
+  )
+  if (isNetworkFail) {
+    res.status(503).json({ error: 'Service momentanément indisponible — réessayez dans quelques secondes.' })
+    return null
+  }
   if (error || !user) { res.status(401).json({ error: 'Token invalide' }); return null }
 
   if (adminOnly) {

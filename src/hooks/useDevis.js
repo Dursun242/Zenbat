@@ -16,6 +16,11 @@ import { isLockAbort } from "../lib/authLock.js";
 
 export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, setTab, effectivePlan, weekCount = 0, stickyDevisThisWeek = 0, onDevisCreated = () => {}, onQuotaReached = () => {}, isAdmin = false }) {
   const [devis,        setDevis]        = useState(DEMO_DEVIS);
+  // Ref synchronisée : permet aux callbacks async (goDevis) de lire l'état
+  // COURANT sans passer par un setState-updater (dont les effets de bord
+  // seraient doublés en StrictMode). Même pattern que invoicesRef.
+  const devisRef = useRef(devis);
+  devisRef.current = devis;
   const [selD,         setSelD]         = useState(null);
   const [loadingDevis, setLoadingDevis] = useState(new Set());
   const [autoOpenPDF,  setAutoOpenPDF]  = useState(null);
@@ -188,16 +193,21 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
       .then(fresh => {
         setLoadingDevis(prev => { const n = new Set(prev); n.delete(id); return n; });
         if (!fresh) return;
+        // L'appel réseau de réparation est décidé ICI, hors de l'updater
+        // setDevis : en StrictMode, React exécute l'updater deux fois →
+        // l'ancien code déclenchait DEUX replaceLignes concurrents
+        // (DELETE+INSERT en course = doublons ou perte de lignes).
+        const current     = devisRef.current.find(x => x.id === id);
+        const dbLignes    = fresh.lignes   || [];
+        const stateLignes = current?.lignes || [];
+        if (dbLignes.length === 0 && stateLignes.length > 0) {
+          replaceLignes(id, stateLignes.map(({ id: _, created_at: __, ...l }) => l))
+            .catch(err => { console.error("[goDevis] retry lignes:", err); showErr("Erreur de synchronisation des lignes"); });
+        }
         setDevis(prev => prev.map(x => {
           if (x.id !== id) return x;
-          const dbLignes    = fresh.lignes || [];
-          const stateLignes = x.lignes     || [];
           if (dbLignes.length > 0) return { ...x, lignes: dbLignes, montant_ht: fresh.montant_ht ?? x.montant_ht };
-          if (stateLignes.length > 0) {
-            replaceLignes(id, stateLignes.map(({ id: _, created_at: __, ...l }) => l))
-              .catch(err => { console.error("[goDevis] retry lignes:", err); showErr("Erreur de synchronisation des lignes"); });
-            return x;
-          }
+          if ((x.lignes || []).length > 0) return x;
           return { ...x, montant_ht: fresh.montant_ht ?? x.montant_ht };
         }));
       })

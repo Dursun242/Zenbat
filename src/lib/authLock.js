@@ -13,3 +13,15 @@ export const isLockAbort = (e) => {
   const m = String(e?.message || "");
   return /lock.*(was stolen|stole it|released because another request|'steal' option|broken)/i.test(m);
 };
+
+// Erreur réseau transitoire (fetch échoué, DNS, timeout, Supabase saturé) :
+// libellés par moteur — Chrome « Failed to fetch », Safari « Load failed »,
+// Firefox « NetworkError when attempting to fetch resource ». Ces échecs ne
+// sont PAS des bugs applicatifs : on les montre à l'utilisateur (toast) mais
+// on ne les pousse pas en app_logs — pendant une panne Supabase, chaque
+// logError est un INSERT de plus sur la base déjà saturée (rétroaction), et
+// le panel admin se noie sous du bruit non actionnable (cf. incident 16/08).
+export const isTransientNetworkError = (e) => {
+  const m = String(e?.message || e || "");
+  return /Failed to fetch|Load failed|NetworkError|fetch failed|network error|timeout|timed out|ERR_NETWORK|ERR_INTERNET|ECONNRESET|ETIMEDOUT/i.test(m);
+};
