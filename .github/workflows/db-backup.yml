@@ -1,0 +1,97 @@
+# Sauvegarde quotidienne de la base Supabase (plan Free = aucun backup natif).
+#
+# Chaque nuit, pg_dump exporte le schéma public (toutes les données métier :
+# profils, clients, devis, factures, logs…) + le schéma auth en best-effort
+# (comptes utilisateurs), et stocke le tout en artefact GitHub privé,
+# conservé 30 jours. Restauration : voir docs/backups.md.
+#
+# Pré-requis (une fois, dans GitHub → Settings → Secrets and variables →
+# Actions) :
+#   - SUPABASE_DB_URL      (obligatoire) : chaîne de connexion « Session
+#     pooler » de Supabase (bouton Connect → Session pooler → URI, en
+#     remplaçant [YOUR-PASSWORD]). NE PAS utiliser la connexion directe
+#     db.<ref>.supabase.co (IPv6 only — injoignable depuis GitHub Actions),
+#     ni le Transaction pooler port 6543 (incompatible pg_dump).
+#   - BACKUP_PASSPHRASE    (optionnel)  : si présent, le dump est chiffré
+#     (AES-256). À conserver précieusement : sans lui, backup illisible.
+
+name: Sauvegarde base Supabase
+
+on:
+  schedule:
+    # Tous les jours à 03:17 UTC (heure creuse, évite le pic de :00).
+    - cron: "17 3 * * *"
+  # Lancement manuel : Actions → Sauvegarde base Supabase → Run workflow.
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Vérifier le secret SUPABASE_DB_URL
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Secret SUPABASE_DB_URL manquant. Ajoutez-le dans Settings → Secrets and variables → Actions (chaîne « Session pooler » de Supabase)."
+            exit 1
+          fi
+
+      # Client PostgreSQL 17 (PGDG) : pg_dump doit être >= à la version du
+      # serveur Supabase (15/16/17 selon l'âge du projet) — 17 couvre tout.
+      - name: Installer postgresql-client-17
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -sSf -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+
+      - name: Dump du schéma public (données métier)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          STAMP=$(date -u +%Y%m%d-%H%M)
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+          pg_dump "$SUPABASE_DB_URL" -Fc --no-owner --no-privileges -n public \
+            -f "zenbat-public-$STAMP.dump"
+          # Garde-fou : un dump métier fait toujours plusieurs dizaines de Ko.
+          SIZE=$(stat -c%s "zenbat-public-$STAMP.dump")
+          echo "Taille dump public : $SIZE octets"
+          if [ "$SIZE" -lt 10000 ]; then
+            echo "::error::Dump anormalement petit ($SIZE octets) — sauvegarde considérée en échec."
+            exit 1
+          fi
+
+      - name: Dump du schéma auth (comptes — best-effort)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          pg_dump "$SUPABASE_DB_URL" -Fc --no-owner --no-privileges -n auth \
+            -f "zenbat-auth-$STAMP.dump" \
+            || echo "::warning::Dump du schéma auth impossible (permissions) — les données métier sont sauvegardées, seuls les comptes manquent."
+
+      - name: Chiffrement (si BACKUP_PASSPHRASE est défini)
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -n "$BACKUP_PASSPHRASE" ]; then
+            for f in zenbat-*-"$STAMP".dump; do
+              [ -e "$f" ] || continue
+              gpg --batch --symmetric --cipher-algo AES256 \
+                  --passphrase "$BACKUP_PASSPHRASE" "$f"
+              rm "$f"
+            done
+            echo "Dumps chiffrés (AES-256)."
+          else
+            echo "BACKUP_PASSPHRASE absent — artefact non chiffré (repo privé)."
+          fi
+
+      - name: Publier l'artefact (conservation 30 jours)
+        uses: actions/upload-artifact@v4
+        with:
+          name: zenbat-db-backup-${{ env.STAMP }}
+          path: zenbat-*
+          retention-days: 30
+          if-no-files-found: error
