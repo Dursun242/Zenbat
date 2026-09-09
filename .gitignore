@@ -47,5 +47,8 @@ coverage/
 # Backup de l'agent d'inspection (ne pas commiter)
 index.html.bak
 
-# Graphify — knowledge graph généré localement (reconstruit par le hook post-commit)
-graphify-out/
+# Graphify — artefacts régénérables (cache, HTML, rapport), sauf graph.json
+# qui est versionné pour que les sessions distantes (Claude Code web/mobile)
+# aient le graphe sans reconstruction. Merge driver dédié dans .gitattributes.
+graphify-out/*
+!graphify-out/graph.json
