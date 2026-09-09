@@ -47,8 +47,7 @@ coverage/
 # Backup de l'agent d'inspection (ne pas commiter)
 index.html.bak
 
-# Graphify — artefacts régénérables (cache, HTML, rapport), sauf graph.json
-# qui est versionné pour que les sessions distantes (Claude Code web/mobile)
-# aient le graphe sans reconstruction. Merge driver dédié dans .gitattributes.
-graphify-out/*
-!graphify-out/graph.json
+# Graphify — knowledge graph local, jamais versionné : la sortie du rebuild
+# n'est pas déterministe (~2500 lignes de churn par commit/checkout).
+# Les sessions distantes le reconstruisent via .claude/hooks/session-start.sh.
+graphify-out/
