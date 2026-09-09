@@ -237,7 +237,11 @@ Pour changer de modèle : modifier la variable d'env `VITE_CLAUDE_MODEL` dans Ve
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
 
 Rules:
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- Pick the tool by question shape (measured on this repo, best economy first):
+  - « qui utilise/appelle X, qu'est-ce qui casse si je change X » → `graphify affected "X"` (~250 tokens, lignes exactes des consommateurs).
+  - « que contient le module X, sa carte » → `graphify explain "<chemin/relatif>"` (~400 tokens ; en cas d'ambiguïté, relancer avec l'ID proposé).
+  - Question ouverte/exploratoire → `graphify query "<question>"` en dernier recours : sur un hub comme pdfBuilder la réponse complète fait ~14k tokens et la troncature par défaut (budget 2000) rate des nœuds — préférer affected/explain, ou `--budget N` en connaissance de cause.
+- `graphify path "<A>" "<B>"` pour les relations — mais les appels front → API Vercel passent par HTTP (`fetch /api/...`), invisibles à l'AST : pour ces frontières, grep reste le bon outil.
 - If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
