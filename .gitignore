@@ -47,5 +47,5 @@ coverage/
 # Backup de l'agent d'inspection (ne pas commiter)
 index.html.bak
 
-# Graphify — cache local du knowledge graph (regénéré par le hook post-commit)
-graphify-out/cache/
+# Graphify — knowledge graph généré localement (reconstruit par le hook post-commit)
+graphify-out/
