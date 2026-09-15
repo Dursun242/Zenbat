@@ -9,7 +9,7 @@ Stack : React + Vite (frontend) · Vercel Serverless Functions (API) · Supabase
 
 ### Vercel : limite 12 fonctions serverless
 Le plan Hobby de Vercel autorise **maximum 12 fichiers** dans `/api/`.
-Fichiers actuels (11/12 — les helpers `_cors.js`, `_email.js`, `_rateLimit.js`, `_serverLog.js`, `_ssrf.js`, `_withAuth.js` ne comptent pas, `*.test.js` ignorés via `.vercelignore`, `fonts/` est un dossier d'assets) :
+Fichiers actuels (11/12 — les helpers `_cors.js`, `_email.js`, `_rateLimit.js`, `_serverLog.js`, `_ssrf.js`, `_superpdp.js`, `_withAuth.js` ne comptent pas, `*.test.js` ignorés via `.vercelignore`, `fonts/` est un dossier d'assets) :
 ```
 account.js             admin-delete-user.js   admin-stats.js     admin-user-detail.js
 claude.js              contact.js             crm.js             devis-public.js
@@ -30,10 +30,11 @@ L'ancienne URL externe (Stripe Dashboard `/api/stripe-checkout`, `/api/stripe-we
 Les fichiers dans `/supabase/migrations/` ne s'appliquent **pas automatiquement**.
 L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - Prévenir l'utilisateur à chaque nouvelle migration créée.
-- **État : toutes les migrations 0001→0056 sont appliquées** (contrôle complet exécuté le 2026-06-11 : tracking 13/13 sur 0044→0056, contraintes CHECK, tables, colonnes, index et fonctions vérifiés un par un). Aucune migration en attente.
+- **État : toutes les migrations 0001→0056 sont appliquées** (contrôle complet exécuté le 2026-06-11 : tracking 13/13 sur 0044→0056, contraintes CHECK, tables, colonnes, index et fonctions vérifiés un par un).
+- **En attente d'application : `0057_pdp_accounts.sql`** (Super PDP étape 1 — tables `pdp_accounts`, `pdp_state`, colonnes `invoices.pdp_*`). Idempotente, à coller dans le SQL Editor.
 - Subtilité de tracking héritée de la collision 0053 : l'essai Pro avait été appliqué sous l'ancien numéro `0053`, puis `0053_invoice_type_solde` a vu son auto-enregistrement ignoré (`on conflict do nothing`), puis `0056` s'est enregistrée normalement. Correctif (réétiquetage, PAS de changement de version — `0056` existe déjà) : `update public.schema_migrations set label='invoice_type_solde' where version='0053' and label='pro_trial_until';`.
 - Jobs pg_cron attendus actifs : `purge-support-tickets-36h` (0050) et `expire-pro-trials-daily` (0056). Diagnostic : `SELECT jobname, schedule, active FROM cron.job;` et `SELECT * FROM cron.job_run_details WHERE jobname = '...' ORDER BY start_time DESC LIMIT 10;`.
-- Prochaine migration à créer : préfixer avec `0057_`.
+- Prochaine migration à créer : préfixer avec `0058_`.
 
 **Tracking depuis 0043** : la table `public.schema_migrations(version, label, applied_at)` est créée par la migration `0043`. À partir de là, chaque nouvelle migration **doit** se terminer par un INSERT idempotent qui s'auto-enregistre :
 ```sql
@@ -111,6 +112,7 @@ Helpers non déployés (préfixés `_`, importés par les endpoints) :
 - `_rateLimit.js` — rate-limiter in-memory par IP (utilisé sur `contact.js`, `newsletter.js`, `devis-public.js` action `request_otp`). Désactivé en env test (`VITEST`). ⚠ Best-effort : les compteurs sont remis à zéro à chaque recyclage d'instance Vercel.
 - `_serverLog.js` — log d'erreurs serveur vers la table `app_logs`.
 - `_ssrf.js` — `assertPublicHost()` : bloque les URLs internes/privées avant un fetch sortant (utilisé par `crm.js` pour le scraping).
+- `_superpdp.js` — client Super PDP (OAuth 2.1, envoi Factur-X binaire, polling `invoice_events`, mapping AFNOR `fr:2xx` → statuts). Routé depuis `facturx.js` (actions `pdp_*` + `?route=pdp_poll`) pour ne pas consommer le dernier slot Vercel. V0 sandbox : actions réservées à `ADMIN_EMAIL`.
 
 | Fichier | Rôle |
 |---------|------|
@@ -121,7 +123,7 @@ Helpers non déployés (préfixés `_`, importés par les endpoints) :
 | `claude.js` | Proxy Claude API avec timeout 28s + AbortController |
 | `contact.js` | Formulaire de contact public — POST avec honeypot anti-bot, envoie un email à l'admin |
 | `devis-public.js` | Endpoint public pour signature client de devis — token + OTP 8 chiffres + audit, multi-routes par `action` (`send`, `request_otp`, `verify_otp`, `accept`, `refuse`, `negotiate`, `artisan_respond`, `send_signed_pdf`). `send_signed_pdf` reçoit le PDF généré côté navigateur en base64 et l'email en pièce jointe au client + à l'artisan ; idempotence via audit log (`event = 'signed_pdf_sent'`). |
-| `facturx.js` | Génération PDF Factur-X (XML CII embarqué). Multi-actions par champ `action` du body : par défaut = assemble + uploade en Storage ; `action: 'send'` = télécharge le PDF depuis Storage et l'envoie par email au client (au nom de `brand.companyName`, avec Reply-To = `brand.email`), met à jour `invoices.sent_to_client_at`. |
+| `facturx.js` | Génération PDF Factur-X (XML CII embarqué, `buildXML` exporté et testé dans `facturx.test.js`). Multi-actions par champ `action` du body : par défaut = assemble + uploade en Storage + émission server-side ; `send` = email du PDF au client ; `set_status` / `hide` ; `pdp_test_connection` / `pdp_send_invoice` / `pdp_get_status` = Super PDP (délégué à `_superpdp.js`, admin-only en v0). `GET ?route=pdp_poll` = cron Vercel quotidien 06:00 UTC de polling des statuts (Bearer `CRON_SECRET`, routé AVANT l'auth utilisateur). |
 | `crm.js` | CRM de prospection admin — CRUD prospects, scraping d'email (protégé `_ssrf.js`), file d'envoi programmée. Multi-actions par `?action=` (GET) / `action` du body (POST). Action `process_queue` appelée par pg_cron, auth par `CRON_SECRET` (timing-safe) |
 | `newsletter.js` | Inscription newsletter |
 | `stripe.js` | Stripe checkout/portal/info (POST authentifié) + webhook (détection par header `stripe-signature`) |
@@ -182,31 +184,36 @@ RLS activé sur toutes les tables — les endpoints admin contournent via `SUPAB
 | `ALLOWED_ORIGINS` | Origines CORS autorisées (séparées par virgule) |
 | `STRIPE_SECRET_KEY` | Clé secrète Stripe (checkout / portal / abonnements) |
 | `STRIPE_WEBHOOK_SECRET` | Secret de signature webhook Stripe |
-| `CRON_SECRET` | Secret Bearer de l'action `process_queue` de `api/crm.js` (appelée par pg_cron) |
+| `CRON_SECRET` | Secret Bearer de l'action `process_queue` de `api/crm.js` (pg_cron) et du polling `/api/facturx?route=pdp_poll` (cron Vercel, qui injecte ce header automatiquement) |
+| `PDP_API_BASE` | Base URL Super PDP (défaut `https://api.superpdp.tech`, prod et sandbox distinguées par `companies/me.env`) |
+| `PDP_CLIENT_ID` / `PDP_CLIENT_SECRET` | App OAuth Super PDP sandbox (v0 : compte unique partagé) |
+| `PDP_SANDBOX_RECEIVER_PEPPOL` | Adresse Peppol du receiver enrôlé en sandbox (`0225:xxxxxxxxx_xxxx`, ligne d'annuaire « receiver OK »). Fallback `PDP_SANDBOX_RECEIVER_SIREN` |
 
 > Variables d'env caduques (à supprimer côté Vercel) : `B2B_API_KEY`, `B2B_API_URL`, `B2B_WEBHOOK_SECRET`, `ODOO_URL`, `ODOO_DB`, `ODOO_USERNAME`, `ODOO_API_KEY`.
 
 ---
 
-## Travail en attente — intégration Super PDP (réforme facturation B2B 2026/2027)
+## Super PDP — facturation électronique B2B (réforme 09/2026 → 09/2027)
 
-**État : code écrit, testé en sandbox, jamais mergé sur `main`.**
+**État : étape 1 (sandbox v0, admin-only) mergée.** L'étape 2 (prod multi-tenant) reste à faire.
 
-L'intégration **Super PDP** (Plateforme Agréée DGFiP) a été développée lors d'une grosse séance et validée en preview Vercel (envoi de factures sandbox fonctionnel). Elle vit aujourd'hui sur 3 branches non-mergées du remote :
+Rappel réforme : réception obligatoire pour toutes les entreprises depuis le 01/09/2026 ; émission obligatoire pour PME/TPE/micro (= les artisans Zenbat) au 01/09/2027. Le B2C reste hors facture électronique.
 
-| Branche origin | Rôle |
-|---|---|
-| `claude/audit-einvoicing-integration-awnev` | Audit faisabilité 850 lignes (`audit-einvoicing.md`) |
-| `claude/add-dpd-integration-x5GRw` | 1ʳᵉ itération + fixes Peppol BT-34/BT-49 |
-| `claude/integrate-superdpd-ZpSGG` | **Version la plus avancée** : superpdp.js (361 lignes) + tests (159 lignes, 13 cas) + migration `0039_pdp_accounts.sql` + bouton UI |
+### Ce qui est en place (étape 1)
+- `api/_superpdp.js` (helper non déployé) routé par `api/facturx.js` : OAuth 2.1 client_credentials, `POST /v1.beta/invoices` (PDF Factur-X binaire), `GET /v1.beta/invoices/{id}`, polling `GET /v1.beta/invoice_events?starting_after_id=` avec curseur global `pdp_state`.
+- Mapping AFNOR → `STATUT_FACTURE` : `fr:200`→`envoyee`, `fr:201/203/210`→`rejetee`, `fr:202/204/206`→`recue`, `fr:212`→`payee`, `fr:205/207/208` = code brut seulement (`invoices.pdp_status_raw`).
+- XML CII conforme Peppol : BT-34/BT-49 (`URIUniversalCommunication`, override `brand/client.peppolAddress`), catégories TVA `AE` (auto-liquidation) / `E` (franchise) avec `ExemptionReason`, avoirs en valeur absolue, `InvoiceReferencedDocument` après la Summation.
+- UI : bouton « 📡 PDP test » dans `InvoiceDetail.jsx`, visible uniquement si `pdpEnabled` (= `isAdmin` dans `App.jsx`). Le serveur refuse aussi (403) tout non-admin.
+- Migration `0057_pdp_accounts.sql` (schéma déjà prêt pour la v1 : secret chiffré, token et curseur par user).
+- Cron Vercel quotidien `0 6 * * *` sur `/api/facturx?route=pdp_poll`.
 
-**Plan de reprise complet** : voir [`docs/superpdp/REPRISE.md`](docs/superpdp/REPRISE.md). Il contient :
-- spec API SuperPDP confirmée (OAuth 2.1, `POST /v1.beta/invoices` binaire, polling `/v1.beta/invoice_events`, mapping AFNOR `fr:2xx` → statuts Zenbat)
-- variables d'env à poser (`PDP_CLIENT_ID`, `PDP_CLIENT_SECRET`, `PDP_API_BASE`, `PDP_SANDBOX_RECEIVER_PEPPOL`, `CRON_SECRET`)
-- conflits à résoudre au rebase (migrations à renuméroter `0039`→`0044` et `0040`→`0045`, `InvoiceDetail.jsx` à fusionner avec PRs #28/#60/#61/#69, `vercel.json` cron + maxDuration)
-- plan d'exécution en 10 étapes
+### Contrainte v0 à connaître
+Compte Super PDP unique : `pdp_send_invoice` swappe le SIRET vendeur (SIREN de l'app OAuth) et l'adresse Peppol acheteur (`PDP_SANDBOX_RECEIVER_PEPPOL`) **dans le XML CII uniquement**, et écrase le Factur-X stocké en Storage par cette version sandbox. → À n'utiliser que sur des factures de test admin.
 
-→ **Ne pas relancer cette intégration sans relire `docs/superpdp/REPRISE.md` d'abord.** Et confirmer avec l'utilisateur que les credentials sandbox Super PDP sont toujours valides.
+### Étape 2 — v1 multi-tenant (à faire)
+Chaque artisan émet sous son propre SIREN avec ses propres identifiants Super PDP : écran de réglages pour saisir `client_id`/`client_secret` (stockage AES-GCM dans `pdp_accounts.encrypted_client_secret` + `secret_iv` + `secret_tag`), cache de token en DB (`access_token`, `token_expires_at`), curseur de polling par user (`pdp_accounts.last_event_id`), retrait du swap SIRET/Peppol, bouton ouvert à tous les Pro. Question commerciale préalable : chaque artisan crée-t-il son compte Super PDP lui-même, ou Zenbat provisionne-t-il via une offre partenaire ? Vérifier aussi que l'API n'est plus en `/v1.beta`.
+
+Historique et spec détaillée : [`docs/superpdp/REPRISE.md`](docs/superpdp/REPRISE.md).
 
 ---
 

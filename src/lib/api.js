@@ -637,3 +637,37 @@ export async function saveCguAcceptance(version = "1.0") {
     .eq("id", user.id)
   if (error) console.warn("[cgu] save error (migration 0008 peut-être pas encore appliquée) :", error.message)
 }
+
+// =========================================================
+// SUPER PDP (Plateforme Agréée — facturation électronique B2B)
+// Routé dans /api/facturx (actions pdp_*) pour ne pas consommer le dernier
+// slot Vercel. V0 sandbox : réservé à l'admin côté serveur (403 sinon).
+// =========================================================
+async function callPDP(action, payload = {}) {
+  const { getToken } = await import('./getToken.js')
+  const token = await getToken()
+  if (!token) throw new Error('Session expirée — reconnectez-vous')
+  const res = await fetch('/api/facturx', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ action, ...payload }),
+  })
+  const data = await res.json().catch(() => null)
+  if (!res.ok) {
+    const err = new Error(data?.error || `Super PDP HTTP ${res.status}`)
+    // Détail brut Super PDP (erreurs de validation XML, Peppol…) pour l'UI.
+    err.detail = data?.detail || null
+    err.status = res.status
+    throw err
+  }
+  return data
+}
+
+export const pdp = {
+  testConnection: ()                    => callPDP('pdp_test_connection'),
+  sendInvoice:    (invoice_id, pdf_b64) => callPDP('pdp_send_invoice', { invoice_id, pdf_base64: pdf_b64 }),
+  getStatus:      (invoice_id)          => callPDP('pdp_get_status', { invoice_id }),
+}
