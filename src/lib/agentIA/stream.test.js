@@ -34,6 +34,18 @@ describe("visibleText", () => {
   it("trim les espaces et sauts de ligne", () => {
     expect(visibleText("   bonjour   ")).toBe("bonjour");
   });
+
+  it("masque un début de balise <DEVIS> en suspens (flux coupé ou en cours)", () => {
+    expect(visibleText("<DE")).toBe("");
+    expect(visibleText("<")).toBe("");
+    expect(visibleText("<DEVIS")).toBe("");
+    expect(visibleText("Quelle surface ?\n<DEV")).toBe("Quelle surface ?");
+  });
+
+  it("ne masque pas un < qui n'est pas un début de balise", () => {
+    expect(visibleText("prix < 100 €")).toBe("prix < 100 €");
+    expect(visibleText("<DEVX")).toBe("<DEVX");
+  });
 });
 
 describe("ClaudeApiError", () => {
@@ -175,10 +187,40 @@ describe("streamClaude", () => {
     const chunks = [
       'data: pas-du-json\n\n',
       'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"ok"}}\n\n',
+      'data: {"type":"message_stop"}\n\n',
     ];
     global.fetch.mockResolvedValueOnce(sseResponse(chunks));
     const raw = await streamClaude({ body: {}, authHeaders: {}, onTextDelta: () => {} });
     expect(raw).toBe("ok");
+  });
+
+  it("rejette (erreur non-API) un flux terminé sans message_stop — texte tronqué", async () => {
+    const chunks = [
+      'data: {"type":"message_start"}\n\n',
+      'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"<DE"}}\n\n',
+    ];
+    global.fetch.mockResolvedValueOnce(sseResponse(chunks));
+    let caught;
+    try { await streamClaude({ body: {}, authHeaders: {}, onTextDelta: () => {} }); }
+    catch (e) { caught = e; }
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught).not.toBeInstanceOf(ClaudeApiError);
+    expect(caught.message).toBe("stream-incomplete");
+    expect(caught.partialRaw).toBe("<DE");
+    expect(caught.partialLen).toBe(3);
+  });
+
+  it("rejette (erreur non-API) sur l'event stream_aborted émis par /api/claude", async () => {
+    const chunks = [
+      'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"<DE"}}\n\n',
+      'event: stream_aborted\ndata: {"type":"stream_aborted","message":"socket hang up"}\n\n',
+    ];
+    global.fetch.mockResolvedValueOnce(sseResponse(chunks));
+    let caught;
+    try { await streamClaude({ body: {}, authHeaders: {}, onTextDelta: () => {} }); }
+    catch (e) { caught = e; }
+    expect(caught).not.toBeInstanceOf(ClaudeApiError);
+    expect(caught.message).toMatch(/stream-aborted: socket hang up/);
   });
 
   it("envoie stream:true dans le body de la requête", async () => {

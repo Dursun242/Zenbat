@@ -345,8 +345,18 @@ export default async function handler(req, res) {
               } catch {}
             }
           }
-        } catch {
-          // client abort ou erreur réseau — on ferme proprement
+        } catch (streamErr) {
+          // Lecture du flux Anthropic interrompue (reset upstream, réseau).
+          // Sans signal, le client recevait un flux « proprement » terminé
+          // mais tronqué (ex : « <DE ») et l'affichait tel quel. On log, et
+          // on tente d'émettre un event dédié que le client traite comme une
+          // erreur réseau → fallback non-streamé. Si c'est le client qui a
+          // coupé, le write échoue silencieusement.
+          console.error("[claude/stream] lecture upstream interrompue:", streamErr?.message || streamErr);
+          try {
+            res.write(`event: stream_aborted\ndata: ${JSON.stringify({ type: "stream_aborted", message: streamErr?.message || "upstream" })}\n\n`);
+            res.flush?.();
+          } catch {}
         }
 
         // Log token usage (fire-and-forget)
