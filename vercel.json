@@ -53,6 +53,9 @@
       ]
     }
   ],
+  "crons": [
+    { "path": "/api/facturx?route=pdp_poll", "schedule": "0 6 * * *" }
+  ],
   "functions": {
     "api/claude.js":              { "maxDuration": 60 },
     "api/facturx.js":             { "maxDuration": 60 },

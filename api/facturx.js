@@ -16,9 +16,10 @@ import { PDFDocument, AFRelationship, PDFName, PDFRawStream } from "pdf-lib";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { cors } from "./_cors.js"
-import { authenticate } from "./_withAuth.js"
+import { authenticate, makeAdmin } from "./_withAuth.js"
 import { sendEmail } from "./_email.js"
 import { logServerError } from "./_serverLog.js"
+import { handlePdpPoll, handlePdpAction, isPdpPollRequest, PDP_ACTIONS } from "./_superpdp.js"
 
 const XML_FILENAME    = "factur-x.xml";
 // Profil EN 16931 (norme européenne, obligatoire PPF/PDP à partir de 09/2026).
@@ -56,26 +57,53 @@ const fmtDate = d => {
   return `${x.getFullYear()}${String(x.getMonth()+1).padStart(2,"0")}${String(x.getDate()).padStart(2,"0")}`;
 };
 
-function buildXML({ invoice, client, brand, sourceInvoice }) {
+export function buildXML({ invoice, client, brand, sourceInvoice }) {
   const ouvrages   = (invoice.lignes || []).filter(l => l.type_ligne === "ouvrage");
   const franchise  = brand.vatRegime === "franchise";
+  const autoLiqBtp = !!invoice.auto_liquidation_btp;
   const isAvoir    = !!invoice.avoir_of_invoice_id || !!sourceInvoice;
   const typeCode   = isAvoir ? TYPE_CREDIT : TYPE_INVOICE;
 
+  // Sur un avoir (TypeCode=381 / credit note), Peppol BIS 3.0 et la plupart
+  // des PA/PDP refusent les montants négatifs et les mix +/- : c'est le
+  // TypeCode qui porte le caractère "crédit", pas le signe des lignes.
+  // → valeur absolue partout dans le XML CII pour les avoirs (le PDF visuel
+  // garde ce que l'utilisateur a saisi ; create_avoir_from() copie déjà les
+  // montants en positif, ceci est un filet de sécurité).
+  const sgn = isAvoir ? Math.abs : (x => x);
+
+  // Catégorie TVA EN 16931 (UNTDID 5305) :
+  //   "S"  = Standard rated (taux normal)
+  //   "E"  = Exempt from tax (franchise art. 293 B CGI)
+  //   "AE" = VAT Reverse Charge (auto-liquidation art. 283-2 nonies CGI)
+  // Priorité : auto-liquidation > franchise > taux ligne. Quand AE ou E
+  // s'applique, on force le taux à 0 — sinon contradiction catégorie
+  // (exempt/reverse) ↔ rate>0, refus PA/PDP (BR-E-05, BR-AE-05).
+  const docVatCategory = autoLiqBtp ? "AE" : (franchise ? "E" : null);
+  const docExemptionReason = autoLiqBtp
+    ? "Autoliquidation — TVA due par le preneur, art. 283-2 nonies CGI"
+    : (franchise ? FRANCHISE_NOTE : "");
+
   const taxByRate = {};
   for (const l of ouvrages) {
-    const rate = Number(l.tva_rate ?? (franchise ? 0 : 20));
-    const ht   = (Number(l.quantite)||0) * (Number(l.prix_unitaire)||0);
+    const rate = docVatCategory ? 0 : Number(l.tva_rate ?? (franchise ? 0 : 20));
+    const ht   = sgn((Number(l.quantite)||0) * (Number(l.prix_unitaire)||0));
     if (!taxByRate[rate]) taxByRate[rate] = { base: 0, montant: 0 };
     taxByRate[rate].base    += ht;
     taxByRate[rate].montant += ht * rate / 100;
   }
-  if (!Object.keys(taxByRate).length) taxByRate[franchise ? 0 : 20] = { base: 0, montant: 0 };
+  if (!Object.keys(taxByRate).length) taxByRate[(docVatCategory || franchise) ? 0 : 20] = { base: 0, montant: 0 };
 
-  const totalHT  = Number(invoice.montant_ht)  || ouvrages.reduce((s,l)=>s+(Number(l.quantite)||0)*(Number(l.prix_unitaire)||0),0);
-  const totalTVA = Number(invoice.montant_tva) || Object.values(taxByRate).reduce((s,t)=>s+t.montant,0);
-  const totalTTC = Number(invoice.montant_ttc) || totalHT + totalTVA;
-  const retenue  = Number(invoice.retenue_garantie_eur) || 0;
+  // Avoir : on IGNORE invoice.montant_* stocké (peut refléter une somme
+  // signée du visuel) et on recalcule TOUT depuis les lignes abs'd — sinon
+  // sum(LineTotalAmount) ≠ TotalHT dans le XML, refus PA/PDP (BR-CO-10).
+  // Facture normale : comportement historique conservé.
+  const totalHTFromLines = ouvrages.reduce((s,l)=>s+sgn((Number(l.quantite)||0)*(Number(l.prix_unitaire)||0)),0);
+  const totalTVAFromTax  = Object.values(taxByRate).reduce((s,t)=>s+t.montant,0);
+  const totalHT  = isAvoir ? totalHTFromLines : (Number(invoice.montant_ht)  || totalHTFromLines);
+  const totalTVA = isAvoir ? totalTVAFromTax  : (Number(invoice.montant_tva) || totalTVAFromTax);
+  const totalTTC = isAvoir ? (totalHT + totalTVA) : (Number(invoice.montant_ttc) || totalHT + totalTVA);
+  const retenue  = sgn(Number(invoice.retenue_garantie_eur) || 0);
   const duePayable = totalTTC - retenue;
 
   const sellerSiret = (brand.siret||"").replace(/\s+/g,"").slice(0,14);
@@ -98,10 +126,11 @@ function buildXML({ invoice, client, brand, sourceInvoice }) {
   };
 
   const lineBlocks = ouvrages.map((l,i) => {
-    const qty = Number(l.quantite)||0;
-    const pu  = Number(l.prix_unitaire)||0;
-    const rate= Number(l.tva_rate ?? (franchise?0:20));
-    const cat = rate>0 ? "S" : "E";
+    const qty = sgn(Number(l.quantite)||0);
+    const pu  = sgn(Number(l.prix_unitaire)||0);
+    // Cohérence ligne ↔ ventilation TVA : même catégorie / même taux forcé.
+    const rate= docVatCategory ? 0 : Number(l.tva_rate ?? (franchise?0:20));
+    const cat = docVatCategory || (rate>0 ? "S" : "E");
     return `
     <ram:IncludedSupplyChainTradeLineItem>
       <ram:AssociatedDocumentLineDocument><ram:LineID>${i+1}</ram:LineID></ram:AssociatedDocumentLineDocument>
@@ -120,8 +149,13 @@ function buildXML({ invoice, client, brand, sourceInvoice }) {
   }).join("");
 
   const taxBlocks = Object.entries(taxByRate).map(([rate,t]) => {
-    const r = Number(rate), cat = r>0 ? "S" : "E";
-    const exempt = cat==="E" ? `<ram:ExemptionReason>${esc(FRANCHISE_NOTE)}</ram:ExemptionReason>` : "";
+    const r = Number(rate);
+    const cat = docVatCategory || (r>0 ? "S" : "E");
+    // BG-23 VAT BREAKDOWN : ExemptionReason obligatoire pour "E" (franchise)
+    // et "AE" (auto-liquidation) — BR-E-10, BR-AE-10.
+    const exempt = (cat === "E" || cat === "AE")
+      ? `<ram:ExemptionReason>${esc(docExemptionReason || FRANCHISE_NOTE)}</ram:ExemptionReason>`
+      : "";
     return `
     <ram:ApplicableTradeTax>
       <ram:CalculatedAmount>${num(t.montant)}</ram:CalculatedAmount>
@@ -158,6 +192,32 @@ function buildXML({ invoice, client, brand, sourceInvoice }) {
   const sellerContact = sellerContactParts
     ? `<ram:DefinedTradeContact>${sellerContactParts}</ram:DefinedTradeContact>`
     : "";
+
+  // BT-34 / BT-49 — Seller/Buyer Electronic Address. Obligatoire pour la
+  // transmission via PA/PDP : c'est l'identifiant de routage dans le réseau
+  // Peppol (Super PDP rejette sans). Schemes :
+  //   "0009" = SIRET FR · "0212" = SIREN FR · "EM" = email · "0225" = FR-SIRENE Peppol
+  // Stratégie : SIRET si dispo, sinon SIREN, sinon email.
+  // Override : brand/client.peppolAddress au format "<scheme>:<id>" (ex
+  // "0225:315143296_6591") est utilisé tel quel — sert à matcher l'annuaire
+  // Peppol-sandbox de Super PDP dont les identifiants ne sont pas des SIRET.
+  const buildElectronicAddress = (siret, siren, email) => {
+    if (siret && siret.length === 14) return `<ram:URIUniversalCommunication><ram:URIID schemeID="0009">${esc(siret)}</ram:URIID></ram:URIUniversalCommunication>`;
+    if (siren && siren.length === 9)  return `<ram:URIUniversalCommunication><ram:URIID schemeID="0212">${esc(siren)}</ram:URIID></ram:URIUniversalCommunication>`;
+    if (email)                        return `<ram:URIUniversalCommunication><ram:URIID schemeID="EM">${esc(email)}</ram:URIID></ram:URIUniversalCommunication>`;
+    return "";
+  };
+  const buildElectronicAddressFromPeppol = (peppol) => {
+    const m = String(peppol || "").trim().match(/^(\d{4}):(.+)$/);
+    if (!m) return null;
+    return `<ram:URIUniversalCommunication><ram:URIID schemeID="${esc(m[1])}">${esc(m[2])}</ram:URIID></ram:URIUniversalCommunication>`;
+  };
+  const sellerElectronicAddress =
+    buildElectronicAddressFromPeppol(brand?.peppolAddress) ||
+    buildElectronicAddress(sellerSiret, sellerSiren, brand.email);
+  const buyerElectronicAddress =
+    buildElectronicAddressFromPeppol(client?.peppolAddress) ||
+    buildElectronicAddress(buyerSiret, buyerSiren, client?.email);
 
   // BT-10 BuyerReference (obligatoire EN 16931 si pas de PurchaseOrderReference)
   const buyerRef = esc(invoice.buyer_reference || client?.reference || client?.raison_sociale || client?.nom || "—");
@@ -205,6 +265,7 @@ function buildXML({ invoice, client, brand, sourceInvoice }) {
           ${sellerAddr.city ? `<ram:CityName>${sellerAddr.city}</ram:CityName>` : ""}
           <ram:CountryID>FR</ram:CountryID>
         </ram:PostalTradeAddress>
+        ${sellerElectronicAddress}
         ${sellerTaxRegs}
       </ram:SellerTradeParty>
       <ram:BuyerTradeParty>
@@ -216,13 +277,13 @@ function buildXML({ invoice, client, brand, sourceInvoice }) {
           ${buyerAddr.city ? `<ram:CityName>${buyerAddr.city}</ram:CityName>` : ""}
           <ram:CountryID>FR</ram:CountryID>
         </ram:PostalTradeAddress>
+        ${buyerElectronicAddress}
       </ram:BuyerTradeParty>
     </ram:ApplicableHeaderTradeAgreement>
     <ram:ApplicableHeaderTradeDelivery>
       <ram:ActualDeliverySupplyChainEvent><ram:OccurrenceDateTime><udt:DateTimeString format="102">${issue}</udt:DateTimeString></ram:OccurrenceDateTime></ram:ActualDeliverySupplyChainEvent>
     </ram:ApplicableHeaderTradeDelivery>
     <ram:ApplicableHeaderTradeSettlement>
-      ${sourceRefBlock}
       <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
       ${iban ? `
       <ram:SpecifiedTradeSettlementPaymentMeans>
@@ -240,6 +301,7 @@ function buildXML({ invoice, client, brand, sourceInvoice }) {
         <ram:GrandTotalAmount>${num(totalTTC)}</ram:GrandTotalAmount>
         <ram:DuePayableAmount>${num(duePayable)}</ram:DuePayableAmount>
       </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+      ${sourceRefBlock}
     </ram:ApplicableHeaderTradeSettlement>
   </rsm:SupplyChainTradeTransaction>
 </rsm:CrossIndustryInvoice>`;
@@ -351,6 +413,16 @@ function addSRGBOutputIntent(pdfDoc, iccBytes) {
 const FACTURX_MAX_BYTES = 8 * 1024 * 1024;
 
 export default async function handler(req, res) {
+  // Cron Vercel de polling Super PDP (GET, Bearer CRON_SECRET, pas de user).
+  // Routé ici plutôt que dans un api/superpdp.js dédié : dernier slot Vercel
+  // (limite 12 fonctions) — cf CLAUDE.md « Convention de fusion ».
+  if (isPdpPollRequest(req)) {
+    if (req.method !== "GET" && req.method !== "POST") {
+      return res.status(405).json({ error: "Method not allowed" });
+    }
+    return handlePdpPoll(req, res, { admin: makeAdmin() });
+  }
+
   cors(req, res, { methods: "POST, OPTIONS" });
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -371,6 +443,9 @@ export default async function handler(req, res) {
   if (req.body?.action === "send")       return handleSend(req, res, { user, admin });
   if (req.body?.action === "set_status") return handleSetStatus(req, res, { user, admin });
   if (req.body?.action === "hide")       return handleHide(req, res, { user, admin });
+  // Super PDP (Plateforme Agréée) — v0 sandbox, admin-only. Logique dans
+  // api/_superpdp.js (helper non déployé).
+  if (PDP_ACTIONS.has(req.body?.action)) return handlePdpAction(req, res, { user, admin });
 
   const { pdf_base64, invoice, client, brand, sourceInvoice } = req.body || {};
   if (!pdf_base64 || !invoice?.id) {

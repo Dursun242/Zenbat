@@ -4,9 +4,28 @@
 > (Plateforme Agréée DGFiP pour la facturation électronique B2B, réforme
 > 09/2026 / 09/2027).
 >
-> **Statut actuel sur `main` : aucune intégration.** Tout le travail vit
-> sur 3 branches non-mergées du remote `origin`. Cette doc sert à
-> retrouver ce qui a été fait et à le rebaser proprement le moment venu.
+> **Mise à jour 2026-09-15 — étape 1 (sandbox v0, admin-only) portée sur `main`.**
+> Différences par rapport au plan ci-dessous, décidées au portage :
+> - Pas de fichier `api/superpdp.js` : il ne restait qu'un slot Vercel et la
+>   règle du projet impose de fusionner. La logique vit dans le helper non
+>   déployé `api/_superpdp.js`, routé par `api/facturx.js` (actions
+>   `pdp_test_connection` / `pdp_send_invoice` / `pdp_get_status`, et
+>   `GET /api/facturx?route=pdp_poll` pour le cron).
+> - Migration unique `0057_pdp_accounts.sql` (le schéma B2Brouter ayant été
+>   supprimé par `0040`, plus besoin de renommage). `0040_ensure_avoir_column`
+>   abandonnée : `0010` a bien la colonne sur l'instance de référence.
+> - Gating admin des deux côtés : `pdpEnabled={isAdmin}` côté UI **et** 403
+>   serveur pour tout non-`ADMIN_EMAIL`.
+> - Le hack `PGRST116` de `useInvoices.js` n'est pas repris : `onSaveInvoice`
+>   accepte désormais `skipPersist` (3ᵉ argument), utilisé après l'envoi.
+> - Fixes XML Factur-X (BT-34/49, AE/E, avoirs abs, position
+>   `InvoiceReferencedDocument`) portés avec leurs 13 tests (`api/facturx.test.js`).
+>
+> Reste à faire = §5 « v1 multi-tenant » + configurer les env vars §4 + appliquer `0057`.
+> Le reste du document est conservé tel quel comme historique.
+>
+> ~~**Statut actuel sur `main` : aucune intégration.** Tout le travail vit
+> sur 3 branches non-mergées du remote `origin`.~~
 
 ---
 
