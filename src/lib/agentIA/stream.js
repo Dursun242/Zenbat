@@ -93,6 +93,12 @@ export async function streamClaude({ body, authHeaders, onTextDelta }) {
   const decoder = new TextDecoder();
   let raw = "";
   let buffer = "";
+  // Anthropic termine toujours un stream sain par un event `message_stop`.
+  // S'il manque, le flux a été coupé en route (upstream, Vercel, réseau
+  // mobile, onglet passé en arrière-plan sur iOS…) et `raw` est tronqué —
+  // typiquement « <DE » quand la coupure survient sur les premiers tokens.
+  let complete = false;
+  const t0 = Date.now();
 
   while (true) {
     const { value, done } = await reader.read();
@@ -106,20 +112,36 @@ export async function streamClaude({ body, authHeaders, onTextDelta }) {
       for (const line of event.split("\n")) {
         if (!line.startsWith("data:")) continue;
         const payload = line.slice(5).trim();
-        if (!payload || payload === "[DONE]") continue;
+        if (!payload) continue;
+        if (payload === "[DONE]") { complete = true; continue; }
         let msg;
         try { msg = JSON.parse(payload); } catch { continue; }
         if (msg.type === "content_block_delta" && msg.delta?.type === "text_delta") {
           const delta = msg.delta.text || "";
           raw += delta;
           if (delta) onTextDelta?.(delta, raw);
+        } else if (msg.type === "message_stop") {
+          complete = true;
+        } else if (msg.type === "stream_aborted") {
+          // Émis par /api/claude quand SA lecture du flux Anthropic a échoué.
+          // Erreur « réseau » (pas ClaudeApiError) → l'appelant retombe sur
+          // le mode non-streamé au lieu d'afficher un message tronqué.
+          throw markIncomplete(new Error(`stream-aborted: ${msg.message || "upstream"}`), raw, t0);
         } else if (msg.type === "error") {
           throw new ClaudeApiError(msg.error?.message || "Erreur Anthropic");
         }
       }
     }
   }
+  if (!complete) throw markIncomplete(new Error("stream-incomplete"), raw, t0);
   return raw;
+}
+
+function markIncomplete(err, raw, t0) {
+  err.partialRaw  = raw;
+  err.partialLen  = raw.length;
+  err.durationMs  = Date.now() - t0;
+  return err;
 }
 
 // Appel non-streamé à /api/claude (utilisé en fallback quand le streaming
@@ -156,10 +178,21 @@ export async function requestClaude({ body, authHeaders }) {
   return (data?.content?.[0]?.text || "").toString();
 }
 
+const DEVIS_TAG = "<DEVIS>";
+
 // Renvoie la portion "visible" du texte brut : tout ce qui précède la balise
 // <DEVIS>. Utilisé pour afficher progressivement le message de l'IA pendant
 // le streaming sans laisser fuiter le JSON brut.
+// Masque aussi un début de balise en suspens en fin de texte (« < », « <DE »,
+// « <DEVIS ») : pendant le streaming la balise arrive token par token, et un
+// flux coupé à cet endroit laissait « <DE » affiché tel quel à l'utilisateur.
 export function visibleText(raw) {
-  const cut = raw.indexOf("<DEVIS>");
-  return (cut >= 0 ? raw.slice(0, cut) : raw).trim();
+  const cut = raw.indexOf(DEVIS_TAG);
+  let text = cut >= 0 ? raw.slice(0, cut) : raw;
+  if (cut < 0) {
+    for (let k = DEVIS_TAG.length - 1; k >= 1; k--) {
+      if (text.endsWith(DEVIS_TAG.slice(0, k))) { text = text.slice(0, -k); break; }
+    }
+  }
+  return text.trim();
 }

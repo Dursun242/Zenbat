@@ -247,6 +247,18 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
           throw streamErr;
         }
         console.warn("[AgentIA] streaming failed, falling back:", streamErr);
+        // Trace admin : un flux coupé (message_stop absent) est le symptôme
+        // d'une coupure upstream / Vercel / réseau mobile — on le journalise
+        // même si le fallback ci-dessous réussit, pour pouvoir le diagnostiquer.
+        if (streamErr?.partialRaw !== undefined) {
+          const secs = streamErr.durationMs != null ? ` après ${(streamErr.durationMs / 1000).toFixed(1)}s` : "";
+          supabase.from("ia_error_logs").insert({
+            error:        `${streamErr.message}${secs} · ${streamErr.partialLen} car. reçus · fallback non-streamé tenté`,
+            user_message: userMsg.content?.slice(0, 500) || null,
+            history_len:  newMsgs.length,
+            stream_tried: true,
+          }).then(() => {}, () => {});
+        }
         try {
           raw = await requestClaude({ body, authHeaders });
           const visible = visibleText(raw);
@@ -259,7 +271,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
 
       const processed = processDevisFromRaw(raw, brand);
       const hasDevis  = !!processed;
-      const txt       = raw.replace(/<DEVIS>[\s\S]*/g, "").trim();
+      const txt       = visibleText(raw);
 
       let residualWarning = "";
       if (processed) {
