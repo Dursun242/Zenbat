@@ -12,6 +12,7 @@ import { useClients }   from "./hooks/useClients.js";
 import { useDevis }     from "./hooks/useDevis.js";
 import { useInvoices }  from "./hooks/useInvoices.js";
 import { useSupportUnread } from "./hooks/useSupportUnread.js";
+import { Analytics } from '@vercel/analytics/react';
 
 import Logo          from "./components/ui/Logo.jsx";
 import { I }         from "./components/ui/icons.jsx";
@@ -669,6 +670,7 @@ export default function App() {
         onClose={() => setAgentSheetOpen(false)}
         actions={agentSheetActions}
       />
+      <Analytics />
     </div>
   );
 }
