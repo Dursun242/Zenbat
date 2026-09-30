@@ -221,7 +221,7 @@ export const CLAUDE_MODEL = import.meta.env.VITE_CLAUDE_MODEL || "claude-haiku-4
 ```
 Pour changer de modèle : modifier la variable d'env `VITE_CLAUDE_MODEL` dans Vercel, pas le code.
 
-**Fournisseur Mistral** : quand `MISTRAL_API_KEY` est posée côté Vercel (ou `AI_PROVIDER=mistral`), `api/claude.js` appelle Mistral (`/v1/chat/completions`) avec le modèle `MISTRAL_MODEL` et ignore le `model` Claude envoyé par le front (qui reste validé contre la whitelist). Le front n'est pas modifié : `api/_ai.js` retraduit la réponse en `content[0].text` et le flux SSE en events `content_block_delta` / `message_stop`. Retour sur Claude : `AI_PROVIDER=anthropic`. Les logs `claude_api_logs.model` enregistrent le modèle réellement utilisé.
+**Fournisseur Mistral** : quand `MISTRAL_API_KEY` est posée côté Vercel (ou `AI_PROVIDER=mistral`), `api/claude.js` appelle Mistral (`/v1/chat/completions`) avec le modèle `MISTRAL_MODEL` et ignore le `model` Claude envoyé par le front (qui reste validé contre la whitelist). Le front n'est pas modifié : `api/_ai.js` retraduit la réponse en `content[0].text` et le flux SSE en events `content_block_delta` / `message_stop`. Retour sur Claude : `AI_PROVIDER=anthropic`. Les logs `claude_api_logs.model` enregistrent le modèle réellement utilisé. `ia_conversations.model` aussi (via l'en-tête de réponse `X-AI-Model` lu par `src/lib/agentIA/stream.js`). **Diagnostic** : ouvrir `GET /api/claude` dans le navigateur → `{ provider, model, keys: {MISTRAL_API_KEY, ANTHROPIC_KEY}, vercel_env }` (booléens de présence uniquement). Rappel : une variable d'env Vercel ajoutée/modifiée n'est prise en compte qu'au **déploiement suivant** (Redeploy).
 
 ---
 

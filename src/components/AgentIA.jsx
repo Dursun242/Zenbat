@@ -12,7 +12,7 @@ import { NAV_RESERVED_CSS } from "./app/BottomNav.jsx";
 import { buildAgentGreeting, quickStartsFor } from "../lib/agentIA/sectors.js";
 import { buildSystemPrompt } from "../lib/agentIA/prompt.js";
 import { processDevisFromRaw } from "../lib/agentIA/extractDevis.js";
-import { streamClaude, requestClaude, visibleText, ClaudeApiError } from "../lib/agentIA/stream.js";
+import { streamClaude, requestClaude, visibleText, ClaudeApiError, getLastServedModel } from "../lib/agentIA/stream.js";
 import { runCoherenceLoop } from "../lib/agentIA/coherenceLoop.js";
 import { loadUserCoherenceSettings } from "../lib/coherence/userOverrides.js";
 import { I } from "./ui/icons.jsx";
@@ -364,7 +364,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
         ai_response:  finalText?.slice(0, 2000) || null,
         had_devis:    hasDevis,
         trade_names:  tradesLabels(brand?.trades || []).slice(0, 3).join(", ") || null,
-        model:        CLAUDE_MODEL,
+        model:        getLastServedModel() || CLAUDE_MODEL,
       }).then(
         ({ error: dbErr }) => { if (dbErr) console.warn("[conv log/db]", dbErr.message); },
         (netErr)           => { console.warn("[conv log/net]", netErr?.message || netErr); },

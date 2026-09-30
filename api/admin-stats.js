@@ -25,6 +25,9 @@ const MODEL_PRICING = {
   "claude-haiku-4-5-20251001": { input: 0.80, output: 4.00 },
   "claude-sonnet-4-6":         { input: 3.00, output: 15.00 },
   "claude-sonnet-4-5":         { input: 3.00, output: 15.00 },
+  // Mistral (tarifs publics indicatifs — à revérifier sur mistral.ai/pricing)
+  "mistral-medium-latest":     { input: 0.40, output: 2.00 },
+  "mistral-small-latest":      { input: 0.10, output: 0.30 },
 }
 
 import { cors } from "./_cors.js"

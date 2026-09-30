@@ -85,10 +85,30 @@ describe("claude endpoint — méthodes & auth", () => {
     expect(res.statusCode).toBe(204);
   });
 
-  it("refuse les méthodes != POST", async () => {
+  it("refuse les méthodes != GET/POST", async () => {
+    const res = makeRes();
+    await handler(makeReq({ method: "PUT" }), res);
+    expect(res.statusCode).toBe(405);
+  });
+
+  it("GET renvoie le diagnostic fournisseur sans exposer les clés", async () => {
+    process.env.MISTRAL_API_KEY = "mistral-secret";
+    process.env.MISTRAL_MODEL   = "mistral-small-latest";
     const res = makeRes();
     await handler(makeReq({ method: "GET" }), res);
-    expect(res.statusCode).toBe(405);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.provider).toBe("mistral");
+    expect(res.body.model).toBe("mistral-small-latest");
+    expect(res.body.keys).toEqual({ MISTRAL_API_KEY: true, ANTHROPIC_KEY: true });
+    expect(JSON.stringify(res.body)).not.toContain("mistral-secret");
+    expect(getUserMock).not.toHaveBeenCalled();
+  });
+
+  it("GET indique anthropic quand aucune clé Mistral n'est posée", async () => {
+    const res = makeRes();
+    await handler(makeReq({ method: "GET" }), res);
+    expect(res.body.provider).toBe("anthropic");
+    expect(res.body.keys.MISTRAL_API_KEY).toBe(false);
   });
 
   it("renvoie 401 si pas de token", async () => {
@@ -557,6 +577,8 @@ describe("claude endpoint — fournisseur Mistral", () => {
     expect(res.body.content[0].text).toBe("bonjour");
     expect(res.body.stop_reason).toBe("end_turn");
     expect(res.body.usage).toEqual({ input_tokens: 12, output_tokens: 3 });
+    expect(res.headers["X-AI-Provider"]).toBe("mistral");
+    expect(res.headers["X-AI-Model"]).toBe("mistral-small-latest");
   });
 
   it("AI_PROVIDER=anthropic force Anthropic même avec une clé Mistral", async () => {

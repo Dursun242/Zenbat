@@ -4,12 +4,16 @@ const MODEL_LABELS = {
   "claude-haiku-4-5-20251001": "Haiku 4.5",
   "claude-sonnet-4-6":         "Sonnet 4.6",
   "claude-sonnet-4-5":         "Sonnet 4.5",
+  "mistral-medium-latest":     "Mistral Medium",
+  "mistral-small-latest":      "Mistral Small",
 }
 
 const MODEL_COLORS = {
   "claude-haiku-4-5-20251001": "#22c55e",
   "claude-sonnet-4-6":         "#6366f1",
   "claude-sonnet-4-5":         "#0ea5e9",
+  "mistral-medium-latest":     "#f97316",
+  "mistral-small-latest":      "#fb923c",
 }
 
 function fmtUsd(n) {
