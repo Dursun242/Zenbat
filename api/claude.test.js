@@ -34,7 +34,7 @@ function makeReq({ method = "POST", headers = {}, body = null } = {}) {
   return { method, headers, body };
 }
 
-const ENV_KEYS = ["SUPABASE_URL", "VITE_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "ANTHROPIC_KEY", "ADMIN_EMAIL"];
+const ENV_KEYS = ["SUPABASE_URL", "VITE_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "ANTHROPIC_KEY", "ADMIN_EMAIL", "AI_PROVIDER", "MISTRAL_API_KEY", "MISTRAL_MODEL"];
 let snap;
 
 function setupSupabaseProfile(plan = "free", callsToday = 0) {
@@ -63,6 +63,9 @@ beforeEach(() => {
   process.env.SUPABASE_URL              = "https://x.supabase.co";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "service-key";
   process.env.ANTHROPIC_KEY             = "sk-ant-test";
+  delete process.env.AI_PROVIDER;
+  delete process.env.MISTRAL_API_KEY;
+  delete process.env.MISTRAL_MODEL;
 
   global.fetch = vi.fn();
   vi.clearAllMocks();
@@ -497,5 +500,124 @@ describe("claude endpoint — mode scrape_urls (import sites web)", () => {
       res,
     );
     expect(res.statusCode).toBe(429);
+  });
+});
+
+describe("claude endpoint — fournisseur Mistral", () => {
+  function setupAuthed() {
+    getUserMock.mockResolvedValueOnce({ data: { user: { id: "u1", email: "u@x.fr", created_at: new Date().toISOString() } }, error: null });
+    setupSupabaseProfile("pro", 0);
+    const base = fromMock.getMockImplementation();
+    fromMock.mockImplementation((table) => table === "claude_api_logs"
+      ? { insert: vi.fn().mockResolvedValue({ data: null, error: null }) }
+      : base(table));
+  }
+  const baseBody = { model: "claude-haiku-4-5-20251001", max_tokens: 100, messages: [{ role: "user", content: "x" }] };
+
+  function sseResp(chunks) {
+    const encoder = new TextEncoder();
+    const queue = chunks.map(c => encoder.encode(c));
+    return {
+      ok: true,
+      status: 200,
+      body: { getReader: () => ({ read: async () => queue.length ? { done: false, value: queue.shift() } : { done: true, value: undefined } }) },
+    };
+  }
+
+  beforeEach(() => {
+    process.env.MISTRAL_API_KEY = "mistral-test";
+  });
+
+  it("bascule sur Mistral quand MISTRAL_API_KEY est posée et traduit la requête", async () => {
+    setupAuthed();
+    process.env.MISTRAL_MODEL = "mistral-small-latest";
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: "bonjour" }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 12, completion_tokens: 3 },
+      }),
+    });
+    const res = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: { ...baseBody, system: "Tu es un assistant", temperature: 0.2 } }), res);
+
+    const [url, init] = global.fetch.mock.calls[0];
+    expect(url).toBe("https://api.mistral.ai/v1/chat/completions");
+    expect(init.headers.Authorization).toBe("Bearer mistral-test");
+    const sent = JSON.parse(init.body);
+    expect(sent.model).toBe("mistral-small-latest");
+    expect(sent.messages).toEqual([
+      { role: "system", content: "Tu es un assistant" },
+      { role: "user", content: "x" },
+    ]);
+    expect(sent.temperature).toBe(0.2);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.content[0].text).toBe("bonjour");
+    expect(res.body.stop_reason).toBe("end_turn");
+    expect(res.body.usage).toEqual({ input_tokens: 12, output_tokens: 3 });
+  });
+
+  it("AI_PROVIDER=anthropic force Anthropic même avec une clé Mistral", async () => {
+    setupAuthed();
+    process.env.AI_PROVIDER = "anthropic";
+    global.fetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ content: [{ text: "ok" }] }) });
+    const res = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: baseBody }), res);
+    expect(global.fetch.mock.calls[0][0]).toBe("https://api.anthropic.com/v1/messages");
+    expect(res.body.content[0].text).toBe("ok");
+  });
+
+  it("renvoie 500 si AI_PROVIDER=mistral sans MISTRAL_API_KEY", async () => {
+    setupAuthed();
+    process.env.AI_PROVIDER = "mistral";
+    delete process.env.MISTRAL_API_KEY;
+    const res = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: baseBody }), res);
+    expect(res.statusCode).toBe(500);
+    expect(res.body.error).toMatch(/MISTRAL_API_KEY/);
+  });
+
+  it("normalise les erreurs Mistral au format { error: { message } }", async () => {
+    setupAuthed();
+    global.fetch.mockResolvedValueOnce({ ok: false, status: 429, json: async () => ({ message: "Requests rate limit exceeded", type: "rate_limited" }) });
+    const res = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: baseBody }), res);
+    expect(res.statusCode).toBe(429);
+    expect(res.body.error.message).toBe("Requests rate limit exceeded");
+  });
+
+  it("traduit le flux SSE Mistral en events Anthropic", async () => {
+    setupAuthed();
+    global.fetch.mockResolvedValueOnce(sseResp([
+      'data: {"choices":[{"delta":{"role":"assistant","content":""}}]}\n\n',
+      'data: {"choices":[{"delta":{"content":"Bon"}}]}\n\ndata: {"choices":[{"delta":{"con',
+      'tent":"jour"},"finish_reason":"stop"}],"usage":{"prompt_tokens":5,"completion_tokens":2}}\n\n',
+      "data: [DONE]\n\n",
+    ]));
+    const res = makeRes();
+    let out = "";
+    res.write = (chunk) => { out += chunk; };
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: { ...baseBody, stream: true } }), res);
+
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body).stream).toBe(true);
+    const events = out.split("\n").filter(l => l.startsWith("data: ")).map(l => JSON.parse(l.slice(6)));
+    const text = events.filter(e => e.type === "content_block_delta").map(e => e.delta.text).join("");
+    expect(text).toBe("Bonjour");
+    expect(events.at(-1).type).toBe("message_stop");
+  });
+
+  it("n'émet pas message_stop si le flux Mistral est coupé avant la fin", async () => {
+    setupAuthed();
+    global.fetch.mockResolvedValueOnce(sseResp([
+      'data: {"choices":[{"delta":{"content":"<DE"}}]}\n\n',
+    ]));
+    const res = makeRes();
+    let out = "";
+    res.write = (chunk) => { out += chunk; };
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: { ...baseBody, stream: true } }), res);
+    expect(out).toContain("<DE");
+    expect(out).not.toContain("message_stop");
   });
 });
