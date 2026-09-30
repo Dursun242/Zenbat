@@ -2,6 +2,7 @@ import { useState, useMemo, useRef } from "react";
 import { CLAUDE_MODEL } from "../../lib/constants.js";
 import { getToken } from "../../lib/getToken.js";
 import { buildSystemPrompt } from "../../lib/agentIA/prompt.js";
+import { buildPriceHints } from "../../lib/coherence/priceHints.js";
 import { extractDevisJson } from "../../lib/agentIA/extractDevis.js";
 import { requestClaude, ClaudeApiError } from "../../lib/agentIA/stream.js";
 import { PROMPTS } from "../../lib/agentIA/testPrompts.js";
@@ -121,7 +122,7 @@ export default function AdminAgentBenchmark() {
           // capturé au début devient invalide en cours de route.
           const token = await getToken();
           const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
-          const system = buildSystemPrompt({ brand: item.brand, historySummary: null });
+          const system = buildSystemPrompt({ brand: item.brand, historySummary: null, priceHints: buildPriceHints([item.prompt]) });
           const text = await requestClaude({
             body: {
               model: CLAUDE_MODEL,
