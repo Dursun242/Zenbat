@@ -110,6 +110,7 @@ Helpers non déployés (préfixés `_`, importés par les endpoints) :
 - `_withAuth.js` — middleware `authenticate(req, res, { adminOnly? })`
 - `_rateLimit.js` — rate-limiter in-memory par IP (utilisé sur `contact.js`, `newsletter.js`, `devis-public.js` action `request_otp`). Désactivé en env test (`VITEST`). ⚠ Best-effort : les compteurs sont remis à zéro à chaque recyclage d'instance Vercel.
 - `_serverLog.js` — log d'erreurs serveur vers la table `app_logs`.
+- `_ai.js` — sélection du fournisseur IA (`AI_PROVIDER`, sinon Mistral si `MISTRAL_API_KEY` posée, sinon Anthropic) + traduction Mistral ⇄ format Anthropic Messages (réponse, erreurs, flux SSE).
 - `_ssrf.js` — `assertPublicHost()` : bloque les URLs internes/privées avant un fetch sortant (utilisé par `crm.js` pour le scraping).
 
 | Fichier | Rôle |
@@ -118,7 +119,7 @@ Helpers non déployés (préfixés `_`, importés par les endpoints) :
 | `admin-delete-user.js` | Suppression compte par l'admin |
 | `admin-stats.js` | Stats globales + logs IA (conversations, erreurs, négatifs, feedback, newsletter, cohérence) — paramètre `?type=` |
 | `admin-user-detail.js` | Données complètes d'un utilisateur (profil, devis, factures, clients, IA) |
-| `claude.js` | Proxy Claude API avec timeout 28s + AbortController |
+| `claude.js` | Proxy IA (Claude **ou Mistral**, cf `_ai.js`) avec timeout 55s + AbortController. Le front parle toujours le format Anthropic ; en mode Mistral, requêtes/réponses/SSE sont traduites côté serveur. |
 | `contact.js` | Formulaire de contact public — POST avec honeypot anti-bot, envoie un email à l'admin |
 | `devis-public.js` | Endpoint public pour signature client de devis — token + OTP 8 chiffres + audit, multi-routes par `action` (`send`, `request_otp`, `verify_otp`, `accept`, `refuse`, `negotiate`, `artisan_respond`, `send_signed_pdf`). `send_signed_pdf` reçoit le PDF généré côté navigateur en base64 et l'email en pièce jointe au client + à l'artisan ; idempotence via audit log (`event = 'signed_pdf_sent'`). |
 | `facturx.js` | Génération PDF Factur-X (XML CII embarqué). Multi-actions par champ `action` du body : par défaut = assemble + uploade en Storage ; `action: 'send'` = télécharge le PDF depuis Storage et l'envoie par email au client (au nom de `brand.companyName`, avec Reply-To = `brand.email`), met à jour `invoices.sent_to_client_at`. |
@@ -178,6 +179,9 @@ RLS activé sur toutes les tables — les endpoints admin contournent via `SUPAB
 | `VITE_SUPABASE_ANON_KEY` | Clé publique Supabase (frontend) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Clé service Supabase (API — bypass RLS) |
 | `ANTHROPIC_KEY` | Clé API Anthropic (Claude) |
+| `MISTRAL_API_KEY` | Clé API Mistral — si posée, l'IA bascule sur Mistral |
+| `MISTRAL_MODEL` | Modèle Mistral (défaut `mistral-medium-latest`) |
+| `AI_PROVIDER` | Optionnel : force `mistral` ou `anthropic` (retour arrière sans supprimer la clé) |
 | `ADMIN_EMAIL` | Email de l'administrateur |
 | `ALLOWED_ORIGINS` | Origines CORS autorisées (séparées par virgule) |
 | `STRIPE_SECRET_KEY` | Clé secrète Stripe (checkout / portal / abonnements) |
@@ -216,6 +220,8 @@ Défini dans `src/lib/constants.js` :
 export const CLAUDE_MODEL = import.meta.env.VITE_CLAUDE_MODEL || "claude-haiku-4-5-20251001"
 ```
 Pour changer de modèle : modifier la variable d'env `VITE_CLAUDE_MODEL` dans Vercel, pas le code.
+
+**Fournisseur Mistral** : quand `MISTRAL_API_KEY` est posée côté Vercel (ou `AI_PROVIDER=mistral`), `api/claude.js` appelle Mistral (`/v1/chat/completions`) avec le modèle `MISTRAL_MODEL` et ignore le `model` Claude envoyé par le front (qui reste validé contre la whitelist). Le front n'est pas modifié : `api/_ai.js` retraduit la réponse en `content[0].text` et le flux SSE en events `content_block_delta` / `message_stop`. Retour sur Claude : `AI_PROVIDER=anthropic`. Les logs `claude_api_logs.model` enregistrent le modèle réellement utilisé.
 
 ---
 

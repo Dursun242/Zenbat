@@ -1,6 +1,10 @@
 import { cors } from "./_cors.js";
 import { authenticate, notifyTelegram } from "./_withAuth.js";
 import { assertPublicHost } from "./_ssrf.js";
+import {
+  aiProvider, missingAiKey, buildMistralBody, mistralFetchInit, mistralToAnthropic,
+  mistralError, pipeMistralStream, completeText, MISTRAL_API_URL,
+} from "./_ai.js";
 
 const ALLOWED_MODELS = [
   "claude-haiku-4-5-20251001",
@@ -116,29 +120,19 @@ async function scrapeOneUrl(rawUrl, { admin, user }) {
   if (!text.trim()) throw new Error("Page vide");
 
   const startTime = Date.now();
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type":      "application/json",
-      "x-api-key":         process.env.ANTHROPIC_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model:      SCRAPE_MODEL,
-      max_tokens: 800,
-      system:     SCRAPE_SYSTEM_PROMPT,
-      messages:   [{ role: "user", content: `URL: ${u.toString()}\n\nContenu de la page :\n${text}` }],
-    }),
+  const { text: raw, usage, model: usedModel } = await completeText({
+    system:         SCRAPE_SYSTEM_PROMPT,
+    user:           `URL: ${u.toString()}\n\nContenu de la page :\n${text}`,
+    max_tokens:     800,
+    anthropicModel: SCRAPE_MODEL,
   });
-  const data = await resp.json();
-  if (!resp.ok) throw new Error(data?.error?.message || `Anthropic ${resp.status}`);
 
-  if (data?.usage) {
+  if (usage) {
     admin.from("claude_api_logs").insert({
-      model:          SCRAPE_MODEL,
+      model:          usedModel,
       use_case:       "scrape",
-      input_tokens:   data.usage.input_tokens  || 0,
-      output_tokens:  data.usage.output_tokens || 0,
+      input_tokens:   usage.input_tokens  || 0,
+      output_tokens:  usage.output_tokens || 0,
       latency_ms:     Date.now() - startTime,
       status_code:    200,
       stream_enabled: false,
@@ -146,7 +140,6 @@ async function scrapeOneUrl(rawUrl, { admin, user }) {
     }).then(() => {}).catch(() => {});
   }
 
-  const raw = data.content?.[0]?.text || "";
   const match = raw.match(/<CONTACT>([\s\S]*?)<\/CONTACT>/) || raw.match(/\{[\s\S]*\}/);
   if (!match) throw new Error("Extraction impossible");
   let parsed;
@@ -160,9 +153,6 @@ async function handleScrape(res, { urls, admin, user }) {
     return res.status(400).json({ error: "scrape_urls doit être un tableau non vide" });
   if (urls.length > SCRAPE_MAX_URLS)
     return res.status(400).json({ error: `Maximum ${SCRAPE_MAX_URLS} URLs par requête` });
-  if (!process.env.ANTHROPIC_KEY)
-    return res.status(500).json({ error: "ANTHROPIC_KEY non configurée côté serveur" });
-
   const results = await Promise.allSettled(urls.map(u => scrapeOneUrl(u, { admin, user })));
   return res.status(200).json({
     results: results.map((r, i) => r.status === "fulfilled"
@@ -212,9 +202,11 @@ export default async function handler(req, res) {
     });
   }
 
-  // ── Clé Anthropic ────────────────────────────────────────────────────────────
-  if (!process.env.ANTHROPIC_KEY)
-    return res.status(500).json({ error: "ANTHROPIC_KEY non configurée côté serveur" });
+  // ── Clé du fournisseur IA (Mistral ou Anthropic, cf _ai.js) ─────────────────
+  const missingKey = missingAiKey();
+  if (missingKey)
+    return res.status(500).json({ error: `${missingKey} non configurée côté serveur` });
+  const provider = aiProvider();
 
   // ── Mode scrape (import contacts depuis sites web) ──────────────────────────
   // Détecté via la présence de `scrape_urls`. Court-circuite la validation
@@ -271,13 +263,22 @@ export default async function handler(req, res) {
   if (messagesSize > MAX_MESSAGES_CHARS)
     return res.status(400).json({ error: `messages trop longs (max ${MAX_MESSAGES_CHARS} caractères)` });
 
-  // ── Appel Anthropic ──────────────────────────────────────────────────────────
-  const payload = { model, max_tokens, messages };
-  if (system && typeof system === "string")
-    payload.system = [{ type: "text", text: system, cache_control: { type: "ephemeral" } }];
-  if (stream === true) payload.stream = true;
-  if (typeof temperature === "number") payload.temperature = temperature;
-  if (typeof top_p === "number")       payload.top_p = top_p;
+  // ── Appel fournisseur IA ─────────────────────────────────────────────────────
+  // Mistral : requête traduite par _ai.js, le modèle vient de MISTRAL_MODEL.
+  // Anthropic : payload transmis tel quel (avec prompt caching du system).
+  const isMistral = provider === "mistral";
+  let payload;
+  if (isMistral) {
+    payload = buildMistralBody({ system, messages, max_tokens, temperature, top_p, stream });
+  } else {
+    payload = { model, max_tokens, messages };
+    if (system && typeof system === "string")
+      payload.system = [{ type: "text", text: system, cache_control: { type: "ephemeral" } }];
+    if (stream === true) payload.stream = true;
+    if (typeof temperature === "number") payload.temperature = temperature;
+    if (typeof top_p === "number")       payload.top_p = top_p;
+  }
+  const loggedModel = payload.model;
 
   try {
     // 55 s — sous le maxDuration Vercel de 60 s, marge de 5 s pour transmettre
@@ -288,17 +289,19 @@ export default async function handler(req, res) {
 
     let upstream;
     try {
-      upstream = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type":        "application/json",
-          "x-api-key":           process.env.ANTHROPIC_KEY,
-          "anthropic-version":   "2023-06-01",
-          "anthropic-beta":      "prompt-caching-2024-07-31",
-        },
-        body: JSON.stringify(payload),
-        signal: controller.signal,
-      });
+      upstream = isMistral
+        ? await fetch(MISTRAL_API_URL, mistralFetchInit(payload, controller.signal))
+        : await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: {
+              "Content-Type":        "application/json",
+              "x-api-key":           process.env.ANTHROPIC_KEY,
+              "anthropic-version":   "2023-06-01",
+              "anthropic-beta":      "prompt-caching-2024-07-31",
+            },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+          });
     } finally {
       clearTimeout(timeout);
     }
@@ -314,7 +317,7 @@ export default async function handler(req, res) {
         res.setHeader("X-Accel-Buffering", "no");
         res.flushHeaders?.();
 
-        const reader = upstream.body.getReader();
+        const reader = isMistral ? null : upstream.body.getReader();
         const decoder = new TextDecoder();
         let sseBuffer = "";
         let inputTokens = 0;
@@ -322,7 +325,9 @@ export default async function handler(req, res) {
         const startTime = Date.now();
 
         try {
-          while (true) {
+          if (isMistral) {
+            ({ inputTokens, outputTokens } = await pipeMistralStream(upstream, res));
+          } else while (true) {
             const { value, done } = await reader.read();
             if (done) break;
             res.write(value);
@@ -362,7 +367,7 @@ export default async function handler(req, res) {
         // Log token usage (fire-and-forget)
         if (inputTokens > 0 || outputTokens > 0) {
           admin.from("claude_api_logs").insert({
-            model,
+            model:         loggedModel,
             use_case:      support_ticket_id ? "support" : "devis",
             input_tokens:  inputTokens,
             output_tokens: outputTokens,
@@ -375,20 +380,23 @@ export default async function handler(req, res) {
 
         return res.end();
       } else {
-        // Erreur Anthropic sur une requête stream : on lit le JSON d'erreur
+        // Erreur fournisseur sur une requête stream : on lit le JSON d'erreur
         const errorData = await upstream.json().catch(() => null);
-        return res.status(upstream.status).json(errorData);
+        return res.status(upstream.status).json(isMistral ? mistralError(errorData, upstream.status) : errorData);
       }
     }
 
     // ── Non-streaming ────────────────────────────────────────────────────────
     const startTime = Date.now();
-    const upstreamData = await upstream.json();
+    const rawData = await upstream.json();
+    const upstreamData = !isMistral ? rawData
+      : upstream.ok ? mistralToAnthropic(rawData)
+      : mistralError(rawData, upstream.status);
 
     // Log token usage (fire-and-forget)
     if (upstream.ok && upstreamData?.usage) {
       admin.from("claude_api_logs").insert({
-        model,
+        model:         loggedModel,
         use_case:      support_ticket_id ? "support" : "devis",
         input_tokens:  upstreamData.usage.input_tokens  || 0,
         output_tokens: upstreamData.usage.output_tokens || 0,
@@ -439,7 +447,7 @@ export default async function handler(req, res) {
 
   } catch (err) {
     if (err?.name === "AbortError")
-      return res.status(504).json({ error: "Délai dépassé — Claude API n'a pas répondu en 55 secondes" });
-    return res.status(502).json({ error: "Upstream Anthropic unreachable" });
+      return res.status(504).json({ error: "Délai dépassé — l'IA n'a pas répondu en 55 secondes" });
+    return res.status(502).json({ error: `Upstream ${isMistral ? "Mistral" : "Anthropic"} unreachable` });
   }
 }
