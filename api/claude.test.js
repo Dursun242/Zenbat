@@ -591,6 +591,28 @@ describe("claude endpoint — fournisseur Mistral", () => {
     expect(res.body.content[0].text).toBe("ok");
   });
 
+  it("l'admin peut forcer Mistral via ai_provider même si la prod est sur Anthropic", async () => {
+    process.env.ADMIN_EMAIL = "admin@x.fr";
+    process.env.AI_PROVIDER = "anthropic";
+    getUserMock.mockResolvedValueOnce({ data: { user: { id: "a1", email: "Admin@x.fr", created_at: new Date().toISOString() } }, error: null });
+    setupSupabaseProfile("free", 0);
+    global.fetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] }) });
+    const res = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: { ...baseBody, ai_provider: "mistral" } }), res);
+    expect(global.fetch.mock.calls[0][0]).toBe("https://api.mistral.ai/v1/chat/completions");
+    expect(res.headers["X-AI-Provider"]).toBe("mistral");
+  });
+
+  it("ignore ai_provider pour un utilisateur non admin", async () => {
+    process.env.ADMIN_EMAIL = "admin@x.fr";
+    process.env.AI_PROVIDER = "anthropic";
+    setupAuthed();
+    global.fetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ content: [{ text: "ok" }] }) });
+    const res = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: { ...baseBody, ai_provider: "mistral" } }), res);
+    expect(global.fetch.mock.calls[0][0]).toBe("https://api.anthropic.com/v1/messages");
+  });
+
   it("renvoie 500 si AI_PROVIDER=mistral sans MISTRAL_API_KEY", async () => {
     setupAuthed();
     process.env.AI_PROVIDER = "mistral";

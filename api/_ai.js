@@ -21,8 +21,8 @@ export function aiProvider() {
 }
 
 // Renvoie le nom de la variable d'env manquante, ou null si la clé est posée.
-export function missingAiKey() {
-  if (aiProvider() === "mistral") return process.env.MISTRAL_API_KEY ? null : "MISTRAL_API_KEY";
+export function missingAiKey(provider = aiProvider()) {
+  if (provider === "mistral") return process.env.MISTRAL_API_KEY ? null : "MISTRAL_API_KEY";
   return process.env.ANTHROPIC_KEY ? null : "ANTHROPIC_KEY";
 }
 

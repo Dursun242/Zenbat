@@ -4,14 +4,20 @@ import { getToken } from "../../lib/getToken.js";
 import { buildSystemPrompt } from "../../lib/agentIA/prompt.js";
 import { buildPriceHints } from "../../lib/coherence/priceHints.js";
 import { extractDevisJson } from "../../lib/agentIA/extractDevis.js";
-import { requestClaude, ClaudeApiError } from "../../lib/agentIA/stream.js";
+import { requestClaude, ClaudeApiError, getLastServedModel } from "../../lib/agentIA/stream.js";
+import { runCoherenceCheck } from "../../lib/coherence/engine.js";
 import { PROMPTS } from "../../lib/agentIA/testPrompts.js";
 
-// Une requête à la fois + 6 s minimum entre 2 départs : le tier free Anthropic
-// plafonne à 50k input tokens/min et 10k output tokens/min, donc 3 requêtes
-// parallèles saturent immédiatement et 90 % des prompts retombent en rate limit.
+// Une requête à la fois + un intervalle minimum entre 2 départs, propre au
+// fournisseur : le tier free Anthropic plafonne à 50k input tokens/min et 10k
+// output tokens/min (3 requêtes parallèles saturent immédiatement). Mistral
+// tolère un rythme plus soutenu ; requestClaude retente de toute façon une
+// fois sur 429.
 const CONCURRENCY = 1;
-const MIN_INTERVAL_MS = 12000;
+const PROVIDERS = {
+  mistral:   { label: "Mistral", intervalMs: 3000 },
+  anthropic: { label: "Claude",  intervalMs: 12000 },
+};
 const REFUSAL_RE = /ne r[ée]alis(ons|e|ent) pas|ne fais(ons|ent)? pas|ne propos(ons|e|ent) pas|ne traitons pas|pas (notre|de) sp[ée]cialit[ée]/i;
 
 function analyseResponse(rawText) {
@@ -31,7 +37,13 @@ function analyseResponse(rawText) {
   const ouvrages = lignes.filter(l => l.type_ligne === "ouvrage");
   const nullPriceLines = ouvrages.filter(l => l.prix_unitaire == null || l.prix_unitaire === 0).length;
   const totalHt = ouvrages.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0);
+  // Même contrôle que l'agent en prod (fourchettes de marché des packs) :
+  // "fail" = prix ou total hors marché, la boucle de correction se serait déclenchée.
+  const coherence = runCoherenceCheck({ objet: parsed.objet, lignes, project_params: parsed.project_params || {} });
   return {
+    coherenceStatus: coherence.typology_id ? coherence.overall_status : "",
+    coherenceTypology: coherence.typology_id || "",
+    coherenceIssues: (coherence.checks || []).flatMap(c => c.issues || []).map(i => i.message).join(" | "),
     hasDevis: true, parseOk: true, isRefusal, askedQuestionFirst,
     nLines: ouvrages.length,
     nLots: lignes.filter(l => l.type_ligne === "lot").length,
@@ -42,7 +54,7 @@ function analyseResponse(rawText) {
 }
 
 function downloadCsv(rows) {
-  const header = ["i","sector","kind","prompt","status","duration_ms","has_devis","parse_ok","is_refusal","asked_question_first","n_lots","n_lines","null_price_lines","total_ht","objet","error"];
+  const header = ["i","sector","kind","prompt","model","status","duration_ms","has_devis","parse_ok","is_refusal","asked_question_first","n_lots","n_lines","null_price_lines","total_ht","coherence_status","coherence_typology","coherence_issues","objet","error"];
   const escape = (v) => {
     const s = v == null ? "" : String(v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -67,6 +79,8 @@ export default function AdminAgentBenchmark() {
   const [error,      setError]      = useState(null);
   const [filter,     setFilter]     = useState("all");
   const [openDetail, setOpenDetail] = useState(null);
+  const [provider,   setProvider]   = useState("mistral");
+  const [servedModel, setServedModel] = useState("");
   const cancelRef = useRef(false);
 
   const total = PROMPTS.length;
@@ -79,7 +93,9 @@ export default function AdminAgentBenchmark() {
     const refusals  = results.filter(r => r.is_refusal).length;
     const askedQ    = results.filter(r => r.asked_question_first).length;
     const nullPrice = results.filter(r => r.null_price_lines > 0).length;
-    return { ok, withDevis, parseOk, refusals, askedQ, nullPrice, total: results.length };
+    const checked   = results.filter(r => r.coherence_status).length;
+    const offMarket = results.filter(r => r.coherence_status === "fail").length;
+    return { ok, withDevis, parseOk, refusals, askedQ, nullPrice, checked, offMarket, total: results.length };
   }, [results]);
 
   const filtered = useMemo(() => {
@@ -89,6 +105,7 @@ export default function AdminAgentBenchmark() {
     if (filter === "asked_first")  return results.filter(r => r.asked_question_first);
     if (filter === "null_price")   return results.filter(r => r.null_price_lines > 0);
     if (filter === "errors")       return results.filter(r => r.status !== 200);
+    if (filter === "off_market")   return results.filter(r => r.coherence_status === "fail");
     return results.filter(r => r.kind === filter || r.sector === filter);
   }, [results, filter]);
 
@@ -96,7 +113,10 @@ export default function AdminAgentBenchmark() {
     if (running) return;
     setRunning(true); setError(null); setResults([]); setOpenDetail(null);
     setProgress({ done: 0, total });
+    setServedModel("");
     cancelRef.current = false;
+    const runProvider = provider;
+    const MIN_INTERVAL_MS = PROVIDERS[runProvider].intervalMs;
 
     const out = new Array(total);
     let nextIndex = 0, doneCount = 0;
@@ -130,17 +150,23 @@ export default function AdminAgentBenchmark() {
               temperature: 0.2,
               system,
               messages: [{ role: "user", content: item.prompt }],
+              // Forçage admin du fournisseur (cf api/claude.js) — n'affecte pas la prod.
+              ai_provider: runProvider,
             },
             authHeaders,
           });
           const a = analyseResponse(text);
+          const model = getLastServedModel() || "";
+          if (model) setServedModel(model);
           row = {
-            i, sector: item.sector, kind: item.kind, prompt: item.prompt,
+            i, sector: item.sector, kind: item.kind, prompt: item.prompt, model,
             status: 200, duration_ms: Date.now() - t0,
             has_devis: a.hasDevis, parse_ok: a.parseOk, is_refusal: a.isRefusal,
             asked_question_first: a.askedQuestionFirst,
             n_lots: a.nLots, n_lines: a.nLines, null_price_lines: a.nullPriceLines,
             total_ht: a.totalHt, objet: a.objet, error: "",
+            coherence_status: a.coherenceStatus, coherence_typology: a.coherenceTypology,
+            coherence_issues: a.coherenceIssues,
             _rawText: text,
           };
         } catch (e) {
@@ -151,7 +177,8 @@ export default function AdminAgentBenchmark() {
             has_devis: false, parse_ok: false, is_refusal: false,
             asked_question_first: false, n_lots: 0, n_lines: 0,
             null_price_lines: 0, total_ht: 0, objet: "",
-            error: e.message || String(e),
+            coherence_status: "", coherence_typology: "", coherence_issues: "",
+            model: "", error: e.message || String(e),
           };
         }
         out[i] = row;
@@ -177,11 +204,16 @@ export default function AdminAgentBenchmark() {
       <div style={{ padding: "12px 16px", borderBottom: "1px solid #F0EBE3", display: "flex", alignItems: "center", gap: 8 }}>
         <div style={{ fontWeight: 700, fontSize: 13, color: "#1A1612", flex: 1 }}>
           Banc de test Agent IA · {total} prompts
+          {servedModel && <span style={{ fontWeight: 500, color: "#6B6358" }}> · modèle servi : <code>{servedModel}</code></span>}
         </div>
+        <select value={provider} onChange={e => setProvider(e.target.value)} disabled={running}
+          style={{ border: "1px solid #E8E2D8", borderRadius: 8, padding: "5px 8px", fontSize: 12, background: "#FAF7F2", color: "#3D3028" }}>
+          {Object.entries(PROVIDERS).map(([k, p]) => <option key={k} value={k}>{p.label}</option>)}
+        </select>
         {!running ? (
           <button onClick={run}
             style={{ background: "#16a34a", color: "white", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-            ▶ Lancer le test
+            ▶ Lancer le test ({PROVIDERS[provider].label})
           </button>
         ) : (
           <button onClick={cancel}
@@ -194,8 +226,10 @@ export default function AdminAgentBenchmark() {
       <div style={{ padding: "12px 16px" }}>
         <div style={{ fontSize: 11, color: "#6B6358", marginBottom: 10, lineHeight: 1.5 }}>
           Envoie {total} requêtes à <code>/api/claude</code> avec le même <code>system</code> que l'agent en prod.
-          Mesure : taux de devis générés, refus IA, questions avant <code>&lt;DEVIS&gt;</code>, lignes à prix nul.
-          Compte ~{Math.ceil((total * MIN_INTERVAL_MS) / 60000)} min (1 appel toutes les {MIN_INTERVAL_MS / 1000} s pour rester sous le rate limit Anthropic).
+          Mesure : taux de devis générés, refus IA, questions avant <code>&lt;DEVIS&gt;</code>, lignes à prix nul,
+          et prix hors marché (même contrôle de cohérence qu'en prod, sur les demandes dont le type de chantier est reconnu).
+          Le fournisseur choisi est forcé pour ce test uniquement. Compte ~{Math.ceil((total * PROVIDERS[provider].intervalMs) / 60000)} min
+          (1 appel toutes les {PROVIDERS[provider].intervalMs / 1000} s pour rester sous les limites de débit).
         </div>
 
         {error && (
@@ -217,19 +251,20 @@ export default function AdminAgentBenchmark() {
 
         {summary && (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8, marginBottom: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 8, marginBottom: 14 }}>
               <Kpi value={summary.withDevis} total={summary.total} label="Devis OK" color="#22c55e" />
               <Kpi value={summary.parseOk}   total={summary.withDevis} label="JSON OK" color="#3b82f6" />
               <Kpi value={summary.refusals}  total={summary.total} label="Refus IA" color="#ef4444" highlightHigh />
               <Kpi value={summary.askedQ}    total={summary.total} label="Questions avant" color="#f59e0b" highlightHigh />
               <Kpi value={summary.nullPrice} total={summary.total} label="Prix manquants" color="#f59e0b" highlightHigh />
+              <Kpi value={summary.offMarket} total={summary.checked} label={`Prix hors marché (sur ${summary.checked} contrôlés)`} color="#f59e0b" highlightHigh />
               <Kpi value={summary.total - summary.ok} total={summary.total} label="Erreurs" color="#6b7280" highlightHigh />
             </div>
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
               {[
                 ["all", "Toutes"], ["refusals", "Refus"], ["no_devis", "Sans devis"],
-                ["asked_first", "Q avant"], ["null_price", "Prix nul"], ["errors", "Erreurs"],
+                ["asked_first", "Q avant"], ["null_price", "Prix nul"], ["off_market", "Hors marché"], ["errors", "Erreurs"],
                 ["T1", "T1"], ["T2", "T2"], ["T3", "T3"], ["ADV", "ADV"],
               ].map(([k, label]) => (
                 <button key={k} onClick={() => setFilter(k)}
@@ -249,7 +284,7 @@ export default function AdminAgentBenchmark() {
                 <thead style={{ position: "sticky", top: 0, background: "#FAF7F2", zIndex: 1 }}>
                   <tr>
                     <Th>#</Th><Th>Type</Th><Th>Secteur</Th><Th>Prompt</Th>
-                    <Th>État</Th><Th>Lignes</Th><Th>Total HT</Th><Th>ms</Th>
+                    <Th>État</Th><Th>Prix</Th><Th>Lignes</Th><Th>Total HT</Th><Th>ms</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -260,6 +295,7 @@ export default function AdminAgentBenchmark() {
                       <Td>{r.sector}</Td>
                       <Td title={r.prompt} style={{ maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.prompt}</Td>
                       <Td>{rowStatus(r)}</Td>
+                      <Td title={r.coherence_issues || r.coherence_typology}>{coherenceBadge(r)}</Td>
                       <Td>{r.has_devis ? `${r.n_lines} (${r.n_lots} lots)` : "—"}</Td>
                       <Td>{r.total_ht ? `${r.total_ht.toLocaleString("fr-FR")} €` : "—"}</Td>
                       <Td style={{ color: "#9A8E82" }}>{r.duration_ms}</Td>
@@ -305,6 +341,13 @@ function rowStatus(r) {
   return <span style={{ color: "#22c55e" }}>✓</span>;
 }
 
+function coherenceBadge(r) {
+  if (!r.coherence_status)               return <span style={{ color: "#C8BFB2" }}>—</span>;
+  if (r.coherence_status === "fail")     return <span style={{ color: "#ef4444" }}>✗ hors marché</span>;
+  if (r.coherence_status === "warn")     return <span style={{ color: "#f59e0b" }}>~ à vérifier</span>;
+  return <span style={{ color: "#22c55e" }}>✓ marché</span>;
+}
+
 function DetailModal({ row, onClose }) {
   return (
     <div onClick={onClose}
@@ -323,6 +366,12 @@ function DetailModal({ row, onClose }) {
             {row.error}
           </div>
         )}
+        {row.coherence_issues && (
+          <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "8px 12px", color: "#92400e", fontSize: 12, marginBottom: 10 }}>
+            Contrôle prix ({row.coherence_typology}) : {row.coherence_issues}
+          </div>
+        )}
+        {row.model && <div style={{ fontSize: 11, color: "#9A8E82", marginBottom: 6 }}>Modèle : <code>{row.model}</code></div>}
         {row._rawText && (
           <pre style={{ background: "#FAF7F2", border: "1px solid #F0EBE3", borderRadius: 8, padding: 12, fontSize: 11, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word", color: "#1A1612", maxHeight: "60vh", overflowY: "auto" }}>
             {row._rawText}

@@ -219,11 +219,16 @@ export default async function handler(req, res) {
     });
   }
 
-  // ── Clé du fournisseur IA (Mistral ou Anthropic, cf _ai.js) ─────────────────
-  const missingKey = missingAiKey();
+  // ── Fournisseur IA (Mistral ou Anthropic, cf _ai.js) ────────────────────────
+  // L'admin peut forcer un fournisseur via `ai_provider` (banc de test agent)
+  // pour mesurer un modèle sans changer la config de prod.
+  const requestedProvider = String(req.body?.ai_provider || "").toLowerCase();
+  const provider = isAdmin && ["mistral", "anthropic"].includes(requestedProvider)
+    ? requestedProvider
+    : aiProvider();
+  const missingKey = missingAiKey(provider);
   if (missingKey)
     return res.status(500).json({ error: `${missingKey} non configurée côté serveur` });
-  const provider = aiProvider();
 
   // ── Mode scrape (import contacts depuis sites web) ──────────────────────────
   // Détecté via la présence de `scrape_urls`. Court-circuite la validation
