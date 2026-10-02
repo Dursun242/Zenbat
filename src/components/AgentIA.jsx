@@ -11,8 +11,9 @@ import { useKeyboardInset } from "../hooks/useKeyboardInset.js";
 import { NAV_RESERVED_CSS } from "./app/BottomNav.jsx";
 import { buildAgentGreeting, quickStartsFor } from "../lib/agentIA/sectors.js";
 import { buildSystemPrompt } from "../lib/agentIA/prompt.js";
+import { buildPriceHints } from "../lib/coherence/priceHints.js";
 import { processDevisFromRaw } from "../lib/agentIA/extractDevis.js";
-import { streamClaude, requestClaude, visibleText, ClaudeApiError } from "../lib/agentIA/stream.js";
+import { streamClaude, requestClaude, visibleText, ClaudeApiError, getLastServedModel } from "../lib/agentIA/stream.js";
 import { runCoherenceLoop } from "../lib/agentIA/coherenceLoop.js";
 import { loadUserCoherenceSettings } from "../lib/coherence/userOverrides.js";
 import { I } from "./ui/icons.jsx";
@@ -218,7 +219,14 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       // Température basse = adhésion forte aux règles "pas de question avant <DEVIS>"
       // et prix plus stables pour une même demande (audit recommandation).
       temperature: 0.2,
-      system: buildSystemPrompt({ brand, historySummary }),
+      system: buildSystemPrompt({
+        brand,
+        historySummary,
+        priceHints: buildPriceHints(
+          newMsgs.filter(m => m.role === "user").map(m => m.content),
+          userSettingsRef.current,
+        ),
+      }),
       messages: newMsgs.slice(-20).map(m => ({ role: m.role, content: m.content })),
     };
 
@@ -364,7 +372,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
         ai_response:  finalText?.slice(0, 2000) || null,
         had_devis:    hasDevis,
         trade_names:  tradesLabels(brand?.trades || []).slice(0, 3).join(", ") || null,
-        model:        CLAUDE_MODEL,
+        model:        getLastServedModel() || CLAUDE_MODEL,
       }).then(
         ({ error: dbErr }) => { if (dbErr) console.warn("[conv log/db]", dbErr.message); },
         (netErr)           => { console.warn("[conv log/net]", netErr?.message || netErr); },

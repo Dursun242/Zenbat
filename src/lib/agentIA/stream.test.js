@@ -4,6 +4,7 @@ import {
   requestClaude,
   visibleText,
   ClaudeApiError,
+  getLastServedModel,
 } from "./stream.js";
 
 // Helper pour fabriquer un Response qui pipe une suite de chunks SSE
@@ -229,5 +230,31 @@ describe("streamClaude", () => {
     const sent = JSON.parse(global.fetch.mock.calls[0][1].body);
     expect(sent.stream).toBe(true);
     expect(sent.model).toBe("x");
+  });
+});
+
+describe("getLastServedModel", () => {
+  beforeEach(() => { global.fetch = vi.fn(); });
+
+  it("retient le modèle annoncé par l'en-tête X-AI-Model (non-streamé)", async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: { get: (k) => (k.toLowerCase() === "x-ai-model" ? "mistral-medium-latest" : null) },
+      json: async () => ({ content: [{ text: "ok" }] }),
+    });
+    await requestClaude({ body: {}, authHeaders: {} });
+    expect(getLastServedModel()).toBe("mistral-medium-latest");
+  });
+
+  it("retient le modèle annoncé en streaming", async () => {
+    const res = sseResponse([
+      'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"x"}}\n\n',
+      'data: {"type":"message_stop"}\n\n',
+    ]);
+    res.headers = { get: (k) => (k.toLowerCase() === "x-ai-model" ? "mistral-small-latest" : null) };
+    global.fetch.mockResolvedValueOnce(res);
+    await streamClaude({ body: {}, authHeaders: {} });
+    expect(getLastServedModel()).toBe("mistral-small-latest");
   });
 });

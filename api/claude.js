@@ -3,7 +3,7 @@ import { authenticate, notifyTelegram } from "./_withAuth.js";
 import { assertPublicHost } from "./_ssrf.js";
 import {
   aiProvider, missingAiKey, buildMistralBody, mistralFetchInit, mistralToAnthropic,
-  mistralError, pipeMistralStream, completeText, MISTRAL_API_URL,
+  mistralError, pipeMistralStream, completeText, MISTRAL_API_URL, mistralModel,
 } from "./_ai.js";
 
 const ALLOWED_MODELS = [
@@ -163,9 +163,26 @@ async function handleScrape(res, { urls, admin, user }) {
 }
 
 export default async function handler(req, res) {
-  cors(req, res, { methods: "POST, OPTIONS", auth: true });
+  cors(req, res, { methods: "GET, POST, OPTIONS", auth: true });
 
   if (req.method === "OPTIONS") return res.status(204).end();
+
+  // ── Diagnostic fournisseur (GET, sans auth) ─────────────────────────────────
+  // Ouvrir /api/claude dans le navigateur indique quel fournisseur le serveur
+  // utilise réellement. Ne renvoie que des booléens de présence, jamais les clés.
+  if (req.method === "GET") {
+    const provider = aiProvider();
+    return res.status(200).json({
+      provider,
+      model:       provider === "mistral" ? mistralModel() : "défini par le front (VITE_CLAUDE_MODEL)",
+      ai_provider: process.env.AI_PROVIDER || null,
+      keys: {
+        MISTRAL_API_KEY: Boolean(process.env.MISTRAL_API_KEY),
+        ANTHROPIC_KEY:   Boolean(process.env.ANTHROPIC_KEY),
+      },
+      vercel_env:  process.env.VERCEL_ENV || null,
+    });
+  }
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   // ── Auth Supabase ───────────────────────────────────────────────────────────
@@ -202,11 +219,16 @@ export default async function handler(req, res) {
     });
   }
 
-  // ── Clé du fournisseur IA (Mistral ou Anthropic, cf _ai.js) ─────────────────
-  const missingKey = missingAiKey();
+  // ── Fournisseur IA (Mistral ou Anthropic, cf _ai.js) ────────────────────────
+  // L'admin peut forcer un fournisseur via `ai_provider` (banc de test agent)
+  // pour mesurer un modèle sans changer la config de prod.
+  const requestedProvider = String(req.body?.ai_provider || "").toLowerCase();
+  const provider = isAdmin && ["mistral", "anthropic"].includes(requestedProvider)
+    ? requestedProvider
+    : aiProvider();
+  const missingKey = missingAiKey(provider);
   if (missingKey)
     return res.status(500).json({ error: `${missingKey} non configurée côté serveur` });
-  const provider = aiProvider();
 
   // ── Mode scrape (import contacts depuis sites web) ──────────────────────────
   // Détecté via la présence de `scrape_urls`. Court-circuite la validation
@@ -279,6 +301,10 @@ export default async function handler(req, res) {
     if (typeof top_p === "number")       payload.top_p = top_p;
   }
   const loggedModel = payload.model;
+  // Le front journalise le modèle réellement servi (ia_conversations.model)
+  // à partir de ces en-têtes, plutôt que la constante CLAUDE_MODEL.
+  res.setHeader("X-AI-Provider", provider);
+  res.setHeader("X-AI-Model", loggedModel);
 
   try {
     // 55 s — sous le maxDuration Vercel de 60 s, marge de 5 s pour transmettre

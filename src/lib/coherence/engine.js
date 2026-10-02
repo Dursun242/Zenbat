@@ -91,6 +91,27 @@ export function runCoherenceCheck(devis, userSettings = null) {
   };
 }
 
+// Détecte la typologie à partir du texte libre de la demande (avant génération),
+// avec les mêmes mots-clés que le contrôle post-génération. Applique les
+// fourchettes personnalisées de l'utilisateur. Renvoie null si aucune typologie
+// n'est reconnue ou si l'utilisateur a désactivé la vérification (globale ou
+// pour cette typologie) : ses prix ne suivent alors pas nos fourchettes.
+export function findTypologyForText(text, userSettings = null) {
+  if (userSettings?.global_disabled) return null;
+  const haystack = String(text || "").toLowerCase();
+  if (!haystack.trim()) return null;
+  for (const pack of PACKS) {
+    for (const typology of pack.typologies) {
+      if ((typology.keywords || []).some(kw => haystack.includes(kw.toLowerCase()))) {
+        const override = userSettings?.typology_overrides?.[typology.typology_id];
+        if (override?.disabled) return null;
+        return applyUserOverrides(typology, override);
+      }
+    }
+  }
+  return null;
+}
+
 // Expose la liste des typologies de tous les packs pour l'UI de configuration.
 export function getAllTypologies() {
   return PACKS.flatMap(pack =>

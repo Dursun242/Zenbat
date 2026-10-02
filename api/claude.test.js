@@ -85,10 +85,30 @@ describe("claude endpoint — méthodes & auth", () => {
     expect(res.statusCode).toBe(204);
   });
 
-  it("refuse les méthodes != POST", async () => {
+  it("refuse les méthodes != GET/POST", async () => {
+    const res = makeRes();
+    await handler(makeReq({ method: "PUT" }), res);
+    expect(res.statusCode).toBe(405);
+  });
+
+  it("GET renvoie le diagnostic fournisseur sans exposer les clés", async () => {
+    process.env.MISTRAL_API_KEY = "mistral-secret";
+    process.env.MISTRAL_MODEL   = "mistral-small-latest";
     const res = makeRes();
     await handler(makeReq({ method: "GET" }), res);
-    expect(res.statusCode).toBe(405);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.provider).toBe("mistral");
+    expect(res.body.model).toBe("mistral-small-latest");
+    expect(res.body.keys).toEqual({ MISTRAL_API_KEY: true, ANTHROPIC_KEY: true });
+    expect(JSON.stringify(res.body)).not.toContain("mistral-secret");
+    expect(getUserMock).not.toHaveBeenCalled();
+  });
+
+  it("GET indique anthropic quand aucune clé Mistral n'est posée", async () => {
+    const res = makeRes();
+    await handler(makeReq({ method: "GET" }), res);
+    expect(res.body.provider).toBe("anthropic");
+    expect(res.body.keys.MISTRAL_API_KEY).toBe(false);
   });
 
   it("renvoie 401 si pas de token", async () => {
@@ -557,6 +577,8 @@ describe("claude endpoint — fournisseur Mistral", () => {
     expect(res.body.content[0].text).toBe("bonjour");
     expect(res.body.stop_reason).toBe("end_turn");
     expect(res.body.usage).toEqual({ input_tokens: 12, output_tokens: 3 });
+    expect(res.headers["X-AI-Provider"]).toBe("mistral");
+    expect(res.headers["X-AI-Model"]).toBe("mistral-small-latest");
   });
 
   it("AI_PROVIDER=anthropic force Anthropic même avec une clé Mistral", async () => {
@@ -567,6 +589,28 @@ describe("claude endpoint — fournisseur Mistral", () => {
     await handler(makeReq({ headers: { authorization: "Bearer t" }, body: baseBody }), res);
     expect(global.fetch.mock.calls[0][0]).toBe("https://api.anthropic.com/v1/messages");
     expect(res.body.content[0].text).toBe("ok");
+  });
+
+  it("l'admin peut forcer Mistral via ai_provider même si la prod est sur Anthropic", async () => {
+    process.env.ADMIN_EMAIL = "admin@x.fr";
+    process.env.AI_PROVIDER = "anthropic";
+    getUserMock.mockResolvedValueOnce({ data: { user: { id: "a1", email: "Admin@x.fr", created_at: new Date().toISOString() } }, error: null });
+    setupSupabaseProfile("free", 0);
+    global.fetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] }) });
+    const res = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: { ...baseBody, ai_provider: "mistral" } }), res);
+    expect(global.fetch.mock.calls[0][0]).toBe("https://api.mistral.ai/v1/chat/completions");
+    expect(res.headers["X-AI-Provider"]).toBe("mistral");
+  });
+
+  it("ignore ai_provider pour un utilisateur non admin", async () => {
+    process.env.ADMIN_EMAIL = "admin@x.fr";
+    process.env.AI_PROVIDER = "anthropic";
+    setupAuthed();
+    global.fetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ content: [{ text: "ok" }] }) });
+    const res = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: { ...baseBody, ai_provider: "mistral" } }), res);
+    expect(global.fetch.mock.calls[0][0]).toBe("https://api.anthropic.com/v1/messages");
   });
 
   it("renvoie 500 si AI_PROVIDER=mistral sans MISTRAL_API_KEY", async () => {

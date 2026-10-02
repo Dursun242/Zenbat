@@ -37,6 +37,18 @@ async function fetchWithNetworkRetry(url, init, { retries = 1, retryDelayMs = 12
   throw lastErr;
 }
 
+// Modèle réellement servi par /api/claude (en-tête X-AI-Model : Mistral ou
+// Claude selon la config serveur). Sert à journaliser ia_conversations.model
+// avec la vérité serveur plutôt qu'avec la constante CLAUDE_MODEL du front.
+let lastServedModel = null;
+export function getLastServedModel() {
+  return lastServedModel;
+}
+function rememberServedModel(res) {
+  const m = res?.headers?.get?.("x-ai-model");
+  if (m) lastServedModel = m;
+}
+
 async function readApiError(res) {
   const detail = await res.json().catch(() => null);
   const errVal = detail?.error;
@@ -87,6 +99,7 @@ export async function streamClaude({ body, authHeaders, onTextDelta }) {
       throw new ClaudeApiError(msg, { status: res.status });
     }
   }
+  rememberServedModel(res);
   if (!res.body) throw new Error("no response body");
 
   const reader  = res.body.getReader();
@@ -175,6 +188,7 @@ export async function requestClaude({ body, authHeaders }) {
       throw new ClaudeApiError(msg, { status: res.status });
     }
   }
+  rememberServedModel(res);
   return (data?.content?.[0]?.text || "").toString();
 }
 
