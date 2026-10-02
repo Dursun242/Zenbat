@@ -1,6 +1,6 @@
 import { runCoherenceCheck } from "../coherence/engine.js";
 import { buildCorrectionPrompt } from "../coherence/formatIssues.js";
-import { extractDevisJson, applyVatRegime } from "./extractDevis.js";
+import { extractDevisJson, parseDevisJson, applyVatRegime } from "./extractDevis.js";
 import { requestClaude, ClaudeApiError } from "./stream.js";
 import { uid } from "../utils.js";
 
@@ -53,8 +53,8 @@ export async function runCoherenceLoop({ devis, apiBody, authHeaders, msgs, rawR
     const corrJsonStr = extractDevisJson(correctedRaw);
     if (!corrJsonStr) break;
 
-    let correctedParsed;
-    try { correctedParsed = JSON.parse(corrJsonStr); } catch { break; }
+    const correctedParsed = parseDevisJson(corrJsonStr);
+    if (!correctedParsed) break;
 
     const correctedLignes = applyVatRegime(
       (correctedParsed.lignes || []).map(l => ({ ...l, id: uid() })),

@@ -212,3 +212,40 @@ describe("processDevisFromRaw", () => {
     expect(out.objet).toBe("");
   });
 });
+
+// ── JSON presque valide (Mistral) ────────────────────────────────────────────
+import { repairJson, parseDevisJson } from "./extractDevis.js";
+
+describe("extraction tolérante (Mistral)", () => {
+  it("retire un bloc ```json à l'intérieur des balises <DEVIS>", () => {
+    const raw = 'Voici.\n<DEVIS>\n```json\n{"objet":"Dalle","lignes":[]}\n```\n</DEVIS>';
+    expect(JSON.parse(extractDevisJson(raw))).toEqual({ objet: "Dalle", lignes: [] });
+    const open = 'Voici.\n<DEVIS>\n```json\n{"objet":"Dalle","lignes":[]}\n```';
+    expect(JSON.parse(extractDevisJson(open))).toEqual({ objet: "Dalle", lignes: [] });
+  });
+
+  it("répare virgules finales, commentaires, retours à la ligne bruts, NaN", () => {
+    const bad = `{
+      "objet": "Dalle béton garage", // commentaire
+      "lignes": [
+        {"type_ligne": "ouvrage", "designation": "Dalle
+béton", "quantite": NaN, "prix_unitaire": 55,},
+      ],
+      /* fin */
+    }`;
+    const parsed = parseDevisJson(bad);
+    expect(parsed.objet).toBe("Dalle béton garage");
+    expect(parsed.lignes[0]).toMatchObject({ designation: "Dalle\nbéton", quantite: null, prix_unitaire: 55 });
+  });
+
+  it("ne touche pas au contenu des chaînes", () => {
+    const ok = '{"designation": "Sol, ] undefined // pas un commentaire, NaN"}';
+    expect(parseDevisJson(ok).designation).toBe("Sol, ] undefined // pas un commentaire, NaN");
+    expect(repairJson('{"a": "x, }"}')).toBe('{"a": "x, }"}');
+  });
+
+  it("illisible → null", () => {
+    expect(parseDevisJson("{pas du json")).toBeNull();
+    expect(parseDevisJson("")).toBeNull();
+  });
+});

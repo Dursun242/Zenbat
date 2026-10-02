@@ -3,7 +3,7 @@ import { CLAUDE_MODEL } from "../../lib/constants.js";
 import { getToken } from "../../lib/getToken.js";
 import { buildSystemPrompt } from "../../lib/agentIA/prompt.js";
 import { buildPriceHints } from "../../lib/coherence/priceHints.js";
-import { extractDevisJson } from "../../lib/agentIA/extractDevis.js";
+import { extractDevisJson, parseDevisJson } from "../../lib/agentIA/extractDevis.js";
 import { requestClaude, ClaudeApiError, getLastServedModel } from "../../lib/agentIA/stream.js";
 import { runCoherenceCheck } from "../../lib/coherence/engine.js";
 import { PROMPTS } from "../../lib/agentIA/testPrompts.js";
@@ -11,11 +11,11 @@ import { PROMPTS } from "../../lib/agentIA/testPrompts.js";
 // Une requête à la fois + un intervalle minimum entre 2 départs, propre au
 // fournisseur : le tier free Anthropic plafonne à 50k input tokens/min et 10k
 // output tokens/min (3 requêtes parallèles saturent immédiatement). Mistral
-// tolère un rythme plus soutenu ; requestClaude retente de toute façon une
-// fois sur 429.
+// tolère un rythme plus soutenu ; sur 429, le serveur retente une fois puis
+// requestClaude jusqu'à 3 fois avec un délai croissant.
 const CONCURRENCY = 1;
 const PROVIDERS = {
-  mistral:   { label: "Mistral", intervalMs: 3000 },
+  mistral:   { label: "Mistral", intervalMs: 4000 },
   anthropic: { label: "Claude",  intervalMs: 12000 },
 };
 const REFUSAL_RE = /ne r[ée]alis(ons|e|ent) pas|ne fais(ons|ent)? pas|ne propos(ons|e|ent) pas|ne traitons pas|pas (notre|de) sp[ée]cialit[ée]/i;
@@ -29,9 +29,9 @@ function analyseResponse(rawText) {
 
   const json = extractDevisJson(rawText);
   if (!json) return { hasDevis: false, parseOk: false, isRefusal, askedQuestionFirst, nLines: 0, nLots: 0, nullPriceLines: 0, totalHt: 0, objet: "" };
-  let parsed;
-  try { parsed = JSON.parse(json); }
-  catch { return { hasDevis: true, parseOk: false, isRefusal, askedQuestionFirst, nLines: 0, nLots: 0, nullPriceLines: 0, totalHt: 0, objet: "" }; }
+  // Même lecture tolérante qu'en production (processDevisFromRaw)
+  const parsed = parseDevisJson(json);
+  if (!parsed) return { hasDevis: true, parseOk: false, isRefusal, askedQuestionFirst, nLines: 0, nLots: 0, nullPriceLines: 0, totalHt: 0, objet: "" };
 
   const lignes = Array.isArray(parsed.lignes) ? parsed.lignes : [];
   const ouvrages = lignes.filter(l => l.type_ligne === "ouvrage");

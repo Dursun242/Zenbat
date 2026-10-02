@@ -17,7 +17,13 @@ function tokenize(str) {
 
 // Cherche l'item de pack dont le libellé correspond le mieux à la désignation de ligne.
 // Requiert que ≥ 60 % des tokens du libellé item soient présents dans la désignation.
-function findItemForLine(designation, typology) {
+// Unités comparables (m2 = m², m3 = m³…).
+const normUnit = (u) => String(u || "").toLowerCase().replace("²", "2").replace("³", "3").trim();
+
+// Le premier mot du libellé item (« dalle », « élévation », « fouilles »…)
+// désigne l'ouvrage : il doit figurer dans la ligne. Sinon un « mur de
+// soutènement béton armé » serait comparé à une « dalle béton armé ».
+function findItemForLine(designation, typology, unite) {
   const lineSet = new Set(tokenize(designation));
   if (lineSet.size === 0) return null;
 
@@ -25,8 +31,10 @@ function findItemForLine(designation, typology) {
   for (const lot of typology.lots || []) {
     for (const item of lot.items || []) {
       if (!item.unit_price) continue;
+      if (item.unit && unite && normUnit(item.unit) !== normUnit(unite)) continue;
       const itemTokens = tokenize(item.label);
       if (itemTokens.length === 0) continue;
+      if (!lineSet.has(itemTokens[0])) continue;
       const overlap = itemTokens.filter(t => lineSet.has(t)).length;
       const score = overlap / itemTokens.length;
       if (score >= 0.6 && score > bestScore) {
@@ -54,8 +62,8 @@ export function checkUnitPrices(devis, typology) {
     if (!QUANTIFIED_UNITS.has((line.unite || "").toLowerCase())) continue;
 
     const itemDef = line.item_id
-      ? (itemById[line.item_id] ?? findItemForLine(line.designation, typology))
-      : findItemForLine(line.designation, typology);
+      ? (itemById[line.item_id] ?? findItemForLine(line.designation, typology, line.unite))
+      : findItemForLine(line.designation, typology, line.unite);
     if (!itemDef?.unit_price) continue;
 
     const pu = Number(line.prix_unitaire) || 0;
