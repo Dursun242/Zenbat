@@ -3,14 +3,18 @@ import { uid } from "../utils.js";
 // Extrait le JSON du bloc <DEVIS> même si la balise fermante est absente
 // (cas où Claude émet du texte ou une astuce après le JSON sans </DEVIS>).
 // Avec balise fermante : trivial. Sans : on équilibre les accolades.
+// Mistral entoure souvent le JSON d'un bloc ```json … ``` à l'intérieur des
+// balises : on le retire avant l'extraction.
+const stripFence = (str) => str.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
+
 export function extractDevisJson(raw) {
   const withClose = raw.match(/<DEVIS>([\s\S]*?)<\/DEVIS>/);
-  if (withClose) return withClose[1].trim();
+  if (withClose) return stripFence(withClose[1].trim()).trim();
 
   const openIdx = raw.indexOf("<DEVIS>");
   if (openIdx < 0) return null;
 
-  const after = raw.slice(openIdx + 7).trimStart();
+  const after = stripFence(raw.slice(openIdx + 7).trimStart()).trimStart();
   if (!after.startsWith("{")) return null;
 
   let depth = 0, inStr = false, escape = false;
@@ -24,6 +28,62 @@ export function extractDevisJson(raw) {
     else if (ch === "}") { depth--; if (depth === 0) return after.slice(0, i + 1); }
   }
   return null;
+}
+
+// JSON « presque valide » produit par un modèle : commentaires, virgules
+// finales, retours à la ligne bruts dans les chaînes, NaN / undefined,
+// guillemets typographiques autour des clés. Réparation conservatrice,
+// caractère par caractère (le contenu des chaînes n'est pas modifié).
+export function repairJson(str) {
+  // Passe 1 : chaînes (retours à la ligne bruts, guillemets typographiques
+  // ouvrants / fermants hors chaîne) et commentaires.
+  let pass1 = "", inStr = false, esc = false;
+  const src = String(str || "").replace(/^\uFEFF/, "");
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (inStr) {
+      if (esc) { esc = false; pass1 += ch; continue; }
+      if (ch === "\\") { esc = true; pass1 += ch; continue; }
+      if (ch === '"') { inStr = false; pass1 += ch; continue; }
+      if (ch === "\n") { pass1 += "\\n"; continue; }
+      if (ch === "\r") continue;
+      if (ch === "\t") { pass1 += "\\t"; continue; }
+      pass1 += ch; continue;
+    }
+    if (ch === '"' || ch === "\u201C" || ch === "\u201D") { inStr = true; pass1 += '"'; continue; }
+    if (ch === "/" && src[i + 1] === "/") { while (i < src.length && src[i] !== "\n") i++; continue; }
+    if (ch === "/" && src[i + 1] === "*") { i += 2; while (i < src.length && !(src[i] === "*" && src[i + 1] === "/")) i++; i++; continue; }
+    pass1 += ch;
+  }
+  // Passe 2 (hors chaînes) : virgules finales, NaN / undefined / Infinity.
+  let out = "";
+  inStr = false; esc = false;
+  for (let i = 0; i < pass1.length; i++) {
+    const ch = pass1[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') inStr = false;
+      out += ch; continue;
+    }
+    if (ch === '"') { inStr = true; out += ch; continue; }
+    if (ch === ",") {
+      let j = i + 1;
+      while (j < pass1.length && /\s/.test(pass1[j])) j++;
+      if (pass1[j] === "}" || pass1[j] === "]") continue;
+    }
+    const word = /^(NaN|undefined|Infinity)\b/.exec(pass1.slice(i, i + 10));
+    if (word && !/[\w$]/.test(pass1[i - 1] || "")) { out += "null"; i += word[1].length - 1; continue; }
+    out += ch;
+  }
+  return out;
+}
+
+/** JSON.parse, puis une seconde chance sur la version réparée. null si illisible. */
+export function parseDevisJson(str) {
+  if (!str) return null;
+  try { return JSON.parse(str); } catch { /* réparation ci-dessous */ }
+  try { return JSON.parse(repairJson(str)); } catch { return null; }
 }
 
 // Force tva_rate = 0 sur les lignes ouvrage si l'utilisateur est en franchise
@@ -123,8 +183,8 @@ export function processDevisFromRaw(raw, brand) {
   const devisJsonStr = extractDevisJson(raw);
   if (!devisJsonStr) return null;
 
-  let rawParsed;
-  try { rawParsed = JSON.parse(devisJsonStr); } catch { return null; }
+  const rawParsed = parseDevisJson(devisJsonStr);
+  if (!rawParsed) return null;
 
   const parsed = sanitizeDevisJson(rawParsed);
   if (!parsed) return null;

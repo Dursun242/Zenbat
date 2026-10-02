@@ -107,3 +107,11 @@ describe("buildSystemPrompt", () => {
     expect(result).toMatch(/HÉSITES.*TYPE 2/);
   });
 });
+
+describe("message sans prestation (banc Mistral)", () => {
+  it("le prompt interdit un devis inventé quand aucune prestation n'est nommée", () => {
+    const p = buildSystemPrompt({ brand: {}, historySummary: null });
+    expect(p).toContain("MESSAGE SANS AUCUNE PRESTATION");
+    expect(p).toMatch(/JAMAIS de devis « diagnostic »/);
+  });
+});

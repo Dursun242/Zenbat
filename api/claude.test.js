@@ -625,11 +625,29 @@ describe("claude endpoint — fournisseur Mistral", () => {
 
   it("normalise les erreurs Mistral au format { error: { message } }", async () => {
     setupAuthed();
-    global.fetch.mockResolvedValueOnce({ ok: false, status: 429, json: async () => ({ message: "Requests rate limit exceeded", type: "rate_limited" }) });
+    const limited = () => ({
+      ok: false, status: 429, headers: { get: (k) => (k === "retry-after" ? "0.01" : null) },
+      json: async () => ({ message: "Requests rate limit exceeded", type: "rate_limited" }),
+    });
+    // 429 persistant : une nouvelle tentative côté serveur, puis 429 transmis avec Retry-After
+    global.fetch.mockResolvedValueOnce(limited()).mockResolvedValueOnce(limited());
     const res = makeRes();
     await handler(makeReq({ headers: { authorization: "Bearer t" }, body: baseBody }), res);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
     expect(res.statusCode).toBe(429);
+    expect(res.headers["Retry-After"]).toBe("0.01");
     expect(res.body.error.message).toBe("Requests rate limit exceeded");
+  });
+
+  it("Mistral 429 passager : nouvelle tentative transparente", async () => {
+    setupAuthed();
+    global.fetch
+      .mockResolvedValueOnce({ ok: false, status: 429, headers: { get: () => "0.01" }, json: async () => ({ message: "rate limit" }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content: "Bonjour" }, finish_reason: "stop" }], usage: {} }) });
+    const res = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: baseBody }), res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.content[0].text).toBe("Bonjour");
   });
 
   it("traduit le flux SSE Mistral en events Anthropic", async () => {

@@ -74,31 +74,35 @@ function readRetryAfterMs(res, fallbackSec = 5) {
   return safe * 1000;
 }
 
+// Nouvelles tentatives sur rate limit fournisseur (Mistral surtout : limite
+// par minute vite atteinte) : 3 essais supplémentaires, délai croissant
+// (Retry-After s'il est fourni, sinon 4 s, 8 s, 16 s). Jamais pour la
+// limite journalière interne (irrécupérable).
+export const RATE_LIMIT_RETRIES = 3;
+export async function fetchWithRateLimitRetry(doFetch, { retries = RATE_LIMIT_RETRIES, sleep = (ms) => new Promise(r => setTimeout(r, ms)) } = {}) {
+  let res = await doFetch();
+  for (let attempt = 0; attempt < retries && res.status === 429; attempt++) {
+    // Lecture sur une copie : l'appelant lit encore le corps de la réponse finale
+    const msg = await readApiError(res.clone ? res.clone() : res);
+    if (/journalière/i.test(msg)) break;
+    await sleep(readRetryAfterMs(res, 4 * 2 ** attempt));
+    res = await doFetch();
+  }
+  return res;
+}
+
 // Streaming SSE : appelle /api/claude en mode stream et invoque onTextDelta
 // à chaque chunk de texte reçu. Renvoie le texte brut complet accumulé.
 // Lance ClaudeApiError si Anthropic répond une erreur, Error sinon (réseau/SSE).
-// Retry auto une fois sur rate limit Anthropic (cap tokens/min de l'org)
-// — sauf si c'est la limite journalière interne (irrécupérable).
+// Nouvelles tentatives sur rate limit (fetchWithRateLimitRetry) — sauf si
+// c'est la limite journalière interne (irrécupérable).
 export async function streamClaude({ body, authHeaders, onTextDelta }) {
-  let res = await fetchWithNetworkRetry("/api/claude", {
+  const res = await fetchWithRateLimitRetry(() => fetchWithNetworkRetry("/api/claude", {
     method:  "POST",
     headers: { "Content-Type": "application/json", ...authHeaders },
     body:    JSON.stringify({ ...body, stream: true }),
-  });
-  if (!res.ok) {
-    const msg = await readApiError(res);
-    if (isRateLimit(res.status, msg) && !/journalière/i.test(msg)) {
-      await new Promise(r => setTimeout(r, readRetryAfterMs(res)));
-      res = await fetchWithNetworkRetry("/api/claude", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
-        body:    JSON.stringify({ ...body, stream: true }),
-      });
-      if (!res.ok) throw new ClaudeApiError(await readApiError(res), { status: res.status });
-    } else {
-      throw new ClaudeApiError(msg, { status: res.status });
-    }
-  }
+  }));
+  if (!res.ok) throw new ClaudeApiError(await readApiError(res), { status: res.status });
   rememberServedModel(res);
   if (!res.body) throw new Error("no response body");
 
@@ -159,34 +163,21 @@ function markIncomplete(err, raw, t0) {
 
 // Appel non-streamé à /api/claude (utilisé en fallback quand le streaming
 // échoue pour des raisons réseau/SSE, et pour la boucle de cohérence).
-// Retry auto une fois sur rate limit Anthropic — sauf limite journalière interne.
+// Nouvelles tentatives sur rate limit (fetchWithRateLimitRetry) — sauf limite journalière interne.
 export async function requestClaude({ body, authHeaders }) {
   const doFetch = () => fetchWithNetworkRetry("/api/claude", {
     method:  "POST",
     headers: { "Content-Type": "application/json", ...authHeaders },
     body:    JSON.stringify(body),
   });
-  let res = await doFetch();
-  let data = await res.json().catch(() => null);
+  const res = await fetchWithRateLimitRetry(doFetch);
+  const data = await res.json().catch(() => null);
   if (!res.ok) {
     const errVal = data?.error;
     const msg = typeof errVal === "string"
       ? errVal
       : (errVal?.message || data?.message || `HTTP ${res.status}`);
-    if (isRateLimit(res.status, msg) && !/journalière/i.test(msg)) {
-      await new Promise(r => setTimeout(r, readRetryAfterMs(res)));
-      res = await doFetch();
-      data = await res.json().catch(() => null);
-      if (!res.ok) {
-        const errVal2 = data?.error;
-        const msg2 = typeof errVal2 === "string"
-          ? errVal2
-          : (errVal2?.message || data?.message || `HTTP ${res.status}`);
-        throw new ClaudeApiError(msg2, { status: res.status });
-      }
-    } else {
-      throw new ClaudeApiError(msg, { status: res.status });
-    }
+    throw new ClaudeApiError(msg, { status: res.status });
   }
   rememberServedModel(res);
   return (data?.content?.[0]?.text || "").toString();

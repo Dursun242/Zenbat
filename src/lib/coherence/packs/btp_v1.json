@@ -54,7 +54,7 @@
     {
       "typology_id": "ite_facade",
       "label": "ITE — Isolation thermique extérieure",
-      "keywords": ["ite ", "isolation thermique extérieure", "isolation thermique exterieure", "isolation par l'extérieur", "isolation par l'exterieur", "isolation extérieure"],
+      "keywords": ["ite", "isolation thermique extérieure", "isolation thermique exterieure", "isolation par l'extérieur", "isolation par l'exterieur", "isolation extérieure"],
       "main_dimension": { "name": "surface_facade", "unit": "m²", "label": "Surface de façade" },
       "default_params": {},
       "envelope": { "min_per_unit": 110, "max_per_unit": 220, "tolerance_pct": 20 },
@@ -90,7 +90,9 @@
     {
       "typology_id": "extension_neuve_go",
       "label": "Extension neuve — gros œuvre seul",
+      "full_scope": true,
       "keywords": ["extension", "agrandissement", "gros oeuvre", "gros œuvre"],
+      "exclude_keywords": ["permis de construire", "dossier", "étude", "plans", "maîtrise d'œuvre", "moe", "mur de soutènement", "soutènement", "maison neuve", "construction maison", "construction d'une maison"],
       "main_dimension": { "name": "surface_sol", "unit": "m²", "label": "Surface au sol" },
       "default_params": { "hauteur_etage": 2.5, "coef_pente": 1.15, "section_semelle": 0.18 },
       "envelope": { "min_per_unit": 800, "max_per_unit": 1200, "tolerance_pct": 15 },
@@ -204,7 +206,7 @@
     {
       "typology_id": "renovation_sdb",
       "label": "Rénovation salle de bain",
-      "keywords": ["salle de bain", "salle de bains", "sdb", "salle d'eau", "douche", "baignoire", "sanitaire"],
+      "keywords": ["salle de bain", "salle de bains", "sdb", "salle d'eau"],
       "main_dimension": { "name": "surface_sol", "unit": "m²", "label": "Surface au sol" },
       "default_params": {},
       "envelope": { "min_per_unit": 600, "max_per_unit": 1800, "tolerance_pct": 20 },
@@ -309,7 +311,9 @@
     {
       "typology_id": "renovation_interieure",
       "label": "Rénovation intérieure complète",
+      "full_scope": true,
       "keywords": ["rénovation complète", "renovation complete", "rénovation totale", "renovation totale", "rénovation appartement", "renovation appartement", "rénovation maison", "renovation maison"],
+      "exclude_keywords": ["salle de bain", "salle de bains", "sdb", "salle d'eau", "cuisine", "plomberie", "électrique", "peinture", "toiture", "façade"],
       "main_dimension": { "name": "surface_sol", "unit": "m²", "label": "Surface au sol" },
       "default_params": {},
       "envelope": { "min_per_unit": 200, "max_per_unit": 900, "tolerance_pct": 20 },

@@ -162,6 +162,21 @@ async function handleScrape(res, { urls, admin, user }) {
   });
 }
 
+// Mistral répond 429 dès que la limite de requêtes / tokens par minute de
+// l'abonnement est atteinte, souvent pour 1 à 2 s. Une nouvelle tentative
+// côté serveur (attente Retry-After, 4 s max) évite d'afficher une erreur
+// pour un pic passager ; au-delà, le 429 remonte au client qui réessaie
+// avec un délai croissant (cf src/lib/agentIA/stream.js).
+async function fetchMistralWithRetry(payload, signal) {
+  const first = await fetch(MISTRAL_API_URL, mistralFetchInit(payload, signal));
+  if (first.status !== 429) return first;
+  const sec = Number(first.headers?.get?.("retry-after"));
+  const waitMs = Number.isFinite(sec) && sec > 0 ? Math.min(sec * 1000, 4000) : 2000;
+  await first.body?.cancel?.().catch(() => {});
+  await new Promise(r => setTimeout(r, waitMs));
+  return fetch(MISTRAL_API_URL, mistralFetchInit(payload, signal));
+}
+
 export default async function handler(req, res) {
   cors(req, res, { methods: "GET, POST, OPTIONS", auth: true });
 
@@ -316,7 +331,7 @@ export default async function handler(req, res) {
     let upstream;
     try {
       upstream = isMistral
-        ? await fetch(MISTRAL_API_URL, mistralFetchInit(payload, controller.signal))
+        ? await fetchMistralWithRetry(payload, controller.signal)
         : await fetch("https://api.anthropic.com/v1/messages", {
             method: "POST",
             headers: {
@@ -408,6 +423,8 @@ export default async function handler(req, res) {
       } else {
         // Erreur fournisseur sur une requête stream : on lit le JSON d'erreur
         const errorData = await upstream.json().catch(() => null);
+        const retryAfter = upstream.headers?.get?.("retry-after");
+        if (retryAfter) res.setHeader("Retry-After", retryAfter);
         return res.status(upstream.status).json(isMistral ? mistralError(errorData, upstream.status) : errorData);
       }
     }
@@ -469,6 +486,10 @@ export default async function handler(req, res) {
       }
     }
 
+    if (!upstream.ok) {
+      const retryAfter = upstream.headers?.get?.("retry-after");
+      if (retryAfter) res.setHeader("Retry-After", retryAfter);
+    }
     return res.status(upstream.status).json(upstreamData);
 
   } catch (err) {

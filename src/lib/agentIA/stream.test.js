@@ -258,3 +258,50 @@ describe("getLastServedModel", () => {
     expect(getLastServedModel()).toBe("mistral-small-latest");
   });
 });
+
+// ── Rate limit fournisseur : nouvelles tentatives avec délai croissant ───────
+import { fetchWithRateLimitRetry } from "./stream.js";
+
+describe("fetchWithRateLimitRetry", () => {
+  const resp = (status, body = {}, retryAfter = null) => {
+    const r = {
+      ok: status < 300, status,
+      headers: { get: (k) => (k === "retry-after" ? retryAfter : null) },
+      json: async () => body,
+    };
+    r.clone = () => ({ ...r });
+    return r;
+  };
+
+  it("réessaie jusqu'à 3 fois sur 429 avec délai croissant, puis renvoie la réponse", async () => {
+    const sleep = vi.fn(async () => {});
+    const doFetch = vi.fn()
+      .mockResolvedValueOnce(resp(429, { error: "rate limit" }))
+      .mockResolvedValueOnce(resp(429, { error: "rate limit" }, "2"))
+      .mockResolvedValueOnce(resp(200, { ok: true }));
+    const res = await fetchWithRateLimitRetry(doFetch, { sleep });
+    expect(res.status).toBe(200);
+    expect(doFetch).toHaveBeenCalledTimes(3);
+    expect(sleep.mock.calls.map(c => c[0])).toEqual([4000, 2000]);
+  });
+
+  it("abandonne après 3 nouvelles tentatives", async () => {
+    const sleep = vi.fn(async () => {});
+    const doFetch = vi.fn(async () => resp(429, { error: "rate limit" }));
+    const res = await fetchWithRateLimitRetry(doFetch, { sleep });
+    expect(res.status).toBe(429);
+    expect(doFetch).toHaveBeenCalledTimes(4);
+    expect(sleep.mock.calls.map(c => c[0])).toEqual([4000, 8000, 16000]);
+  });
+
+  it("pas de nouvelle tentative pour la limite journalière ni pour une autre erreur", async () => {
+    const sleep = vi.fn(async () => {});
+    const daily = vi.fn(async () => resp(429, { error: "Limite journalière atteinte" }));
+    expect((await fetchWithRateLimitRetry(daily, { sleep })).status).toBe(429);
+    expect(daily).toHaveBeenCalledTimes(1);
+    const other = vi.fn(async () => resp(500, { error: "boom" }));
+    await fetchWithRateLimitRetry(other, { sleep });
+    expect(other).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+  });
+});

@@ -15,25 +15,55 @@ function findTypologyById(id) {
   return null;
 }
 
-// Détecte automatiquement la typologie en cherchant les keywords du pack
-// dans l'objet + les noms de lots uniquement (pas les désignations d'ouvrages,
-// trop bruyantes et source de faux positifs).
-function detectTypology(devis) {
-  const haystack = [
-    devis.objet || "",
-    ...(devis.lignes || []).map(l =>
-      l.type_ligne === "lot" ? (l.designation || "") : (l.lot || "")
-    ),
-  ].join(" ").toLowerCase();
+// Normalise un texte pour la recherche de mots-clés : minuscules, sans
+// accents, œ/æ développés, ponctuation → espaces.
+export function foldText(str) {
+  return " " + String(str || "").toLowerCase()
+    .replace(/œ/g, "oe").replace(/æ/g, "ae")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ").trim() + " ";
+}
 
+// Le mot-clé apparaît comme mot(s) entier(s) : « ite » ne doit pas
+// reconnaître « site », « conduite » ou « stéatite ».
+function hasKeyword(folded, kw) {
+  const k = foldText(kw).trim();
+  return !!k && folded.includes(` ${k} `);
+}
+
+// Meilleure typologie pour un texte : celle dont le mot-clé reconnu est le
+// plus long (le plus spécifique). Les typologies dont un mot-clé d'exclusion
+// apparaît (`exclude_keywords` : prestation intellectuelle, autre ouvrage…)
+// sont écartées.
+function bestTypologyForText(text, context = "") {
+  const folded = foldText(text);
+  if (!folded.trim()) return null;
+  const foldedAll = folded + foldText(context);
+  let best = null, bestLen = 0;
   for (const pack of PACKS) {
     for (const typology of pack.typologies) {
-      if ((typology.keywords || []).some(kw => haystack.includes(kw.toLowerCase()))) {
-        return { pack, typology };
+      if ((typology.exclude_keywords || []).some(kw => hasKeyword(foldedAll, kw))) continue;
+      for (const kw of typology.keywords || []) {
+        const len = foldText(kw).trim().length;
+        if (len > bestLen && hasKeyword(folded, kw)) { best = { pack, typology }; bestLen = len; }
       }
     }
   }
-  return null;
+  return best;
+}
+
+// Détecte automatiquement la typologie : d'abord sur l'objet du devis (le
+// plus fiable), puis seulement s'il ne dit rien, sur les noms de lots (pas
+// les désignations d'ouvrages, trop bruyantes et source de faux positifs).
+function detectTypology(devis) {
+  const fromObjet = bestTypologyForText(devis.objet || "");
+  if (fromObjet) return fromObjet;
+  const lots = (devis.lignes || []).map(l =>
+    l.type_ligne === "lot" ? (l.designation || "") : (l.lot || "")
+  ).join(" | ");
+  // Les exclusions tiennent compte de l'objet (« Mur de soutènement » avec
+  // un lot « Gros œuvre » n'est pas une extension).
+  return bestTypologyForText(lots, devis.objet || "");
 }
 
 // Applique les surcharges utilisateur sur une typologie (fourchettes custom).
@@ -98,18 +128,11 @@ export function runCoherenceCheck(devis, userSettings = null) {
 // pour cette typologie) : ses prix ne suivent alors pas nos fourchettes.
 export function findTypologyForText(text, userSettings = null) {
   if (userSettings?.global_disabled) return null;
-  const haystack = String(text || "").toLowerCase();
-  if (!haystack.trim()) return null;
-  for (const pack of PACKS) {
-    for (const typology of pack.typologies) {
-      if ((typology.keywords || []).some(kw => haystack.includes(kw.toLowerCase()))) {
-        const override = userSettings?.typology_overrides?.[typology.typology_id];
-        if (override?.disabled) return null;
-        return applyUserOverrides(typology, override);
-      }
-    }
-  }
-  return null;
+  const found = bestTypologyForText(text);
+  if (!found) return null;
+  const override = userSettings?.typology_overrides?.[found.typology.typology_id];
+  if (override?.disabled) return null;
+  return applyUserOverrides(found.typology, override);
 }
 
 // Expose la liste des typologies de tous les packs pour l'UI de configuration.
