@@ -19,6 +19,7 @@ import Toast         from "./components/app/Toast.jsx";
 import UpdateAvailableToast from "./components/app/UpdateAvailableToast.jsx";
 import BottomNav, { NAV_RESERVED_CSS }    from "./components/app/BottomNav.jsx";
 import BottomNavActionSheet from "./components/app/BottomNavActionSheet.jsx";
+import ViewportDiag from "./components/app/ViewportDiag.jsx";
 import SearchBar     from "./components/app/SearchBar.jsx";
 import SaveIndicator from "./components/app/SaveIndicator.jsx";
 import HeaderMenu    from "./components/app/HeaderMenu.jsx";
@@ -83,6 +84,14 @@ function initialTabFromUrl() {
 export default function App() {
   const [screen, setScreen] = useState("app");
   const [tab,    setTab]    = useState(initialTabFromUrl);
+  // Diagnostic d'affichage : 5 appuis rapides sur le logo de l'en-tête.
+  const [diagOpen, setDiagOpen] = useState(false);
+  const logoTapsRef = useRef([]);
+  const onLogoTap = () => {
+    const now = Date.now();
+    logoTapsRef.current = [...logoTapsRef.current.filter(t => now - t < 2000), now];
+    if (logoTapsRef.current.length >= 5) { logoTapsRef.current = []; setDiagOpen(true); }
+  };
   const [selC,   setSelC]   = useState(null);
   const [plan,         setPlan]         = useState("free");
   const [billingCycle, setBillingCycle] = useState(null);
@@ -484,7 +493,8 @@ export default function App() {
 
       {/* Header */}
       <header style={{ background: "#1A1612", padding: "calc(10px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 10px calc(18px + env(safe-area-inset-left))", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-        <Logo size={24} white/>
+        <span onClick={onLogoTap} style={{ display: "inline-flex" }}><Logo size={24} white/></span>
+        {diagOpen && <ViewportDiag onClose={() => setDiagOpen(false)}/>}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <SaveIndicator state={saveState}/>
           <HeaderMenu
