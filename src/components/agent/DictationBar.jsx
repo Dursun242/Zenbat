@@ -106,14 +106,14 @@ const DictationBar = forwardRef(function DictationBar({
             {currentLang.code.slice(0, 2).toUpperCase()}
           </button>
 
-          <div className="zb-dict-field" style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 6, minHeight: 48, padding: "4px 4px 4px 12px",
+          <div className="zb-dict-field" style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "flex-end", gap: 6, minHeight: 48, padding: "4px 4px 4px 12px",
             borderRadius: 10, border: `1px solid ${micActive ? ZB.danger : ZB.rule}`, background: ZB.sheet, boxSizing: "border-box" }}>
             <label htmlFor="zb-dictation" className="zb-sr">Décris tes travaux</label>
             <textarea id="zb-dictation" ref={inputRef} value={input} rows={1}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); } }}
               placeholder={listening ? "Je t'écoute…" : "Décris tes travaux…"}
-              style={{ flex: 1, alignSelf: "center", padding: "8px 0", border: "none", outline: "none", resize: "none", background: "none",
+              style={{ flex: 1, minWidth: 0, width: "100%", alignSelf: "center", padding: "8px 0", border: "none", outline: "none", resize: "none", background: "none",
                 fontFamily: "inherit", fontSize: 16, lineHeight: 1.4, color: ZB.ink, maxHeight: 120, overflowY: "auto" }}/>
             {canSend && (
               <button type="button" onClick={onSend} aria-label="Envoyer"

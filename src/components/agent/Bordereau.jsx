@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { fmt } from "../../lib/utils.js";
 import { TVA_RATES } from "../../lib/constants.js";
 import { ZB, NUM } from "../../lib/theme.js";
+import { computeTotals, isNoTva, lineTotal } from "../../lib/invoiceCalc.js";
 
 const fmtQty = q => (q == null ? "—" : String(q).replace(".", ","));
 const fmtRate = r => String(r).replace(".", ",");
@@ -18,22 +19,30 @@ const fmtRate = r => String(r).replace(".", ",");
 // Découpe les lignes en sections de lot (les ouvrages avant le 1er lot vont
 // dans une section sans titre). Le sous-total est calculé sur TOUTES les
 // lignes du lot, pas seulement celles déjà inscrites à l'écran.
+// Sans lignes « titre de lot », on regroupe d'après le champ `lot` de chaque
+// ouvrage (format que l'IA renvoie aussi).
 function sectionsOf(lignes, visibleCount) {
   const sections = [];
+  const hasLotRows = lignes.some(l => l.type_ligne === "lot");
   let current = null;
   lignes.forEach((l, idx) => {
     if (l.type_ligne === "lot") {
-      current = { lot: l, rows: [], subtotal: 0 };
+      current = { lot: l, rows: [], subtotal: 0, at: idx };
       sections.push(current);
       return;
     }
-    if (!current) { current = { lot: null, rows: [], subtotal: 0 }; sections.push(current); }
-    current.subtotal += (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0);
+    if (!hasLotRows && l.lot && current?.lot?.designation !== l.lot) {
+      current = { lot: { id: `lot-${l.lot}-${idx}`, designation: l.lot }, rows: [], subtotal: 0, at: idx };
+      sections.push(current);
+    }
+    if (!current) { current = { lot: null, rows: [], subtotal: 0, at: idx }; sections.push(current); }
+    // Le sous-total du lot monte au fil des lignes inscrites.
+    if (idx < visibleCount) current.subtotal += lineTotal(l);
     current.rows.push({ l, idx });
   });
   return sections
     .map(s => ({ ...s, rows: s.rows.filter(r => r.idx < visibleCount) }))
-    .filter(s => (s.lot && lignes.indexOf(s.lot) < visibleCount) || s.rows.length);
+    .filter(s => (s.lot && s.at < visibleCount) || s.rows.length);
 }
 
 const ICON = {
@@ -171,11 +180,11 @@ function WritingRows() {
     return () => clearInterval(t);
   }, []);
   return (
-    <div aria-live="polite" style={{ padding: "6px 0 4px" }}>
-      {[0.78, 0.6, 0.7].map((w, i) => (
-        <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 16, padding: "14px 0", borderBottom: `1px solid ${ZB.ruleSoft}` }}>
-          <span className="zb-ink-line" style={{ "--i": i, height: 10, width: `${w * 100}%`, borderRadius: 3, background: ZB.ruleSoft }}/>
-          <span className="zb-ink-line" style={{ "--i": i, height: 10, width: 64, borderRadius: 3, background: ZB.ruleSoft }}/>
+    <div aria-live="polite" style={{ padding: "0 0 4px" }}>
+      {/* Lignes vierges du bordereau ; la première reçoit le trait de plume. */}
+      {[0, 1, 2].map(i => (
+        <div key={i} style={{ display: "flex", alignItems: "flex-end", height: 48, borderBottom: `1px ${i ? "dotted" : "solid"} ${ZB.rule}` }}>
+          {i === 0 && <span className="zb-pen-line" aria-hidden="true"/>}
         </div>
       ))}
       <div style={{ fontSize: 14, color: ZB.ink2, paddingTop: 12 }}>{WRITING_STEPS[step]}</div>
@@ -193,6 +202,14 @@ export default function Bordereau({
   const done = !empty && visibleCount >= lignes.length;
   const ouvrages = lignes.filter(l => l.type_ligne === "ouvrage").length;
   const [confirmClear, setConfirmClear] = useState(false);
+  // L'objet passe à la ligne au lieu d'être coupé.
+  const objetRef = useRef(null);
+  useEffect(() => {
+    const el = objetRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  }, [objet]);
   useEffect(() => {
     if (!confirmClear) return;
     const t = setTimeout(() => setConfirmClear(false), 4000);
@@ -200,6 +217,12 @@ export default function Bordereau({
   }, [confirmClear]);
   const today = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
   const sections = sectionsOf(lignes, visibleCount);
+  // Pendant la rédaction, le total des lignes déjà inscrites reste visible
+  // en bas de l'écran (le bloc des totaux n'apparaît qu'à la fin).
+  const writing = !empty && (!done || loading);
+  const running = writing ? computeTotals(lignes.slice(0, visibleCount), { noTva: isNoTva(brand?.vatRegime) }) : null;
+  const shownCount = writing ? lignes.slice(0, visibleCount).filter(l => l.type_ligne === "ouvrage").length : ouvrages;
+  const shownHt = writing ? running.ht : ht;
 
   return (
     <article className="zb-bordereau" aria-label="Devis en cours"
@@ -212,10 +235,10 @@ export default function Bordereau({
         .zb-bordereau input::placeholder, .zb-bordereau textarea::placeholder { color: ${ZB.ink3}; opacity: 1; }
         @media (hover: hover) { .zb-line:hover { background: ${ZB.paper} !important; } }
         @keyframes zbInscribe { from { opacity: 0; clip-path: inset(0 100% 0 0); } to { opacity: 1; clip-path: inset(0 0 0 0); } }
-        @keyframes zbInk { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
         .zb-line { animation: zbInscribe .32s cubic-bezier(.2,.7,.2,1) both; }
-        .zb-ink-line { animation: zbInk 1.6s ease-in-out infinite; animation-delay: calc(var(--i) * 180ms); }
-        @media (prefers-reduced-motion: reduce) { .zb-line, .zb-ink-line { animation: none; } }
+        @keyframes zbWrite { 0% { transform: scaleX(.05); } 70%, 100% { transform: scaleX(1); } }
+        .zb-pen-line { display: block; width: 58%; height: 2px; margin-bottom: 14px; background: ${ZB.ink3}; transform-origin: left; animation: zbWrite 1.8s cubic-bezier(.2,.7,.2,1) infinite; }
+        @media (prefers-reduced-motion: reduce) { .zb-line, .zb-pen-line { animation: none; } }
       `}</style>
 
       {/* En-tête du document */}
@@ -233,13 +256,14 @@ export default function Bordereau({
       </header>
 
       <label htmlFor="zb-objet" className="zb-sr">Objet du devis</label>
-      <input id="zb-objet" value={objet} onChange={e => onObjetChange(e.target.value)}
+      <textarea id="zb-objet" ref={objetRef} rows={1} value={objet} onChange={e => onObjetChange(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } }}
         placeholder={empty ? "Objet du devis" : "Ajoute un objet"}
-        style={{ display: "block", width: "100%", margin: "16px 0 0", padding: "4px 0", border: "none", borderBottom: `1px solid transparent`,
+        style={{ display: "block", width: "100%", margin: "16px 0 0", padding: "4px 0", border: "none", resize: "none", overflow: "hidden",
           background: "none", fontFamily: "inherit", fontSize: 21, fontWeight: 700, lineHeight: 1.25, color: ZB.ink, outline: "none" }}/>
       {!empty && (
         <div style={{ fontSize: 13, color: ZB.ink2, marginTop: 4, ...NUM }}>
-          {ouvrages} ligne{ouvrages > 1 ? "s" : ""}{ht > 0 ? ` · ${fmt(ht)} HT` : ""}
+          {shownCount} ligne{shownCount > 1 ? "s" : ""}{shownHt > 0 ? ` · ${fmt(shownHt)} HT` : ""}
         </div>
       )}
 
@@ -264,6 +288,11 @@ export default function Bordereau({
               </button>
             ))}
           </div>
+          <div aria-hidden="true" style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 14,
+            paddingTop: 10, paddingBottom: 8, borderTop: `2px solid ${ZB.ink}`, borderBottom: `3px double ${ZB.ink}`, color: ZB.ink3, ...NUM }}>
+            <span style={{ fontSize: 15, fontWeight: 700 }}>Total TTC</span>
+            <span style={{ fontSize: 22, fontWeight: 700 }}>0,00 €</span>
+          </div>
           {historySummary && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 16, fontSize: 13, color: ZB.ink2 }}>
               <span style={{ color: ZB.stamp, display: "inline-flex" }}>{ICON.book}</span>
@@ -283,8 +312,8 @@ export default function Bordereau({
             <section key={s.lot?.id || `s${si}`} aria-label={s.lot?.designation || "Prestations"}>
               {s.lot && (
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "baseline", padding: "16px 0 6px", borderBottom: `1px solid ${ZB.rule}` }}>
-                  <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: ZB.ink }}>{s.lot.designation}</h3>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: ZB.ink2, ...NUM }}>{fmt(s.subtotal)}</span>
+                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, letterSpacing: ".04em", textTransform: "uppercase", color: ZB.ink }}>{s.lot.designation}</h3>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: ZB.ink, ...NUM }}>{fmt(s.subtotal)}</span>
                 </div>
               )}
               {s.rows.map(({ l, idx }) => editingId === l.id ? (
@@ -305,6 +334,14 @@ export default function Bordereau({
               {ICON.plus} Ajouter une ligne
             </button>
           )}
+        </div>
+      )}
+
+      {writing && (
+        <div style={{ position: "sticky", bottom: 0, zIndex: 1, margin: "0 -18px", padding: "12px 18px",
+          display: "flex", justifyContent: "space-between", alignItems: "baseline", background: ZB.sheet, borderTop: `2px solid ${ZB.ink}` }}>
+          <span style={{ fontSize: 15, fontWeight: 700 }}>{franchise ? "Total" : "Total TTC"} <span style={{ fontWeight: 500, color: ZB.ink2 }}>en cours</span></span>
+          <span style={{ fontSize: 22, fontWeight: 700, ...NUM }}>{fmt(running.ttc)}</span>
         </div>
       )}
 

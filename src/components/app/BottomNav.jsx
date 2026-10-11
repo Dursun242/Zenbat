@@ -250,9 +250,8 @@ function AgentCtaTab({ label, icon, active, onClick, plan, quotaReached, showNud
           display: "inline-flex",
           alignItems: "center", justifyContent: "center",
           transform: "translateY(-8px) scale(1.1)",
-          boxShadow: active
-            ? "0 8px 22px rgba(164,70,31,.55), 0 0 0 3px rgba(164,70,31,.28)"
-            : "0 4px 14px rgba(164,70,31,.4)",
+          // Pas de halo : un anneau de la couleur de la barre détache le bouton.
+          boxShadow: `0 0 0 3px ${BG}`,
           transition: "box-shadow .18s ease, transform .15s ease",
         }}>
         {showNudge && (
@@ -292,7 +291,6 @@ function AgentCtaTab({ label, icon, active, onClick, plan, quotaReached, showNud
           borderRadius: 10,
           whiteSpace: "nowrap",
           pointerEvents: "none",
-          boxShadow: "0 6px 20px rgba(164,70,31,.45)",
           animation: "bn-nudge-bob 1.8s ease-in-out infinite",
           zIndex: 2,
         }}>

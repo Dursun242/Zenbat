@@ -332,17 +332,17 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
         setLignes(resolvedLignes);
 
         if (validationResult.residual_issues?.length > 0) {
-          residualWarning = "\n\n⚠️ Devis vérifié automatiquement : des écarts de marché subsistent. Vous pouvez les ajuster manuellement.";
+          residualWarning = "\n\nDevis vérifié automatiquement : quelques prix restent éloignés du marché, tu peux les ajuster.";
         }
 
         const missing = Array.isArray(parsed.champs_a_completer) ? parsed.champs_a_completer.filter(Boolean) : [];
         if (missing.length > 0) {
-          residualWarning += "\n\n📋 À compléter :\n" + missing.map(m => `• ${m}`).join("\n");
+          residualWarning += "\n\nÀ compléter :\n" + missing.map(m => `• ${m}`).join("\n");
         }
 
         const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions.filter(Boolean) : [];
         if (suggestions.length > 0) {
-          residualWarning += "\n\n💡 À envisager :\n" + suggestions.map(s => `• ${s}`).join("\n");
+          residualWarning += "\n\nÀ envisager :\n" + suggestions.map(s => `• ${s}`).join("\n");
         }
 
         // Tout premier devis jamais généré sur ce compte :
@@ -356,7 +356,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
         }
       }
 
-      const finalText = (txt || (hasDevis ? TX.linesAdded : "Je n'ai pas compris, pouvez-vous reformuler ?")) + residualWarning;
+      const finalText = (txt || (hasDevis ? TX.linesAdded : "Je n'ai pas compris, tu peux reformuler ?")) + residualWarning;
       updateAssistant(finalText, hasDevis);
 
       // Détection best-effort des interactions "négatives" pour analyse admin.
@@ -423,11 +423,11 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       } else if (apiError?.includes("Période d'essai")) {
         msg = apiError;
       } else if (/rate.?limit|tokens per minute|too many requests/i.test(apiError || "") || apiError?.includes("429")) {
-        msg = "L'assistant est très sollicité, réessayez dans quelques secondes.";
+        msg = "L'assistant est très sollicité. Réessaie dans quelques secondes.";
       } else if (apiError?.includes("55 secondes") || apiError?.includes("504")) {
-        msg = "La demande a pris trop de temps. Réessayez avec une description plus courte.";
+        msg = "La demande a pris trop de temps. Réessaie avec une description plus courte.";
       } else if (apiError?.includes("529") || apiError?.includes("overloaded") || apiError?.includes("Upstream")) {
-        msg = "Les serveurs IA sont surchargés en ce moment. Réessayez dans 30 secondes.";
+        msg = "Les serveurs de l'IA sont surchargés. Réessaie dans 30 secondes, ton texte est toujours là.";
       } else {
         msg = e instanceof ClaudeApiError ? TX.errApi : TX.errGeneral;
       }

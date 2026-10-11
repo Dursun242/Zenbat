@@ -27,6 +27,18 @@ describe("Bordereau (écran Agent IA)", () => {
     expect(onExample).toHaveBeenCalledWith("Rénovation salle de bain 6 m²");
   });
 
+  it("sans lignes de lot : regroupe d'après le champ lot des ouvrages", () => {
+    const parLot = [
+      { id: "a", type_ligne: "ouvrage", lot: "Démolition", designation: "Dépose faïence", unite: "m²", quantite: 10, prix_unitaire: 20, tva_rate: 10 },
+      { id: "b", type_ligne: "ouvrage", lot: "Démolition", designation: "Évacuation gravats", unite: "forfait", quantite: 1, prix_unitaire: 150, tva_rate: 10 },
+      { id: "c", type_ligne: "ouvrage", lot: "Plomberie", designation: "Douche", unite: "u", quantite: 1, prix_unitaire: 900, tva_rate: 10 },
+    ];
+    render(<Bordereau {...base} lignes={parLot} visibleCount={3} ht={1250} ttc={1375}
+      tvaRows={[{ rate: 10, base: 1250, montant: 125 }]}/>);
+    expect(screen.getByRole("heading", { name: "Démolition" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Plomberie" })).toBeInTheDocument();
+  });
+
   it("rempli : lot avec sous-total, total TTC et action principale", () => {
     const onSave = vi.fn();
     render(<Bordereau {...base} lignes={lignes} visibleCount={3} ht={890} ttc={979}

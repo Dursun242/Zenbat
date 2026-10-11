@@ -21,7 +21,7 @@ OWN-WORLD : papier #FBFAF7, encre #1A1612, secondaire #5C544B, filets #D9D2C5, u
 
 STORY : l'artisan comprend en un regard que ce qu'il dicte devient des lignes chiffrées ; il voit le total monter ; il corrige d'un appui ; il enregistre.
 
-FIRST VIEWPORT : en haut, l'en-tête du bordereau (entreprise, objet modifiable, nombre de lignes) ; au centre, les lots en sections tracées, sous-total de lot dans la marge droite, lignes Désignation / Qté / PU / Total ; en bas, le total TTC en grand puis l'action « Enregistrer le devis » ; collée au-dessus de la barre de navigation, la barre de dictée permanente : champ « Dicte ou écris tes travaux… », langue, gros bouton micro. Vide : bordereau vierge réglé et trois exemples du métier.
+FIRST VIEWPORT : en haut, l'en-tête du bordereau (entreprise, objet modifiable, nombre de lignes) ; au centre, les lots en sections tracées, sous-total de lot dans la marge droite, deux colonnes Désignation / Montant HT, chaque ligne portant en dessous « qté unité × PU · TVA » (quatre colonnes chiffrées ne tiennent pas lisiblement à 390 px) ; pendant la rédaction, une bande « Total TTC en cours » reste collée en bas de la feuille ; en bas, le total TTC en grand puis l'action « Enregistrer le devis » ; collée au-dessus de la barre de navigation, la barre de dictée permanente : champ « Dicte ou écris tes travaux… », langue, gros bouton micro. Vide : bordereau vierge réglé et trois exemples du métier.
 
 FORM : direction B « Bordereau » épinglée par l'utilisateur, première de la liste présentée ; seed key : aucune (direction épinglée).
 Signature move : les lignes s'inscrivent une à une dans le bordereau pendant la rédaction, et le total de lot se met à jour dans la marge.
