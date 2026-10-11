@@ -8,7 +8,7 @@ import { getToken } from "../lib/getToken.js";
 import { useAuth } from "../lib/auth.jsx";
 import { useSpeechRecognition } from "../hooks/useSpeechRecognition.js";
 import { useKeyboardInset } from "../hooks/useKeyboardInset.js";
-import { NAV_RESERVED_CSS } from "./app/BottomNav.jsx";
+import { ABOVE_NAV_CSS } from "./app/BottomNav.jsx";
 import { buildAgentGreeting, quickStartsFor } from "../lib/agentIA/sectors.js";
 import { buildSystemPrompt } from "../lib/agentIA/prompt.js";
 import { buildPriceHints } from "../lib/coherence/priceHints.js";
@@ -713,7 +713,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       <div ref={inputAreaRef} className="agent-input-bar" style={{
         position: "fixed",
         left: 0, right: 0,
-        bottom: keyboardInset > 0 ? `${keyboardInset}px` : NAV_RESERVED_CSS,
+        bottom: keyboardInset > 0 ? `${keyboardInset}px` : ABOVE_NAV_CSS,
         padding: "10px 14px 12px",
         background: "white",
         borderTop: "1px solid #F0EBE3",

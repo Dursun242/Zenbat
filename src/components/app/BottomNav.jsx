@@ -44,6 +44,12 @@ const NAV_CORE_HEIGHT = 64;
 export const SAFE_BOTTOM_CSS = "min(env(safe-area-inset-bottom, 0px), 34px)";
 export const NAV_RESERVED_CSS =
   `calc(${NAV_CORE_HEIGHT}px + ${SAFE_BOTTOM_CSS})`;
+// Écart à compenser quand iOS raccourcit la zone d'affichage (cf.
+// lib/iosViewportGap.js, variable posée par App.jsx) : les éléments ancrés
+// en bas redescendent d'autant pour toucher le vrai bas de l'écran.
+export const IOS_GAP_CSS = "var(--ios-viewport-gap, 0px)";
+// `bottom` d'un élément fixe posé juste au-dessus de la barre du bas.
+export const ABOVE_NAV_CSS = `calc(${NAV_RESERVED_CSS} - ${IOS_GAP_CSS})`;
 
 const BRAND     = "#22c55e";
 const BG        = "#1A1612";
@@ -327,7 +333,7 @@ export default function BottomNav({
       aria-hidden={!visible}
       style={{
         position: "fixed",
-        left: 0, right: 0, bottom: 0,
+        left: 0, right: 0, bottom: `calc(-1 * ${IOS_GAP_CSS})`,
         boxSizing: "border-box",
         height: NAV_RESERVED_CSS,
         paddingBottom: SAFE_BOTTOM_CSS,

@@ -7,7 +7,7 @@
 //   onClose — () => void, fermeture (tap overlay ou bouton)
 //   actions — [{ id, label, hint?, icon?, onClick }]
 import { useEffect } from "react";
-import { SAFE_BOTTOM_CSS } from "./BottomNav.jsx";
+import { SAFE_BOTTOM_CSS, IOS_GAP_CSS } from "./BottomNav.jsx";
 
 const BRAND = "#22c55e";
 
@@ -49,7 +49,7 @@ export default function BottomNavActionSheet({ open, onClose, actions = [] }) {
             style={{
               position: "fixed",
               left: 16, right: 16,
-              bottom: `calc(80px + ${SAFE_BOTTOM_CSS})`,
+              bottom: `calc(80px + ${SAFE_BOTTOM_CSS} - ${IOS_GAP_CSS})`,
               background: "white",
               borderRadius: 18,
               boxShadow: "0 20px 60px rgba(0,0,0,.35)",
