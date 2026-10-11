@@ -19,6 +19,8 @@ colors:
   danger-soft: "#FBE9E7"
   warn-ochre: "#8A5A00"
   warn-ochre-soft: "#FBF0D9"
+  on-ink: "#F3F0E9"
+  on-ink-2: "#A89E92"
 typography:
   total:
     fontFamily: "Archivo Variable, Archivo, system-ui, sans-serif"
@@ -113,7 +115,7 @@ L'application parle à l'artisan (tutoiement) ; les documents qu'il envoie reste
 Papier chaud, encre brun-noir, une terre cuite pour agir, un vert tampon pour ce qui est acquis.
 
 ### Primary
-- **Terre cuite** (terre-cuite) : l'action principale de l'écran (« Enregistrer le devis »), le micro au repos, les liens d'action (« Ajouter une ligne », « Historique »), la sélection, l'anneau de focus. Survol : terre cuite profonde. Fond de sélection : terre cuite pâle.
+- **Terre cuite** (terre-cuite) : l'action principale de l'écran (« Enregistrer le devis »), le micro au repos, les liens d'action (« Ajouter une ligne », « Historique »), la sélection, l'anneau de focus, l'onglet actif et les pastilles de compteur (« à traiter »). Survol : terre cuite profonde. Fond de sélection : terre cuite pâle.
 
 ### Secondary
 - **Vert tampon** (stamp-green) : état acquis (devis signé, facture payée, retour enregistré, « Merci »). Jamais pour une action.
@@ -122,7 +124,8 @@ Papier chaud, encre brun-noir, une terre cuite pour agir, un vert tampon pour ce
 - **Papier** (paper) : fond de toutes les pages et de la barre de dictée.
 - **Papier gris** (paper-2) : second plan (survol d'une ligne, panneaux).
 - **Feuille** (sheet) : le document posé sur le papier, les champs.
-- **Encre** (ink) : texte, montants, filet sous les colonnes, double trait du total, barre du haut et du bas.
+- **Encre** (ink) : texte, montants, filet sous les colonnes et sous la barre du haut, double trait du total, barre du bas et barre latérale (ordinateur).
+- **Sur encre** (on-ink) et **sur encre 2** (on-ink-2) : texte actif et texte au repos sur les barres encre.
 - **Encre 2** (ink-2) : texte secondaire (date, sous-ligne « qté × PU », libellés de colonnes).
 - **Encre 3** (ink-3) : indications et valeurs vides (placeholder, total à 0,00 €, trait de plume).
 - **Filet** (rule) et **filet léger** (rule-soft) : séparations de lots et de lignes, bordures de champs.
@@ -133,6 +136,8 @@ Papier chaud, encre brun-noir, une terre cuite pour agir, un vert tampon pour ce
 
 ### Named Rules
 **The One Action Rule.** La terre cuite marque une seule action principale par écran ; les autres actions sont du texte terre cuite ou de l'encre.
+
+**The Red Means Wrong Rule.** Le rouge signale une erreur, une écoute en cours ou une suppression à confirmer, jamais un simple compteur ; un compteur « à traiter » est une pastille terre cuite.
 
 **The Interface Is Not The Brand Rule.** La couleur de l'artisan (brand.color) reste sur ses PDF et sa page de signature client ; l'interface garde la terre cuite.
 
@@ -186,7 +191,11 @@ Coins doux et sobres : 8px pour la feuille et les champs, 10px pour les boutons 
 - **Error / Active:** bordure rouge pendant l'écoute du micro.
 
 ### Navigation
-- Barre du bas encre, onglets en ivoire atténué, actif en blanc avec indicateur terre cuite ; bouton central « Agent IA » en disque terre cuite cerné d'un anneau de la couleur de la barre, sans halo.
+- **Barre du haut :** fond papier, titre de l'écran en 22px/700 à gauche (« Devis », « Factures »…), indicateur d'enregistrement (vert tampon une fois enregistré) et bouton menu 44px à droite ; filet encre de 2px dessous. En PWA iOS, une bande encre de la hauteur de la barre d'état reste au-dessus (l'heure s'écrit en blanc). Les écrans ne répètent pas ce titre.
+- **Bandeau de quota (gratuit) :** papier gris sous la barre du haut, « N devis sur 5 cette semaine. » en encre 2 et lien terre cuite « Passer en Pro » ; fond rouge pâle une fois la limite atteinte.
+- **Barre du bas (téléphone) :** 5 onglets encre (Accueil, Clients, Agent IA, Devis, Factures), libellés 12px sur encre 2, actif en blanc avec un trait terre cuite qui glisse en haut ; bouton central « Agent IA » en disque terre cuite cerné d'un anneau de la couleur de la barre, sans halo ; pastilles de compteur terre cuite.
+- **Barre latérale (ordinateur, 1024px et plus) :** même encre, rangées de 44px, actif en blanc gras souligné terre cuite sur un fond légèrement éclairci, pastilles terre cuite.
+- **Menu :** panneau feuille avec l'ombre des menus flottants, rangées de 44px avec icône 22px, déconnexion en rouge.
 
 ### Bordereau (signature)
 La feuille du devis : en-tête (logo ou nom, « Devis · date », réglages de vérification des prix), objet modifiable, colonnes « Désignation / Montant HT », lots en capitales avec sous-total dans la marge, chaque ligne avec sa sous-ligne « qté unité × PU · TVA » et ouverte à l'édition d'un appui. Pendant la rédaction : lignes vierges réglées avec un trait de plume, puis les lignes s'inscrivent une à une (fondu de gauche à droite, 320ms) et les sous-totaux montent. Vide : trois exemples du métier comme lignes, total à 0,00 €.

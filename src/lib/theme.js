@@ -22,6 +22,8 @@ export const ZB = {
   dangerSoft: "#FBE9E7",
   warn:       "#8A5A00",
   warnSoft:   "#FBF0D9",
+  onInk:      "#F3F0E9",  // texte sur les barres encre
+  onInk2:     "#A89E92",  // texte secondaire sur les barres encre (6,6:1)
   font:       "var(--zb-font)",
 };
 

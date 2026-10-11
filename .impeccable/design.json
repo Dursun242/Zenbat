@@ -63,6 +63,16 @@
         "role": "semantic",
         "displayName": "Ocre « à chiffrer »",
         "canonical": "#8A5A00"
+      },
+      "on-ink": {
+        "role": "neutral",
+        "displayName": "Sur encre",
+        "canonical": "#F3F0E9"
+      },
+      "on-ink-2": {
+        "role": "neutral",
+        "displayName": "Sur encre 2",
+        "canonical": "#A89E92"
       }
     },
     "typographyMeta": {
@@ -115,6 +125,10 @@
       {
         "name": "document",
         "value": "760px"
+      },
+      {
+        "name": "sidebar",
+        "value": "1024px"
       }
     ]
   },
@@ -187,6 +201,11 @@
       {
         "name": "The Interface Is Not The Brand Rule",
         "body": "La couleur de l'artisan (brand.color) reste sur ses PDF et sa page de signature client ; l'interface garde la terre cuite.",
+        "section": "colors"
+      },
+      {
+        "name": "The Red Means Wrong Rule",
+        "body": "Le rouge signale une erreur, une écoute en cours ou une suppression à confirmer, jamais un simple compteur ; un compteur « à traiter » est une pastille terre cuite.",
         "section": "colors"
       },
       {
