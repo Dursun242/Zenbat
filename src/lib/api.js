@@ -398,11 +398,15 @@ export async function deleteDevis(id) {
 // =========================================================
 export async function listInvoices() {
   return withRetry(async () => {
-    const [{ data: inv, error: e1 }, { data: ls }] = await Promise.all([
+    // Lignes : uniquement les actives. replaceInvoiceLignes archive les
+    // anciennes (deleted_at) avant de réinsérer : sans ce filtre elles
+    // revenaient en double au rechargement.
+    const [{ data: inv, error: e1 }, { data: ls, error: e2 }] = await Promise.all([
       supabase.from('invoices').select('*').is('deleted_at', null).order('created_at', { ascending: false }),
-      supabase.from('lignes_invoices').select('*').order('position'),
+      supabase.from('lignes_invoices').select('*').is('deleted_at', null).order('position'),
     ])
     if (e1) throw e1
+    if (e2) throw e2
     const byInvoice = new Map()
     for (const l of ls || []) {
       if (!byInvoice.has(l.invoice_id)) byInvoice.set(l.invoice_id, [])
