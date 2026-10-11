@@ -205,6 +205,9 @@ Le devis se lit comme le document du client : le même bordereau que l'Agent IA 
 - **Tampon :** capitales 13px/800 espacées, double filet de 4px, penché de -3°. Encre 3 pour brouillon et remplacé, encre 2 pour envoyé, encre pour « À signer » et « Modifications demandées », vert tampon pour « Signé », rouge pour « Refusé ».
 - **Barre d'action :** collée en bas de l'écran (au pouce), une seule action terre cuite selon le statut : « Envoyer au client » (brouillon), « Relancer {client} » (envoyé, à signer), « Facturer » (signé). Envoyer, relancer et les statuts posés à la main passent par une confirmation dans la barre, qui nomme le destinataire et le montant TTC. Les actions rares sont dans le menu « ⋯ ».
 
+### Fiche facture
+Même bordereau et même barre d'action que la fiche devis. Tampon : Brouillon (encre 3), Émise puis Envoyée (encre 2), Payée (vert tampon), Impayée (rouge), Annulée (encre 3). Action principale selon l'état : « Émettre la facture » (brouillon ; la confirmation nomme le numéro, le TTC, le client et le verrouillage définitif, CGI art. 289), « Envoyer à {client} » (émise, pas encore envoyée), « Marquer comme payée » (envoyée). Un impayé se signale avec confirmation ; une facture émise ne s'annule pas, elle se corrige par un avoir (menu « ⋯ »). Les options de facturation (type d'opération, retenue de garantie, autoliquidation) ne s'affichent qu'au brouillon.
+
 ### Listes (registre)
 Devis, factures, clients et accueil partagent `src/components/ui/Register.jsx` : compteur en encre 2, filtres en onglets soulignés terre cuite (44px), lignes tracées sur une feuille (titre 15/600 sur deux lignes au plus, montant à droite en chiffres tabulaires, sous-ligne avec le statut en **petit tampon droit** : capitales 12px, filet de 1px, même code couleur que le tampon de la fiche). Les actions rares d'une ligne (dupliquer, supprimer) sont dans un menu « ⋯ » ; supprimer demande un second appui. Pas d'avatars ni de couleurs par type de client.
 
