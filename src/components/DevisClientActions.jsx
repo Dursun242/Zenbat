@@ -1,46 +1,43 @@
-// Section "Suivi client" dans DevisDetail.
-// Gère : envoi par email, copie du lien, audit log, panel de réponse aux négociations.
+// Suivi client d'un devis (fiche devis) : envoi par email, lien public,
+// demande de modification du client, historique.
+//
+// useDevisSuivi porte l'état et les appels ; NegotiationPanel et SuiviLog
+// l'affichent. DevisDetail place l'envoi dans sa zone d'action.
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase }  from '../lib/supabase.js'
 import { getToken }  from '../lib/getToken.js'
+import { fmt }       from '../lib/utils.js'
+import { ZB, NUM }   from '../lib/theme.js'
 
-const fmtEur = n => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n || 0)
-const fmtDT  = d => d ? new Date(d).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'
+const fmtDT = d => d ? new Date(d).toLocaleString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : '—'
 
 const AUDIT_LABELS = {
-  sent:             { icon: '✉',  label: 'Devis envoyé au client',      color: '#3b82f6' },
-  opened:           { icon: '👁', label: 'Consulté par le client',       color: '#6B6358' },
-  accepted:         { icon: '✅', label: 'Accepté',                       color: '#22c55e' },
-  refused:          { icon: '✗',  label: 'Refusé',                       color: '#ef4444' },
-  negotiation_sent: { icon: '↩',  label: 'Proposition client reçue',     color: '#f97316' },
-  artisan_responded:{ icon: '↪',  label: 'Réponse envoyée',              color: '#6b21a8' },
+  sent:              'Envoyé au client',
+  opened:            'Consulté par le client',
+  accepted:          'Signé par le client',
+  refused:           'Refusé par le client',
+  negotiation_sent:  'Demande de modification reçue',
+  artisan_responded: 'Réponse envoyée au client',
 }
 
-export default function DevisClientActions({ devis, client, onChange, onCreateIndice }) {
+export function useDevisSuivi({ devis, client, onChange }) {
   const [sending,    setSending]    = useState(false)
   const [sendErr,    setSendErr]    = useState(null)
+  const [sentTo,     setSentTo]     = useState(null)
   const [publicUrl,  setPublicUrl]  = useState(null)
   const [copied,     setCopied]     = useState(false)
   const [auditLog,   setAuditLog]   = useState(null)
   const [neg,        setNeg]        = useState(null)
-  const [negLoading, setNegLoading] = useState(false)
   const [artMsg,     setArtMsg]     = useState('')
   const [responding, setResponding] = useState(false)
-  const [creatingIndice, setCreatingIndice] = useState(false)
   const [respErr,    setRespErr]    = useState(null)
-  const [showLog,    setShowLog]    = useState(false)
 
-  // public_token est généré côté serveur à l'envoi : avant la 1ère envoi, il
-  // peut être null/undefined → on évite « .../d/undefined » qui mènerait
-  // nulle part. L'UI désactive les actions tant que baseUrl est vide.
-  const baseUrl = devis.public_token ? `${window.location.origin}/d/${devis.public_token}` : ""
+  // public_token est généré côté serveur au 1er envoi : avant, pas de lien.
+  const baseUrl = devis.public_token ? `${window.location.origin}/d/${devis.public_token}` : ''
 
-  // Charge l'audit log et la négociation en cours depuis Supabase (RLS artisan).
-  // try/catch englobant : si une des deux requêtes throw (réseau coupé, RLS
-  // refusée, etc.), on log + on retombe sur des états par défaut au lieu
-  // de laisser les anciennes valeurs en place — l'utilisateur ne voit pas
-  // un audit obsolète après un changement de statut.
+  // Audit + négociation en cours (RLS artisan). En cas d'échec, on retombe
+  // sur des états vides plutôt que de garder un historique obsolète.
   const loadAudit = useCallback(async () => {
     if (!devis.id) return
     try {
@@ -59,9 +56,8 @@ export default function DevisClientActions({ devis, client, onChange, onCreateIn
 
   useEffect(() => { loadAudit() }, [loadAudit])
 
-  // ── Envoyer le devis au client ────────────────────────────────────────
   const send = async () => {
-    if (!client?.email) { setSendErr("Le client n'a pas d'email renseigné."); return }
+    if (!client?.email) { setSendErr("Ce client n'a pas d'email.") ; return false }
     setSending(true); setSendErr(null)
     try {
       const token = await getToken()
@@ -71,31 +67,32 @@ export default function DevisClientActions({ devis, client, onChange, onCreateIn
         body: JSON.stringify({ action: 'send', devis_id: devis.id }),
       })
       const data = await res.json()
-      if (!res.ok) { setSendErr(data.error); return }
+      if (!res.ok) { setSendErr(data.error || "L'envoi a échoué. Réessaie."); return false }
       setPublicUrl(data.publicUrl)
-      onChange({ ...devis, statut: 'envoye' })
+      setSentTo(client.email)
+      onChange({ ...devis, statut: devis.statut === 'brouillon' ? 'envoye' : devis.statut })
       loadAudit()
-    } catch { setSendErr('Erreur réseau') } finally { setSending(false) }
+      return true
+    } catch {
+      setSendErr("Pas de connexion : le devis n'est pas parti. Réessaie.")
+      return false
+    } finally { setSending(false) }
   }
 
   const copyLink = async () => {
-    // navigator.clipboard peut rejeter : permission refusée, contexte non
-    // sécurisé (http://), navigateur ancien, etc. Sans catch, l'utilisateur
-    // croyait que la copie avait marché et collait du contenu obsolète
-    // ailleurs.
+    // navigator.clipboard peut rejeter (permission, http://, vieux navigateur).
     try {
       await navigator.clipboard.writeText(publicUrl || baseUrl)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (e) {
-      setSendErr("Copie indisponible — sélectionnez et copiez le lien à la main.")
+      setSendErr('Copie impossible ici : ouvre le PDF et partage-le depuis là.')
       if (import.meta.env.DEV) console.warn('[copyLink]', e?.message || e)
     }
   }
 
-  // ── Répondre à une négociation ─────────────────────────────────────────
   const respond = async (response) => {
-    if (responding) return
+    if (responding || !neg) return
     setResponding(true); setRespErr(null)
     try {
       const token = await getToken()
@@ -111,7 +108,7 @@ export default function DevisClientActions({ devis, client, onChange, onCreateIn
         }),
       })
       const data = await res.json()
-      if (!res.ok) { setRespErr(data.error); return }
+      if (!res.ok) { setRespErr(data.error || 'La réponse n\'est pas partie. Réessaie.'); return }
       setNeg(null); setArtMsg('')
       if (response === 'accept_client_changes') {
         onChange({ ...devis, statut: 'accepte', montant_ht: data.newHt ?? devis.montant_ht })
@@ -119,164 +116,130 @@ export default function DevisClientActions({ devis, client, onChange, onCreateIn
         onChange({ ...devis, statut: 'envoye' })
       }
       loadAudit()
-    } catch { setRespErr('Erreur réseau') } finally { setResponding(false) }
+    } catch { setRespErr('Pas de connexion : la réponse n\'est pas partie. Réessaie.') } finally { setResponding(false) }
   }
 
-  const isSent   = ['envoye', 'en_negociation', 'en_signature', 'accepte', 'refuse'].includes(devis.statut)
-  const canSend  = ['brouillon', 'envoye'].includes(devis.statut) && client?.email
-  const cloture  = ['accepte', 'refuse', 'remplace'].includes(devis.statut)
+  const lastSent = [...(auditLog || [])].reverse().find(e => e.event === 'sent')
+  const hasLink = !!(publicUrl || baseUrl)
 
+  return {
+    sending, sendErr, sentTo, send, copyLink, copied, hasLink, lastSent,
+    auditLog, neg, artMsg, setArtMsg, respond, responding, respErr,
+  }
+}
+
+const btn = {
+  minHeight: 44, padding: '0 16px', borderRadius: 10, fontFamily: 'inherit', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+}
+
+// Demande de modification du client, en attente de réponse.
+export function NegotiationPanel({ devis, suivi, onCreateIndice }) {
+  const { neg, artMsg, setArtMsg, respond, responding, respErr } = suivi
+  const [creating, setCreating] = useState(false)
+  if (!neg) return null
+  const lignesMap = new Map((devis.lignes || []).map(l => [l.id, l]))
+  const changes   = Array.isArray(neg.line_changes) ? neg.line_changes : []
+  const busy = responding || creating
   return (
-    <div style={{ margin: '12px 0' }}>
+    <section aria-labelledby="neg-title" style={{ background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderTop: `3px solid ${ZB.accent}`, borderRadius: 8, padding: '16px 18px', marginBottom: 16 }}>
+      <h2 id="neg-title" style={{ margin: 0, fontSize: 17, fontWeight: 700, color: ZB.ink }}>
+        Le client demande des modifications{neg.round > 1 ? ` (tour ${neg.round})` : ''}
+      </h2>
+      <p style={{ margin: '6px 0 12px', fontSize: 15, color: ZB.ink2, lineHeight: 1.45 }}>
+        Adapte le devis dans un nouvel indice, ou refuse sa proposition.
+      </p>
 
-      {/* ── Négociation en attente ── */}
-      {neg && !cloture && (() => {
-        // Map id → ligne pour afficher les désignations dans la liste
-        // des changements (sans ça l'artisan ne sait pas QUELLES lignes
-        // le client veut retirer ou ajuster).
-        const lignesMap = new Map((devis.lignes || []).map(l => [l.id, l]))
-        const changes   = Array.isArray(neg.line_changes) ? neg.line_changes : []
-
-        return (
-        <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 14, padding: 16, marginBottom: 12 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: '#c2410c', marginBottom: 4 }}>
-            🔄 Demande de modification du client — Round {neg.round}
-          </div>
-          <div style={{ fontSize: 12, color: '#9a3412', marginBottom: 12, lineHeight: 1.5 }}>
-            Le client propose les changements ci-dessous. À vous d'adapter le devis (créez un nouvel indice avec vos ajustements) ou de refuser sa proposition.
-          </div>
-
-          {changes.length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#9A8E82', textTransform: 'uppercase', marginBottom: 6, letterSpacing: '0.4px' }}>Modifications demandées</div>
-              {changes.map((c, i) => {
-                const ligne       = lignesMap.get(c.ligne_id)
-                const designation = ligne?.designation || `Ligne #${c.ligne_id?.slice?.(0, 6) || '?'}`
-                const unite       = ligne?.unite ? ` ${ligne.unite}` : ''
-                const isRemove    = c.action === 'remove'
-                return (
-                  <div key={i} style={{ background: 'white', borderRadius: 10, padding: '10px 12px', marginBottom: 6, border: '1px solid #fed7aa' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <span style={{ display: 'inline-block', background: isRemove ? '#fee2e2' : '#fff7ed', color: isRemove ? '#991b1b' : '#c2410c', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, letterSpacing: '0.4px' }}>
-                        {isRemove ? 'RETIRER' : 'AJUSTER'}
-                      </span>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#1A1612', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{designation}</span>
-                    </div>
-                    {!isRemove && (
-                      <div style={{ fontSize: 12, color: '#555', marginLeft: 2 }}>
-                        Quantité : <strong>{ligne?.quantite ?? '?'}{unite}</strong> → <strong style={{ color: '#c2410c' }}>{c.new_qty}{unite}</strong>
-                      </div>
-                    )}
-                    {c.comment && (
-                      <div style={{ fontSize: 12, color: '#6B6358', fontStyle: 'italic', marginTop: 4, marginLeft: 2 }}>
-                        « {c.comment} »
-                      </div>
-                    )}
+      {changes.length > 0 && (
+        <ul style={{ listStyle: 'none', margin: '0 0 12px', padding: 0, borderTop: `1px solid ${ZB.rule}` }}>
+          {changes.map((c, i) => {
+            const ligne = lignesMap.get(c.ligne_id)
+            const designation = ligne?.designation || 'Ligne supprimée depuis'
+            const unite = ligne?.unite ? ` ${ligne.unite}` : ''
+            const isRemove = c.action === 'remove'
+            return (
+              <li key={i} style={{ padding: '10px 0', borderBottom: `1px solid ${ZB.ruleSoft}` }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: ZB.ink }}>
+                  <span style={{ color: isRemove ? ZB.danger : ZB.accent }}>{isRemove ? 'Retirer' : 'Ajuster'} : </span>{designation}
+                </div>
+                {!isRemove && (
+                  <div style={{ fontSize: 14, color: ZB.ink2, marginTop: 2, ...NUM }}>
+                    Quantité {ligne?.quantite ?? '?'}{unite} → <strong style={{ color: ZB.ink }}>{c.new_qty}{unite}</strong>
                   </div>
-                )
-              })}
-            </div>
-          )}
+                )}
+                {c.comment && <div style={{ fontSize: 14, color: ZB.ink2, marginTop: 2 }}>« {c.comment} »</div>}
+              </li>
+            )
+          })}
+        </ul>
+      )}
 
-          {neg.budget_target && (
-            <div style={{ background: 'white', borderRadius: 10, padding: '10px 12px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #fed7aa' }}>
-              <span style={{ fontSize: 12, color: '#6B6358' }}>Budget cible client</span>
-              <strong style={{ fontSize: 14, color: '#1A1612' }}>{fmtEur(neg.budget_target)} HT</strong>
-            </div>
-          )}
-
-          {neg.message && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#9A8E82', textTransform: 'uppercase', marginBottom: 6, letterSpacing: '0.4px' }}>Message du client</div>
-              <div style={{ fontSize: 13, color: '#1A1612', background: 'white', borderRadius: 10, padding: '10px 12px', border: '1px solid #fed7aa', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
-                {neg.message}
-              </div>
-            </div>
-          )}
-
-          <textarea
-            value={artMsg} onChange={e => setArtMsg(e.target.value)} rows={2}
-            placeholder="Message au client (optionnel — envoyé par email si vous refusez)"
-            style={{ width: '100%', padding: '8px 12px', borderRadius: 10, border: '1px solid #fed7aa', fontSize: 12, resize: 'vertical', marginBottom: 10, boxSizing: 'border-box' }}
-          />
-
-          {respErr && <div style={{ color: '#ef4444', fontSize: 12, marginBottom: 8 }}>{respErr}</div>}
-
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => respond('refuse_client_changes')} disabled={responding}
-              style={{ flex: 1, padding: '9px', borderRadius: 10, border: '1.5px solid #ef4444', background: 'white', color: '#ef4444', fontWeight: 700, fontSize: 12, cursor: responding ? 'default' : 'pointer', opacity: responding ? 0.6 : 1 }}>
-              ✗ Refuser
-            </button>
-            {onCreateIndice && (
-              <button onClick={async () => {
-                  if (creatingIndice || responding) return
-                  setCreatingIndice(true)
-                  try { await onCreateIndice(devis.id) } finally { setCreatingIndice(false) }
-                }} disabled={responding || creatingIndice}
-                style={{ flex: 2, padding: '9px', borderRadius: 10, border: 'none', background: '#6b21a8', color: 'white', fontWeight: 700, fontSize: 12, cursor: (responding || creatingIndice) ? 'default' : 'pointer', opacity: (responding || creatingIndice) ? 0.6 : 1 }}>
-                {creatingIndice ? '…' : '✦ Créer un nouvel indice'}
-              </button>
-            )}
-          </div>
-        </div>
-        )
-      })()}
-
-      {/* ── Bouton d'envoi ── */}
-      {!cloture && (
-        <div style={{ background: 'white', borderRadius: 12, padding: '10px 12px', border: '1px solid #E8E2D8', marginBottom: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#9A8E82', textTransform: 'uppercase', letterSpacing: '0.5px', flexShrink: 0 }}>Suivi</span>
-            {client?.email
-              ? <a href={`mailto:${client.email}`} style={{ fontSize: 12, color: '#1d4ed8', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: 'none' }}>✉ {client.email}</a>
-              : <span style={{ fontSize: 12, color: '#f97316' }}>⚠ Pas d'email</span>
-            }
-            {canSend && (
-              <button onClick={send} disabled={sending}
-                style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: '#1d4ed8', color: 'white', fontWeight: 700, fontSize: 11, cursor: 'pointer', opacity: sending ? 0.7 : 1, flexShrink: 0 }}>
-                {sending ? 'Envoi…' : isSent ? '✉ Renvoyer' : '✉ Envoyer'}
-              </button>
-            )}
-            {(isSent || devis.public_token) && (
-              <button onClick={copyLink}
-                style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #E8E2D8', background: 'white', color: copied ? '#22c55e' : '#6B6358', fontWeight: 600, fontSize: 11, cursor: 'pointer', flexShrink: 0 }}>
-                {copied ? '✓ Copié' : '🔗 Lien'}
-              </button>
-            )}
-          </div>
-          {sendErr && <div style={{ fontSize: 11, color: '#ef4444', marginTop: 6 }}>{sendErr}</div>}
+      {neg.budget_target && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '8px 0', marginBottom: 8, borderBottom: `1px solid ${ZB.ruleSoft}` }}>
+          <span style={{ fontSize: 14, color: ZB.ink2 }}>Budget visé par le client</span>
+          <strong style={{ fontSize: 16, color: ZB.ink, ...NUM }}>{fmt(neg.budget_target)} HT</strong>
         </div>
       )}
 
-      {/* ── Audit log ── */}
-      {auditLog && auditLog.length > 0 && (
-        <div style={{ background: 'white', borderRadius: 14, border: '1px solid #E8E2D8', overflow: 'hidden' }}>
-          <button onClick={() => setShowLog(s => !s)}
-            style={{ width: '100%', padding: '10px 14px', background: 'none', border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#9A8E82', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            <span>Historique de suivi</span>
-            <span style={{ fontSize: 10 }}>{showLog ? '▲' : '▼'}</span>
+      {neg.message && (
+        <blockquote style={{ margin: '0 0 12px', padding: '10px 12px', background: ZB.paper, borderRadius: 8, fontSize: 15, color: ZB.ink, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+          {neg.message}
+        </blockquote>
+      )}
+
+      <label htmlFor="neg-msg" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: ZB.ink2, marginBottom: 6 }}>
+        Message au client (facultatif, envoyé par mail si tu refuses)
+      </label>
+      <textarea id="neg-msg" value={artMsg} onChange={e => setArtMsg(e.target.value)} rows={2}
+        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 8, border: `1px solid ${ZB.rule}`, fontFamily: 'inherit', fontSize: 16, resize: 'vertical', marginBottom: 12 }}/>
+
+      {respErr && <div role="alert" style={{ color: ZB.danger, fontSize: 14, marginBottom: 8 }}>{respErr}</div>}
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <button type="button" onClick={() => respond('refuse_client_changes')} disabled={busy}
+          style={{ ...btn, background: 'none', border: `1px solid ${ZB.rule}`, color: ZB.ink, opacity: busy ? 0.6 : 1 }}>
+          Refuser sa proposition
+        </button>
+        {onCreateIndice && (
+          <button type="button" disabled={busy} onClick={async () => {
+              setCreating(true)
+              try { await onCreateIndice(devis.id) } finally { setCreating(false) }
+            }}
+            style={{ ...btn, border: 'none', background: ZB.accent, color: '#fff', opacity: busy ? 0.6 : 1 }}>
+            {creating ? 'Création…' : 'Créer un nouvel indice'}
           </button>
-          {showLog && (
-            <div style={{ padding: '0 14px 12px', borderTop: '1px solid #F0EBE3' }}>
-              {auditLog.map((e, i) => {
-                const info = AUDIT_LABELS[e.event] || { icon: '·', label: e.event, color: '#9A8E82' }
-                return (
-                  <div key={i} style={{ display: 'flex', gap: 8, padding: '6px 0', borderBottom: i < auditLog.length - 1 ? '1px solid #F5F0E8' : 'none', fontSize: 12 }}>
-                    <span style={{ color: info.color, fontSize: 14, width: 20, textAlign: 'center' }}>{info.icon}</span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, color: '#1A1612' }}>{info.label}
-                        {e.meta?.client_name ? ` — ${e.meta.client_name}` : ''}
-                        {e.meta?.reason ? <span style={{ color: '#6B6358', fontWeight: 400 }}> · "{e.meta.reason}"</span> : ''}
-                      </div>
-                      <div style={{ color: '#9A8E82', fontSize: 10 }}>{fmtDT(e.created_at)}</div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+// Historique d'envoi, de consultation et de signature.
+export function SuiviLog({ suivi }) {
+  const { auditLog } = suivi
+  const [open, setOpen] = useState(false)
+  if (!auditLog || auditLog.length === 0) return null
+  return (
+    <section style={{ marginTop: 20 }}>
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open}
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', minHeight: 44, padding: '0', background: 'none', border: 'none', borderBottom: `1px solid ${ZB.rule}`, fontFamily: 'inherit', fontSize: 15, fontWeight: 700, color: ZB.ink, cursor: 'pointer' }}>
+        <span>Suivi du devis <span style={{ fontWeight: 500, color: ZB.ink2 }}>· {auditLog.length} événement{auditLog.length > 1 ? 's' : ''}</span></span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+          style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      {open && (
+        <ol style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          {auditLog.map((e, i) => (
+            <li key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '10px 0', borderBottom: `1px solid ${ZB.ruleSoft}`, fontSize: 14 }}>
+              <span style={{ color: e.event === 'accepted' ? ZB.stamp : e.event === 'refused' ? ZB.danger : ZB.ink }}>
+                {AUDIT_LABELS[e.event] || e.event}
+                {e.meta?.client_name ? ` : ${e.meta.client_name}` : ''}
+                {e.meta?.reason ? <span style={{ color: ZB.ink2 }}> · « {e.meta.reason} »</span> : ''}
+              </span>
+              <span style={{ color: ZB.ink2, whiteSpace: 'nowrap', ...NUM }}>{fmtDT(e.created_at)}</span>
+            </li>
+          ))}
+        </ol>
       )}
-    </div>
+    </section>
   )
 }

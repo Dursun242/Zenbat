@@ -137,7 +137,7 @@ Papier chaud, encre brun-noir, une terre cuite pour agir, un vert tampon pour ce
 ### Named Rules
 **The One Action Rule.** La terre cuite marque une seule action principale par écran ; les autres actions sont du texte terre cuite ou de l'encre.
 
-**The Red Means Wrong Rule.** Le rouge signale une erreur, une écoute en cours ou une suppression à confirmer, jamais un simple compteur ; un compteur « à traiter » est une pastille terre cuite.
+**The Red Means Wrong Rule.** Le rouge signale une erreur, un refus, une écoute en cours ou une suppression à confirmer, jamais un simple compteur ; un compteur « à traiter » est une pastille terre cuite.
 
 **The Interface Is Not The Brand Rule.** La couleur de l'artisan (brand.color) reste sur ses PDF et sa page de signature client ; l'interface garde la terre cuite.
 
@@ -199,6 +199,11 @@ Coins doux et sobres : 8px pour la feuille et les champs, 10px pour les boutons 
 
 ### Bordereau (signature)
 La feuille du devis : en-tête (logo ou nom, « Devis · date », réglages de vérification des prix), objet modifiable, colonnes « Désignation / Montant HT », lots en capitales avec sous-total dans la marge, chaque ligne avec sa sous-ligne « qté unité × PU · TVA » et ouverte à l'édition d'un appui. Pendant la rédaction : lignes vierges réglées avec un trait de plume, puis les lignes s'inscrivent une à une (fondu de gauche à droite, 320ms) et les sous-totaux montent. Vide : trois exemples du métier comme lignes, total à 0,00 €.
+
+### Fiche devis (signature)
+Le devis se lit comme le document du client : le même bordereau que l'Agent IA (pièces partagées dans `src/components/bordereau/parts.jsx`), en-tête avec le numéro, la date et le **tampon de statut**, ligne client (« Changer »), objet, lieu du chantier. Un appui sur une ligne ou un titre de lot l'ouvre à l'édition (monter, descendre, supprimer en deux appuis). Un devis signé ne se modifie plus.
+- **Tampon :** capitales 13px/800 espacées, double filet de 4px, penché de -3°. Encre 3 pour brouillon et remplacé, encre 2 pour envoyé, encre pour « À signer » et « Modifications demandées », vert tampon pour « Signé », rouge pour « Refusé ».
+- **Barre d'action :** collée en bas de l'écran (au pouce), une seule action terre cuite selon le statut : « Envoyer au client » (brouillon), « Relancer {client} » (envoyé, à signer), « Facturer » (signé). Envoyer, relancer et les statuts posés à la main passent par une confirmation dans la barre, qui nomme le destinataire et le montant TTC. Les actions rares sont dans le menu « ⋯ ».
 
 ### Barre de dictée (signature)
 Note de l'IA (3 lignes max, pouces haut / bas, « Historique »), langue, champ, micro. Un appui démarre, un second arrête et envoie ; en écoute le micro devient un carré stop rouge qui pulse.

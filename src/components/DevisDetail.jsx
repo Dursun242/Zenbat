@@ -1,15 +1,39 @@
+// Fiche devis (système « Bordereau ») : le devis se lit comme le document
+// que reçoit le client. Statut en tampon, lots tracés avec leur sous-total
+// dans la marge, appui sur une ligne pour la modifier, une seule action
+// principale selon le statut, dans une barre collée en bas (au pouce).
 import { useState, useEffect, useRef } from "react";
-import { fmt } from "../lib/utils.js";
+import { fmt, uid } from "../lib/utils.js";
 import { computeTotals, isNoTva, splitByRate, ventilatedLines } from "../lib/invoiceCalc.js";
+import { ZB, NUM } from "../lib/theme.js";
 import { I } from "./ui/icons.jsx";
-import Badge from "./ui/Badge.jsx";
-import LignesEditor from "./LignesEditor.jsx";
 import PDFViewer from "./PDFViewer.jsx";
 import ClientPickerModal from "./app/ClientPickerModal.jsx";
-import DevisClientActions from "./DevisClientActions.jsx";
+import { useDevisSuivi, NegotiationPanel, SuiviLog } from "./DevisClientActions.jsx";
+import StatusStamp from "./devis/StatusStamp.jsx";
+import { sectionsOf, Line, LineEditor, LotEditor, LotHeading, Totals, BORDEREAU_CSS, ICON } from "./bordereau/parts.jsx";
 import { useModalGuard } from "../hooks/useModalGuard.js";
 import { useAuth } from "../lib/auth.jsx";
 import { devisDraftKey } from "../lib/devisDraft.js";
+
+const clientName = c => c ? (c.raison_sociale || `${c.prenom || ""} ${c.nom || ""}`.trim() || c.email || "Client sans nom") : null;
+const fmtDate = d => d ? new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "";
+
+const btnPrimary = {
+  minHeight: 52, padding: "0 20px", borderRadius: 10, border: "none", background: ZB.accent, color: "#fff",
+  fontFamily: "inherit", fontSize: 16, fontWeight: 700, cursor: "pointer",
+};
+const btnSecondary = {
+  minHeight: 48, padding: "0 16px", borderRadius: 10, border: `1px solid ${ZB.rule}`, background: ZB.sheet, color: ZB.ink,
+  fontFamily: "inherit", fontSize: 15, fontWeight: 600, cursor: "pointer",
+};
+const btnText = {
+  minHeight: 44, padding: "0 4px", background: "none", border: "none", color: ZB.accent,
+  fontFamily: "inherit", fontSize: 15, fontWeight: 600, cursor: "pointer",
+};
+
+const MoreIcon = <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>;
+const BackIcon = <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>;
 
 export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChange, onConvertToInvoice, onCreateAcompte, onCreateSolde, invoices = [], onDuplicate, onCreateIndice, groupVersions = [], goDevis, loading, autoOpenPDF, onAutoOpenPDFConsumed, isFreemium = false, onPaywall = () => {} }) {
   const [showPDF,        setShowPDF]        = useState(false);
@@ -24,9 +48,15 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
   const [proformaBusy,   setProformaBusy]   = useState(false);
   const [clientPicker,   setClientPicker]   = useState(false);
   const [statutBusy,     setStatutBusy]     = useState(false);
+  const [editingId,      setEditingId]      = useState(null);
+  const [moreOpen,       setMoreOpen]       = useState(false);
+  // Envoi sécurisé : un premier appui ouvre la confirmation (destinataire,
+  // montant), le second envoie.
+  const [confirmSend,    setConfirmSend]    = useState(false);
+  // Statut posé à la main (« signé en direct », « refusé ») : confirmation.
+  const [confirmStatus,  setConfirmStatus]  = useState(null);
   // Protection anti-double-clic sur les actions qui créent une ressource
-  // (Dupliquer, Facturer, Nouvel indice). Un seul état partagé suffit :
-  // ces actions sont mutuellement exclusives côté UX.
+  // (Dupliquer, Facturer, Nouvel indice).
   const [actionBusy,     setActionBusy]     = useState(false);
   const runAction = async (fn) => {
     if (actionBusy || !fn) return;
@@ -34,21 +64,18 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
     try { await fn(); } finally { setActionBusy(false); }
   };
 
+  const suivi = useDevisSuivi({ devis: d || {}, client: cl, onChange });
+
   // Brouillon en cours d'édition persisté en localStorage : filet de
-  // sécurité contre tout reload imprévu (cache PWA périmé géré par
-  // chunkReload, crash JS, déconnexion intempestive, fermeture d'onglet
-  // accidentelle). Si à l'arrivée sur ce devis on trouve un brouillon
-  // plus récent que la version DB, on propose de le restaurer.
+  // sécurité contre tout reload imprévu. Si à l'arrivée sur ce devis on
+  // trouve un brouillon plus récent que la version DB, on propose de le
+  // restaurer.
   const { user } = useAuth();
   const userId = user?.id;
   const [restoreOffer, setRestoreOffer] = useState(null);
   const restoreCheckedRef = useRef(false);
   const lastPersistRef    = useRef(0);
 
-  // Au 1er rendu de ce devis : vérifie s'il y a un brouillon local plus
-  // récent que la version DB et propose la restauration. useDevis nettoie
-  // ce brouillon après chaque sauvegarde DB réussie, donc s'il en reste
-  // un, c'est qu'une frappe n'a jamais été sauvegardée.
   useEffect(() => {
     if (restoreCheckedRef.current || !d?.id) return;
     restoreCheckedRef.current = true;
@@ -58,8 +85,7 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
       const local = JSON.parse(raw);
       const dbAt    = new Date(d.updated_at || d.created_at || 0).getTime();
       const localAt = Number(local?.savedAt || 0);
-      // Tolérance 2 s : évite de proposer un brouillon qui est en fait la
-      // dernière sauvegarde DB déjà en place.
+      // Tolérance 2 s : évite de proposer la dernière sauvegarde DB elle-même.
       if (localAt > dbAt + 2000 && local?.d) {
         setRestoreOffer(local);
       } else {
@@ -68,9 +94,8 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
     } catch {}
   }, [d?.id, d?.updated_at, userId]);
 
-  // Persiste le brouillon à chaque changement de d. Throttle 600 ms pour
-  // ne pas marteler localStorage à chaque frappe (la persistance DB a
-  // déjà son debounce 800 ms côté useDevis).
+  // Persiste le brouillon à chaque changement (throttle 600 ms ; la
+  // persistance DB a son propre debounce côté useDevis).
   useEffect(() => {
     if (!d?.id) return;
     const now = Date.now();
@@ -92,20 +117,20 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
     setRestoreOffer(null);
   };
 
-  // Filet de sécurité : onChange est synchrone et fire-and-forget. En cas
-  // de succès, d.statut change et les boutons disparaissent ; en cas
-  // d'échec serveur, le statut ne bouge pas — sans ce reset, les boutons
-  // resteraient figés (disabled) jusqu'au rechargement de la page.
+  // onChange est fire-and-forget : si le serveur refuse, le statut ne bouge
+  // pas et les boutons ne doivent pas rester bloqués.
   useEffect(() => {
     if (!statutBusy) return;
     const t = setTimeout(() => setStatutBusy(false), 4000);
     return () => clearTimeout(t);
   }, [statutBusy]);
 
-  // La modale acompte est rendue inline (pas un composant séparé) → on
-  // gère son scroll-lock + bouton retour depuis le parent. clientPicker
-  // est aussi piloté ici car ClientPickerModal n'est monté que quand le
-  // flag est true (l'utilisateur attend que le retour le ferme).
+  useEffect(() => {
+    if (!confirmSend) return;
+    const t = setTimeout(() => setConfirmSend(false), 15000);
+    return () => clearTimeout(t);
+  }, [confirmSend]);
+
   useModalGuard(acompteModal, () => setAcompteModal(false));
 
   // Ouvre automatiquement le PDF quand on arrive depuis l'Agent IA après save
@@ -119,34 +144,59 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
   if (loading) return <LoadingSkeleton/>;
 
   const isRemplace = d.statut === "remplace";
-  const lignes = d.lignes || [];
-  const ht = lignes.filter(l => l.type_ligne === "ouvrage")
-    .reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0), 0);
-  const ac = brand.color || "#22c55e";
+  // Un devis signé ne se modifie plus : il fait foi entre les deux parties.
+  const isSigned   = d.statut === "accepte";
+  const readOnly   = isRemplace || isSigned;
+  const isOut      = ["envoye", "en_signature", "en_negociation"].includes(d.statut);
+  const lignes     = d.lignes || [];
+  const franchise  = brand?.vatRegime === "franchise";
+  const autoLiqDevis = !!d.auto_liquidation_btp;
+  const noTvaDevis   = isNoTva(brand?.vatRegime, autoLiqDevis);
+  const totals     = computeTotals(lignes, { noTva: noTvaDevis, docRate: d.tva_rate });
+  const ht         = totals.ht;
+  const hasLotRows = lignes.some(l => l.type_ligne === "lot");
+  const sections   = sectionsOf(lignes);
+  const ouvrages   = lignes.filter(l => l.type_ligne === "ouvrage");
 
   const updateLignes = (newLignes) => {
-    const newHt = newLignes.filter(l => l.type_ligne === "ouvrage")
-      .reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0), 0);
+    const newHt = computeTotals(newLignes, { noTva: noTvaDevis, docRate: d.tva_rate }).ht;
     onChange({ ...d, lignes: newLignes, montant_ht: newHt }, true);
   };
-
-  const lotsResume = lignes.filter(l => l.type_ligne === "ouvrage").reduce((a, l) => {
-    a[l.lot || "Divers"] = (a[l.lot || "Divers"] || 0) + (l.quantite || 0) * (l.prix_unitaire || 0);
-    return a;
-  }, {});
+  const changeLine = (id, patch) => updateLignes(lignes.map(l => l.id === id ? { ...l, ...patch } : l));
+  const deleteLine = (id) => { updateLignes(lignes.filter(l => l.id !== id)); setEditingId(null); };
+  const moveLine = (id, dir) => {
+    const i = lignes.findIndex(l => l.id === id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= lignes.length) return;
+    const arr = [...lignes];
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+    updateLignes(arr);
+  };
+  const addLine = () => {
+    const lastLot = [...lignes].reverse().find(l => l.type_ligne === "lot");
+    const id = uid();
+    updateLignes([...lignes, {
+      id, type_ligne: "ouvrage", designation: "",
+      lot: lastLot?.designation ? lastLot.designation.charAt(0) + lastLot.designation.slice(1).toLowerCase() : "",
+      unite: "u", quantite: 1, prix_unitaire: 0, tva_rate: franchise ? 0 : 20,
+    }]);
+    setEditingId(id);
+  };
+  const addLot = () => {
+    const id = uid();
+    updateLignes([...lignes, { id, type_ligne: "lot", designation: "NOUVEAU LOT", lot: "" }]);
+    setEditingId(id);
+  };
 
   // Acompte / solde : TVA ventilée sur les taux du devis (même calcul que la
   // facture créée, cf. createAcompteFromDevis). 0 % en franchise ou autoliquidation.
-  const autoLiqDevis = !!d.auto_liquidation_btp;
-  const noTvaDevis   = isNoTva(brand?.vatRegime, autoLiqDevis);
   const ttcOf = (amountHT) => computeTotals(
     ventilatedLines(amountHT, lignes, { noTva: noTvaDevis, docRate: d.tva_rate }),
   ).ttc;
   const devisRates   = noTvaDevis ? [0] : splitByRate(ht, lignes, d.tva_rate).map(p => p.rate);
-  const tvaLabel     = devisRates.length === 1 ? `${String(devisRates[0]).replace(".", ",")}%` : "TVA ventilée";
+  const tvaLabel     = devisRates.length === 1 ? `TVA ${String(devisRates[0]).replace(".", ",")} %` : "TVA ventilée";
   const canAcompte = onCreateAcompte && ht > 0 && ["envoye","en_signature","accepte"].includes(d.statut);
 
-  // Acomptes et solde déjà créés pour ce devis
   const devisAcomptes = invoices.filter(inv =>
     inv.devis_id === d.id && inv.invoice_type === "acompte" && inv.statut !== "annulee"
   );
@@ -159,15 +209,13 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
   const maxAcomptePct  = Math.max(1, remainingPct);
   const clampedPct     = Math.min(acomptePct, maxAcomptePct);
   const pctHT          = Math.round(ht * clampedPct) / 100;
-  // Mode "montant" : montant HT libre, plafonné au reste à facturer (jamais négatif).
   const freeHT         = Math.min(remainingHT, Math.max(0, Number(acompteMontantHT) || 0));
   const acompteHT      = acompteMode === "montant" ? freeHT : pctHT;
   const acompteEffPct  = ht > 0 ? Math.round(acompteHT / ht * 100) : 0;
   const acompteTTC     = ttcOf(acompteHT);
   const soldeTTC       = ttcOf(remainingHT);
 
-  // Génère un PDF « facture pro forma » à partir du devis (document commercial
-  // sans valeur fiscale). Aucun numéro légal consommé, aucun verrouillage.
+  // Facture « pro forma » (PDF commercial sans valeur fiscale, aucun numéro légal).
   const handleProforma = async () => {
     if (proformaBusy || !lignes.length) return;
     setProformaBusy(true);
@@ -209,16 +257,151 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
     }
   };
 
+  const markSigned = () => {
+    setStatutBusy(true); setConfirmStatus(null);
+    onChange({ ...d, statut: "accepte", signed_at: new Date().toISOString(), signed_by: clientName(cl) || "" });
+  };
+  const markRefused = () => { setStatutBusy(true); setConfirmStatus(null); onChange({ ...d, statut: "refuse" }); };
+
+  // ── Zone d'action : une seule action principale selon le statut ─────────
+  const email = cl?.email;
+  const canEditStatus = !isRemplace;
+  const sentLine = suivi.sentTo
+    ? <>Envoyé à <strong style={{ color: ZB.ink }}>{suivi.sentTo}</strong>. Le client a reçu un lien pour consulter et signer.</>
+    : suivi.lastSent && email
+      ? <>Envoyé à {email} le {fmtDate(suivi.lastSent.created_at)}.</>
+      : null;
+
+  let actionBar = null;
+  if (canEditStatus && d.statut === "brouillon") {
+    if (!lignes.length) {
+      actionBar = <p style={hint}>Ajoute des lignes au devis pour pouvoir l'envoyer.</p>;
+    } else if (!cl) {
+      actionBar = <button type="button" style={{ ...btnPrimary, width: "100%" }} onClick={() => setClientPicker(true)}>Choisir le client</button>;
+    } else if (!email) {
+      actionBar = (
+        <div style={{ display: "grid", gap: 8 }}>
+          <p style={{ ...hint, color: ZB.warn }}>{clientName(cl)} n'a pas d'email : ajoute-le dans sa fiche (onglet Clients) pour envoyer le devis.</p>
+          <button type="button" style={btnSecondary} onClick={() => setClientPicker(true)}>Choisir un autre client</button>
+        </div>
+      );
+    } else if (confirmSend) {
+      actionBar = (
+        <div role="group" aria-label="Confirmer l'envoi" style={{ display: "grid", gap: 10 }}>
+          <p style={{ margin: 0, fontSize: 15, color: ZB.ink, lineHeight: 1.45 }}>
+            Envoyer le devis <strong>{d.numero}</strong> (<span style={NUM}>{fmt(totals.ttc)}</span> TTC) à <strong>{email}</strong> ? Le client recevra un lien pour le consulter et le signer.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 8 }}>
+            <button type="button" style={btnSecondary} onClick={() => setConfirmSend(false)}>Annuler</button>
+            <button type="button" style={{ ...btnPrimary, opacity: suivi.sending ? 0.7 : 1 }} disabled={suivi.sending}
+              onClick={async () => { const ok = await suivi.send(); if (ok) setConfirmSend(false); }}>
+              {suivi.sending ? "Envoi…" : "Envoyer"}
+            </button>
+          </div>
+        </div>
+      );
+    } else {
+      actionBar = <button type="button" className="zb-primary" style={{ ...btnPrimary, width: "100%" }} onClick={() => setConfirmSend(true)}>Envoyer au client</button>;
+    }
+  } else if (canEditStatus && isOut) {
+    const who = clientName(cl) || email;
+    actionBar = (
+      <div style={{ display: "grid", gap: 10 }}>
+        {sentLine && <p style={{ ...hint, fontSize: 14 }}>{sentLine}</p>}
+        {confirmSend ? (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 8 }}>
+            <button type="button" style={btnSecondary} onClick={() => setConfirmSend(false)}>Annuler</button>
+            <button type="button" style={{ ...btnPrimary, minHeight: 48 }} disabled={suivi.sending}
+              onClick={async () => { const ok = await suivi.send(); if (ok) setConfirmSend(false); }}>
+              {suivi.sending ? "Envoi…" : `Renvoyer à ${email}`}
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {email && d.statut !== "en_negociation" && (
+              <button type="button" className="zb-primary" style={{ ...btnPrimary, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                onClick={() => setConfirmSend(true)}>
+                Relancer {who}
+              </button>
+            )}
+            {suivi.hasLink && (
+              <button type="button" style={{ ...btnText, flexShrink: 0 }} onClick={suivi.copyLink}>{suivi.copied ? "Lien copié" : "Copier le lien"}</button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  } else if (canEditStatus && d.statut === "accepte") {
+    actionBar = (
+      <div style={{ display: "grid", gap: 8 }}>
+        {onConvertToInvoice && lignes.length > 0 && (
+          isFreemium ? (
+            <button type="button" style={{ ...btnPrimary, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }} onClick={onPaywall}>
+              Facturer <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".06em", padding: "2px 6px", borderRadius: 4, border: "1px solid rgba(255,255,255,.7)" }}>PRO</span>
+            </button>
+          ) : (
+            <button type="button" className="zb-primary" style={{ ...btnPrimary, width: "100%", opacity: actionBusy ? 0.7 : 1 }} disabled={actionBusy}
+              onClick={() => runAction(() => onConvertToInvoice())}>
+              {actionBusy ? "Création de la facture…" : "Facturer"}
+            </button>
+          )
+        )}
+      </div>
+    );
+  } else if (canEditStatus && d.statut === "refuse" && onCreateIndice) {
+    actionBar = (
+      <button type="button" style={{ ...btnSecondary, width: "100%" }} disabled={actionBusy} onClick={() => runAction(() => onCreateIndice())}>
+        Proposer un nouvel indice
+      </button>
+    );
+  }
+
+  if (confirmStatus) {
+    const signed = confirmStatus === "accepte";
+    actionBar = (
+      <div role="group" aria-label="Confirmer le statut" style={{ display: "grid", gap: 10 }}>
+        <p style={{ margin: 0, fontSize: 15, color: ZB.ink, lineHeight: 1.45 }}>
+          {signed
+            ? <>Marquer le devis comme signé par <strong>{clientName(cl) || "le client"}</strong> (<span style={NUM}>{fmt(totals.ttc)}</span> TTC) ? Il ne pourra plus être modifié.</>
+            : <>Marquer le devis comme refusé par <strong>{clientName(cl) || "le client"}</strong> ?</>}
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 8 }}>
+          <button type="button" style={btnSecondary} onClick={() => setConfirmStatus(null)}>Annuler</button>
+          <button type="button" disabled={statutBusy} onClick={signed ? markSigned : markRefused}
+            style={{ ...btnPrimary, background: signed ? ZB.stamp : ZB.danger }}>
+            {signed ? "Oui, il est signé" : "Oui, il est refusé"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Menu « Plus » ──────────────────────────────────────────────────────
+  const moreItems = [
+    onDuplicate && { key: "dup", label: "Dupliquer le devis", onClick: () => runAction(() => onDuplicate()) },
+    onCreateIndice && d.statut !== "accepte" && !isRemplace && d.statut !== "refuse" && { key: "ind", label: "Créer un nouvel indice", onClick: () => runAction(() => onCreateIndice()) },
+    lignes.length > 0 && { key: "pro", label: proformaBusy ? "Pro forma en cours…" : "Télécharger une pro forma", onClick: handleProforma },
+    d.statut === "brouillon" && !isRemplace && { key: "sent", label: "Marquer comme envoyé (envoyé hors Zenbat)", onClick: () => onChange({ ...d, statut: "envoye" }) },
+    d.statut === "brouillon" && !isRemplace && { key: "sig", label: "Marquer comme à signer", onClick: () => onChange({ ...d, statut: "en_signature" }) },
+    canAcompte && { key: "aco", label: "Créer une facture d'acompte", onClick: () => setAcompteModal(true) },
+    ["envoye", "en_signature"].includes(d.statut) && !isRemplace && { key: "ok", label: "Marquer comme signé (signé en direct)", onClick: () => setConfirmStatus("accepte") },
+    ["envoye", "en_signature"].includes(d.statut) && !isRemplace && { key: "ko", label: "Marquer comme refusé", onClick: () => setConfirmStatus("refuse"), danger: true },
+  ].filter(Boolean);
+
+  const createdAt = d.date_emission || d.created_at;
+
   return (
     <>
       <style>{`
+        ${BORDEREAU_CSS}
         @media (min-width:1024px){
           .detail-shell{height:100%;min-height:unset !important;overflow:hidden}
           .detail-row{height:100%}
           .detail-editor{overflow-y:auto}
-          .detail-preview{display:flex !important;flex-direction:column;width:58%;flex-shrink:0;border-left:1px solid #E8E2D8;overflow-y:auto}
-          .detail-pdf-btn{display:none !important}
+          .detail-preview{display:flex !important;flex-direction:column;width:52%;flex-shrink:0;border-left:1px solid ${ZB.rule};overflow-y:auto}
+          .detail-mobile-only{display:none !important}
         }
+        .detail-shell button:focus-visible{outline:2px solid ${ZB.accent};outline-offset:2px}
       `}</style>
       {showPDF && (
         <PDFViewer d={d} cl={cl} brand={brand} onClose={() => setShowPDF(false)}
@@ -228,140 +411,118 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
       )}
 
       {acompteModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 200, display: "flex", alignItems: "flex-end", justifyContent: "center" }}
-          onClick={e => { if (e.target === e.currentTarget) setAcompteModal(false); }}>
-          <div style={{ background: "white", borderRadius: "20px 20px 0 0", padding: 24, width: "100%", maxWidth: 480, maxHeight: "90vh", overflowY: "auto" }}>
-            <div style={{ fontWeight: 700, fontSize: 16, color: "#1A1612", marginBottom: 4 }}>Facturation par acomptes</div>
-            <div style={{ fontSize: 12, color: "#6B6358", marginBottom: 16 }}>Devis {d.numero} · Total HT {fmt(ht)}</div>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(26,22,18,.5)", zIndex: 200, display: "flex", alignItems: "flex-end", justifyContent: "center", fontFamily: ZB.font }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="acompte-title"
+            style={{ background: ZB.sheet, borderRadius: "12px 12px 0 0", padding: "20px 18px calc(20px + env(safe-area-inset-bottom))", width: "100%", maxWidth: 480, maxHeight: "90vh", overflowY: "auto", color: ZB.ink }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 4 }}>
+              <h2 id="acompte-title" style={{ margin: 0, fontSize: 19, fontWeight: 700 }}>Facturer par acomptes</h2>
+              <button type="button" aria-label="Fermer" onClick={() => setAcompteModal(false)}
+                style={{ width: 44, height: 44, marginTop: -10, marginRight: -10, display: "grid", placeItems: "center", background: "none", border: "none", color: ZB.ink2, cursor: "pointer" }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+              </button>
+            </div>
+            <div style={{ fontSize: 14, color: ZB.ink2, marginBottom: 16, ...NUM }}>Devis {d.numero} · Total {fmt(ht)} HT</div>
 
-            {/* Liste des acomptes déjà créés */}
             {devisAcomptes.length > 0 && (
-              <div style={{ background: "#FAF7F2", borderRadius: 12, padding: "12px 14px", marginBottom: 16 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#9A8E82", marginBottom: 8, letterSpacing: "0.05em" }}>DÉJÀ FACTURÉ</div>
+              <div style={{ marginBottom: 16, borderTop: `1px solid ${ZB.rule}` }}>
                 {devisAcomptes.map(a => (
-                  <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <div>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: "#1A1612" }}>{a.numero}</span>
-                      <span style={{ fontSize: 11, color: "#9A8E82", marginLeft: 6 }}>
-                        {Math.round((Number(a.montant_ht) || 0) / ht * 100)}%
-                      </span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "#1A1612" }}>{fmt(Number(a.montant_ht) || 0)} HT</span>
-                      <span style={{
-                        fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 6,
-                        background: a.statut === "envoyee" || a.statut === "payee" ? "#ecfdf5" : "#f1f5f9",
-                        color:      a.statut === "envoyee" || a.statut === "payee" ? "#065f46" : "#64748b",
-                        border:     `1px solid ${a.statut === "envoyee" || a.statut === "payee" ? "#bbf7d0" : "#e2e8f0"}`,
-                      }}>{a.statut === "envoyee" ? "Émis" : a.statut === "payee" ? "Payé" : "Brouillon"}</span>
-                    </div>
+                  <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, padding: "8px 0", borderBottom: `1px solid ${ZB.ruleSoft}`, fontSize: 14, ...NUM }}>
+                    <span><strong>{a.numero}</strong> <span style={{ color: ZB.ink2 }}>· {Math.round((Number(a.montant_ht) || 0) / ht * 100)} % · {a.statut === "envoyee" ? "émise" : a.statut === "payee" ? "payée" : "brouillon"}</span></span>
+                    <span style={{ fontWeight: 700 }}>{fmt(Number(a.montant_ht) || 0)} HT</span>
                   </div>
                 ))}
-                <div style={{ borderTop: "1px solid #E8E2D8", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 12, color: "#6B6358" }}>Reste à facturer</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: remainingHT > 0 ? "#1A1612" : "#9A8E82" }}>
-                    {fmt(remainingHT)} HT ({remainingPct}%)
-                  </span>
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", fontSize: 15, ...NUM }}>
+                  <span>Reste à facturer</span>
+                  <strong>{fmt(remainingHT)} HT ({remainingPct} %)</strong>
                 </div>
               </div>
             )}
 
-            {/* Facture de solde déjà créée */}
             {devisHasSolde && (
-              <div style={{ background: "#ecfdf5", border: "1px solid #bbf7d0", borderRadius: 12, padding: "12px 14px", marginBottom: 16, fontSize: 12, color: "#065f46" }}>
-                ✓ Facture de solde déjà créée pour ce devis.
-              </div>
+              <p style={{ margin: "0 0 16px", fontSize: 15, color: ZB.stamp }}>La facture de solde de ce devis est déjà créée.</p>
             )}
 
-            {/* Acompte suivant — masqué si plus rien à facturer ou solde déjà créé */}
             {remainingHT > 0 && !devisHasSolde && (
               <>
-                <label style={{ fontSize: 11, fontWeight: 600, color: "#6B6358", display: "block", marginBottom: 8 }}>
-                  {devisAcomptes.length > 0 ? "NOUVEL ACOMPTE" : "MONTANT DE L'ACOMPTE"}
-                </label>
-                {/* Basculement pourcentage / montant forfaitaire libre */}
-                <div style={{ display: "flex", gap: 6, marginBottom: 12, background: "#F0EBE3", borderRadius: 10, padding: 3 }}>
-                  {[{ k: "pct", label: "En %" }, { k: "montant", label: "Montant libre (€)" }].map(opt => (
-                    <button key={opt.k} onClick={() => setAcompteMode(opt.k)}
-                      style={{ flex: 1, border: "none", borderRadius: 8, padding: "8px 0", fontSize: 12, fontWeight: 700, cursor: "pointer",
-                        background: acompteMode === opt.k ? "white" : "transparent",
-                        color:      acompteMode === opt.k ? "#1A1612" : "#9A8E82",
-                        boxShadow:  acompteMode === opt.k ? "0 1px 3px rgba(0,0,0,.08)" : "none" }}>
-                      {opt.label}
-                    </button>
-                  ))}
+                <div style={{ fontSize: 14, fontWeight: 600, color: ZB.ink2, marginBottom: 8 }}>
+                  {devisAcomptes.length > 0 ? "Nouvel acompte" : "Montant de l'acompte"}
+                </div>
+                <div role="radiogroup" aria-label="Mode de saisie" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 12 }}>
+                  {[{ k: "pct", label: "En %" }, { k: "montant", label: "Montant libre" }].map(opt => {
+                    const on = acompteMode === opt.k;
+                    return (
+                      <button key={opt.k} type="button" role="radio" aria-checked={on} onClick={() => setAcompteMode(opt.k)}
+                        style={{ minHeight: 44, borderRadius: 8, border: `1px solid ${on ? ZB.accent : ZB.rule}`, background: on ? ZB.accentSoft : ZB.sheet,
+                          color: on ? ZB.accent : ZB.ink, fontFamily: "inherit", fontSize: 15, fontWeight: on ? 700 : 500, cursor: "pointer" }}>
+                        {opt.label}
+                      </button>
+                    );
+                  })}
                 </div>
                 {acompteMode === "pct" ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-                    <input type="range" min={1} max={maxAcomptePct} value={clampedPct}
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                    <input type="range" min={1} max={maxAcomptePct} value={clampedPct} aria-label="Pourcentage de l'acompte"
                       onChange={e => setAcomptePct(Number(e.target.value))}
-                      style={{ flex: 1, accentColor: ac }}/>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4, border: "1px solid #E8E2D8", borderRadius: 10, padding: "6px 10px" }}>
-                      <input type="number" min={1} max={maxAcomptePct} value={clampedPct}
+                      style={{ flex: 1, accentColor: ZB.accent, minHeight: 44 }}/>
+                    <label style={{ display: "flex", alignItems: "center", gap: 4, border: `1px solid ${ZB.rule}`, borderRadius: 8, padding: "0 10px", minHeight: 44 }}>
+                      <span className="zb-sr">Pourcentage</span>
+                      <input type="number" inputMode="decimal" min={1} max={maxAcomptePct} value={clampedPct}
                         onChange={e => setAcomptePct(Math.min(maxAcomptePct, Math.max(1, Number(e.target.value))))}
-                        style={{ width: 48, border: "none", outline: "none", fontSize: 15, fontWeight: 700, textAlign: "right", fontFamily: "inherit", color: "#1A1612" }}/>
-                      <span style={{ color: "#6B6358", fontSize: 14 }}>%</span>
-                    </div>
+                        style={{ width: 52, border: "none", outline: "none", fontSize: 16, fontWeight: 700, textAlign: "right", fontFamily: "inherit", color: ZB.ink, ...NUM }}/>
+                      <span style={{ color: ZB.ink2, fontSize: 15 }}>%</span>
+                    </label>
                   </div>
                 ) : (
-                  <div style={{ marginBottom: 8 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, border: "1px solid #E8E2D8", borderRadius: 10, padding: "10px 12px" }}>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, border: `1px solid ${ZB.rule}`, borderRadius: 8, padding: "0 12px", minHeight: 48 }}>
+                      <span className="zb-sr">Montant HT de l'acompte</span>
                       <input type="number" inputMode="decimal" min={0} max={remainingHT} step="0.01"
-                        value={acompteMontantHT}
-                        placeholder="0"
+                        value={acompteMontantHT} placeholder="0"
                         onChange={e => setAcompteMontantHT(e.target.value)}
-                        style={{ flex: 1, minWidth: 0, border: "none", outline: "none", fontSize: 17, fontWeight: 700, fontFamily: "inherit", color: "#1A1612" }}/>
-                      <span style={{ color: "#6B6358", fontSize: 14, fontWeight: 600 }}>€ HT</span>
-                    </div>
-                    <div style={{ fontSize: 11, color: "#9A8E82", marginTop: 6 }}>
+                        style={{ flex: 1, minWidth: 0, border: "none", outline: "none", fontSize: 17, fontWeight: 700, fontFamily: "inherit", color: ZB.ink, ...NUM }}/>
+                      <span style={{ color: ZB.ink2, fontSize: 15, fontWeight: 600 }}>€ HT</span>
+                    </label>
+                    <div style={{ fontSize: 13, color: Number(acompteMontantHT) > remainingHT ? ZB.warn : ZB.ink2, marginTop: 6, ...NUM }}>
                       {Number(acompteMontantHT) > remainingHT
-                        ? <span style={{ color: "#c2410c", fontWeight: 600 }}>Plafonné à {fmt(remainingHT)} HT (reste à facturer)</span>
+                        ? `Limité à ${fmt(remainingHT)} HT (reste à facturer).`
                         : acompteHT > 0
-                          ? `Soit ${acompteEffPct}% du devis · max ${fmt(remainingHT)} HT`
+                          ? `Soit ${acompteEffPct} % du devis · maximum ${fmt(remainingHT)} HT`
                           : `Maximum ${fmt(remainingHT)} HT`}
                     </div>
                   </div>
                 )}
 
-                <div style={{ background: "#FAF7F2", borderRadius: 14, padding: "14px 16px", marginBottom: 16 }}>
+                <div style={{ borderTop: `2px solid ${ZB.ink}`, borderBottom: `3px double ${ZB.ink}`, padding: "10px 0", marginBottom: 16, ...NUM }}>
                   {noTvaDevis ? (
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ fontSize: 13, color: "#6B6358" }}>{autoLiqDevis ? "Montant (autoliquidation, sans TVA)" : "Montant (TVA non applicable)"}</span>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: ac }}>{fmt(acompteHT)}</span>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 15 }}>
+                      <span>{autoLiqDevis ? "Montant (autoliquidation, sans TVA)" : "Montant (TVA non applicable)"}</span>
+                      <strong style={{ fontSize: 18 }}>{fmt(acompteHT)}</strong>
                     </div>
                   ) : (
                     <>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                        <span style={{ fontSize: 13, color: "#6B6358" }}>Montant HT</span>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: "#1A1612" }}>{fmt(acompteHT)}</span>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 15, marginBottom: 4 }}>
+                        <span>Montant HT</span><span style={{ fontWeight: 600 }}>{fmt(acompteHT)}</span>
                       </div>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ fontSize: 13, color: "#6B6358" }}>Montant TTC ({tvaLabel})</span>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: ac }}>{fmt(acompteTTC)}</span>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 15 }}>
+                        <span>Montant TTC ({tvaLabel})</span><strong style={{ fontSize: 18 }}>{fmt(acompteTTC)}</strong>
                       </div>
                     </>
                   )}
                 </div>
 
-                <button onClick={handleAcompte} disabled={acompteLoading || !acompteHT}
-                  style={{ width: "100%", background: acompteLoading || !acompteHT ? "#9A8E82" : ac, border: "none", borderRadius: 14, padding: 14, fontSize: 14, fontWeight: 700, cursor: acompteLoading || !acompteHT ? "not-allowed" : "pointer", color: "white", marginBottom: devisAcomptes.length > 0 ? 10 : 0 }}>
-                  {acompteLoading ? "Création…" : `Créer l'acompte (${fmt(acompteTTC)} TTC)`}
+                <button type="button" onClick={handleAcompte} disabled={acompteLoading || !acompteHT}
+                  style={{ ...btnPrimary, width: "100%", opacity: acompteLoading || !acompteHT ? 0.5 : 1, cursor: acompteLoading || !acompteHT ? "not-allowed" : "pointer", marginBottom: 8 }}>
+                  {acompteLoading ? "Création…" : <>Créer l'acompte de <span style={NUM}>{fmt(acompteTTC)}</span> TTC</>}
                 </button>
 
-                {/* Bouton "Facture de solde" dès qu'il y a au moins un acompte */}
                 {devisAcomptes.length > 0 && onCreateSolde && (
-                  <button onClick={handleSolde} disabled={soldeLoading}
-                    style={{ width: "100%", background: "white", border: "1.5px solid #1A1612", borderRadius: 14, padding: 13, fontSize: 13, fontWeight: 700, cursor: soldeLoading ? "not-allowed" : "pointer", color: "#1A1612", opacity: soldeLoading ? 0.6 : 1 }}>
-                    {soldeLoading ? "Création…" : `Créer la facture de solde (${fmt(soldeTTC)} TTC · ${remainingPct}%)`}
+                  <button type="button" onClick={handleSolde} disabled={soldeLoading}
+                    style={{ ...btnSecondary, width: "100%", opacity: soldeLoading ? 0.6 : 1 }}>
+                    {soldeLoading ? "Création…" : <>Créer la facture de solde (<span style={NUM}>{fmt(soldeTTC)}</span> TTC · {remainingPct} %)</>}
                   </button>
                 )}
               </>
             )}
-
-            <button onClick={() => setAcompteModal(false)}
-              style={{ width: "100%", background: "#F0EBE3", border: "none", borderRadius: 14, padding: 13, fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#6B6358", marginTop: 10 }}>
-              Fermer
-            </button>
           </div>
         </div>
       )}
@@ -372,239 +533,227 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
           onSelect={c => onChange({ ...d, client_id: c?.id ?? null })}
           onClose={() => setClientPicker(false)}/>
       )}
-      <div className="detail-shell" style={{ minHeight: "100%", background: "#FAF7F2", display: "flex", flexDirection: "column" }}>
-        {restoreOffer && (
-          <div style={{ background: "#fffbeb", borderBottom: "1px solid #fde68a", padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 13, color: "#92400e", flex: 1, lineHeight: 1.4 }}>
-              💾 Un brouillon non sauvegardé a été détecté pour ce devis.
-            </span>
-            <button onClick={restoreDraft}
-              style={{ background: "#1A1612", border: "none", color: "white", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-              Restaurer
-            </button>
-            <button onClick={dismissDraft}
-              style={{ background: "transparent", border: "1px solid #fde68a", color: "#92400e", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-              Ignorer
-            </button>
-          </div>
-        )}
+
+      <div className="detail-shell" style={{ minHeight: "100%", background: ZB.paper, display: "flex", flexDirection: "column", fontFamily: ZB.font, color: ZB.ink }}>
         <div className="detail-row" style={{ flex: 1, display: "flex" }}>
-          <div className="detail-editor fu" style={{ flex: 1, minWidth: 0 }}>
-        {/* En-tête */}
-        <div style={{ background: "white", borderBottom: "1px solid #F0EBE3", padding: "10px 14px" }}>
-          {/* Barre principale : Retour + actions */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: "#6B6358", fontSize: 13, cursor: "pointer", flexShrink: 0, padding: "4px 0" }}>
-              {I.back} Retour
-            </button>
-            <div style={{ flex: 1 }}/>
-            {/* Actions compactes */}
-            <div style={{ display: "flex", gap: 5, flexWrap: "wrap", justifyContent: "flex-end" }}>
-              {onDuplicate && (
-                <button onClick={() => runAction(() => onDuplicate())} disabled={actionBusy}
-                  style={{ background: "#FAF7F2", color: "#6B6358", border: "1px solid #E8E2D8", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: actionBusy ? "default" : "pointer", whiteSpace: "nowrap", opacity: actionBusy ? 0.6 : 1 }}>
-                  {actionBusy ? "…" : "📋 Dupliquer"}
-                </button>
-              )}
-              {onConvertToInvoice && lignes.length > 0 && (
-                isFreemium ? (
-                  <button onClick={onPaywall}
-                    title="Disponible en Pro — 9,50 €/mois"
-                    style={{ background: "#F5F0E8", color: "#9A8E82", border: "1px solid #E8E2D8", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-                    📄 Facturer · Pro
-                  </button>
-                ) : (
-                  <button onClick={() => runAction(() => onConvertToInvoice())} disabled={actionBusy}
-                    style={{ background: "#FAF7F2", color: "#1A1612", border: "1px solid #E8E2D8", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: actionBusy ? "default" : "pointer", whiteSpace: "nowrap", opacity: actionBusy ? 0.6 : 1 }}>
-                    {actionBusy ? "…" : "📄 Facturer"}
-                  </button>
-                )
-              )}
-              {lignes.length > 0 && (
-                <button onClick={handleProforma} disabled={proformaBusy}
-                  title="Générer une facture pro forma (PDF, sans valeur fiscale)"
-                  style={{ background: "#FAF7F2", color: "#1A1612", border: "1px solid #E8E2D8", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: proformaBusy ? "default" : "pointer", whiteSpace: "nowrap", opacity: proformaBusy ? 0.6 : 1 }}>
-                  {proformaBusy ? "…" : "🧾 Pro forma"}
-                </button>
-              )}
-              {onCreateIndice && d.statut !== "accepte" && !isRemplace && (
-                <button onClick={() => runAction(() => onCreateIndice())} disabled={actionBusy}
-                  style={{ background: "#f5f3ff", color: "#6b21a8", border: "1px solid #e9d5ff", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: actionBusy ? "default" : "pointer", whiteSpace: "nowrap", opacity: actionBusy ? 0.6 : 1 }}>
-                  {actionBusy ? "…" : "✦ Nouvel indice"}
-                </button>
-              )}
-              {d.statut === "brouillon" && !isRemplace && (
-                <button onClick={() => onChange({ ...d, statut: "envoye" })}
-                  style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-                  ✉️ Envoyé
-                </button>
-              )}
-            </div>
-          </div>
-          {/* Numero + montant + badge */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <div style={{ fontSize: 10, color: "#9A8E82", fontFamily: "monospace" }}>{d.numero}</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 18, fontWeight: 700, color: "#1A1612" }}>{fmt(ht)}</span>
-              <span style={{ fontSize: 10, color: "#9A8E82" }}>HT</span>
-              <Badge s={d.statut}/>
-            </div>
-          </div>
+          <div className="detail-editor" style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
 
-          {/* Navigation entre versions du dossier */}
-          {groupVersions.length > 1 && (
-            <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
-              {groupVersions.map(v => {
-                const isCurrent = v.id === d.id;
-                return (
-                  <button key={v.id} onClick={() => !isCurrent && goDevis(v.id)}
-                    style={{ padding: "4px 10px", borderRadius: 20, border: "none", fontSize: 11, fontWeight: 700,
-                      cursor: isCurrent ? "default" : "pointer",
-                      background: isCurrent ? (brand.color || "#22c55e") : "#F0EBE3",
-                      color: isCurrent ? "white" : "#6B6358",
-                      boxShadow: isCurrent ? `0 2px 8px ${brand.color || "#22c55e"}44` : "none" }}>
-                    {v.indice || "Initial"}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Bannière version remplacée */}
-          {isRemplace && (
-            <div style={{ background: "#f5f3ff", border: "1px solid #e9d5ff", borderRadius: 10,
-              padding: "8px 12px", marginBottom: 10, fontSize: 11, color: "#6b21a8",
-              display: "flex", alignItems: "center", gap: 8 }}>
-              <span>🔒</span>
-              <span><strong>Version remplacée</strong> — consultation uniquement. Créez un nouvel indice pour modifier.</span>
-            </div>
-          )}
-
-          {/* Client */}
-          {["brouillon","envoye"].includes(d.statut) && !isRemplace && !cl?.email && (
-            <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10,
-              padding: "10px 12px", marginBottom: 8, display: "flex", alignItems: "flex-start", gap: 8 }}>
-              <span style={{ fontSize: 16, lineHeight: "1.3", flexShrink: 0 }}>✉️</span>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#92400e", marginBottom: 2 }}>Email requis pour l'envoi</div>
-                <div style={{ fontSize: 11, color: "#b45309", lineHeight: "1.4" }}>Sélectionnez un client avec une adresse email pour envoyer ce devis au client.</div>
+            {/* Retour + actions secondaires */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px 6px 6px", borderBottom: `1px solid ${ZB.rule}`, background: ZB.paper }}>
+              <button type="button" onClick={onBack}
+                style={{ display: "flex", alignItems: "center", gap: 4, minHeight: 44, padding: "0 8px", background: "none", border: "none", color: ZB.ink, fontFamily: "inherit", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+                {BackIcon} Devis
+              </button>
+              <div style={{ flex: 1 }}/>
+              <button type="button" className="detail-mobile-only" onClick={() => setShowPDF(true)}
+                style={{ ...btnText, display: "flex", alignItems: "center", gap: 6, padding: "0 8px" }}>
+                {I.pdf} PDF
+              </button>
+              <div style={{ position: "relative" }}>
+                <button type="button" aria-label="Plus d'actions" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen(o => !o)}
+                  style={{ width: 44, height: 44, display: "grid", placeItems: "center", borderRadius: 8, border: `1px solid ${ZB.rule}`, background: ZB.sheet, color: ZB.ink, cursor: "pointer" }}>
+                  {MoreIcon}
+                </button>
+                {moreOpen && (
+                  <>
+                    <div onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }}/>
+                    <div role="menu" style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", zIndex: 91, width: 280, maxWidth: "calc(100vw - 24px)", padding: 4,
+                      background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 10, boxShadow: "0 10px 30px rgba(26,22,18,.16)" }}>
+                      {moreItems.map(it => (
+                        <button key={it.key} type="button" role="menuitem" disabled={actionBusy && ["dup", "ind"].includes(it.key)}
+                          onClick={() => { setMoreOpen(false); it.onClick(); }}
+                          style={{ display: "block", width: "100%", minHeight: 44, padding: "10px 12px", textAlign: "left", background: "none", border: "none", borderRadius: 8, fontFamily: "inherit", fontSize: 15, color: it.danger ? ZB.danger : ZB.ink, cursor: "pointer" }}>
+                          {it.label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
-          )}
-          <button onClick={() => { if (!isRemplace) setClientPicker(true); }} disabled={isRemplace}
-            style={{ width: "100%", display: "flex", alignItems: "center", gap: 8,
-              background: isRemplace ? "#F0EBE3" : "#FAF7F2",
-              border: "1px solid #E8E2D8", borderRadius: 10, padding: "7px 10px", marginBottom: 8,
-              cursor: isRemplace ? "not-allowed" : "pointer", textAlign: "left" }}>
-            <span style={{ fontSize: 16 }}>👤</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1612", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {cl ? (cl.raison_sociale || `${cl.prenom || ""} ${cl.nom || ""}`.trim()) : <span style={{ color: "#9A8E82", fontStyle: "italic" }}>Sans client</span>}
-              </div>
-              {cl?.email && <div style={{ fontSize: 11, color: "#9A8E82" }}>{cl.email}</div>}
-            </div>
-            <span style={{ fontSize: 11, color: "#9A8E82", flexShrink: 0 }}>Changer ›</span>
-          </button>
 
-          <label style={{ display: "block", fontSize: 10, color: "#9A8E82", fontWeight: 600, marginBottom: 2 }}>OBJET</label>
-          <input
-            value={d.objet || ""}
-            onChange={e => !isRemplace && onChange({ ...d, objet: e.target.value })}
-            readOnly={isRemplace}
-            placeholder="Objet du devis"
-            style={{ fontSize: 15, fontWeight: 700, color: isRemplace ? "#9A8E82" : "#1A1612", border: "1px solid #E8E2D8", borderRadius: 8, background: isRemplace ? "#F0EBE3" : "#FAF7F2", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box", cursor: isRemplace ? "not-allowed" : "text" }}
-          />
-          <label style={{ display: "block", fontSize: 10, color: "#9A8E82", fontWeight: 600, marginBottom: 2 }}>LIEU</label>
-          <input
-            value={d.ville_chantier || ""}
-            onChange={e => !isRemplace && onChange({ ...d, ville_chantier: e.target.value })}
-            readOnly={isRemplace}
-            placeholder="Ville / lieu"
-            style={{ fontSize: 13, color: isRemplace ? "#9A8E82" : "#6B6358", border: "1px solid #E8E2D8", borderRadius: 8, background: isRemplace ? "#F0EBE3" : "#FAF7F2", outline: "none", width: "100%", padding: "7px 10px", fontFamily: "inherit", boxSizing: "border-box", cursor: isRemplace ? "not-allowed" : "text" }}
-          />
-        </div>
-
-        <div style={{ padding: 18 }}>
-          {/* Suivi client — envoi, négociation, audit */}
-          <DevisClientActions devis={d} client={cl} onChange={onChange} onCreateIndice={onCreateIndice} />
-
-          {/* Bouton PDF */}
-          <button className="detail-pdf-btn" onClick={() => setShowPDF(true)}
-            style={{ width: "100%", background: `linear-gradient(135deg,${ac}ee,${ac})`, color: "white", border: "none", borderRadius: 16, padding: 16, fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, cursor: "pointer", boxShadow: `0 6px 20px ${ac}44`, marginBottom: 12 }}>
-            {I.pdf} Voir le PDF du devis
-          </button>
-
-          {/* Acompte (visible si devis envoyé / en signature / accepté) */}
-          {canAcompte && (
-            <button onClick={() => setAcompteModal(true)}
-              style={{ width: "100%", background: "#fff7ed", color: "#c2410c", border: "1.5px solid #fed7aa", borderRadius: 14, padding: 13, fontSize: 13, fontWeight: 700, cursor: "pointer", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              💰 Créer une facture d'acompte
-            </button>
-          )}
-
-          {/* Éditeur de lignes (lecture seule si remplacé) */}
-          <LignesEditor lignes={lignes} onChange={isRemplace ? undefined : updateLignes} ac={ac} vatRegime={brand?.vatRegime} readOnly={isRemplace}/>
-
-          {/* Récapitulatif lots */}
-          {Object.keys(lotsResume).length > 0 && (
-            <div style={{ background: "white", borderRadius: 14, border: "1px solid #F0EBE3", overflow: "hidden", marginBottom: 12 }}>
-              <div style={{ padding: "12px 16px", borderBottom: "1px solid #FAF7F2", fontWeight: 600, fontSize: 13, color: "#1A1612" }}>Récapitulatif par lot</div>
-              {Object.entries(lotsResume).map(([lot, mt]) => (
-                <div key={lot} style={{ padding: "10px 16px", borderBottom: "1px solid #FAF7F2", display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 12, color: "#3D3028" }}>{lot}</span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "#1A1612" }}>{fmt(mt)}</span>
+            <div style={{ flex: 1, padding: "14px 12px 0" }}>
+              {restoreOffer && (
+                <div role="status" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "10px 12px", marginBottom: 12, background: ZB.warnSoft, borderRadius: 8 }}>
+                  <span style={{ flex: 1, minWidth: 180, fontSize: 15, color: ZB.ink, lineHeight: 1.4 }}>Des modifications de ce devis n'ont pas été enregistrées.</span>
+                  <button type="button" onClick={dismissDraft} style={{ ...btnText, color: ZB.ink2 }}>Ignorer</button>
+                  <button type="button" onClick={restoreDraft} style={{ ...btnSecondary, minHeight: 44 }}>Les récupérer</button>
                 </div>
-              ))}
-              <div style={{ padding: "12px 16px", background: "#FAF7F2", display: "flex", justifyContent: "space-between" }}>
-                <span style={{ fontWeight: 700, fontSize: 13, color: "#1A1612" }}>Total HT</span>
-                <span style={{ fontWeight: 700, fontSize: 14, color: ac }}>{fmt(ht)}</span>
-              </div>
-            </div>
-          )}
+              )}
 
-          {/* Actions statut */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {d.statut === "en_signature" && (
-              <div style={{ display: "flex", gap: 8 }}>
-                <button disabled={statutBusy} onClick={() => {
-                  setStatutBusy(true);
-                  const signedBy = cl?.raison_sociale?.trim() || `${cl?.prenom || ""} ${cl?.nom || ""}`.trim() || cl?.email || "";
-                  onChange({ ...d, statut: "accepte", signed_at: new Date().toISOString(), signed_by: signedBy });
-                }}
-                  style={{ flex: 1, background: "#ecfdf5", color: "#065f46", border: "1px solid #a7f3d0", borderRadius: 12, padding: 10, fontSize: 12, fontWeight: 600, cursor: statutBusy ? "not-allowed" : "pointer", opacity: statutBusy ? 0.6 : 1 }}>
-                  ✓ Accepté
+              {isRemplace && (
+                <p style={{ margin: "0 0 12px", padding: "10px 12px", background: ZB.paper2, borderRadius: 8, fontSize: 15, color: ZB.ink2, lineHeight: 1.4 }}>
+                  Version remplacée : consultation seulement. Pour la modifier, crée un nouvel indice depuis la dernière version.
+                </p>
+              )}
+
+              {isSigned && (
+                <p style={{ margin: "0 0 12px", padding: "10px 12px", background: ZB.stampSoft, borderRadius: 8, fontSize: 15, color: ZB.ink, lineHeight: 1.4 }}>
+                  Devis signé : il ne se modifie plus. Pour changer quelque chose, duplique-le depuis le menu.
+                </p>
+              )}
+              {isOut && editingId && (
+                <p role="status" style={{ margin: "0 0 12px", padding: "10px 12px", background: ZB.warnSoft, borderRadius: 8, fontSize: 15, color: ZB.ink, lineHeight: 1.4 }}>
+                  Le client a déjà reçu ce devis : ce que tu modifies apparaît sur son lien. Pour une nouvelle proposition, crée plutôt un nouvel indice.
+                </p>
+              )}
+
+              {d.statut === "en_negociation" && <NegotiationPanel devis={d} suivi={suivi} onCreateIndice={onCreateIndice}/>}
+
+              {/* Le devis */}
+              <article className="zb-bordereau" aria-label={`Devis ${d.numero || ""}`}
+                style={{ background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 8, padding: "18px 18px 20px" }}>
+                <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, ...NUM }}>{d.numero || "Devis"}{d.indice ? ` · indice ${d.indice}` : ""}</div>
+                    {createdAt && <div style={{ fontSize: 13, color: ZB.ink2, marginTop: 4 }}>{fmtDate(createdAt)}</div>}
+                  </div>
+                  <StatusStamp statut={d.statut}/>
+                </header>
+
+                {groupVersions.length > 1 && (
+                  <nav aria-label="Versions du devis" style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", marginTop: 12, fontSize: 14 }}>
+                    <span style={{ color: ZB.ink2, marginRight: 4 }}>Versions :</span>
+                    {groupVersions.map(v => {
+                      const cur = v.id === d.id;
+                      return (
+                        <button key={v.id} type="button" aria-current={cur ? "page" : undefined} onClick={() => !cur && goDevis(v.id)}
+                          style={{ minHeight: 36, minWidth: 36, padding: "0 8px", background: "none", border: "none", fontFamily: "inherit", fontSize: 14,
+                            fontWeight: cur ? 700 : 500, color: cur ? ZB.ink : ZB.accent, cursor: cur ? "default" : "pointer",
+                            textDecoration: cur ? "underline" : "none", textDecorationColor: ZB.accent, textDecorationThickness: 2, textUnderlineOffset: 5 }}>
+                          {v.indice || "Initiale"}
+                        </button>
+                      );
+                    })}
+                  </nav>
+                )}
+
+                {/* Client */}
+                <button type="button" onClick={() => !readOnly && setClientPicker(true)} disabled={readOnly}
+                  style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", minHeight: 56, marginTop: 14, padding: "8px 0",
+                    background: "none", border: "none", borderTop: `1px solid ${ZB.ruleSoft}`, borderBottom: `1px solid ${ZB.ruleSoft}`,
+                    textAlign: "left", fontFamily: "inherit", cursor: readOnly ? "default" : "pointer" }}>
+                  <span style={{ fontSize: 13, color: ZB.ink2, width: 44, flexShrink: 0 }}>Client</span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: 15, fontWeight: 600, color: cl ? ZB.ink : ZB.ink3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {clientName(cl) || "Aucun client"}
+                    </span>
+                    {cl && <span style={{ display: "block", fontSize: 13, color: email ? ZB.ink2 : ZB.warn, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{email || "Pas d'email"}</span>}
+                  </span>
+                  {!readOnly && <span style={{ fontSize: 15, fontWeight: 600, color: ZB.accent, flexShrink: 0 }}>{cl ? "Changer" : "Choisir"}</span>}
                 </button>
-                <button disabled={statutBusy} onClick={() => { setStatutBusy(true); onChange({ ...d, statut: "refuse" }); }}
-                  style={{ flex: 1, background: "#fef2f2", color: "#991b1b", border: "1px solid #fecaca", borderRadius: 12, padding: 10, fontSize: 12, fontWeight: 600, cursor: statutBusy ? "not-allowed" : "pointer", opacity: statutBusy ? 0.6 : 1 }}>
-                  ✗ Refusé
-                </button>
+
+                <label htmlFor="dv-objet" className="zb-sr">Objet du devis</label>
+                <AutoTextarea id="dv-objet" value={d.objet || ""} readOnly={readOnly} placeholder="Objet du devis"
+                  onChange={v => onChange({ ...d, objet: v })}
+                  style={{ display: "block", width: "100%", margin: "14px 0 0", padding: "4px 0", border: "none", resize: "none", overflow: "hidden",
+                    background: "none", fontFamily: "inherit", fontSize: 21, fontWeight: 700, lineHeight: 1.25, color: ZB.ink, outline: "none" }}/>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+                  <label htmlFor="dv-lieu" style={{ fontSize: 13, color: ZB.ink2, flexShrink: 0 }}>Lieu du chantier</label>
+                  <input id="dv-lieu" value={d.ville_chantier || ""} readOnly={readOnly} placeholder="À préciser"
+                    onChange={e => !readOnly && onChange({ ...d, ville_chantier: e.target.value })}
+                    style={{ flex: 1, minWidth: 0, minHeight: 36, padding: "4px 0", border: "none", borderBottom: `1px dotted ${ZB.rule}`, background: "none", fontFamily: "inherit", fontSize: 16, color: ZB.ink, outline: "none" }}/>
+                </div>
+
+                {/* Colonnes */}
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 18, paddingBottom: 8, borderBottom: `2px solid ${ZB.ink}`, fontSize: 13, fontWeight: 600, color: ZB.ink2 }}>
+                  <span>Désignation <span style={{ fontWeight: 500 }}>· {ouvrages.length} ligne{ouvrages.length > 1 ? "s" : ""}</span></span><span>Montant HT</span>
+                </div>
+
+                {lignes.length === 0 && (
+                  <p style={{ margin: "14px 0", fontSize: 15, color: ZB.ink2 }}>Aucune ligne pour l'instant.</p>
+                )}
+
+                {sections.map((s, si) => (
+                  <section key={s.lot?.id || `s${si}`} aria-label={s.lot?.designation || "Prestations"}>
+                    {s.lot && (editingId === s.lot.id && !s.lot.virtual ? (
+                      <LotEditor lot={s.lot}
+                        onChange={patch => changeLine(s.lot.id, patch)}
+                        onDelete={() => deleteLine(s.lot.id)}
+                        onDone={() => setEditingId(null)}
+                        onMove={dir => moveLine(s.lot.id, dir)}
+                        canUp={s.at > 0} canDown={s.at < lignes.length - 1}/>
+                    ) : (
+                      <LotHeading lot={s.lot} subtotal={s.subtotal}
+                        onOpen={readOnly || s.lot.virtual ? undefined : () => setEditingId(s.lot.id)}/>
+                    ))}
+                    {s.rows.map(({ l, idx }) => editingId === l.id ? (
+                      <LineEditor key={l.id} l={l} franchise={franchise} withLot={!hasLotRows} withPercent
+                        onChange={patch => changeLine(l.id, patch)}
+                        onDelete={() => deleteLine(l.id)}
+                        onDone={() => setEditingId(null)}
+                        onMove={dir => moveLine(l.id, dir)}
+                        canUp={idx > 0} canDown={idx < lignes.length - 1}/>
+                    ) : (
+                      <Line key={l.id} l={l} idx={idx} franchise={franchise} onOpen={readOnly ? undefined : () => setEditingId(l.id)}/>
+                    ))}
+                  </section>
+                ))}
+
+                {!readOnly && (
+                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                    <button type="button" onClick={addLine} style={{ ...btnText, display: "flex", alignItems: "center", gap: 8, minHeight: 48 }}>{ICON.plus} Ajouter une ligne</button>
+                    <button type="button" onClick={addLot} style={{ ...btnText, display: "flex", alignItems: "center", gap: 8, minHeight: 48, color: ZB.ink2 }}>{ICON.plus} Ajouter un lot</button>
+                  </div>
+                )}
+
+                {lignes.length > 0 && (
+                  <Totals ht={ht} tvaRows={totals.tvaRows} ttc={totals.ttc} franchise={franchise} autoLiquidation={autoLiqDevis && !franchise}/>
+                )}
+              </article>
+
+              <SuiviLog suivi={suivi}/>
+              {suivi.sendErr && <p role="alert" style={{ margin: "12px 0 0", fontSize: 15, color: ZB.danger }}>{suivi.sendErr}</p>}
+              <div style={{ height: 16 }}/>
+            </div>
+
+            {/* Zone d'action collée en bas, au pouce */}
+            {/* Masquée pendant l'édition d'une ligne : la place va au clavier. */}
+            {actionBar && !editingId && (
+              <div className="detail-actions" style={{ position: "sticky", bottom: 0, zIndex: 2, padding: "12px 12px 14px", background: ZB.paper, borderTop: `1px solid ${ZB.rule}` }}>
+                <div style={{ maxWidth: 760, margin: "0 auto" }}>{actionBar}</div>
               </div>
             )}
           </div>
-        </div>
-          </div>{/* end detail-editor */}
 
-          {/* Aperçu PDF live — desktop uniquement */}
-          <div className="detail-preview" style={{ display: "none", background: "#dde1e7" }}>
+          {/* Aperçu PDF en direct : ordinateur uniquement */}
+          <div className="detail-preview" style={{ display: "none", background: ZB.paper2 }}>
             <PDFViewer d={d} cl={cl} brand={brand} inline/>
           </div>
-
-        </div>{/* end detail-row */}
-      </div>{/* end detail-shell */}
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        </div>
+      </div>
     </>
+  );
+}
+
+const hint = { margin: 0, fontSize: 15, color: ZB.ink2, lineHeight: 1.45 };
+
+// Champ texte qui s'agrandit avec son contenu (objet sur plusieurs lignes).
+function AutoTextarea({ value, onChange, readOnly, style, ...rest }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  }, [value]);
+  return (
+    <textarea ref={ref} rows={1} value={value} readOnly={readOnly}
+      onChange={e => !readOnly && onChange(e.target.value)}
+      onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } }}
+      style={style} {...rest}/>
   );
 }
 
 function LoadingSkeleton() {
   return (
-    <div style={{ padding: 18, animation: "fadeUp .2s ease both" }}>
-      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}`}</style>
-      <div style={{ height: 16, width: 80, background: "#E8E2D8", borderRadius: 8, marginBottom: 20, animation: "pulse 1.5s ease infinite" }}/>
-      {[200, 140, 160, 120].map((w, i) => (
-        <div key={i} style={{ height: i === 0 ? 28 : 14, width: `${w}px`, background: "#E8E2D8", borderRadius: 8, marginBottom: i === 0 ? 8 : 14, animation: "pulse 1.5s ease infinite" }}/>
-      ))}
-      <div style={{ height: 44, background: "#E8E2D8", borderRadius: 12, marginTop: 24, animation: "pulse 1.5s ease infinite" }}/>
+    <div role="status" aria-label="Chargement du devis" style={{ padding: "14px 12px" }}>
+      <div style={{ background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 8, padding: 18 }}>
+        <div style={{ height: 14, width: 120, background: ZB.ruleSoft, borderRadius: 3 }}/>
+        <div style={{ height: 22, width: "70%", background: ZB.ruleSoft, borderRadius: 3, marginTop: 24 }}/>
+        <div style={{ borderBottom: `2px solid ${ZB.ink}`, marginTop: 24 }}/>
+        {[0, 1, 2].map(i => <div key={i} style={{ height: 48, borderBottom: `1px ${i ? "dotted" : "solid"} ${ZB.rule}` }}/>)}
+      </div>
     </div>
   );
 }
