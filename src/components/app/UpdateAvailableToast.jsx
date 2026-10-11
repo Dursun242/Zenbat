@@ -42,7 +42,7 @@ export default function UpdateAvailableToast() {
         position: "fixed",
         // Au-dessus du BottomNav full-width style YouTube (~64px de bar
         // + safe-area capped 20px). Marge supplémentaire pour le confort tactile.
-        bottom: "calc(76px + min(env(safe-area-inset-bottom, 0px), 20px))",
+        bottom: "calc(76px + min(env(safe-area-inset-bottom, 0px), 20px) - var(--ios-viewport-gap, 0px))",
         left: 12, right: 12,
         zIndex: 200,
         background: "#1A1612",

@@ -20,6 +20,7 @@ import UpdateAvailableToast from "./components/app/UpdateAvailableToast.jsx";
 import BottomNav, { NAV_RESERVED_CSS }    from "./components/app/BottomNav.jsx";
 import BottomNavActionSheet from "./components/app/BottomNavActionSheet.jsx";
 import ViewportDiag from "./components/app/ViewportDiag.jsx";
+import { iosViewportGap, isStandalone } from "./lib/iosViewportGap.js";
 import SearchBar     from "./components/app/SearchBar.jsx";
 import SaveIndicator from "./components/app/SaveIndicator.jsx";
 import HeaderMenu    from "./components/app/HeaderMenu.jsx";
@@ -335,9 +336,20 @@ export default function App() {
     //   de saisie d'AgentIA est désormais `position: fixed` au-dessus
     //   du clavier via le hook `useKeyboardInset` (pas besoin de
     //   réduire toute la page).
-    const h = Math.max(vvh, iwh) || iwh || vvh;
+    // Bug iOS PWA : zone d'affichage amputée de la barre d'état (59 px) après
+    // un passage du clavier. On rallonge la page et on redescend les
+    // éléments ancrés en bas d'autant (--ios-viewport-gap, cf. BottomNav).
+    const gap = iosViewportGap({
+      outerHeight: window.outerHeight, innerHeight: iwh, visualHeight: vvh, standalone: isStandalone(),
+    });
+    document.documentElement.style.setProperty("--ios-viewport-gap", gap + "px");
+    const h = (Math.max(vvh, iwh) || iwh || vvh) + gap;
     document.documentElement.style.height = h + "px";
     document.body.style.height = h + "px";
+    // #root est position:fixed : sans hauteur explicite il suit la zone
+    // d'affichage raccourcie par iOS au lieu de la page.
+    const root = document.getElementById("root");
+    if (root) root.style.height = h + "px";
     // iOS PWA : annule tout auto-scroll de la window que iOS aurait
     // déclenché pour amener un input dans la vue (inutile maintenant
     // que la zone de saisie suit le clavier en position fixed).
@@ -347,13 +359,25 @@ export default function App() {
   }, []);
   useLayoutEffect(() => {
     recomputeShellHeight();
+    // Fermeture du clavier / retour dans l'appli : iOS ne signale pas
+    // toujours le changement de taille par un « resize » ; on remesure après
+    // l'animation du clavier.
+    let later;
+    const recomputeLater = () => { clearTimeout(later); later = setTimeout(recomputeShellHeight, 350); };
     window.visualViewport?.addEventListener("resize", recomputeShellHeight);
     window.addEventListener("resize", recomputeShellHeight);
     window.addEventListener("orientationchange", recomputeShellHeight);
+    window.addEventListener("focusout", recomputeLater);
+    window.addEventListener("pageshow", recomputeLater);
+    document.addEventListener("visibilitychange", recomputeLater);
     return () => {
+      clearTimeout(later);
       window.visualViewport?.removeEventListener("resize", recomputeShellHeight);
       window.removeEventListener("resize", recomputeShellHeight);
       window.removeEventListener("orientationchange", recomputeShellHeight);
+      window.removeEventListener("focusout", recomputeLater);
+      window.removeEventListener("pageshow", recomputeLater);
+      document.removeEventListener("visibilitychange", recomputeLater);
     };
   }, [recomputeShellHeight]);
   useEffect(() => {

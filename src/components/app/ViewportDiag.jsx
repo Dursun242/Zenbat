@@ -33,7 +33,8 @@ function measure() {
     ["html.clientHeight", String(document.documentElement.clientHeight)],
     ["Zone sécurité haut / bas", `${insets.top} / ${insets.bottom}`],
     ["Barre du bas (haut → bas)", nav ? `${Math.round(nav.top)} → ${Math.round(nav.bottom)} (h ${Math.round(nav.height)})` : "—"],
-    ["Écart bas barre / bas écran", nav ? `${Math.round(screen.height - nav.bottom)} px` : "—"],
+    ["Écart bas barre / bas écran", nav ? `${Math.round(window.outerHeight - nav.bottom)} px` : "—"],
+    ["Correctif iOS (--ios-viewport-gap)", getComputedStyle(document.documentElement).getPropertyValue("--ios-viewport-gap").trim() || "0px"],
     ["devicePixelRatio", String(window.devicePixelRatio)],
   ];
 }
