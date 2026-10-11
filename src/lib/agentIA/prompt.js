@@ -362,6 +362,7 @@ project_params : extrais les dimensions principales du projet depuis la demande,
 ${tvaContext}
 
 LANGUE : tu comprends toutes les langues, tu réponds TOUJOURS en français.
+TON : dans tes phrases visibles, tu tutoies l'artisan (« ton devis », « tu peux ajuster les prix »). Le contenu du devis (désignations, lots) reste neutre et professionnel.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RELECTURE FINALE — 5 AXES DE COHÉRENCE (avant d'émettre le <DEVIS>)

@@ -1,0 +1,218 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-11T21:34:15Z",
+  "title": "Design System: Zenbat",
+  "extensions": {
+    "colorMeta": {
+      "terre-cuite": {
+        "role": "primary",
+        "displayName": "Terre cuite",
+        "canonical": "#A4461F",
+        "tonalRamp": [
+          "#3A170A",
+          "#5C2510",
+          "#7E3316",
+          "#A4461F",
+          "#C2643B",
+          "#D98D6B",
+          "#ECBBA4",
+          "#F6E7DF"
+        ]
+      },
+      "stamp-green": {
+        "role": "secondary",
+        "displayName": "Vert tampon",
+        "canonical": "#1E7B3C",
+        "tonalRamp": [
+          "#0A2A14",
+          "#114820",
+          "#18652F",
+          "#1E7B3C",
+          "#3E9A5A",
+          "#6FB884",
+          "#A9D6B5",
+          "#E3F1E7"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Encre",
+        "canonical": "#1A1612",
+        "tonalRamp": [
+          "#1A1612",
+          "#3A332C",
+          "#5C544B",
+          "#6E655B",
+          "#9A9084",
+          "#D9D2C5",
+          "#ECE7DE",
+          "#FBFAF7"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Papier",
+        "canonical": "#FBFAF7"
+      },
+      "danger": {
+        "role": "semantic",
+        "displayName": "Rouge erreur",
+        "canonical": "#B42318"
+      },
+      "warn-ochre": {
+        "role": "semantic",
+        "displayName": "Ocre « à chiffrer »",
+        "canonical": "#8A5A00"
+      }
+    },
+    "typographyMeta": {
+      "total": {
+        "displayName": "Total",
+        "purpose": "Total TTC du devis, chiffres tabulaires."
+      },
+      "headline": {
+        "displayName": "Objet",
+        "purpose": "Objet du devis, sur deux lignes si besoin."
+      },
+      "lot": {
+        "displayName": "Lot",
+        "purpose": "Titre de lot en capitales espacées."
+      },
+      "body": {
+        "displayName": "Ligne",
+        "purpose": "Désignations, note de l'IA."
+      },
+      "label": {
+        "displayName": "Libellé",
+        "purpose": "Colonnes, sous-lignes qté × PU, statuts. Jamais sous 12px."
+      }
+    },
+    "shadows": [
+      {
+        "name": "floating-menu",
+        "value": "0 10px 30px rgba(26,22,18,.16)",
+        "purpose": "Menus flottants seulement (liste des langues)."
+      }
+    ],
+    "motion": [
+      {
+        "name": "inscribe",
+        "value": "320ms cubic-bezier(.2,.7,.2,1)",
+        "purpose": "Une ligne s'inscrit dans le bordereau (clip de gauche à droite)."
+      },
+      {
+        "name": "pen-stroke",
+        "value": "1.8s cubic-bezier(.2,.7,.2,1) infinite",
+        "purpose": "Trait de plume sur la ligne vierge pendant la rédaction."
+      },
+      {
+        "name": "nav-indicator",
+        "value": "cubic-bezier(.16,1,.3,1)",
+        "purpose": "Indicateur d'onglet de la barre du bas."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "document",
+        "value": "760px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Action principale",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Une seule par écran : « Enregistrer le devis ».",
+      "html": "<button class=\"ds-btn-primary\">Enregistrer le devis</button>",
+      "css": ".ds-btn-primary{width:100%;min-height:52px;border:none;border-radius:10px;background:var(--zb-accent,#A4461F);color:#fff;font:700 16px var(--zb-font,system-ui);cursor:pointer;transition:background .15s}.ds-btn-primary:hover{background:var(--zb-accent-hover,#8E3B19)}.ds-btn-primary:focus-visible{outline:2px solid #A4461F;outline-offset:2px}"
+    },
+    {
+      "name": "Action texte",
+      "kind": "button",
+      "refersTo": "button-text",
+      "description": "Actions secondaires sans fond.",
+      "html": "<button class=\"ds-btn-text\">+ Ajouter une ligne</button>",
+      "css": ".ds-btn-text{min-height:48px;background:none;border:none;color:#A4461F;font:600 15px var(--zb-font,system-ui);cursor:pointer}.ds-btn-text:focus-visible{outline:2px solid #A4461F;outline-offset:2px}"
+    },
+    {
+      "name": "Champ",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Champ sur feuille, 16px pour éviter le zoom iOS.",
+      "html": "<input class=\"ds-input\" placeholder=\"Décris tes travaux…\">",
+      "css": ".ds-input{min-height:48px;padding:0 12px;border:1px solid #D9D2C5;border-radius:8px;background:#fff;color:#1A1612;font:16px var(--zb-font,system-ui)}.ds-input::placeholder{color:#6E655B}.ds-input:focus{outline:none;border-color:#A4461F}"
+    },
+    {
+      "name": "Ligne du bordereau",
+      "kind": "custom",
+      "refersTo": "sheet",
+      "description": "Désignation, sous-ligne qté × PU · TVA, montant à droite.",
+      "html": "<button class=\"ds-line\"><span class=\"d\">Dépose baignoire et lavabo</span><span class=\"m\">320,00 €</span><span class=\"s\">1 forfait × 320,00 € · TVA 10 %</span></button>",
+      "css": ".ds-line{display:grid;grid-template-columns:1fr auto;gap:4px 16px;width:100%;padding:12px 0;background:none;border:none;border-bottom:1px solid #ECE7DE;text-align:left;font-family:var(--zb-font,system-ui);color:#1A1612;cursor:pointer}.ds-line:hover{background:#FBFAF7}.ds-line .d{font:500 15px/1.35 inherit}.ds-line .m{font-weight:600;font-variant-numeric:tabular-nums}.ds-line .s{font-size:13px;color:#5C544B;font-variant-numeric:tabular-nums}"
+    },
+    {
+      "name": "Total TTC",
+      "kind": "custom",
+      "refersTo": "sheet",
+      "description": "Total souligné d'un double trait.",
+      "html": "<div class=\"ds-total\"><span>Total TTC</span><strong>4 408,80 €</strong></div>",
+      "css": ".ds-total{display:flex;justify-content:space-between;align-items:baseline;padding:10px 0 8px;border-top:2px solid #1A1612;border-bottom:3px double #1A1612;font-family:var(--zb-font,system-ui);color:#1A1612}.ds-total span{font-weight:700}.ds-total strong{font-size:28px;font-variant-numeric:tabular-nums;letter-spacing:-.01em}"
+    },
+    {
+      "name": "Micro",
+      "kind": "button",
+      "refersTo": "mic-button",
+      "description": "Appui : dicter ; second appui : arrêter et envoyer.",
+      "html": "<button class=\"ds-mic\" aria-label=\"Dicter\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><rect x=\"9\" y=\"2\" width=\"6\" height=\"12\" rx=\"3\"/><path d=\"M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8\"/></svg></button>",
+      "css": ".ds-mic{width:56px;height:56px;border:none;border-radius:50%;display:grid;place-items:center;background:#A4461F;color:#fff;cursor:pointer}.ds-mic:focus-visible{outline:2px solid #A4461F;outline-offset:2px}.ds-mic[aria-pressed=true]{background:#B42318}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Le Bordereau",
+    "overview": "L'écran est le document : un bordereau de prix posé sur le papier, qui se remplit pendant que l'artisan dicte. Papier, encre, filets, une seule terre cuite pour agir, un vert tampon pour ce qui est acquis.",
+    "keyCharacteristics": [
+      "Une feuille sur du papier, des filets plutôt que des cartes.",
+      "Montants en chiffres tabulaires, alignés à droite, toujours en encre.",
+      "Une seule couleur d'action (terre cuite) par écran, sur l'action principale et le micro.",
+      "Les lignes s'inscrivent (fondu de gauche à droite), le total monte.",
+      "Mouvement réduit respecté partout."
+    ],
+    "rules": [
+      {
+        "name": "The One Action Rule",
+        "body": "La terre cuite marque une seule action principale par écran ; les autres actions sont du texte terre cuite ou de l'encre.",
+        "section": "colors"
+      },
+      {
+        "name": "The Interface Is Not The Brand Rule",
+        "body": "La couleur de l'artisan (brand.color) reste sur ses PDF et sa page de signature client ; l'interface garde la terre cuite.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Money Rule",
+        "body": "Tout montant est en chiffres tabulaires, aligné à droite, en encre.",
+        "section": "typography"
+      },
+      {
+        "name": "The Ruled Not Raised Rule",
+        "body": "On sépare par un filet, jamais par une ombre ou un halo ; une carte arrondie dans une carte est exclue.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do passer par les variables `--zb-*` de `src/index.css` ou l'objet `ZB` de `src/lib/theme.js`, jamais une couleur en dur.",
+      "Do afficher les montants en encre, chiffres tabulaires, alignés à droite.",
+      "Do tutoyer l'artisan dans l'interface, et garder le vouvoiement dans ce qui part chez le client.",
+      "Do garder des cibles de 44px minimum et du texte de 12px minimum.",
+      "Do prévoir `prefers-reduced-motion` pour chaque animation."
+    ],
+    "donts": [
+      "Don't afficher la conversation en bulles de chat ; l'IA parle par une note courte.",
+      "Don't poser d'ombre décorative ni de halo coloré ; séparer par des filets.",
+      "Don't utiliser la couleur de l'artisan dans l'interface.",
+      "Don't utiliser l'ocre ailleurs que pour une ligne à chiffrer, ni le vert pour une action.",
+      "Don't recopier un calcul de montant : `src/lib/invoiceCalc.js` est la seule source."
+    ]
+  }
+}

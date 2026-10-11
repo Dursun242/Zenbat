@@ -51,7 +51,7 @@ export const IOS_GAP_CSS = "var(--ios-viewport-gap, 0px)";
 // `bottom` d'un élément fixe posé juste au-dessus de la barre du bas.
 export const ABOVE_NAV_CSS = `calc(${NAV_RESERVED_CSS} - ${IOS_GAP_CSS})`;
 
-const BRAND     = "#22c55e";
+const BRAND     = "#A4461F"; // terre cuite du système « Bordereau » (cf. src/lib/theme.js)
 const BG        = "#1A1612";
 const ACTIVE    = "#FFFFFF";
 const INACTIVE  = "#8A8278";
@@ -250,9 +250,8 @@ function AgentCtaTab({ label, icon, active, onClick, plan, quotaReached, showNud
           display: "inline-flex",
           alignItems: "center", justifyContent: "center",
           transform: "translateY(-8px) scale(1.1)",
-          boxShadow: active
-            ? "0 8px 22px rgba(34,197,94,.55), 0 0 0 3px rgba(34,197,94,.28)"
-            : "0 4px 14px rgba(34,197,94,.4)",
+          // Pas de halo : un anneau de la couleur de la barre détache le bouton.
+          boxShadow: `0 0 0 3px ${BG}`,
           transition: "box-shadow .18s ease, transform .15s ease",
         }}>
         {showNudge && (
@@ -292,7 +291,6 @@ function AgentCtaTab({ label, icon, active, onClick, plan, quotaReached, showNud
           borderRadius: 10,
           whiteSpace: "nowrap",
           pointerEvents: "none",
-          boxShadow: "0 6px 20px rgba(34,197,94,.45)",
           animation: "bn-nudge-bob 1.8s ease-in-out infinite",
           zIndex: 2,
         }}>
@@ -348,7 +346,7 @@ export default function BottomNav({
       }}>
       <style>{`
         @keyframes bn-nudge-bob   { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-5px); } }
-        @keyframes bn-nudge-pulse { 0% { box-shadow: 0 0 0 0 rgba(34,197,94,.55); } 100% { box-shadow: 0 0 0 14px rgba(34,197,94,0); } }
+        @keyframes bn-nudge-pulse { 0% { box-shadow: 0 0 0 0 rgba(164,70,31,.55); } 100% { box-shadow: 0 0 0 14px rgba(164,70,31,0); } }
         .app-bottom-nav button:active { opacity: .65; }
         .app-bottom-nav button:active .bn-cta-circle { transform: translateY(-12px) scale(1.16) !important; }
       `}</style>
@@ -373,7 +371,7 @@ export default function BottomNav({
           borderRadius: 2,
           width: `${indicatorWidthPct}%`,
           left: `${indicatorLeftPct}%`,
-          transition: "left .28s cubic-bezier(.34, 1.56, .64, 1), width .28s ease",
+          transition: "left .28s cubic-bezier(.16, 1, .3, 1), width .28s ease",
           // Onglet central (Agent IA) : on cache l'indicateur, le CTA cercle
           // est déjà très visible et a son propre highlight.
           opacity: items[activeIndex]?.id === "agent" ? 0 : 1,
