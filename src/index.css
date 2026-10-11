@@ -15,6 +15,36 @@
        url('/fonts/Caveat-Regular.ttf')   format('truetype');
 }
 
+/* ── Système « Bordereau » (cf. DESIGN.md) ─────────────────────────────
+   Couleurs de l'APPLICATION Zenbat. La couleur choisie par l'artisan
+   (brand.color) reste réservée à ses documents (PDF, page de signature) :
+   elle ne colore pas l'interface. Contrastes mesurés sur --zb-paper :
+   ink 17,2 · ink-2 7,1 · ink-3 5,5 · accent 5,8 (blanc dessus 6,0) ·
+   stamp 5,1 · danger 6,3 · warn 5,7. */
+:root {
+  --zb-paper:       #FBFAF7;  /* fond des pages, papier du bordereau */
+  --zb-paper-2:     #F3F0E9;  /* second plan : barres d'outils, panneaux */
+  --zb-sheet:       #FFFFFF;  /* feuille posée sur le papier */
+  --zb-ink:         #1A1612;  /* texte principal, en-tête et barre du bas */
+  --zb-ink-2:       #5C544B;  /* texte secondaire */
+  --zb-ink-3:       #6E655B;  /* texte tertiaire (indications) */
+  --zb-rule:        #D9D2C5;  /* filets */
+  --zb-rule-soft:   #ECE7DE;  /* filets légers entre lignes */
+  --zb-accent:      #A4461F;  /* terre cuite : action principale, sélection */
+  --zb-accent-hover:#8E3B19;
+  --zb-accent-soft: #F6E7DF;  /* fond de sélection / focus */
+  --zb-stamp:       #1E7B3C;  /* tampon « signé », succès */
+  --zb-stamp-soft:  #E3F1E7;
+  --zb-danger:      #B42318;
+  --zb-danger-soft: #FBE9E7;
+  --zb-warn:        #8A5A00;
+  --zb-warn-soft:   #FBF0D9;
+  --zb-font: "Archivo Variable", "Archivo", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --zb-radius: 10px;
+  --zb-radius-sm: 6px;
+}
+::selection { background: var(--zb-accent-soft); color: var(--zb-ink); }
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -35,3 +65,7 @@ button:focus-visible, a:focus-visible {
   outline-offset: 2px;
   border-radius: 4px;
 }
+
+/* Texte réservé aux lecteurs d'écran */
+.zb-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+@media (hover: hover) { .zb-primary:hover { background: var(--zb-accent-hover) !important; } }

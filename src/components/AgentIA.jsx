@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { CLAUDE_MODEL, TX, TVA_RATES } from "../lib/constants.js";
-import { fmt, uid } from "../lib/utils.js";
+import { CLAUDE_MODEL, TX } from "../lib/constants.js";
+import { uid } from "../lib/utils.js";
 import { tradesLabels } from "../lib/trades.js";
 import { buildDevisHistorySummary } from "../lib/devisHistory.js";
 import { supabase } from "../lib/supabase.js";
@@ -16,10 +16,14 @@ import { processDevisFromRaw } from "../lib/agentIA/extractDevis.js";
 import { streamClaude, requestClaude, visibleText, ClaudeApiError, getLastServedModel } from "../lib/agentIA/stream.js";
 import { runCoherenceLoop } from "../lib/agentIA/coherenceLoop.js";
 import { loadUserCoherenceSettings } from "../lib/coherence/userOverrides.js";
-import { I } from "./ui/icons.jsx";
 import ClientPickerModal from "./ClientPickerModal.jsx";
 import CelebrateModal from "./agent/CelebrateModal.jsx";
 import ChatThread from "./agent/ChatThread.jsx";
+import Bordereau from "./agent/Bordereau.jsx";
+import DictationBar from "./agent/DictationBar.jsx";
+import { useModalGuard } from "../hooks/useModalGuard.js";
+import { ZB } from "../lib/theme.js";
+import { computeTotals, isNoTva } from "../lib/invoiceCalc.js";
 import CoherenceSettings from "./CoherenceSettings.jsx";
 
 // Clé localStorage du brouillon IA, scopée par user.id pour éviter qu'un
@@ -50,7 +54,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   // au-dessus du clavier (modèle WhatsApp / Claude / Telegram).
   const keyboardInset = useKeyboardInset();
 
-  const [msgs,         setMsgs]         = useState(() => [{ role: "assistant", content: buildAgentGreeting(brand) }]);
+  const [msgs,         setMsgs]         = useState(() => [{ role: "assistant", content: buildAgentGreeting(brand), greeting: true }]);
   const [input,        setInput]        = useState("");
   const [loading,      setLoading]      = useState(false);
   const [feedback,     setFeedback]     = useState({});
@@ -83,12 +87,16 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   const [celebrate,    setCelebrate]    = useState(false);
   const celebrateStartRef = useRef(null);
   const celebrateSecondsRef = useRef(0);
-  const [editing,      setEditing]      = useState(null);   // { id, field }
-  const [editingObjet, setEditingObjet] = useState(false);
+  const [editingId,    setEditingId]    = useState(null);   // ligne ouverte en édition
+  const [historyOpen,  setHistoryOpen]  = useState(false);
+  useModalGuard(historyOpen, () => setHistoryOpen(false));
   const [coherenceSettingsOpen, setCoherenceSettingsOpen] = useState(false);
   const userSettingsRef = useRef(null);
-  const chatRef  = useRef(null);
-  const inputRef = useRef(null);
+  const scrollRef = useRef(null);
+  const inputRef  = useRef(null);
+  // Dernier texte saisi / dicté : lu par l'envoi automatique à l'arrêt du micro.
+  const latestInputRef  = useRef("");
+  const pendingSendRef  = useRef(false);
   // Mesure dynamique de la hauteur de la barre de saisie fixe pour
   // calculer le padding-bottom du ChatThread (= permet de scroller le
   // dernier message au-dessus de la barre).
@@ -113,8 +121,21 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   } = useSpeechRecognition({ input, setInput });
   const micActive = listening || connecting;
 
-  const ac         = brand.color || "#22c55e";
-  const fontFamily = brand.fontStyle === "elegant" ? "Playfair Display" : brand.fontStyle === "tech" ? "Space Grotesk" : "DM Sans";
+  // Appui sur le micro : démarre la dictée ; second appui = arrêt ET envoi
+  // (le dernier fragment transcrit peut arriver juste après l'arrêt).
+  const onMicTap = () => {
+    if (micActive) { pendingSendRef.current = true; toggleMic(); }
+    else toggleMic();
+  };
+  useEffect(() => { latestInputRef.current = input; }, [input]);
+  useEffect(() => {
+    if (micActive || !pendingSendRef.current) return;
+    const t = setTimeout(() => {
+      pendingSendRef.current = false;
+      if (latestInputRef.current.trim()) send(latestInputRef.current);
+    }, 450);
+    return () => clearTimeout(t);
+  }, [micActive]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Résume l'historique pour contextualiser l'IA (recalculé quand devis change)
   const historySummary = useMemo(() => buildDevisHistorySummary(devis), [devis]);
@@ -123,9 +144,12 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     loadUserCoherenceSettings().then(s => { userSettingsRef.current = s; });
   }, []);
 
+  // Pendant la rédaction, on suit les lignes qui s'inscrivent.
   useEffect(() => {
-    chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
-  }, [msgs, loading]);
+    if (!loading && visibleCount === 0) return;
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [loading, visibleCount]);
 
   // Auto-grandit le textarea et suit la fin du texte (utile pendant la dictée)
   useEffect(() => {
@@ -162,18 +186,8 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     return () => clearInterval(iv);
   }, [lignes]);
 
-  const ht = lignes.filter(l => l.type_ligne === "ouvrage")
-    .reduce((s, l) => s + l.quantite * (l.prix_unitaire || 0), 0);
-
-  const tvaGroups = lignes.filter(l => l.type_ligne === "ouvrage").reduce((a, l) => {
-    const r = Number(l.tva_rate ?? 20);
-    a[r] = (a[r] || 0) + (l.quantite || 0) * (l.prix_unitaire || 0);
-    return a;
-  }, {});
-  const tvaRows = Object.keys(tvaGroups).map(Number).sort((a, b) => a - b)
-    .map(r => ({ rate: r, base: tvaGroups[r], montant: tvaGroups[r] * (r / 100) }));
-  const tvaTotal = tvaRows.reduce((s, r) => s + r.montant, 0);
-  const ttc = ht + tvaTotal;
+  // Calcul commun (lib/invoiceCalc.js) : mêmes montants que le PDF et la facture.
+  const { ht, tvaRows, ttc } = computeTotals(lignes, { noTva: isNoTva(brand?.vatRegime) });
 
 
   const send = async (overrideText) => {
@@ -417,20 +431,25 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       } else {
         msg = e instanceof ClaudeApiError ? TX.errApi : TX.errGeneral;
       }
-      updateAssistant("❌ " + msg);
+      updateAssistant(msg);
+      setMsgs(prev => {
+        const next = [...prev];
+        next[next.length - 1] = { ...next[next.length - 1], error: true };
+        return next;
+      });
     }
     setLoading(false);
   };
 
   const deleteLigne = id => setLignes(l => l.filter(x => x.id !== id));
 
-  const updateLigne = (id, field, val) =>
-    setLignes(prev => prev.map(l => l.id === id ? { ...l, [field]: val } : l));
+  const updateLigne = (id, patch) =>
+    setLignes(prev => prev.map(l => l.id === id ? { ...l, ...patch } : l));
 
   const addLigne = () => {
     const l = { id: uid(), type_ligne: "ouvrage", designation: "Nouvelle prestation", unite: "u", quantite: 1, prix_unitaire: 0, tva_rate: brand.vatRegime === "franchise" ? 0 : 20 };
     setLignes(prev => [...prev, l]);
-    setEditing({ id: l.id, field: "designation" });
+    setEditingId(l.id);
   };
 
   const finalizeSave = async (clientId) => {
@@ -441,7 +460,6 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     if (savingDevisRef.current) return;
     savingDevisRef.current = true;
     try {
-    const ht2     = lignes.filter(l => l.type_ligne === "ouvrage").reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0), 0);
     const picked  = clientId ? clients.find(c => c.id === clientId) : null;
     const newId   = uid();
     const ok = await onCreateDevis({
@@ -451,7 +469,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       client_id: clientId || null,
       ville_chantier: picked?.ville || "",
       statut: "brouillon",
-      montant_ht: ht2,
+      montant_ht: ht,
       tva_rate: 20,
       date_emission: new Date().toISOString().split("T")[0],
       lignes,
@@ -471,346 +489,94 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     }
   };
 
-  const visibleLignes = lignes.slice(0, visibleCount);
+  // Note de l'IA : sa dernière réponse, sauf le message d'accueil (l'écran
+  // vierge du bordereau le remplace).
+  const lastMsg = msgs[msgs.length - 1];
+  const note = lastMsg?.role === "assistant" && !lastMsg.greeting ? lastMsg : null;
+  const noteIdx = msgs.length - 1;
+  const onVote = (vote) => {
+    if (vote === 1) { setFeedback(prev => ({ ...prev, [noteIdx]: { vote: 1 } })); saveFeedback(noteIdx, 1); }
+    else { setFeedback(prev => ({ ...prev, [noteIdx]: { vote: -1, showReason: true } })); setHistoryOpen(true); }
+  };
+  const clearDevis = () => { try { localStorage.removeItem(draftKey); } catch {} setLignes([]); setObjet(""); setEditingId(null); };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#FAF7F2" }}>
-      <style>{`
-        @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
-        @keyframes slideIn{from{opacity:0;transform:translateX(-14px) scale(.97)}to{opacity:1;transform:translateX(0) scale(1)}}
-        @keyframes rowPop{0%{opacity:0;transform:translateY(6px) scaleY(.85)}100%{opacity:1;transform:translateY(0) scaleY(1)}}
-        @keyframes totalCount{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
-        @keyframes iaPulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(34,197,94,.35)}50%{transform:scale(1.08);box-shadow:0 0 0 6px rgba(34,197,94,0)}}
-        @keyframes fadeMsg{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes shimmer{0%{transform:translateX(-120%)}100%{transform:translateX(380%)}}
-      `}</style>
-
-      {/* ═══ HAUT : aperçu devis en cours ═══════════════════ */}
-      {/* Masqué tant qu'aucune ligne n'a été générée : le chat occupe
-          alors 100% de l'écran (boutons "Démarrage rapide" et message
-          de bienvenue remontent above-the-fold sur mobile). Le bandeau
-          réapparaît dès la 1ère ligne, avec son animation habituelle. */}
-      {lignes.length > 0 && (
-      <div style={{ flexShrink: 0, background: "white", borderBottom: "2px solid #F0EBE3", minHeight: 110, maxHeight: "45%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-
-        {/* En-tête branding */}
-        <div style={{ background: ac, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {brand.logo
-              ? <img src={brand.logo} alt="" style={{ height: 32, maxWidth: 100, objectFit: "contain" }}/>
-              : <span style={{ fontFamily, fontWeight: 800, fontSize: 15, color: "white" }}>{brand.companyName || "Votre entreprise"}</span>
-            }
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontFamily, color: "rgba(255,255,255,.6)", fontSize: 9, letterSpacing: "1.5px", fontWeight: 600 }}>{TX.quoteInProgress.toUpperCase()}</div>
-              <div style={{ fontFamily, color: "white", fontWeight: 800, fontSize: 18, marginTop: 2, animation: "totalCount .3s ease both" }}>
-                {fmt(ht)} <span style={{ fontSize: 10, fontWeight: 400, color: "rgba(255,255,255,.7)", marginLeft: 4 }}>HT</span>
-              </div>
-            </div>
-            <button onClick={() => setCoherenceSettingsOpen(true)} title="Paramètres de vérification"
-              style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: 8, padding: 6, cursor: "pointer", color: "white", lineHeight: 0, flexShrink: 0 }}>
-              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-            </button>
-          </div>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: ZB.paper, fontFamily: ZB.font, color: ZB.ink }}>
+      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: `12px 12px ${inputAreaHeight + keyboardInset + 16}px` }}>
+        <div style={{ maxWidth: 760, margin: "0 auto" }}>
+          <Bordereau
+            brand={brand}
+            objet={objet}
+            onObjetChange={setObjet}
+            lignes={lignes}
+            visibleCount={visibleCount}
+            editingId={editingId}
+            setEditingId={setEditingId}
+            onLineChange={updateLigne}
+            onLineDelete={deleteLigne}
+            onAddLine={addLigne}
+            ht={ht}
+            tvaRows={tvaRows}
+            ttc={ttc}
+            loading={loading}
+            quickStarts={quickStarts}
+            onExample={send}
+            onSave={() => setPickingClient(true)}
+            onClear={clearDevis}
+            onOpenCoherence={() => setCoherenceSettingsOpen(true)}
+            historySummary={historySummary}
+          />
         </div>
-
-        {/* Objet du devis */}
-        {objet && (
-          <div style={{ background: "#1A1612", padding: "6px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            {editingObjet
-              ? <input autoFocus defaultValue={objet}
-                  onBlur={e => { setObjet(e.target.value.trim() || objet); setEditingObjet(false); }}
-                  onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEditingObjet(false); }}
-                  style={{ flex: 1, fontFamily, fontSize: 12, fontWeight: 600, color: "#1A1612", background: "white", border: "none", outline: "none", borderRadius: 4, padding: "2px 6px" }} />
-              : <span onClick={() => setEditingObjet(true)} title="Cliquer pour modifier"
-                  style={{ fontFamily, color: "rgba(255,255,255,.9)", fontSize: 12, fontWeight: 600, cursor: "text", flex: 1 }}>{objet}</span>
-            }
-            <span style={{ color: "#6B6358", fontSize: 10, marginLeft: 8, flexShrink: 0 }}>{lignes.filter(l => l.type_ligne === "ouvrage").length} ligne{lignes.filter(l => l.type_ligne === "ouvrage").length > 1 ? "s" : ""}</span>
-          </div>
-        )}
-
-        {/* Tableau des lignes */}
-        <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
-          {visibleLignes.length === 0 ? (
-            <div style={{ padding: "20px 16px", textAlign: "center" }}>
-              <div style={{ fontSize: 24, marginBottom: 8 }}>📋</div>
-              <div style={{ fontSize: 12, color: "#9A8E82", fontWeight: 500 }}>Les lignes du devis apparaîtront ici</div>
-              <div style={{ fontSize: 11, color: "#cbd5e1", marginTop: 4 }}>Décrivez votre besoin ci-dessous</div>
-            </div>
-          ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead style={{ position: "sticky", top: 0, background: "white", zIndex: 1 }}>
-                <tr style={{ borderBottom: "1px solid #F0EBE3" }}>
-                  <th style={{ textAlign: "left",  padding: "6px 14px", fontSize: 9, fontWeight: 600, color: "#9A8E82", letterSpacing: "1px" }}>DÉSIGNATION</th>
-                  <th style={{ textAlign: "right", padding: "6px 8px",  fontSize: 9, fontWeight: 600, color: "#9A8E82", width: 50 }}>QTÉ</th>
-                  <th style={{ textAlign: "right", padding: "6px 8px",  fontSize: 9, fontWeight: 600, color: "#9A8E82", width: 65 }}>P.U. HT</th>
-                  <th style={{ textAlign: "right", padding: "6px 14px", fontSize: 9, fontWeight: 600, color: "#9A8E82", width: 75 }}>TOTAL HT</th>
-                  <th style={{ width: 28 }}/>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleLignes.map((l, idx) => {
-                  if (l.type_ligne === "lot") return (
-                    <tr key={l.id} style={{ animation: "slideIn .25s ease both", animationDelay: `${idx * 0.05}s` }}>
-                      <td colSpan={5} style={{ background: ac + "18", padding: "7px 14px", borderBottom: "1px solid " + ac + "22" }}>
-                        <span style={{ fontFamily, fontSize: 10, fontWeight: 700, color: ac, textTransform: "uppercase", letterSpacing: "1px" }}>{l.designation}</span>
-                      </td>
-                    </tr>
-                  );
-                  const total = (l.quantite != null && l.prix_unitaire != null)
-                    ? l.quantite * l.prix_unitaire
-                    : null;
-                  return (
-                    <tr key={l.id} style={{ borderBottom: "1px solid #FAF7F2", animation: "rowPop .3s cubic-bezier(.34,1.3,.64,1) both", animationDelay: `${idx * 0.06}s` }}>
-                      <td style={{ padding: "8px 14px" }}>
-                        {editing?.id === l.id && editing?.field === "designation"
-                          ? <input autoFocus defaultValue={l.designation}
-                              onBlur={e => { updateLigne(l.id, "designation", e.target.value.trim() || l.designation); setEditing(null); }}
-                              onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEditing(null); }}
-                              style={{ fontSize: 12, fontWeight: 500, color: "#2A231C", width: "100%", border: "none", outline: `2px solid ${ac}`, borderRadius: 4, padding: "2px 4px", background: "#f0fdf4", fontFamily }} />
-                          : <div onClick={() => setEditing({ id: l.id, field: "designation" })} title="Cliquer pour modifier"
-                              style={{ fontSize: 12, fontWeight: 500, color: "#2A231C", fontFamily, cursor: "text" }}>{l.designation}</div>
-                        }
-                        <div style={{ fontSize: 10, color: "#9A8E82", marginTop: 1, display: "flex", alignItems: "center", gap: 6 }}>
-                          <span>{l.unite}</span>
-                          <button
-                            onClick={() => {
-                              if (brand.vatRegime === "franchise") return;
-                              const cur   = Number(l.tva_rate ?? 20);
-                              const idx   = TVA_RATES.indexOf(cur);
-                              const next  = TVA_RATES[(idx >= 0 ? idx + 1 : 0) % TVA_RATES.length];
-                              setLignes(prev => prev.map(x => x.id === l.id ? { ...x, tva_rate: next } : x));
-                            }}
-                            disabled={brand.vatRegime === "franchise"}
-                            title={brand.vatRegime === "franchise" ? "Franchise en base (art. 293 B du CGI)" : "Cliquer pour changer le taux de TVA"}
-                            style={{ background: "#F0EBE3", color: "#6B6358", border: "none", borderRadius: 4, padding: "1px 6px", fontSize: 9, fontWeight: 600, cursor: brand.vatRegime === "franchise" ? "default" : "pointer" }}>
-                            TVA {(l.tva_rate ?? (brand.vatRegime === "franchise" ? 0 : 20)).toString().replace(".", ",")}%
-                          </button>
-                        </div>
-                      </td>
-                      <td style={{ padding: "8px", textAlign: "right", fontSize: 12, color: "#3D3028", fontWeight: 600 }}>
-                        {editing?.id === l.id && editing?.field === "quantite"
-                          ? <input autoFocus type="number" defaultValue={l.quantite} min="0"
-                              onBlur={e => { updateLigne(l.id, "quantite", parseFloat(e.target.value) || 0); setEditing(null); }}
-                              onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEditing(null); }}
-                              style={{ width: 50, textAlign: "right", border: "none", outline: `2px solid ${ac}`, borderRadius: 4, fontSize: 12, fontWeight: 600, color: "#3D3028", background: "#f0fdf4", padding: "2px 4px" }} />
-                          : <span onClick={() => setEditing({ id: l.id, field: "quantite" })} title="Cliquer pour modifier" style={{ cursor: "text", color: l.quantite == null ? "#f59e0b" : undefined }}>{l.quantite ?? "—"}</span>
-                        }
-                      </td>
-                      <td style={{ padding: "8px", textAlign: "right", fontSize: 11, color: "#6B6358" }}>
-                        {editing?.id === l.id && editing?.field === "prix"
-                          ? <input autoFocus type="number" defaultValue={l.prix_unitaire} min="0" step="0.01"
-                              onBlur={e => { updateLigne(l.id, "prix_unitaire", parseFloat(e.target.value) || 0); setEditing(null); }}
-                              onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEditing(null); }}
-                              style={{ width: 65, textAlign: "right", border: "none", outline: `2px solid ${ac}`, borderRadius: 4, fontSize: 11, color: "#6B6358", background: "#f0fdf4", padding: "2px 4px" }} />
-                          : <span onClick={() => setEditing({ id: l.id, field: "prix" })} title="Cliquer pour modifier" style={{ cursor: "text", color: l.prix_unitaire == null ? "#f59e0b" : undefined }}>{l.prix_unitaire != null ? fmt(l.prix_unitaire) : "—"}</span>
-                        }
-                      </td>
-                      <td style={{ padding: "8px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: total == null ? "#f59e0b" : "#1A1612" }}>{total != null ? fmt(total) : "—"}</td>
-                      <td style={{ padding: "4px" }}>
-                        <button onClick={() => deleteLigne(l.id)}
-                          aria-label="Supprimer la ligne"
-                          style={{ background: "none", border: "none", cursor: "pointer", color: "#E8E2D8", fontSize: 14, lineHeight: 1, padding: "2px 4px" }}
-                          onMouseOver={e => e.target.style.color = "#ef4444"}
-                          onMouseOut={e => e.target.style.color = "#E8E2D8"}>×</button>
-                      </td>
-                    </tr>
-                  );
-                })}
-
-                {/* Bouton ajouter une ligne manuelle */}
-                {visibleCount >= lignes.length && lignes.length > 0 && (
-                  <tr>
-                    <td colSpan={5} style={{ padding: "4px 14px 8px" }}>
-                      <button onClick={addLigne}
-                        style={{ background: "none", border: `1px dashed ${ac}44`, borderRadius: 8, padding: "5px 14px", fontSize: 11, color: ac, cursor: "pointer", width: "100%", fontWeight: 600 }}>
-                        + Ajouter une ligne
-                      </button>
-                    </td>
-                  </tr>
-                )}
-
-                {/* Indicateur d'ajout en cours */}
-                {visibleCount < lignes.length && (
-                  <tr><td colSpan={5} style={{ padding: "8px 14px" }}>
-                    <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
-                      {[0, 1, 2].map(i => (
-                        <div key={i} style={{ width: 5, height: 5, borderRadius: "50%", background: ac, animation: `bounce .8s ease ${i * 150}ms infinite` }}/>
-                      ))}
-                      <span style={{ fontSize: 10, color: "#9A8E82", marginLeft: 4 }}>Ajout en cours…</span>
-                    </div>
-                  </td></tr>
-                )}
-              </tbody>
-
-              {/* Totaux */}
-              {ht > 0 && visibleCount >= lignes.length && (
-                <tfoot>
-                  <tr style={{ borderTop: `2px solid ${ac}` }}>
-                    <td colSpan={3} style={{ padding: "8px 14px", fontSize: 12, fontWeight: 700, color: "#1A1612", fontFamily }}>Total HT</td>
-                    <td style={{ padding: "8px 14px", textAlign: "right", fontSize: 14, fontWeight: 800, color: ac, fontFamily, animation: "totalCount .4s ease both" }}>{fmt(ht)}</td>
-                    <td/>
-                  </tr>
-                  {tvaRows.map(row => (
-                    <tr key={row.rate} style={{ background: "#FAF7F2" }}>
-                      <td colSpan={3} style={{ padding: "4px 14px", fontSize: 11, color: "#6B6358" }}>
-                        TVA {row.rate.toString().replace(".", ",")}% <span style={{ color: "#cbd5e1", fontSize: 10 }}>(sur {fmt(row.base)})</span>
-                      </td>
-                      <td style={{ padding: "4px 14px", textAlign: "right", fontSize: 11, color: "#6B6358" }}>{fmt(row.montant)}</td>
-                      <td/>
-                    </tr>
-                  ))}
-                  <tr style={{ background: ac }}>
-                    <td colSpan={3} style={{ padding: "8px 14px", fontSize: 13, fontWeight: 800, color: "white", fontFamily }}>Total TTC</td>
-                    <td style={{ padding: "8px 14px", textAlign: "right", fontSize: 15, fontWeight: 800, color: "white", fontFamily }}>{fmt(ttc)}</td>
-                    <td/>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          )}
-        </div>
-
-        {/* Boutons Enregistrer / Effacer */}
-        {lignes.length > 0 && visibleCount >= lignes.length && (
-          <div style={{ padding: "10px 14px", borderTop: "1px solid #F0EBE3", display: "flex", gap: 8, flexShrink: 0, animation: "fadeUp .3s ease both" }}>
-            <button onClick={() => { try { localStorage.removeItem(draftKey); } catch {} setLignes([]); setObjet(""); }}
-              style={{ flex: 1, background: "none", border: "1px solid #E8E2D8", borderRadius: 10, padding: 9, fontSize: 12, color: "#6B6358", cursor: "pointer", fontWeight: 500 }}>
-              {TX.clearQuote}
-            </button>
-            <button onClick={() => setPickingClient(true)}
-              style={{ flex: 2, background: ac, color: "white", border: "none", borderRadius: 10, padding: 9, fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: `0 3px 10px ${ac}55` }}>
-              {TX.saveQuote}
-            </button>
-          </div>
-        )}
       </div>
+
+      <DictationBar
+        ref={inputAreaRef}
+        bottom={keyboardInset > 0 ? `${keyboardInset}px` : ABOVE_NAV_CSS}
+        inputRef={inputRef}
+        input={input}
+        setInput={setInput}
+        onSend={() => send()}
+        loading={loading}
+        micActive={micActive}
+        listening={listening}
+        connecting={connecting}
+        micSupported={micSupported}
+        micError={micError}
+        onMicTap={onMicTap}
+        currentLang={currentLang}
+        langs={langs}
+        langMenu={langMenu}
+        setLangMenu={setLangMenu}
+        pickLang={pickLang}
+        note={note}
+        feedback={feedback[noteIdx]}
+        onVote={onVote}
+        onOpenHistory={() => setHistoryOpen(true)}
+      />
+
+      {historyOpen && (
+        <div role="dialog" aria-modal="true" aria-labelledby="zb-history-title"
+          style={{ position: "fixed", inset: 0, zIndex: 70, background: ZB.paper, display: "flex", flexDirection: "column", fontFamily: ZB.font }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "calc(10px + env(safe-area-inset-top, 0px)) 14px 10px", borderBottom: `1px solid ${ZB.rule}`, background: ZB.sheet }}>
+            <h2 id="zb-history-title" style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>Échanges avec Zenbat</h2>
+            <button type="button" onClick={() => setHistoryOpen(false)}
+              style={{ minHeight: 44, padding: "0 14px", borderRadius: 8, border: `1px solid ${ZB.rule}`, background: ZB.sheet, color: ZB.ink, fontFamily: "inherit", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+              Fermer
+            </button>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: "0 16px calc(24px + env(safe-area-inset-bottom, 0px))" }}>
+            <div style={{ maxWidth: 760, margin: "0 auto" }}>
+              <ChatThread msgs={msgs} feedback={feedback} setFeedback={setFeedback} saveFeedback={saveFeedback} loading={loading}/>
+            </div>
+          </div>
+        </div>
       )}
-
-      {/* ═══ BAS : chat ══════════════════════════════════════ */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-
-        {/* Messages */}
-        <ChatThread
-          chatRef={chatRef}
-          msgs={msgs}
-          feedback={feedback}
-          setFeedback={setFeedback}
-          saveFeedback={saveFeedback}
-          loading={loading}
-          ac={ac}
-          historySummary={historySummary}
-          quickStarts={quickStarts}
-          lignes={lignes}
-          send={send}
-          bottomPad={inputAreaHeight + keyboardInset + 8}
-        />
-      </div>
-
-      {/* Zone de saisie — `position: fixed` ancrée au-dessus du clavier
-          ou au-dessus du BottomNav. Modèle chat (WhatsApp / Claude). */}
-      <div ref={inputAreaRef} className="agent-input-bar" style={{
-        position: "fixed",
-        left: 0, right: 0,
-        bottom: keyboardInset > 0 ? `${keyboardInset}px` : ABOVE_NAV_CSS,
-        padding: "10px 14px 12px",
-        background: "white",
-        borderTop: "1px solid #F0EBE3",
-        transition: "bottom .22s ease",
-        zIndex: 30,
-      }}>
-        <style>{`
-          @keyframes micPulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,.55),0 6px 18px rgba(239,68,68,.45)}70%{box-shadow:0 0 0 16px rgba(239,68,68,0),0 6px 18px rgba(239,68,68,.45)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0),0 6px 18px rgba(239,68,68,.45)}}
-          @keyframes micWave{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
-        `}</style>
-
-          {/* Champ texte + envoyer */}
-          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", background: "#FAF7F2", borderRadius: 14, border: `1.5px solid ${micActive ? "#ef4444" : (input.trim() ? ac : "#E8E2D8")}`, padding: "8px 10px", transition: "border-color .2s" }}>
-            <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-              placeholder={connecting ? "Connexion au micro…" : listening ? "Écoute en cours…" : TX.inputPlaceholder}
-              rows={1} style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 16, color: "#2A231C", resize: "none", fontFamily: "inherit", lineHeight: 1.5, maxHeight: 120, overflowY: "auto" }}/>
-            <button onClick={send} disabled={!input.trim() || loading}
-              aria-label="Envoyer le message"
-              style={{ width: 34, height: 34, borderRadius: 10, background: input.trim() && !loading ? ac : "#d1fae5", border: "none", display: "flex", alignItems: "center", justifyContent: "center", color: "white", cursor: "pointer", transition: "background .2s", flexShrink: 0 }}>
-              {I.send}
-            </button>
-          </div>
-
-          {/* Sélecteur langue + bouton micro — layout compact horizontal */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 8, position: "relative" }}>
-            <button
-              onClick={() => setLangMenu(v => !v)}
-              style={{ background: "#F0EBE3", border: "1px solid #E8E2D8", borderRadius: 20, padding: "3px 9px", fontSize: 11, fontWeight: 600, color: "#3D3028", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-              <span>{currentLang.flag}</span>
-              <span>{currentLang.label}</span>
-              <span style={{ fontSize: 9, color: "#9A8E82" }}>▾</span>
-            </button>
-
-            <span style={{ fontSize: 11, color: micActive ? "#ef4444" : "#6B6358", fontWeight: 500 }}>
-              {connecting ? "Connexion au micro…" : listening ? "Parlez, je transcris…" : (micSupported ? "Appuyez pour dicter" : "Vocal indisponible")}
-            </span>
-
-            <button
-              onClick={toggleMic}
-              disabled={!micSupported}
-              aria-label={micSupported ? (micActive ? "Arrêter la dictée" : "Démarrer la dictée vocale") : "Dictée vocale non supportée"}
-              title={micSupported ? (micActive ? "Appuyez pour arrêter" : "Appuyez pour parler") : "Non supporté par ce navigateur — essayez Chrome ou Edge"}
-              style={{
-                width: 44, height: 44, borderRadius: "50%",
-                background: micActive ? "#ef4444" : (micSupported ? ac : "#cbd5e1"),
-                border: "none", cursor: micSupported ? "pointer" : "not-allowed",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "white",
-                boxShadow: micActive
-                  ? "0 0 0 0 rgba(239,68,68,.55), 0 4px 12px rgba(239,68,68,.4)"
-                  : `0 4px 12px ${ac}55`,
-                transition: "background .2s, transform .15s",
-                animation: listening ? "micPulse 1.4s ease-out infinite" : connecting ? "micPulse 0.9s ease-out infinite" : "none",
-                flexShrink: 0,
-                opacity: connecting ? 0.8 : 1,
-              }}>
-              {listening ? (
-                <div style={{ display: "flex", gap: 2, alignItems: "center", height: 16 }}>
-                  {[0, 1, 2, 3, 4].map(i => (
-                    <div key={i} style={{ width: 2.5, height: 14, borderRadius: 2, background: "white", animation: `micWave .9s ease-in-out ${i * 0.12}s infinite` }}/>
-                  ))}
-                </div>
-              ) : connecting ? (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" style={{ animation: "micWave .9s linear infinite" }}/></svg>
-              ) : <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 003-3V5a3 3 0 00-6 0v6a3 3 0 003 3z"/><path d="M19 11a1 1 0 10-2 0 5 5 0 01-10 0 1 1 0 10-2 0 7 7 0 006 6.92V20H8a1 1 0 100 2h8a1 1 0 100-2h-3v-2.08A7 7 0 0019 11z"/></svg>}
-            </button>
-
-            {langMenu && (
-              <>
-                <div onClick={() => setLangMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }}/>
-                <div style={{ position: "absolute", bottom: "calc(100% + 6px)", left: 0, background: "white", border: "1px solid #E8E2D8", borderRadius: 12, boxShadow: "0 10px 28px rgba(15,23,42,.18)", padding: 4, zIndex: 41, maxHeight: 260, overflowY: "auto", minWidth: 180 }}>
-                  {langs.map(l => (
-                    <button key={l.code} onClick={() => pickLang(l.code)}
-                      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: l.code === currentLang.code ? "#f0fdf4" : "none", border: "none", padding: "8px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, color: "#1A1612", textAlign: "left" }}>
-                      <span style={{ fontSize: 14 }}>{l.flag}</span>
-                      <span style={{ fontWeight: l.code === currentLang.code ? 700 : 500, flex: 1 }}>{l.label}</span>
-                      {l.code === currentLang.code && <span style={{ color: ac, fontSize: 12 }}>✓</span>}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-        {micError && (
-          <div style={{ fontSize: 11, color: "#991b1b", background: "#fef2f2", border: "1px solid #fecaca", padding: "5px 10px", borderRadius: 8, marginTop: 6, textAlign: "center" }}>
-            {micError}
-          </div>
-        )}
-      </div>
 
       {pickingClient && (
         <ClientPickerModal
           clients={clients}
-          ac={ac}
-          fontFamily={fontFamily}
+          ac={ZB.accent}
+          fontFamily={ZB.font}
           onSaveClient={onSaveClient}
           onPick={finalizeSave}
           onClose={() => setPickingClient(false)}
@@ -820,8 +586,8 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       {celebrate && (
         <CelebrateModal
           seconds={celebrateSecondsRef.current}
-          fontFamily={fontFamily}
-          ac={ac}
+          fontFamily={ZB.font}
+          ac={ZB.accent}
           onClose={() => setCelebrate(false)}
           onSave={() => { setCelebrate(false); setPickingClient(true); }}
         />
