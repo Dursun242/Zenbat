@@ -13,8 +13,8 @@ import { useDevis }     from "./hooks/useDevis.js";
 import { useInvoices }  from "./hooks/useInvoices.js";
 import { useSupportUnread } from "./hooks/useSupportUnread.js";
 
-import Logo          from "./components/ui/Logo.jsx";
 import { I }         from "./components/ui/icons.jsx";
+import { ZB }        from "./lib/theme.js";
 import Toast         from "./components/app/Toast.jsx";
 import UpdateAvailableToast from "./components/app/UpdateAvailableToast.jsx";
 import BottomNav, { NAV_RESERVED_CSS }    from "./components/app/BottomNav.jsx";
@@ -52,17 +52,24 @@ import SubscriptionScreen from "./pages/SubscriptionScreen.jsx"
 
 const ScreenLoader = () => (
   <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 200 }}>
-    <div style={{ width: 20, height: 20, border: "2px solid #E8E2D8", borderTopColor: "#22c55e", borderRadius: "50%", animation: "spin 0.7s linear infinite" }}/>
+    <div style={{ width: 20, height: 20, border: `2px solid ${ZB.rule}`, borderTopColor: ZB.accent, borderRadius: "50%", animation: "spin 0.7s linear infinite" }}/>
   </div>
 )
 
 const NAV = [
-  { id: "dashboard", label: "Accueil",  icon: I.trend },
-  { id: "clients",   label: "Clients",  icon: I.users },
-  { id: "agent",     label: "Agent IA", icon: I.spark },
-  { id: "devis",     label: "Devis",    icon: I.file  },
-  { id: "factures",  label: "Factures", icon: I.file  },
+  { id: "dashboard", label: "Accueil",  icon: I.home    },
+  { id: "clients",   label: "Clients",  icon: I.users   },
+  { id: "agent",     label: "Agent IA", icon: I.spark   },
+  { id: "devis",     label: "Devis",    icon: I.file    },
+  { id: "factures",  label: "Factures", icon: I.receipt },
 ];
+
+// Titre affiché dans la barre du haut pour chaque écran.
+const SCREEN_TITLES = {
+  dashboard: "Accueil", clients: "Clients", client_detail: "Client",
+  devis: "Devis", devis_detail: "Devis", factures: "Factures", factures_detail: "Facture",
+  agent: "Agent IA", admin: "Administration",
+};
 
 // Onglet initial depuis ?tab= dans l'URL — utilisé par les liens dans les
 // emails artisan (ex. notification de négociation client). On nettoie
@@ -404,9 +411,9 @@ export default function App() {
 
   if (checkoutPending) {
     return (
-      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#FAF7F2", fontFamily: "Inter, system-ui, sans-serif", padding: 24 }}>
+      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: ZB.paper, fontFamily: ZB.font, padding: 24 }}>
         <div style={{ textAlign: "center", maxWidth: 360 }}>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 28, fontWeight: 800, marginBottom: 16, letterSpacing: "-0.5px" }}>
+          <div style={{ fontSize: 28, fontWeight: 800, marginBottom: 16, letterSpacing: "-0.01em" }}>
             <span style={{ color: "#22c55e" }}>Zen</span><span style={{ color: "#1A1612" }}>bat</span>
           </div>
           {!checkoutError ? (
@@ -477,9 +484,8 @@ export default function App() {
   );
 
   return (
-    <div style={{ fontFamily: "Inter, system-ui, sans-serif", height: "100%", display: "flex", flexDirection: "column", background: "#FAF7F2", overflow: "hidden", position: "relative" }}>
+    <div style={{ fontFamily: ZB.font, color: ZB.ink, height: "100%", display: "flex", flexDirection: "column", background: ZB.paper, overflow: "hidden", position: "relative" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,400;1,700&family=Space+Grotesk:wght@400;600;700&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
         html,body,#root{height:100%;overflow:hidden}
         /* iOS PWA standalone : sans position:fixed, iOS scrolle la
@@ -490,7 +496,7 @@ export default function App() {
            document, et notre setH gère la hauteur dynamiquement. */
         body,#root{position:fixed;inset:0}
         html,body{background:#1A1612}
-        ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#E8E2D8;border-radius:2px}
+        ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:${ZB.rule};border-radius:3px}
         @keyframes fadeUp{from{opacity:0}to{opacity:1}}
         @keyframes popIn{0%{opacity:0;transform:scale(.92) translateY(6px)}100%{opacity:1;transform:scale(1) translateY(0)}}
         @keyframes spin{to{transform:rotate(360deg)}}
@@ -511,15 +517,22 @@ export default function App() {
           .agent-input-bar{left:220px !important;bottom:0 !important}
         }
         @media (max-width:1023px){.app-sidebar{display:none !important}}
-        .app-sidebar button:hover{background:rgba(255,255,255,.05) !important;color:#9A8E82 !important}
-        .app-sidebar button.active-nav:hover{background:rgba(34,197,94,.15) !important;color:#22c55e !important}
+        .app-sidebar button:hover{background:rgba(255,255,255,.06) !important;color:${ZB.onInk} !important}
+        .app-sidebar button.active-nav:hover{background:rgba(255,255,255,.1) !important;color:#FFFFFF !important}
+        .app-sidebar button:focus-visible,.app-header button:focus-visible{outline:2px solid ${ZB.accent};outline-offset:2px}
       `}</style>
 
       {/* Header */}
-      <header style={{ background: "#1A1612", padding: "calc(10px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 10px calc(18px + env(safe-area-inset-left))", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-        <span onClick={onLogoTap} style={{ display: "inline-flex" }}><Logo size={24} white/></span>
+      {/* La bande sous l'heure reste encre : en PWA iOS la barre d'état
+          (black-translucent) écrit en blanc par-dessus. */}
+      <header className="app-header" style={{ flexShrink: 0, background: ZB.paper, borderBottom: `2px solid ${ZB.ink}` }}>
+        <div aria-hidden="true" style={{ height: "env(safe-area-inset-top)", background: ZB.ink }}/>
+        <div style={{ minHeight: 56, padding: "6px calc(14px + env(safe-area-inset-right)) 6px calc(18px + env(safe-area-inset-left))", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <h1 onClick={onLogoTap} style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.2, color: ZB.ink, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", userSelect: "none" }}>
+          {SCREEN_TITLES[tab] || "Zenbat"}
+        </h1>
         {diagOpen && <ViewportDiag onClose={() => setDiagOpen(false)}/>}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           <SaveIndicator state={saveState}/>
           <HeaderMenu
             isAdmin={isAdmin}
@@ -538,15 +551,17 @@ export default function App() {
             onSignOut={handleSignOut}
           />
         </div>
+        </div>
       </header>
 
       {/* Compteur quota devis freemium (hebdomadaire) */}
       {isFreemium && devisThisWeekCount > 0 && (
         <button onClick={() => setScreen("paywall")}
-          style={{ flexShrink: 0, width: "100%", background: freemiumQuotaReached ? "#fef2f2" : "#f0fdf4", borderBottom: `1px solid ${freemiumQuotaReached ? "#fecaca" : "#bbf7d0"}`, padding: "6px 14px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", border: "none", color: freemiumQuotaReached ? "#991b1b" : "#166534", fontSize: 11, fontWeight: 600 }}>
+          style={{ flexShrink: 0, width: "100%", minHeight: 36, background: freemiumQuotaReached ? ZB.dangerSoft : ZB.paper2, border: "none", borderBottom: `1px solid ${ZB.rule}`, padding: "6px 14px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", color: freemiumQuotaReached ? ZB.danger : ZB.ink2, fontSize: 13, fontWeight: 600 }}>
           {freemiumQuotaReached
-            ? `⛔ Limite atteinte (${FREEMIUM_WEEKLY_DEVIS_LIMIT}/${FREEMIUM_WEEKLY_DEVIS_LIMIT} devis cette semaine) — passer en Pro`
-            : `📝 ${devisThisWeekCount}/${FREEMIUM_WEEKLY_DEVIS_LIMIT} devis cette semaine — passer en Pro`}
+            ? `Limite atteinte : ${FREEMIUM_WEEKLY_DEVIS_LIMIT} devis sur ${FREEMIUM_WEEKLY_DEVIS_LIMIT} cette semaine.`
+            : `${devisThisWeekCount} devis sur ${FREEMIUM_WEEKLY_DEVIS_LIMIT} cette semaine.`}
+          <span style={{ color: ZB.accent, textDecoration: "underline", textUnderlineOffset: 3 }}>Passer en Pro</span>
         </button>
       )}
 
@@ -554,23 +569,22 @@ export default function App() {
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
 
         {/* Sidebar desktop */}
-        <nav className="app-sidebar" style={{ display: "none", width: 220, flexDirection: "column", background: "#1A1612", borderRight: "1px solid rgba(255,255,255,.06)", flexShrink: 0, paddingTop: 8, overflowY: "auto" }}>
+        <nav className="app-sidebar" aria-label="Navigation" style={{ display: "none", width: 220, flexDirection: "column", gap: 2, background: ZB.ink, flexShrink: 0, padding: "10px 10px", overflowY: "auto" }}>
           {NAV.map(({ id, label, icon }) => {
             const active = activeNav === id;
             const badgeCount = navBadges[id] || 0;
             return (
               <button key={id} onClick={() => setTab(id)}
-                className={active ? "active-nav" : ""}
-                style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", background: active ? "rgba(34,197,94,.1)" : "transparent", border: "none", borderLeft: `3px solid ${active ? "#22c55e" : "transparent"}`, color: active ? "#22c55e" : "#6B6358", cursor: "pointer", width: "100%", textAlign: "left", fontSize: 14, fontWeight: active ? 600 : 400, transition: "all .15s", position: "relative" }}>
+                className={active ? "active-nav" : ""} aria-current={active ? "page" : undefined}
+                style={{ display: "flex", alignItems: "center", gap: 12, minHeight: 44, padding: "10px 12px", borderRadius: 8, background: active ? "rgba(255,255,255,.1)" : "transparent", border: "none", color: active ? "#FFFFFF" : ZB.onInk2, cursor: "pointer", width: "100%", textAlign: "left", fontSize: 15, fontWeight: active ? 700 : 500, transition: "background .15s, color .15s", position: "relative" }}>
                 {icon}
-                <span>{label}</span>
+                {/* Même repère que la barre du bas : un trait terre cuite. */}
+                <span style={active ? { textDecoration: "underline", textDecorationColor: ZB.accent, textDecorationThickness: 2, textUnderlineOffset: 6 } : undefined}>{label}</span>
                 {id === "agent" && isFreemium && freemiumQuotaReached && (
-                  <span style={{ marginLeft: "auto", background: "#ef4444", color: "white", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 10 }}>
-                    !
-                  </span>
+                  <span aria-label="Limite atteinte" style={{ marginLeft: "auto", width: 10, height: 10, borderRadius: "50%", background: ZB.danger, boxShadow: `0 0 0 2px ${ZB.onInk}` }}/>
                 )}
                 {id !== "agent" && badgeCount > 0 && (
-                  <span style={{ marginLeft: "auto", background: "#ef4444", color: "white", fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 10, minWidth: 18, textAlign: "center" }}>
+                  <span style={{ marginLeft: "auto", background: ZB.accent, color: "white", fontSize: 12, fontWeight: 700, padding: "1px 7px", borderRadius: 10, minWidth: 20, textAlign: "center" }}>
                     {badgeCount > 99 ? "99+" : badgeCount}
                   </span>
                 )}
@@ -684,7 +698,7 @@ export default function App() {
 
       <Toast toast={toast} onDismiss={dismissToast}/>
       <UpdateAvailableToast />
-      <SupportChat accent={brand?.color || "#22c55e"} open={supportOpen} onClose={() => { setSupportOpen(false); refreshSupportUnread(); }}/>
+      <SupportChat accent={ZB.accent} open={supportOpen} onClose={() => { setSupportOpen(false); refreshSupportUnread(); }}/>
       {comptableOpen && (
         <SendToComptableModal user={user} onClose={() => setComptableOpen(false)}/>
       )}

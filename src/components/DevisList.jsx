@@ -257,8 +257,7 @@ export default function DevisList({ devis, clients, goDevis, setTab, onDelete, o
     <div style={{ padding: 18 }} className="fu">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 600, color: "#1A1612", fontFamily: "'Syne', sans-serif", letterSpacing: '-0.3px' }}>Devis</h1>
-          <p style={{ color: "#9A8E82", fontSize: 11, marginTop: 2 }}>{total} affaire{total > 1 ? "s" : ""}</p>
+          <p style={{ color: "#5C544B", fontSize: 14 }}>{total} devis</p>
         </div>
         <button onClick={() => setTab("agent")}
           style={{ background: "#22c55e", color: "white", border: "none", borderRadius: 12,

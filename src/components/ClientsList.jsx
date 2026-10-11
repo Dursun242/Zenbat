@@ -106,8 +106,7 @@ Règles :
     <div style={{ padding: 18 }} className="fu">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 600, color: "#1A1612", fontFamily: "'Syne', sans-serif", letterSpacing: "-0.3px" }}>Contacts</h1>
-          <p style={{ color: "#9A8E82", fontSize: 12, marginTop: 2 }}>{clients.length} contact{clients.length > 1 ? "s" : ""}</p>
+          <p style={{ color: "#5C544B", fontSize: 14 }}>{clients.length} client{clients.length > 1 ? "s" : ""}</p>
         </div>
       </div>
 

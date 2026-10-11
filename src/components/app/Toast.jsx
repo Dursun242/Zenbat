@@ -1,17 +1,23 @@
 // Toast applicatif (Undo pour les suppressions, erreurs réseau).
+import { ZB } from "../../lib/theme.js";
+
 export default function Toast({ toast, onDismiss }) {
   if (!toast) return null;
   return (
-    <div className="app-toast" style={{ position: "fixed", bottom: "88px", left: 12, right: 12, background: toast.isError ? "#7f1d1d" : "#1A1612", color: "white", borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, boxShadow: "0 10px 30px rgba(0,0,0,.25)", zIndex: 100, animation: "fadeUp .18s ease both" }}>
-      <span style={{ fontSize: 12, fontWeight: 500 }}>{toast.label}</span>
-      <div style={{ display: "flex", gap: 6 }}>
+    <div className="app-toast" role={toast.isError ? "alert" : "status"}
+      style={{ position: "fixed", bottom: "88px", left: 12, right: 12, background: toast.isError ? ZB.danger : ZB.ink, color: "white", borderRadius: 10, padding: "8px 8px 8px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, boxShadow: "0 10px 30px rgba(26,22,18,.25)", zIndex: 100, animation: "fadeUp .18s ease both", fontFamily: ZB.font }}>
+      <span style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.35 }}>{toast.label}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
         {!toast.isError && (
           <button onClick={() => { toast.onUndo?.(); onDismiss(); }}
-            style={{ background: "#22c55e", color: "white", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+            style={{ minHeight: 40, background: ZB.accent, color: "white", border: "none", borderRadius: 8, padding: "0 14px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
             Annuler
           </button>
         )}
-        <button onClick={onDismiss} style={{ background: "transparent", color: "#9A8E82", border: "none", fontSize: 14, cursor: "pointer", padding: "2px 6px" }}>×</button>
+        <button onClick={onDismiss} aria-label="Fermer"
+          style={{ width: 40, height: 40, display: "grid", placeItems: "center", background: "transparent", color: ZB.onInk, border: "none", cursor: "pointer" }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
       </div>
     </div>
   );

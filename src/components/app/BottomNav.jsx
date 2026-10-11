@@ -30,6 +30,7 @@
 //   onAgentLongPress — () => void, callback appui long sur le CTA central
 import { useEffect, useRef, useState } from "react";
 import { useKeyboardOpen } from "../../hooks/useKeyboardOpen.js";
+import { ZB } from "../../lib/theme.js";
 
 const NAV_CORE_HEIGHT = 64;
 
@@ -51,10 +52,10 @@ export const IOS_GAP_CSS = "var(--ios-viewport-gap, 0px)";
 // `bottom` d'un élément fixe posé juste au-dessus de la barre du bas.
 export const ABOVE_NAV_CSS = `calc(${NAV_RESERVED_CSS} - ${IOS_GAP_CSS})`;
 
-const BRAND     = "#A4461F"; // terre cuite du système « Bordereau » (cf. src/lib/theme.js)
-const BG        = "#1A1612";
+const BRAND     = ZB.accent;
+const BG        = ZB.ink;
 const ACTIVE    = "#FFFFFF";
-const INACTIVE  = "#8A8278";
+const INACTIVE  = ZB.onInk2;
 
 // Délai à partir duquel un touch sur le CTA est considéré comme long-press.
 // 450ms = standard iOS / Material.
@@ -110,17 +111,17 @@ function Badge({ count }) {
       aria-hidden="true"
       style={{
         position: "absolute",
-        top: -3,
-        right: wide ? -10 : -6,
-        minWidth: 16,
-        height: 16,
+        top: -7,
+        right: wide ? -16 : -12,
+        minWidth: 18,
+        height: 18,
         padding: wide ? "0 4px" : 0,
-        borderRadius: 8,
-        background: "#ef4444",
+        borderRadius: 9,
+        background: BRAND,
         color: "white",
-        fontSize: 9,
+        fontSize: 12,
         fontWeight: 700,
-        lineHeight: "16px",
+        lineHeight: "18px",
         textAlign: "center",
         border: `2px solid ${BG}`,
         boxSizing: "content-box",
@@ -136,7 +137,7 @@ function StandardTab({ label, icon, active, onClick, badge }) {
   return (
     <button
       onClick={onClick}
-      aria-label={label}
+      aria-label={badge > 0 ? `${label}, ${badge} en attente` : label}
       aria-current={active ? "page" : undefined}
       style={{
         flex: 1,
@@ -165,7 +166,7 @@ function StandardTab({ label, icon, active, onClick, badge }) {
         <Badge count={badge}/>
       </span>
       <span style={{
-        fontSize: 10.5,
+        fontSize: 12,
         fontWeight: active ? 600 : 500,
         letterSpacing: 0.1,
         lineHeight: 1.2,
@@ -254,26 +255,19 @@ function AgentCtaTab({ label, icon, active, onClick, plan, quotaReached, showNud
           boxShadow: `0 0 0 3px ${BG}`,
           transition: "box-shadow .18s ease, transform .15s ease",
         }}>
-        {showNudge && (
-          <span style={{
-            position: "absolute", inset: -6, borderRadius: "50%",
-            pointerEvents: "none",
-            animation: "bn-nudge-pulse 1.6s ease-out infinite",
-          }}/>
-        )}
         {icon}
         {plan === "free" && quotaReached && (
           <span style={{
             position: "absolute", top: -2, right: -2,
-            background: "#ef4444",
-            width: 11, height: 11, borderRadius: "50%",
+            background: ZB.danger,
+            width: 12, height: 12, borderRadius: "50%",
             border: `2px solid ${BG}`,
           }}/>
         )}
       </span>
 
       <span style={{
-        fontSize: 10.5,
+        fontSize: 12,
         fontWeight: active ? 700 : 600,
         letterSpacing: 0.1,
         lineHeight: 1.2,
@@ -286,7 +280,7 @@ function AgentCtaTab({ label, icon, active, onClick, plan, quotaReached, showNud
           position: "absolute", bottom: "calc(100% + 6px)", left: "50%",
           transform: "translateX(-50%)",
           background: BRAND, color: "white",
-          fontSize: 12, fontWeight: 700,
+          fontSize: 13, fontWeight: 700,
           padding: "8px 12px",
           borderRadius: 10,
           whiteSpace: "nowrap",
@@ -294,7 +288,7 @@ function AgentCtaTab({ label, icon, active, onClick, plan, quotaReached, showNud
           animation: "bn-nudge-bob 1.8s ease-in-out infinite",
           zIndex: 2,
         }}>
-          ✨ Essaye ton premier devis
+          Essaie ton premier devis
           <span style={{
             position: "absolute", top: "100%", left: "50%",
             marginLeft: -6, width: 0, height: 0,
@@ -346,8 +340,9 @@ export default function BottomNav({
       }}>
       <style>{`
         @keyframes bn-nudge-bob   { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-5px); } }
-        @keyframes bn-nudge-pulse { 0% { box-shadow: 0 0 0 0 rgba(164,70,31,.55); } 100% { box-shadow: 0 0 0 14px rgba(164,70,31,0); } }
         .app-bottom-nav button:active { opacity: .65; }
+        .app-bottom-nav button:focus-visible { outline: 2px solid ${ZB.onInk}; outline-offset: -2px; }
+        @media (prefers-reduced-motion: reduce) { .app-bottom-nav * { animation: none !important; } }
         .app-bottom-nav button:active .bn-cta-circle { transform: translateY(-12px) scale(1.16) !important; }
       `}</style>
 

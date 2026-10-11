@@ -39,6 +39,8 @@
   --zb-danger-soft: #FBE9E7;
   --zb-warn:        #8A5A00;
   --zb-warn-soft:   #FBF0D9;
+  --zb-on-ink:      #F3F0E9;  /* texte sur les barres encre */
+  --zb-on-ink-2:    #A89E92;  /* texte secondaire sur les barres encre */
   --zb-font: "Archivo Variable", "Archivo", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --zb-radius: 10px;
   --zb-radius-sm: 6px;
