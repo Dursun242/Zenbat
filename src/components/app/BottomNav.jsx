@@ -33,10 +33,17 @@ import { useKeyboardOpen } from "../../hooks/useKeyboardOpen.js";
 
 const NAV_CORE_HEIGHT = 64;
 
-// Pas de cap sur env(safe-area-inset-bottom) : la nav doit couvrir TOUTE
-// la zone home indicator iOS.
+// Zone home indicator iOS plafonnée à 34px (sa hauteur réelle sur tous les
+// iPhone Face ID, 20px sur iPad). En PWA standalone, iOS renvoie parfois un
+// env(safe-area-inset-bottom) gonflé (~93px, comme si la barre d'outils de
+// Safari était encore là) : sans plafond, la nav faisait ~157px avec un grand
+// vide sous les onglets. Historique : plafond posé (9532ccb) puis retiré
+// (92a1ec4) parce qu'une bande claire apparaissait SOUS la nav dans l'autre
+// état bogué d'iOS (viewport plus court que l'écran). Ce cas-là est couvert
+// par le prolongement sombre sous la nav (cf. <span> « bn-underlay »).
+export const SAFE_BOTTOM_CSS = "min(env(safe-area-inset-bottom, 0px), 34px)";
 export const NAV_RESERVED_CSS =
-  `calc(${NAV_CORE_HEIGHT}px + env(safe-area-inset-bottom, 0px))`;
+  `calc(${NAV_CORE_HEIGHT}px + ${SAFE_BOTTOM_CSS})`;
 
 const BRAND     = "#22c55e";
 const BG        = "#1A1612";
@@ -323,7 +330,7 @@ export default function BottomNav({
         left: 0, right: 0, bottom: 0,
         boxSizing: "border-box",
         height: NAV_RESERVED_CSS,
-        paddingBottom: `env(safe-area-inset-bottom, 0px)`,
+        paddingBottom: SAFE_BOTTOM_CSS,
         background: BG,
         borderTop: "1px solid rgba(255,255,255,.06)",
         display: "flex",
@@ -339,6 +346,15 @@ export default function BottomNav({
         .app-bottom-nav button:active { opacity: .65; }
         .app-bottom-nav button:active .bn-cta-circle { transform: translateY(-12px) scale(1.16) !important; }
       `}</style>
+
+      {/* Prolongement sombre sous la nav : invisible normalement (hors écran),
+          il couvre la bande qu'iOS standalone laisse parfois sous une nav
+          fixed bottom:0 quand le viewport est plus court que l'écran. */}
+      <span
+        aria-hidden="true"
+        className="bn-underlay"
+        style={{ position: "absolute", top: "100%", left: 0, right: 0, height: 160, background: BG, pointerEvents: "none" }}
+      />
 
       {/* Indicateur actif unique — slide entre les onglets via transition CSS */}
       <span
