@@ -205,6 +205,12 @@ Le devis se lit comme le document du client : le même bordereau que l'Agent IA 
 - **Tampon :** capitales 13px/800 espacées, double filet de 4px, penché de -3°. Encre 3 pour brouillon et remplacé, encre 2 pour envoyé, encre pour « À signer » et « Modifications demandées », vert tampon pour « Signé », rouge pour « Refusé ».
 - **Barre d'action :** collée en bas de l'écran (au pouce), une seule action terre cuite selon le statut : « Envoyer au client » (brouillon), « Relancer {client} » (envoyé, à signer), « Facturer » (signé). Envoyer, relancer et les statuts posés à la main passent par une confirmation dans la barre, qui nomme le destinataire et le montant TTC. Les actions rares sont dans le menu « ⋯ ».
 
+### Listes (registre)
+Devis, factures, clients et accueil partagent `src/components/ui/Register.jsx` : compteur en encre 2, filtres en onglets soulignés terre cuite (44px), lignes tracées sur une feuille (titre 15/600 sur deux lignes au plus, montant à droite en chiffres tabulaires, sous-ligne avec le statut en **petit tampon droit** : capitales 12px, filet de 1px, même code couleur que le tampon de la fiche). Les actions rares d'une ligne (dupliquer, supprimer) sont dans un menu « ⋯ » ; supprimer demande un second appui. Pas d'avatars ni de couleurs par type de client.
+
+### Accueil
+Une liste « À faire » (calculée par `src/lib/todo.js`) : modifications demandées, paiement en retard, devis à relancer après 7 jours, devis signé à facturer, paiement attendu, brouillon à terminer, profil incomplet ; puis un registre « En cours » (en attente de signature, signé à facturer, à encaisser) sous un filet encre. Jamais de cartes de chiffres. Le nouveau devis se lance depuis le disque Agent IA de la barre du bas.
+
 ### Barre de dictée (signature)
 Note de l'IA (3 lignes max, pouces haut / bas, « Historique »), langue, champ, micro. Un appui démarre, un second arrête et envoie ; en écoute le micro devient un carré stop rouge qui pulse.
 
@@ -222,4 +228,5 @@ Note de l'IA (3 lignes max, pouces haut / bas, « Historique »), langue, champ,
 - **Don't** poser d'ombre décorative ni de halo coloré ; séparer par des filets.
 - **Don't** utiliser la couleur de l'artisan dans l'interface.
 - **Don't** utiliser l'ocre ailleurs que pour une ligne à chiffrer, ni le vert pour une action.
+- **Don't** poser des cartes de chiffres (KPI) : un registre tracé dit la même chose.
 - **Don't** recopier un calcul de montant : `src/lib/invoiceCalc.js` est la seule source.

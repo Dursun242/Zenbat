@@ -1,29 +1,22 @@
+// Liste des clients (système « Bordereau ») : recherche, création (à la
+// main ou depuis une photo lue par l'IA), registre tracé.
 import { useState, useRef, useMemo } from "react";
 import { CLAUDE_MODEL } from "../lib/constants.js";
 import { uid, displayName, emptyClient } from "../lib/utils.js";
+import { ZB } from "../lib/theme.js";
 import ContactEditor from "./ContactEditor.jsx";
 import { getToken } from "../lib/getToken.js";
 import { useDebouncedValue } from "../hooks/useDebouncedValue.js";
+import { LIST_CSS, ListHeader, Sheet, EmptyRow, RowMenu, btnPrimary, btnSecondary, SearchIcon, PlusIcon, CameraIcon } from "./ui/Register.jsx";
 
-const TYPE_STYLE = {
-  particulier: { bg: "#eff6ff", color: "#1e40af", label: "Particulier", avatarBg: "#dbeafe", avatarColor: "#1d4ed8" },
-  artisan:     { bg: "#f0fdf4", color: "#166534", label: "Artisan",     avatarBg: "#bbf7d0", avatarColor: "#15803d" },
-  entreprise:  { bg: "#fef3c7", color: "#92400e", label: "Entreprise",  avatarBg: "#fde68a", avatarColor: "#b45309" },
-};
+const TYPE_LABEL = { particulier: "Particulier", artisan: "Artisan", entreprise: "Entreprise" };
 
-function initials(c) {
-  const name = displayName(c).trim();
-  const words = name.split(/\s+/).filter(w => /\w/.test(w));
-  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
-  return name.charAt(0).toUpperCase();
-}
 
 export default function ClientsList({ clients, onSave, onDelete, onRestore, goClient, showUndo }) {
   const [query,       setQuery]       = useState("");
   const [editing,     setEditing]     = useState(null);
   const [importing,   setImporting]   = useState(false);
   const [importError, setImportError] = useState("");
-  const [openMenu,    setOpenMenu]    = useState(null);
   const fileRef = useRef(null);
 
   // Debounce + memo : sur un compte avec 500+ clients, filtrer sur 8 champs
@@ -89,7 +82,7 @@ Règles :
       const parsed = JSON.parse((match[1] || match[0]).trim());
       setEditing({ ...emptyClient(), ...parsed, id: uid() });
     } catch {
-      setImportError("Impossible d'analyser l'image. Essayez une photo plus nette ou saisissez manuellement.");
+      setImportError("Impossible de lire l'image. Essaie une photo plus nette, ou saisis le client à la main.");
     } finally {
       setImporting(false);
     }
@@ -99,116 +92,64 @@ Règles :
   const deleteContact = async (id) => {
     const { victim, idx } = await onDelete(id);
     if (!victim) return;
-    showUndo?.(`Contact "${displayName(victim)}" supprimé`, () => onRestore(victim, idx));
+    showUndo?.(`Client « ${displayName(victim)} » supprimé`, () => onRestore(victim, idx));
   };
 
   return (
-    <div style={{ padding: 18 }} className="fu">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-        <div>
-          <p style={{ color: "#5C544B", fontSize: 14 }}>{clients.length} client{clients.length > 1 ? "s" : ""}</p>
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
-        <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: "none" }}/>
-        {importing ? (
-          <div style={{ background: "#eef2ff", border: "1.5px solid #c7d2fe", borderRadius: 14, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: "#4338ca", fontSize: 13, fontWeight: 600 }}>
-            <span style={{ display: "inline-block", width: 14, height: 14, border: "2px solid #c7d2fe", borderTopColor: "#4338ca", borderRadius: "50%", animation: "spin .8s linear infinite" }}/> Analyse en cours…
-          </div>
-        ) : (
-          <button onClick={() => fileRef.current?.click()}
-            style={{ background: "#eef2ff", border: "1.5px solid #c7d2fe", borderRadius: 14, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, color: "#4338ca", fontSize: 13, fontWeight: 600, cursor: "pointer", width: "100%" }}>
-            📷 Importer une photo
-          </button>
-        )}
-        <button onClick={() => setEditing(emptyClient())}
-          style={{ background: "#1A1612", color: "white", border: "none", borderRadius: 14, padding: "12px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-          + Nouveau contact
+    <div className="zb-list" style={{ maxWidth: 960, margin: "0 auto", padding: "16px 12px 24px", fontFamily: ZB.font, color: ZB.ink }}>
+      <style>{LIST_CSS + "@keyframes spin{to{transform:rotate(360deg)}}"}</style>
+      <ListHeader count={`${clients.length} client${clients.length > 1 ? "s" : ""}`}/>
+      <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: "none" }}/>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+        <button type="button" style={{ ...btnSecondary, padding: "0 10px", opacity: importing ? 0.7 : 1 }} disabled={importing} onClick={() => fileRef.current?.click()}>
+          {importing
+            ? <><span aria-hidden="true" style={{ width: 14, height: 14, border: `2px solid ${ZB.rule}`, borderTopColor: ZB.accent, borderRadius: "50%", animation: "spin .8s linear infinite" }}/> Lecture…</>
+            : <>{CameraIcon} Depuis une photo</>}
         </button>
-        {importError && (
-          <div style={{ background: "#fef2f2", color: "#991b1b", border: "1px solid #fecaca", borderRadius: 10, padding: "8px 12px", fontSize: 12 }}>{importError}</div>
-        )}
+        <button type="button" className="zb-primary" style={{ ...btnPrimary, padding: "0 10px" }} onClick={() => setEditing(emptyClient())}>{PlusIcon} Nouveau client</button>
       </div>
+      {importError && <p role="alert" style={{ margin: "0 0 12px", fontSize: 15, color: ZB.danger }}>{importError}</p>}
 
-      {/* Recherche */}
-      <div style={{ marginBottom: 12, position: "relative" }}>
-        <input value={query} onChange={e => setQuery(e.target.value)}
-          placeholder="Rechercher nom, société, ville, email…"
-          style={{ width: "100%", background: "#F0EBE3", border: "1px solid #E8E2D8", borderRadius: 12, padding: "11px 14px 11px 36px", fontSize: 13, color: "#1A1612", outline: "none" }}/>
-        <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#9A8E82", fontSize: 14 }}>🔍</span>
-      </div>
+      <label style={{ position: "relative", display: "block", marginBottom: 12 }}>
+        <span className="zb-sr">Rechercher un client</span>
+        <span aria-hidden="true" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: ZB.ink3, display: "inline-flex" }}>{SearchIcon}</span>
+        <input value={query} onChange={e => setQuery(e.target.value)} type="search"
+          placeholder="Nom, société, ville, email…"
+          style={{ width: "100%", boxSizing: "border-box", minHeight: 48, padding: "0 14px 0 42px", background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 10,
+            fontFamily: "inherit", fontSize: 16, color: ZB.ink, outline: "none" }}/>
+      </label>
 
-      {/* Liste */}
-      <div style={{ background: "white", borderRadius: 16, border: "1px solid #F0EBE3", overflow: "hidden" }}
-        onClick={() => setOpenMenu(null)}>
+      <Sheet>
         {filtered.length === 0 && (
-          <div style={{ padding: "28px 16px", textAlign: "center", color: "#9A8E82", fontSize: 12 }}>Aucun contact trouvé</div>
+          <EmptyRow>{clients.length === 0 ? "Aucun client pour l'instant. Ajoute-le à la main ou depuis une photo de sa carte." : "Aucun client ne correspond à ta recherche."}</EmptyRow>
         )}
         {filtered.map((c, i) => {
-          const ts = TYPE_STYLE[c.type] || TYPE_STYLE.particulier;
-          const contactLine = [c.email, c.telephone].filter(Boolean).join(" · ");
+          const contactLine  = [c.email, c.telephone].filter(Boolean).join(" · ");
           const locationLine = [c.code_postal, c.ville].filter(Boolean).join(" ");
+          const sub = [c.activite || contactLine, locationLine].filter(Boolean).join(" · ") || "Pas de coordonnées";
           return (
-            <div key={c.id} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #FAF7F2" : "none", display: "flex", alignItems: "center", gap: 12, padding: "13px 14px 13px 16px", position: "relative" }}>
-
-              {/* Avatar */}
-              <div onClick={() => goClient(c.id)}
-                style={{ width: 46, height: 46, borderRadius: 14, background: ts.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, color: ts.avatarColor, fontSize: 15, flexShrink: 0, cursor: "pointer", letterSpacing: "-0.5px" }}>
-                {initials(c)}
-              </div>
-
-              {/* Infos */}
-              <div onClick={() => goClient(c.id)} style={{ flex: 1, minWidth: 0, cursor: "pointer" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 1 }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: "#1A1612", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 4, paddingRight: 4, borderBottom: i < filtered.length - 1 ? `1px solid ${ZB.ruleSoft}` : "none" }}>
+              <button type="button" className="zb-row" onClick={() => goClient(c.id)} aria-label={`Ouvrir la fiche de ${displayName(c)}`}
+                style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 12, minHeight: 64, padding: "10px 8px 10px 16px",
+                  background: "none", border: "none", textAlign: "left", fontFamily: "inherit", color: ZB.ink, cursor: "pointer" }}>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: "block", fontSize: 15, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {displayName(c)}
+                    {TYPE_LABEL[c.type] && <span style={{ fontWeight: 500, color: ZB.ink3 }}> · {TYPE_LABEL[c.type]}</span>}
                   </span>
-                  <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 10, flexShrink: 0, background: ts.bg, color: ts.color }}>
-                    {ts.label}
-                  </span>
-                </div>
-                {c.activite && (
-                  <div style={{ fontSize: 11, color: "#6B6358", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {c.activite}
-                  </div>
-                )}
-                <div style={{ fontSize: 11, color: "#9A8E82", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {contactLine || locationLine || "—"}
-                  {contactLine && locationLine && <span style={{ color: "#C8BFB5" }}> · {locationLine}</span>}
-                </div>
-              </div>
-
-              {/* Menu ⋯ */}
-              <div style={{ position: "relative", flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                <button
-                  onClick={() => setOpenMenu(openMenu === c.id ? null : c.id)}
-                  style={{ background: openMenu === c.id ? "#F0EBE3" : "transparent", border: "none", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 18, color: "#9A8E82", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
-                  ···
-                </button>
-                {openMenu === c.id && (
-                  <div style={{ position: "absolute", right: 0, top: 36, background: "white", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,.12)", border: "1px solid #F0EBE3", zIndex: 20, minWidth: 150, overflow: "hidden" }}>
-                    <button onClick={() => { setEditing(c); setOpenMenu(null); }}
-                      style={{ width: "100%", padding: "12px 16px", background: "none", border: "none", textAlign: "left", fontSize: 13, fontWeight: 500, color: "#1A1612", cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
-                      ✏️ Modifier
-                    </button>
-                    <div style={{ height: 1, background: "#F0EBE3" }}/>
-                    <button onClick={() => { deleteContact(c.id); setOpenMenu(null); }}
-                      style={{ width: "100%", padding: "12px 16px", background: "none", border: "none", textAlign: "left", fontSize: 13, fontWeight: 500, color: "#dc2626", cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
-                      🗑️ Supprimer
-                    </button>
-                  </div>
-                )}
-              </div>
-
+                  <span style={{ display: "block", fontSize: 13, color: ZB.ink2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>
+                </span>
+              </button>
+              <RowMenu label={`Actions pour ${displayName(c)}`} items={[
+                { key: "edit", label: "Modifier", onClick: () => setEditing(c) },
+                { key: "del", label: "Supprimer", danger: true, confirmLabel: "Appuie encore pour supprimer", onClick: () => deleteContact(c.id) },
+              ]}/>
             </div>
           );
         })}
-      </div>
+      </Sheet>
 
       {editing && <ContactEditor c={editing} onSave={saveContact} onClose={() => setEditing(null)}/>}
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }

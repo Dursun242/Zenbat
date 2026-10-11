@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { ZB } from "../lib/theme.js";
 
 const STORAGE_KEY = "zenbat_pwa_banner_dismissed_at";
 const SNOOZE_DAYS = 3;
@@ -37,48 +38,27 @@ export default function PWAInstallBanner({ onOpenInstall }) {
 
   return (
     <div style={{
-      background: "linear-gradient(135deg,#1A1612,#2A231C)",
-      borderRadius: 14, padding: 14, marginBottom: 14,
-      display: "flex", alignItems: "center", gap: 12,
-      boxShadow: "0 4px 14px rgba(15,23,42,.15)",
-      position: "relative", overflow: "hidden"
+      display: "flex", alignItems: "center", gap: 12, padding: "10px 6px 10px 14px",
+      background: ZB.paper2, borderRadius: 8, fontFamily: ZB.font,
     }}>
-      <div style={{
-        width: 42, height: 42, borderRadius: 11,
-        background: "linear-gradient(135deg,#22c55e,#16a34a)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 22, flexShrink: 0,
-        boxShadow: "0 4px 12px rgba(34,197,94,.35)"
-      }}>
-        {isIOS ? "🍎" : "📲"}
-      </div>
-
+      <span aria-hidden="true" style={{ color: ZB.ink2, display: "inline-flex", flexShrink: 0 }}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M12 7v7M9 11l3 3 3-3"/></svg>
+      </span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ color: "white", fontSize: 13, fontWeight: 700, marginBottom: 2 }}>
-          Installez Zenbat sur votre {isIOS ? "iPhone" : "téléphone"}
+        <div style={{ color: ZB.ink, fontSize: 15, fontWeight: 600 }}>
+          Installe Zenbat sur ton {isIOS ? "iPhone" : "téléphone"}
         </div>
-        <div style={{ color: "#9A8E82", fontSize: 11, lineHeight: 1.4 }}>
-          Accès hors-ligne, lancement en un tap
+        <div style={{ color: ZB.ink2, fontSize: 13, lineHeight: 1.4 }}>
+          Ouverture en un appui, même sans réseau sur le chantier.
         </div>
       </div>
-
-      <button onClick={onOpenInstall}
-        style={{
-          background: "#22c55e", color: "white", border: "none",
-          borderRadius: 10, padding: "8px 12px",
-          fontSize: 12, fontWeight: 700, cursor: "pointer", flexShrink: 0
-        }}>
+      <button type="button" onClick={onOpenInstall}
+        style={{ minHeight: 44, padding: "0 12px", background: "none", border: "none", color: ZB.accent, fontFamily: "inherit", fontSize: 15, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>
         Installer
       </button>
-
-      <button onClick={dismiss} aria-label="Fermer"
-        style={{
-          position: "absolute", top: 6, right: 8,
-          background: "none", border: "none",
-          color: "#6B6358", fontSize: 16, cursor: "pointer",
-          padding: "2px 6px", lineHeight: 1
-        }}>
-        ×
+      <button type="button" onClick={dismiss} aria-label="Masquer pour l'instant"
+        style={{ width: 44, height: 44, display: "grid", placeItems: "center", background: "none", border: "none", color: ZB.ink2, cursor: "pointer", flexShrink: 0 }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
   );

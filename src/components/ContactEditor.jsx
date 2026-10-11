@@ -1,20 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { searchEntreprises } from "../lib/insee";
+import { ZB } from "../lib/theme.js";
+
+const labelStyle = { display: "block", fontSize: 13, fontWeight: 600, color: ZB.ink2, marginBottom: 6 };
+const inputStyle = { width: "100%", minHeight: 44, background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 8, padding: "10px 12px", fontSize: 16, color: ZB.ink, outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
 
 // Composant champ de formulaire générique
 function Field({ label, val, onChange, type = "text", placeholder = "" }) {
   return (
-    <div>
-      <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#6B6358", marginBottom: 6 }}>{label}</label>
+    <label style={{ display: "block" }}>
+      <span style={labelStyle}>{label}</span>
       <input
         type={type}
         value={val || ""}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        style={{ width: "100%", background: "white", border: "1px solid #E8E2D8", borderRadius: 12, padding: "10px 14px", fontSize: 13, color: "#1A1612", outline: "none", boxSizing: "border-box" }}
+        style={inputStyle}
       />
-    </div>
+    </label>
   );
 }
 
@@ -84,73 +88,79 @@ export default function ContactEditor({ c, onSave, onClose }) {
   }
 
   return createPortal(
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(15,23,42,.7)", zIndex: 9999, fontFamily: "'DM Sans',sans-serif" }}>
-      <div onClick={onClose} style={{ position: "absolute", inset: 0 }}/>
-      <div style={{
-        position: "absolute", left: 0, right: 0, bottom: 0,
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(26,22,18,.55)", zIndex: 9999, fontFamily: ZB.font, color: ZB.ink }}>
+      <style>{`.zb-contact input:focus, .zb-contact textarea:focus { border-color: ${ZB.accent} !important; } .zb-contact input::placeholder, .zb-contact textarea::placeholder { color: ${ZB.ink3}; opacity: 1; } .zb-contact button:focus-visible { outline: 2px solid ${ZB.accent}; outline-offset: 2px; }`}</style>
+      <div role="dialog" aria-modal="true" aria-labelledby="contact-title" className="zb-contact" style={{
+        position: "absolute", left: 0, right: 0, bottom: 0, margin: "0 auto", maxWidth: 640,
         maxHeight: "92dvh", height: "92dvh",
-        background: "white",
-        borderTopLeftRadius: 20, borderTopRightRadius: 20,
+        background: ZB.paper,
+        borderTopLeftRadius: 10, borderTopRightRadius: 10,
         display: "flex", flexDirection: "column",
       }}>
 
-        <div style={{ padding: "14px 18px", borderBottom: "1px solid #F0EBE3", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#1A1612" }}>
-            {c.raison_sociale || c.nom ? "Modifier le contact" : "Nouveau contact"}
-          </div>
-          <button onClick={onClose} style={{ background: "#F0EBE3", border: "none", borderRadius: 10, width: 32, height: 32, cursor: "pointer", fontSize: 14, color: "#6B6358" }}>✕</button>
+        <div style={{ padding: "6px 6px 6px 18px", borderBottom: `1px solid ${ZB.rule}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <h2 id="contact-title" style={{ margin: 0, fontSize: 19, fontWeight: 700 }}>
+            {c.raison_sociale || c.nom ? "Modifier le client" : "Nouveau client"}
+          </h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" style={{ width: 44, height: 44, display: "grid", placeItems: "center", background: "none", border: "none", cursor: "pointer", color: ZB.ink2 }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
         </div>
 
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
           {/* Type */}
           <div>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#6B6358", marginBottom: 6 }}>TYPE</label>
-            <div style={{ display: "flex", gap: 6 }}>
-              {[["particulier", "Particulier"], ["artisan", "Artisan"], ["entreprise", "Entreprise"]].map(([id, lbl]) => (
-                <button key={id} onClick={() => set("type", id)}
-                  style={{ flex: 1, padding: 8, borderRadius: 10, border: `1.5px solid ${form.type === id ? "#1A1612" : "#E8E2D8"}`, background: form.type === id ? "#1A1612" : "white", color: form.type === id ? "white" : "#6B6358", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                  {lbl}
-                </button>
-              ))}
+            <span style={labelStyle} id="contact-type">Type de client</span>
+            <div role="radiogroup" aria-labelledby="contact-type" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+              {[["particulier", "Particulier"], ["artisan", "Artisan"], ["entreprise", "Entreprise"]].map(([id, lbl]) => {
+                const on = form.type === id;
+                return (
+                  <button key={id} type="button" role="radio" aria-checked={on} onClick={() => set("type", id)}
+                    style={{ minHeight: 44, borderRadius: 8, border: `1px solid ${on ? ZB.accent : ZB.rule}`, background: on ? ZB.accentSoft : ZB.sheet, color: on ? ZB.accent : ZB.ink, fontFamily: "inherit", fontSize: 15, fontWeight: on ? 700 : 500, cursor: "pointer" }}>
+                    {lbl}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {form.type !== "particulier" && (
             <div style={{ position: "relative" }}>
-              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#6B6358", marginBottom: 6 }}>
-                RECHERCHE INSEE (NOM OU SIRET)
+              <label htmlFor="contact-insee" style={labelStyle}>
+                Retrouver l'entreprise (nom ou SIRET)
               </label>
               <input
-                type="text"
+                id="contact-insee"
+                type="search"
                 value={inseeQuery}
                 onChange={e => setInseeQuery(e.target.value)}
                 onFocus={() => inseeResults.length && setInseeOpen(true)}
-                placeholder="Ex : Dupont Maçonnerie ou 12345678900010"
-                style={{ width: "100%", background: "white", border: "1px solid #E8E2D8", borderRadius: 12, padding: "10px 14px", fontSize: 13, color: "#1A1612", outline: "none", boxSizing: "border-box" }}
+                placeholder="Nom de l'entreprise ou SIRET"
+                style={inputStyle}
               />
               {inseeLoading && (
-                <div style={{ fontSize: 11, color: "#6B6358", marginTop: 4 }}>Recherche…</div>
+                <div role="status" style={{ fontSize: 14, color: ZB.ink2, marginTop: 6 }}>Recherche…</div>
               )}
               {inseeError && (
-                <div style={{ fontSize: 11, color: "#dc2626", marginTop: 4 }}>{inseeError}</div>
+                <div role="alert" style={{ fontSize: 14, color: ZB.danger, marginTop: 6 }}>{inseeError}</div>
               )}
               {inseeOpen && inseeResults.length > 0 && (
-                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: "white", border: "1px solid #E8E2D8", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,.08)", zIndex: 50, maxHeight: 240, overflowY: "auto" }}>
+                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 10, boxShadow: "0 10px 30px rgba(26,22,18,.16)", zIndex: 50, maxHeight: 280, overflowY: "auto" }}>
                   {inseeResults.map((r, i) => (
                     <button
                       key={`${r.siret}-${i}`}
                       type="button"
                       onClick={() => pickInseeResult(r)}
-                      style={{ display: "block", width: "100%", textAlign: "left", background: "white", border: "none", borderBottom: i < inseeResults.length - 1 ? "1px solid #F0EBE3" : "none", padding: "10px 12px", cursor: "pointer", fontSize: 12 }}
+                      style={{ display: "block", width: "100%", minHeight: 52, textAlign: "left", background: "none", border: "none", borderBottom: i < inseeResults.length - 1 ? `1px solid ${ZB.ruleSoft}` : "none", padding: "10px 12px", cursor: "pointer", fontFamily: "inherit", fontSize: 15 }}
                     >
-                      <div style={{ fontWeight: 600, color: "#1A1612", display: "flex", gap: 6, alignItems: "center" }}>
+                      <div style={{ fontWeight: 600, color: ZB.ink, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                         <span>{r._display.label}</span>
                         {r._display.etat && (
-                          <span style={{ fontSize: 10, fontWeight: 700, color: "#dc2626", background: "#fee2e2", padding: "1px 6px", borderRadius: 6 }}>{r._display.etat}</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: ZB.danger, border: `1px solid ${ZB.danger}`, padding: "0 5px", borderRadius: 3, textTransform: "uppercase", letterSpacing: ".04em" }}>{r._display.etat}</span>
                         )}
                       </div>
                       {r._display.sub && (
-                        <div style={{ color: "#6B6358", marginTop: 2 }}>{r._display.sub}</div>
+                        <div style={{ color: ZB.ink2, fontSize: 13, marginTop: 2 }}>{r._display.sub}</div>
                       )}
                     </button>
                   ))}
@@ -168,45 +178,50 @@ export default function ContactEditor({ c, onSave, onClose }) {
             <Field label={form.type === "particulier" ? "Nom *"    : "Nom contact"}    val={form.nom}    onChange={v => set("nom", v)}/>
           </div>
 
-          <Field label="Email" type="email" val={form.email} onChange={v => set("email", v)} placeholder="contact@exemple.fr"/>
+          <Field label="Email" type="email" val={form.email} onChange={v => set("email", v)} placeholder="Ex : contact@exemple.fr"/>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Field label="Mobile" type="tel" val={form.telephone}       onChange={v => set("telephone", v)}       placeholder="06 12 34 56 78"/>
-            <Field label="Fixe"   type="tel" val={form.telephone_fixe} onChange={v => set("telephone_fixe", v)}  placeholder="02 35 00 00 00"/>
+            <Field label="Mobile" type="tel" val={form.telephone}       onChange={v => set("telephone", v)}       placeholder="Ex : 06 12 34 56 78"/>
+            <Field label="Fixe"   type="tel" val={form.telephone_fixe} onChange={v => set("telephone_fixe", v)}  placeholder="Ex : 02 35 00 00 00"/>
           </div>
 
-          <Field label="Adresse" val={form.adresse} onChange={v => set("adresse", v)} placeholder="12 rue des Artisans"/>
+          <Field label="Adresse" val={form.adresse} onChange={v => set("adresse", v)} placeholder="Ex : 12 rue des Artisans"/>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 10 }}>
-            <Field label="Code postal" val={form.code_postal} onChange={v => set("code_postal", v)} placeholder="76600"/>
-            <Field label="Ville"       val={form.ville}       onChange={v => set("ville", v)}       placeholder="Le Havre"/>
+            <Field label="Code postal" val={form.code_postal} onChange={v => set("code_postal", v)} placeholder="Ex : 76600"/>
+            <Field label="Ville"       val={form.ville}       onChange={v => set("ville", v)}       placeholder="Ex : Le Havre"/>
           </div>
 
           {form.type !== "particulier" && (
             <>
-              <Field label="SIRET" val={form.siret} onChange={v => set("siret", v)} placeholder="12345678900010"/>
-              <Field label="N° TVA intracommunautaire" val={form.tva_intra} onChange={v => set("tva_intra", v)} placeholder="FR12345678901"/>
+              <Field label="SIRET" val={form.siret} onChange={v => set("siret", v)} placeholder="14 chiffres"/>
+              <Field label="N° TVA intracommunautaire" val={form.tva_intra} onChange={v => set("tva_intra", v)} placeholder="Ex : FR12345678901"/>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 10 }}>
-                <Field label="Code NAF/APE" val={form.naf} onChange={v => set("naf", v)} placeholder="43.32A"/>
+                <Field label="Code NAF/APE" val={form.naf} onChange={v => set("naf", v)} placeholder="Ex : 43.32A"/>
                 <Field label="Activité" val={form.activite} onChange={v => set("activite", v)} placeholder="Ex : Travaux de menuiserie bois et PVC"/>
               </div>
             </>
           )}
 
           <div>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#6B6358", marginBottom: 6 }}>NOTES</label>
-            <textarea value={form.notes || ""} onChange={e => set("notes", e.target.value)} rows={2}
-              style={{ width: "100%", background: "white", border: "1px solid #E8E2D8", borderRadius: 12, padding: "10px 14px", fontSize: 13, color: "#1A1612", outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }}/>
+            <label htmlFor="contact-notes" style={labelStyle}>Notes</label>
+            <textarea id="contact-notes" value={form.notes || ""} onChange={e => set("notes", e.target.value)} rows={2}
+              style={{ ...inputStyle, resize: "vertical" }}/>
           </div>
         </div>
 
-        <div style={{ padding: "12px 16px calc(12px + env(safe-area-inset-bottom))", borderTop: "1px solid #F0EBE3", display: "flex", gap: 10, flexShrink: 0 }}>
-          <button onClick={onClose}
-            style={{ flex: 1, background: "white", border: "1px solid #E8E2D8", borderRadius: 12, padding: 12, fontSize: 13, fontWeight: 600, color: "#6B6358", cursor: "pointer" }}>
+        {!isValid && (
+          <p style={{ margin: 0, padding: "8px 16px 0", fontSize: 14, color: ZB.ink2, flexShrink: 0 }}>
+            {form.type === "particulier" ? "Indique au moins le nom ou le prénom." : "Indique au moins la raison sociale ou un nom."}
+          </p>
+        )}
+        <div style={{ padding: "12px 16px calc(12px + env(safe-area-inset-bottom))", borderTop: isValid ? `1px solid ${ZB.rule}` : "none", display: "flex", gap: 10, flexShrink: 0 }}>
+          <button type="button" onClick={onClose}
+            style={{ flex: 1, minHeight: 48, background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 10, fontFamily: "inherit", fontSize: 15, fontWeight: 600, color: ZB.ink, cursor: "pointer" }}>
             Annuler
           </button>
-          <button onClick={handleSave} disabled={!isValid || saving}
-            style={{ flex: 2, background: (isValid && !saving) ? "#22c55e" : "#cbd5e1", color: "white", border: "none", borderRadius: 12, padding: 12, fontSize: 13, fontWeight: 700, cursor: (isValid && !saving) ? "pointer" : "not-allowed" }}>
+          <button type="button" onClick={handleSave} disabled={!isValid || saving}
+            style={{ flex: 2, minHeight: 48, background: ZB.accent, color: ZB.sheet, border: "none", borderRadius: 10, fontFamily: "inherit", fontSize: 15, fontWeight: 700, opacity: (isValid && !saving) ? 1 : 0.5, cursor: (isValid && !saving) ? "pointer" : "not-allowed" }}>
             {saving ? "Enregistrement…" : "Enregistrer"}
           </button>
         </div>

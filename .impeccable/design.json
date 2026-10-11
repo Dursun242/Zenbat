@@ -239,6 +239,7 @@
       "Don't poser d'ombre décorative ni de halo coloré ; séparer par des filets.",
       "Don't utiliser la couleur de l'artisan dans l'interface.",
       "Don't utiliser l'ocre ailleurs que pour une ligne à chiffrer, ni le vert pour une action.",
+      "Don't poser des cartes de chiffres (KPI) : un registre tracé dit la même chose.",
       "Don't recopier un calcul de montant : `src/lib/invoiceCalc.js` est la seule source."
     ]
   }
