@@ -17,7 +17,8 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { cors } from "./_cors.js"
 import { authenticate } from "./_withAuth.js"
-import { sendEmail } from "./_email.js"
+import { sendEmail, safeColor } from "./_email.js"
+import { consumeDailyQuota, refundDailyQuota, EMAIL_DAILY_LIMIT } from "./_quota.js"
 import { logServerError } from "./_serverLog.js"
 import { computeTotals, isNoTva, lineRate, lineTotal, round2 } from "../src/lib/invoiceCalc.js"
 
@@ -678,6 +679,8 @@ async function handleSend(req, res, { user, admin }) {
   const subject  = `Facture ${invoice.numero} — ${company}`;
   const html     = buildSendEmailHtml({ company, brand, invoice, clientName, message });
 
+  const emailQuota = await consumeDailyQuota(admin, user.id, "email", EMAIL_DAILY_LIMIT);
+  if (!emailQuota.allowed) return res.status(429).json({ error: `Limite d'envoi d'emails atteinte pour aujourd'hui (${EMAIL_DAILY_LIMIT}). Réessayez demain ou contactez le support.` });
   try {
     await sendEmail({
       to:        client.email,
@@ -688,6 +691,7 @@ async function handleSend(req, res, { user, admin }) {
       attachments: [{ filename, content: pdfBase64, contentType: "application/pdf" }],
     });
   } catch (err) {
+    refundDailyQuota(admin, user.id, "email", emailQuota);
     console.error("[facturx/send]", err);
     return res.status(500).json({ error: "Échec envoi email : " + (err.message || "inconnu") });
   }
@@ -715,7 +719,7 @@ async function handleSend(req, res, { user, admin }) {
 }
 
 function buildSendEmailHtml({ company, brand, invoice, clientName, message }) {
-  const ac       = brand?.color || "#22c55e";
+  const ac       = safeColor(brand?.color);
   const ttc      = Number(invoice.montant_ttc || 0).toFixed(2).replace(".", ",");
   const echeance = invoice.date_echeance
     ? new Date(invoice.date_echeance).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })

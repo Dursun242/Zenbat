@@ -12,6 +12,8 @@ import { cors }         from './_cors.js'
 import { authenticate } from './_withAuth.js'
 import { rateLimit, sendRateLimited } from './_rateLimit.js'
 import { logServerError } from './_serverLog.js'
+import { safeColor, safeImageSrc } from './_email.js'
+import { consumeDailyQuota, refundDailyQuota, EMAIL_DAILY_LIMIT } from './_quota.js'
 import { createHash, randomInt } from 'crypto'
 import { createClient } from '@supabase/supabase-js'
 
@@ -88,8 +90,8 @@ async function verifySession(admin, publicToken, sessionId) {
 
 // ── Templates email ────────────────────────────────────────────────────────
 function emailDevis({ clientName, company, brand, devis, fmtEurFn, publicUrl, logoSrc }) {
-  const accent = brand?.color || '#22c55e'
-  const logo   = logoSrc || (brand?.logo?.startsWith('http') ? brand.logo : null)
+  const accent = safeColor(brand?.color)
+  const logo   = safeImageSrc(logoSrc || brand?.logo)
   const date   = devis.date_validite
     ? new Date(devis.date_validite).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
     : null
@@ -134,7 +136,7 @@ function emailDevis({ clientName, company, brand, devis, fmtEurFn, publicUrl, lo
       <tr>
         <td style="padding:20px 24px;border-bottom:1px solid #e8e8e8">
           <p style="margin:0 0 2px;font-size:11px;color:#999;font-weight:500;text-transform:uppercase;letter-spacing:0.5px">Référence</p>
-          <p style="margin:0;font-size:15px;font-weight:700;color:#111">${devis.numero}</p>
+          <p style="margin:0;font-size:15px;font-weight:700;color:#111">${esc(devis.numero)}</p>
         </td>
         <td style="padding:20px 24px;border-bottom:1px solid #e8e8e8;text-align:right">
           <p style="margin:0 0 2px;font-size:11px;color:#999;font-weight:500;text-transform:uppercase;letter-spacing:0.5px">Montant HT</p>
@@ -204,7 +206,7 @@ function emailDevis({ clientName, company, brand, devis, fmtEurFn, publicUrl, lo
 function emailOtp({ otp, devis, company, brandColor }) {
   const safe = (s) => String(s || '').replace(/[<>&"]/g, (c) => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]))
   const header = safe(company) || 'Devis'
-  const accent = brandColor || '#22c55e'
+  const accent = safeColor(brandColor)
   return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f5;font-family:Inter,system-ui,sans-serif">
 <div style="max-width:480px;margin:32px auto;background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)">
   <div style="background:${accent};height:4px;font-size:0;line-height:0">&nbsp;</div>
@@ -212,7 +214,7 @@ function emailOtp({ otp, devis, company, brandColor }) {
     <div style="font-size:18px;font-weight:700;color:white;letter-spacing:-0.3px">${header}</div>
   </div>
   <div style="padding:32px;text-align:center">
-    <p style="color:#6B6358;font-size:14px;margin:0 0 24px">Code d'accès pour le devis <strong>${devis.numero}</strong></p>
+    <p style="color:#6B6358;font-size:14px;margin:0 0 24px">Code d'accès pour le devis <strong>${esc(devis.numero)}</strong></p>
     <div style="background:#FAF7F2;border-radius:16px;padding:28px;margin-bottom:24px;letter-spacing:12px;font-size:38px;font-weight:800;color:#1A1612;font-family:monospace">${otp}</div>
     <p style="color:#9A8E82;font-size:12px;margin:0">Ce code expire dans <strong>15 minutes</strong>.<br>Si vous n'avez pas demandé ce code, ignorez cet email.</p>
   </div>
@@ -228,7 +230,7 @@ function emailClientConfirm({ devis, clientName, newHt }) {
   </div>
   <div style="padding:32px">
     <p style="color:#1A1612;font-size:14px">Bonjour${clientName ? ' ' + esc(clientName) : ''},</p>
-    <p style="color:#6B6358;font-size:14px;line-height:1.6">Le devis <strong>${devis.numero}</strong>${newHt ? ` (${fmtEur(newHt)} HT)` : ''} a bien été accepté avec vos modifications. L'artisan prendra contact avec vous pour la suite.</p>
+    <p style="color:#6B6358;font-size:14px;line-height:1.6">Le devis <strong>${esc(devis.numero)}</strong>${newHt ? ` (${fmtEur(newHt)} HT)` : ''} a bien été accepté avec vos modifications. L'artisan prendra contact avec vous pour la suite.</p>
   </div>
 </div></body></html>`
 }
@@ -238,7 +240,7 @@ function emailClientConfirm({ devis, clientName, newHt }) {
 // pour que le client sache où en est sa demande et puisse rebondir
 // (renégocier, accepter le devis initial, ou contacter l'artisan).
 function emailRefusalToClient({ devis, clientName, company, brand, message, publicUrl }) {
-  const accent     = brand?.color || '#1A1612'
+  const accent     = safeColor(brand?.color, '#1A1612')
   const senderName = company || "l'artisan"
   return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif">
 <div style="max-width:520px;margin:32px auto;background:white;border-radius:12px;overflow:hidden;border:1px solid #ececec">
@@ -540,6 +542,8 @@ export default async function handler(req, res) {
       logoSrc = rawLogo
     }
 
+    const emailQuota = await consumeDailyQuota(admin, user.id, 'email', EMAIL_DAILY_LIMIT)
+    if (!emailQuota.allowed) return res.status(429).json({ error: `Limite d'envoi d'emails atteinte pour aujourd'hui (${EMAIL_DAILY_LIMIT}). Réessayez demain ou contactez le support.` })
     const ccEmails = [...new Set([user.email, brand.email].filter(Boolean))]
     try {
       await sendEmail({
@@ -551,6 +555,7 @@ export default async function handler(req, res) {
         attachments,
       })
     } catch (e) {
+      refundDailyQuota(admin, user.id, 'email', emailQuota)
       console.error('[send email]', e?.message)
       await logServerError('devis-public/send-email', e, { devis_id: devis.id, to: client.email })
       return res.status(502).json({ error: "Échec de l'envoi email. Vérifiez la configuration GMAIL ou réessayez." })

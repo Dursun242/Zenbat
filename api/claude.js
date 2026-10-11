@@ -1,4 +1,5 @@
-import { cors } from "./_cors.js";
+import { cors } from "./_cors.js"
+import { consumeDailyQuota, refundDailyQuota } from "./_quota.js";
 import { authenticate, notifyTelegram } from "./_withAuth.js";
 import { assertPublicHost } from "./_ssrf.js";
 import {
@@ -17,6 +18,48 @@ const MAX_MESSAGES_CHARS = 40_000;
 const STREAM_TIMEOUT_MS  = 55_000;
 const AI_LIMIT_FREE      = 40;
 const AI_LIMIT_PRO       = 200;
+const MAX_IMAGES         = 4;
+
+// Taille réelle des messages : texte des blocs (string ou tableau de blocs
+// Anthropic). L'ancien String(m.content) donnait « [object Object] » pour un
+// tableau et laissait passer n'importe quelle taille. Les images sont
+// comptées à part (la limite de body Vercel borne déjà leur poids).
+function measureMessages(messages) {
+  let chars = 0, images = 0;
+  for (const m of messages) {
+    const c = m?.content;
+    if (typeof c === "string") { chars += c.length; continue; }
+    if (!Array.isArray(c)) { chars += JSON.stringify(c ?? "").length; continue; }
+    for (const b of c) {
+      if (b?.type === "image") images++;
+      else if (b?.type === "text") chars += String(b.text ?? "").length;
+      else chars += JSON.stringify(b ?? "").length;
+    }
+  }
+  return { chars, images };
+}
+
+// ── Quota journalier compté côté serveur (migration 0059, cf _quota.js) ────
+// Un appel est réservé atomiquement avant d'interroger l'IA (pas de
+// dépassement par requêtes parallèles), puis rendu si l'IA échoue. Avant 0059,
+// le quota comptait les lignes ia_conversations insérées par le navigateur :
+// appeler /api/claude directement ne consommait rien. Ce comptage reste le
+// repli tant que la migration n'est pas appliquée.
+function reserveAiCall(admin, userId, limit) {
+  return consumeDailyQuota(admin, userId, "ai", limit, async () => {
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+    const { count } = await admin.from("ia_conversations")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_id", userId)
+      .gte("created_at", todayStart.toISOString());
+    return (count || 0) < limit;
+  });
+}
+
+function releaseAiCall(admin, userId, reservation) {
+  refundDailyQuota(admin, userId, "ai", reservation);
+}
 
 // ── Scraper de sites web (action scrape_urls) ───────────────────────────────
 // Limites volontairement basses pour tenir dans le maxDuration 60s de Vercel
@@ -220,19 +263,13 @@ export default async function handler(req, res) {
   const effectivePlan = isAdmin ? "pro" : profile.plan;
 
   const AI_DAILY_LIMIT = effectivePlan === "pro" ? AI_LIMIT_PRO : AI_LIMIT_FREE;
-  const todayStart = new Date();
-  todayStart.setUTCHours(0, 0, 0, 0);
-  const { count: callsToday } = await admin.from("ia_conversations")
-    .select("id", { count: "exact", head: true })
-    .eq("owner_id", user.id)
-    .gte("created_at", todayStart.toISOString());
-
+  // Réservation d'un appel sur le quota du jour, juste avant d'interroger
+  // l'IA (après validation : une requête refusée ne consomme rien).
   // L'admin est exempté de toute limite journalière (debug, support, tests).
-  if (!isAdmin && (callsToday || 0) >= AI_DAILY_LIMIT) {
-    return res.status(429).json({
-      error: `Limite journalière atteinte (${AI_DAILY_LIMIT} appels/jour). Réessayez demain.`,
-    });
-  }
+  const quotaExceeded = () => res.status(429).json({
+    error: `Limite journalière atteinte (${AI_DAILY_LIMIT} appels/jour). Réessayez demain.`,
+  });
+  const reserve = async () => (isAdmin ? { counter: false, allowed: true } : reserveAiCall(admin, user.id, AI_DAILY_LIMIT));
 
   // ── Fournisseur IA (Mistral ou Anthropic, cf _ai.js) ────────────────────────
   // L'admin peut forcer un fournisseur via `ai_provider` (banc de test agent)
@@ -249,6 +286,8 @@ export default async function handler(req, res) {
   // Détecté via la présence de `scrape_urls`. Court-circuite la validation
   // classique (model/messages/etc.) car le payload est différent.
   if (Array.isArray(req.body?.scrape_urls)) {
+    const reservation = await reserve();
+    if (!reservation.allowed) return quotaExceeded();
     try {
       return await handleScrape(res, { urls: req.body.scrape_urls, admin, user });
     } catch (err) {
@@ -296,9 +335,16 @@ export default async function handler(req, res) {
   // Limite de taille pour maîtriser les coûts tokens
   if (system && system.length > MAX_SYSTEM_CHARS)
     return res.status(400).json({ error: `system trop long (max ${MAX_SYSTEM_CHARS} caractères)` });
-  const messagesSize = messages.reduce((s, m) => s + String(m.content || "").length, 0);
+  if (system !== undefined && typeof system !== "string")
+    return res.status(400).json({ error: "Paramètre 'system' invalide" });
+  const { chars: messagesSize, images } = measureMessages(messages);
   if (messagesSize > MAX_MESSAGES_CHARS)
     return res.status(400).json({ error: `messages trop longs (max ${MAX_MESSAGES_CHARS} caractères)` });
+  if (images > MAX_IMAGES)
+    return res.status(400).json({ error: `Trop d'images (max ${MAX_IMAGES})` });
+
+  const reservation = await reserve();
+  if (!reservation.allowed) return quotaExceeded();
 
   // ── Appel fournisseur IA ─────────────────────────────────────────────────────
   // Mistral : requête traduite par _ai.js, le modèle vient de MISTRAL_MODEL.
@@ -422,6 +468,7 @@ export default async function handler(req, res) {
         return res.end();
       } else {
         // Erreur fournisseur sur une requête stream : on lit le JSON d'erreur
+        releaseAiCall(admin, user.id, reservation);
         const errorData = await upstream.json().catch(() => null);
         const retryAfter = upstream.headers?.get?.("retry-after");
         if (retryAfter) res.setHeader("Retry-After", retryAfter);
@@ -487,12 +534,14 @@ export default async function handler(req, res) {
     }
 
     if (!upstream.ok) {
+      releaseAiCall(admin, user.id, reservation);
       const retryAfter = upstream.headers?.get?.("retry-after");
       if (retryAfter) res.setHeader("Retry-After", retryAfter);
     }
     return res.status(upstream.status).json(upstreamData);
 
   } catch (err) {
+    releaseAiCall(admin, user.id, reservation);
     if (err?.name === "AbortError")
       return res.status(504).json({ error: "Délai dépassé — l'IA n'a pas répondu en 55 secondes" });
     return res.status(502).json({ error: `Upstream ${isMistral ? "Mistral" : "Anthropic"} unreachable` });

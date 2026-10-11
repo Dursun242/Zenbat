@@ -3,12 +3,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // ── Mocks ─────────────────────────────────────────────────────────────────
 const getUserMock = vi.fn();
 const fromMock    = vi.fn();
+const rpcMock     = vi.fn();
 let supabaseChain;
 
 vi.mock("@supabase/supabase-js", () => ({
   createClient: () => ({
     auth: { getUser: getUserMock },
     from: fromMock,
+    rpc:  rpcMock,
   }),
 }));
 vi.mock("./_cors.js", () => ({ cors: () => {} }));
@@ -167,7 +169,7 @@ describe("claude endpoint — plan, trial, rate-limit", () => {
     authedUser();
     setupSupabaseProfile("free", 40);
     const res = makeRes();
-    await handler(makeReq({ headers: { authorization: "Bearer t" } }), res);
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: { model: "claude-haiku-4-5-20251001", max_tokens: 100, messages: [{ role: "user", content: "hi" }] } }), res);
     expect(res.statusCode).toBe(429);
     expect(res.body.error).toMatch(/Limite journalière/);
   });
@@ -681,5 +683,70 @@ describe("claude endpoint — fournisseur Mistral", () => {
     await handler(makeReq({ headers: { authorization: "Bearer t" }, body: { ...baseBody, stream: true } }), res);
     expect(out).toContain("<DE");
     expect(out).not.toContain("message_stop");
+  });
+});
+
+
+describe("quota IA compté côté serveur (migration 0059)", () => {
+  const validBody = { model: "claude-haiku-4-5-20251001", max_tokens: 100, messages: [{ role: "user", content: "hi" }] };
+  const authed = () => getUserMock.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.fr" } }, error: null });
+
+  it("compteur atteint (daily_quota_consume renvoie null) → 429, sans appeler l'IA", async () => {
+    authed();
+    setupSupabaseProfile("free", 0); // l'ancien comptage dirait « OK »
+    rpcMock.mockResolvedValue({ data: null, error: null });
+    const res = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: validBody }), res);
+    expect(res.statusCode).toBe(429);
+    expect(rpcMock).toHaveBeenCalledWith("daily_quota_consume", { p_user: "u1", p_kind: "ai", p_limit: 40 });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("appel réservé puis rendu si l'IA répond en erreur", async () => {
+    authed();
+    setupSupabaseProfile("free", 0);
+    rpcMock.mockImplementation(async (fn) => ({ data: fn === "daily_quota_consume" ? 3 : null, error: null }));
+    global.fetch.mockResolvedValue({ ok: false, status: 529, headers: { get: () => null }, json: async () => ({ error: { message: "overloaded" } }) });
+    const res = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: validBody }), res);
+    await new Promise(r => setTimeout(r, 0));
+    expect(res.statusCode).toBe(529);
+    expect(rpcMock).toHaveBeenCalledWith("daily_quota_refund", { p_user: "u1", p_kind: "ai" });
+  });
+
+  it("appel réussi : pas de remboursement", async () => {
+    authed();
+    setupSupabaseProfile("free", 0);
+    rpcMock.mockImplementation(async (fn) => ({ data: fn === "daily_quota_consume" ? 3 : null, error: null }));
+    global.fetch.mockResolvedValue({ ok: true, status: 200, headers: { get: () => null }, json: async () => ({ content: [{ text: "ok" }] }) });
+    const res = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: validBody }), res);
+    await new Promise(r => setTimeout(r, 0));
+    expect(res.statusCode).toBe(200);
+    expect(rpcMock).not.toHaveBeenCalledWith("daily_quota_refund", expect.anything());
+  });
+
+  it("taille mesurée sur le texte des blocs (un tableau ne contourne plus la limite)", async () => {
+    authed();
+    setupSupabaseProfile("free", 0);
+    const big = "x".repeat(40_001);
+    const res = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: { ...validBody, messages: [{ role: "user", content: [{ type: "text", text: big }] }] } }), res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toMatch(/messages trop longs/);
+  });
+
+  it("une image (carte de visite) reste acceptée, 5 images refusées", async () => {
+    authed();
+    setupSupabaseProfile("free", 0);
+    rpcMock.mockResolvedValue({ data: 1, error: null });
+    global.fetch.mockResolvedValue({ ok: true, status: 200, headers: { get: () => null }, json: async () => ({ content: [{ text: "ok" }] }) });
+    const img = { type: "image", source: { type: "base64", media_type: "image/jpeg", data: "A".repeat(200_000) } };
+    const ok = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: { ...validBody, messages: [{ role: "user", content: [img, { type: "text", text: "Lis ce contact" }] }] } }), ok);
+    expect(ok.statusCode).toBe(200);
+    const ko = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: { ...validBody, messages: [{ role: "user", content: [img, img, img, img, img] }] } }), ko);
+    expect(ko.statusCode).toBe(400);
   });
 });

@@ -84,3 +84,23 @@ export async function sendEmail({ to, subject, html, cc, fromName, replyTo, atta
   }
   return { provider: 'resend' }
 }
+
+// ── Données de profil insérées dans le HTML des emails ─────────────────────
+// brand_data est saisi par l'artisan : sans contrôle, une « couleur » comme
+// `red"><a href=…>` ou un logo `javascript:` injectait du HTML dans des mails
+// partant de l'adresse Zenbat.
+export function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+}
+
+export function safeColor(c, fallback = '#22c55e') {
+  return /^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(String(c ?? '').trim()) ? String(c).trim() : fallback
+}
+
+// URL d'image utilisable dans un email : cid: (pièce jointe) ou https/http.
+export function safeImageSrc(src) {
+  const s = String(src ?? '').trim()
+  if (/^cid:[\w.@-]+$/i.test(s)) return s
+  if (!/^https?:\/\//i.test(s)) return null
+  try { return escapeHtml(new URL(s).href) } catch { return null }
+}

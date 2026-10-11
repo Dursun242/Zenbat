@@ -33,9 +33,10 @@ L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - **État : toutes les migrations 0001→0056 sont appliquées** (contrôle complet exécuté le 2026-06-11 : tracking 13/13 sur 0044→0056, contraintes CHECK, tables, colonnes, index et fonctions vérifiés un par un).
 - **En attente : `0057_security_urgences_audit.sql`** (audit du 2026-10-11) : colonnes d'abonnement de `profiles` non modifiables depuis le navigateur (trigger `protect_profile_columns`), RLS sur les tables du CRM de prospection, droits EXECUTE retirés à anon/authenticated sur les fonctions de purge/admin, `create_avoir_from()` ignore les lignes supprimées. Une fois appliquée, le diagnostic `schema_migrations` doit montrer `0057`.
 - **En attente : `0058_invoice_immutability.sql`** (audit, 2ᵉ série) : factures émises immuables — lignes non modifiables depuis l'app (trigger `protect_locked_invoice_lines`), numéro / montants / dates / client figés pour tous les rôles une fois `locked` (trigger `protect_locked_invoice_fields`), insertion forcée en brouillon depuis l'app, dossier Storage `{user}/invoices/` (archives Factur-X) réservé au service_role. Restent modifiables par le serveur : statut de paiement, envoi au client, `deleted_at`. Une facture émise se corrige par un avoir.
+- **En attente : `0059_daily_quotas.sql`** (audit, 3ᵉ série) : table `daily_quotas` + fonctions `daily_quota_consume` / `daily_quota_refund` (service_role uniquement) — quota IA de `/api/claude` (kind `ai`, 40/200 par jour) et emails envoyés par un artisan (kind `email`, 60 par jour) comptés côté serveur. Tant qu'elle n'est pas appliquée, `api/_quota.js` retombe sur l'ancien comptage (IA) ou laisse passer (emails).
 - Subtilité de tracking héritée de la collision 0053 : l'essai Pro avait été appliqué sous l'ancien numéro `0053`, puis `0053_invoice_type_solde` a vu son auto-enregistrement ignoré (`on conflict do nothing`), puis `0056` s'est enregistrée normalement. Correctif (réétiquetage, PAS de changement de version — `0056` existe déjà) : `update public.schema_migrations set label='invoice_type_solde' where version='0053' and label='pro_trial_until';`.
 - Jobs pg_cron attendus actifs : `purge-support-tickets-36h` (0050) et `expire-pro-trials-daily` (0056). Diagnostic : `SELECT jobname, schedule, active FROM cron.job;` et `SELECT * FROM cron.job_run_details WHERE jobname = '...' ORDER BY start_time DESC LIMIT 10;`.
-- Prochaine migration à créer : préfixer avec `0059_`.
+- Prochaine migration à créer : préfixer avec `0060_`.
 
 **Tracking depuis 0043** : la table `public.schema_migrations(version, label, applied_at)` est créée par la migration `0043`. À partir de là, chaque nouvelle migration **doit** se terminer par un INSERT idempotent qui s'auto-enregistre :
 ```sql
@@ -114,6 +115,8 @@ Helpers non déployés (préfixés `_`, importés par les endpoints) :
 - `_serverLog.js` — log d'erreurs serveur vers la table `app_logs`.
 - `_ai.js` — sélection du fournisseur IA (`AI_PROVIDER`, sinon Mistral si `MISTRAL_API_KEY` posée, sinon Anthropic) + traduction Mistral ⇄ format Anthropic Messages (réponse, erreurs, flux SSE).
 - `_ssrf.js` — `assertPublicHost()` : bloque les URLs internes/privées avant un fetch sortant (utilisé par `crm.js` pour le scraping).
+- `_quota.js` — quotas journaliers par utilisateur comptés en base (`consumeDailyQuota` / `refundDailyQuota`, migration 0059) : IA (`claude.js`) et emails envoyés par un artisan (`devis-public.js` send, `facturx.js` send, `account.js` export comptable).
+- `_email.js` exporte aussi `escapeHtml`, `safeColor`, `safeImageSrc` : toute donnée de `brand_data` insérée dans le HTML d'un email passe par eux.
 
 | Fichier | Rôle |
 |---------|------|
@@ -135,14 +138,16 @@ Le bot Telegram est volontairement éclaté en **deux fonctions Edge** distincte
 
 | Fonction | Sens | Auth | Rôle |
 |----------|------|------|------|
-| `supabase/functions/notify-telegram/` | sortant | `verify_jwt: true` | Reçoit des événements (DB webhooks, API Vercel, front) et les pousse en HTML formaté vers le chat admin (`TELEGRAM_CHAT_ID`). |
+| `supabase/functions/notify-telegram/` | sortant | `verify_jwt: true` + clé service_role (tout) ou session utilisateur vérifiée (seulement `pdf_generated` et `support_escalation`) ; la clé anon est refusée | Reçoit des événements (DB webhooks, API Vercel, front) et les pousse en HTML formaté vers le chat admin (`TELEGRAM_CHAT_ID`). |
 | `supabase/functions/telegram-bot/`    | entrant | `verify_jwt: false` + `TELEGRAM_WEBHOOK_SECRET` (header `X-Telegram-Bot-Api-Secret-Token`) | Reçoit le webhook Telegram et exécute les commandes admin : `/stats`, `/user`, `/tickets`, `/reply`. Validation à deux étages (secret + chat_id whitelisté). |
-| `supabase/functions/welcome-email/`   | sortant | `verify_jwt: true` | Déclenché par DB Webhook sur `INSERT INTO profiles`. Récupère l'email depuis `auth.users`, envoie l'email de bienvenue via Resend (template HTML : mini-tuto 4 étapes + mention conformité Factur-X 2026). |
+| `supabase/functions/welcome-email/`   | sortant | `verify_jwt: true` + clé service_role exigée (la clé anon est refusée) | Déclenché par DB Webhook sur `INSERT INTO profiles`. Récupère l'email depuis `auth.users`, envoie l'email de bienvenue via Resend (template HTML : mini-tuto 4 étapes + mention conformité Factur-X 2026). |
 
 Pourquoi deux fonctions :
 - `notify-telegram` est appelée par des sources authentifiées Supabase (DB triggers, service_role keys) → JWT obligatoire pour la sécurité.
 - Le webhook Telegram entrant est public (Telegram ne sait pas envoyer de JWT Supabase) → on doit désactiver `verify_jwt` et valider à la place le secret token Telegram.
 - Mélanger les deux = devoir baisser `verify_jwt` partout, ce qui exposerait les notifications.
+
+`supabase/functions/process-email-queue/` (file CRM, `--no-verify-jwt`) exige `Authorization: Bearer <CRON_SECRET>` (secret de la fonction) ou la clé service_role — le job pg_cron doit envoyer cet en-tête.
 
 Ces fonctions Edge n'occupent **pas** de slot Vercel (limite 12) — les Edge Functions Supabase sont gratuites et illimitées.
 
