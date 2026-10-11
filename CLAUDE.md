@@ -244,6 +244,11 @@ Pour changer de modèle : modifier la variable d'env `VITE_CLAUDE_MODEL` dans Ve
 
 `.claude/settings.json` active le plugin **ECC** (Everything Claude Code, `ecc@ecc`, marketplace `affaan-m/ECC`) pour toutes les sessions sur ce dépôt : agents, skills, commandes (`/ecc:…`) et hooks, en plus des hooks graphify. Les « rules » d'ECC ne sont pas installées : en cas de conflit, ce fichier CLAUDE.md fait foi.
 
+Skills de design (`.claude/skills/`, repris du dépôt `idm`) :
+- **impeccable** : conception, critique et finition d'interface (`/impeccable audit|critique|polish|…`). Son moteur se télécharge au premier lancement dans `~/.impeccable` (hors dépôt). Pas encore de `PRODUCT.md` / `DESIGN.md` : `/impeccable init` les crée.
+- **awesome-design-md** : 74 systèmes de design de sites réels (DESIGN.md) pour un rendu « dans le style de ».
+- **design-taste-frontend** : règles anti-« slop » pour landing pages et refontes (pas pour les écrans métier).
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
