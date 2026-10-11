@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { fmt } from "../lib/utils.js";
+import { computeTotals, invoiceAmounts } from "../lib/invoiceCalc.js";
 import Badge from "./ui/Badge.jsx";
 import LignesEditor from "./LignesEditor.jsx";
 import PDFViewer from "./PDFViewer.jsx";
@@ -47,13 +48,10 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
   const ac = brand.color || "#22c55e";
 
   const lignes = invoice.lignes || [];
-  const ouvrages = lignes.filter(l => l.type_ligne === "ouvrage");
   const franchise = brand.vatRegime === "franchise";
   const autoLiq   = !!invoice.auto_liquidation_btp;
   const noTva     = franchise || autoLiq;
-  const ht   = ouvrages.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0);
-  const tva  = ouvrages.reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0) * (noTva ? 0 : Number(l.tva_rate ?? 20)) / 100, 0);
-  const ttc  = ht + tva;
+  const { ht, tva, ttc } = computeTotals(lignes, { noTva });
   const retenue = Number(invoice.retenue_garantie_eur) || 0;
   const netAPayer = ttc - retenue;
   // Conformité fiscale : une facture émise est immuable (CGI art. 289).
@@ -66,10 +64,12 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
 
   const updateLignes = (newLignes) => {
     if (isLocked) return;
+    // HT, TVA et TTC recalculés ensemble : le XML Factur-X, la liste et
+    // l'export comptable lisent montant_tva / montant_ttc.
     onChange({
       ...invoice,
       lignes: newLignes,
-      montant_ht:  newLignes.filter(l => l.type_ligne === "ouvrage").reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0),
+      ...invoiceAmounts(newLignes, brand.vatRegime, autoLiq),
     }, true);
   };
 
@@ -585,7 +585,7 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
             <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 12, cursor: isLocked ? "not-allowed" : "pointer", opacity: isLocked ? 0.6 : 1 }}>
               <input type="checkbox"
                 checked={!!invoice.auto_liquidation_btp}
-                onChange={e => onChange({ ...invoice, auto_liquidation_btp: e.target.checked }, false)}
+                onChange={e => onChange({ ...invoice, auto_liquidation_btp: e.target.checked, ...invoiceAmounts(lignes, brand.vatRegime, e.target.checked) }, false)}
                 disabled={isLocked}
                 style={{ marginTop: 2, accentColor: "#22c55e", cursor: isLocked ? "not-allowed" : "pointer" }}/>
               <div>

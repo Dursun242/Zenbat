@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import { fmt, fmtD } from "../lib/utils.js"
+import { computeTotals, isNoTva, lineRate } from "../lib/invoiceCalc.js"
 import { useModalGuard } from "../hooks/useModalGuard.js"
 
 // Délais pour stabiliser la mesure de hauteur après changement de scale ;
@@ -97,21 +98,9 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
     return group.some(x => x.type_ligne === "ouvrage")
   })
 
-  const ouvrages = filteredLignes.filter(l => l.type_ligne === "ouvrage")
-  const noTva    = brand.vatRegime === "franchise" || !!d.auto_liquidation_btp
-  const rateOf = (l) => noTva ? 0 : Number(l.tva_rate ?? d.tva_rate ?? 20)
-  const ht = ouvrages.reduce((s, l) => s + ((l.quantite||0) * (l.prix_unitaire||0)), 0)
-  const tvaGroups = ouvrages.reduce((acc, l) => {
-    const r = rateOf(l)
-    const lineHt = (l.quantite||0) * (l.prix_unitaire||0)
-    acc[r] = (acc[r] || 0) + lineHt
-    return acc
-  }, {})
-  const tvaRows = Object.keys(tvaGroups).map(r => Number(r)).sort((a,b) => a-b).map(r => ({
-    rate: r, base: tvaGroups[r], montant: tvaGroups[r] * (r/100),
-  }))
-  const tva = tvaRows.reduce((s, row) => s + row.montant, 0)
-  const ttc = ht + tva
+  const noTva    = isNoTva(brand.vatRegime, d.auto_liquidation_btp)
+  const rateOf   = (l) => noTva ? 0 : lineRate(l, d.tva_rate)
+  const { ht, tva, ttc, tvaRows } = computeTotals(filteredLignes, { noTva, docRate: d.tva_rate })
   const fontFamily = brand.fontStyle==="elegant"?"Playfair Display":brand.fontStyle==="tech"?"Space Grotesk":"DM Sans"
   const navy  = "#1A1612"
   // Couleur d'accent du profil utilisateur, fallback terracotta historique.

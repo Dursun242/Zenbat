@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { computeTotals, invoiceAmounts, isNoTva, round2, ventilatedLines } from './invoiceCalc.js'
 
 async function withRetry(fn, retries = 2, delay = 700) {
   try {
@@ -426,19 +427,23 @@ export async function nextInvoiceNumber() {
   })
 }
 
-export async function createAcompteFromDevis(devis, montantHT, tvaRate = 20, vatRegime) {
+// Acompte et solde : le montant HT est ventilé sur les taux de TVA du devis
+// (devis à 5,5 / 10 / 20 % mélangés), une ligne par taux. Franchise ou
+// autoliquidation du devis : une ligne à 0 %, le flag est propagé.
+function invoiceFromDevisParts(devis, vatRegime, montantHT, designation) {
+  const autoLiq = !!devis.auto_liquidation_btp
+  const lignes = ventilatedLines(montantHT, devis.lignes, {
+    noTva: isNoTva(vatRegime, autoLiq), docRate: devis.tva_rate, designation,
+  })
+  return { lignes, autoLiq, amounts: invoiceAmounts(lignes, vatRegime, autoLiq) }
+}
+
+export async function createAcompteFromDevis(devis, montantHT, vatRegime) {
   const numero = await nextInvoiceNumber()
-  const effectiveRate = vatRegime === 'franchise' ? 0 : tvaRate
-  const montant_tva = Math.round(montantHT * effectiveRate) / 100
-  const montant_ttc = montantHT + montant_tva
-  const lignes = [{
-    type_ligne:    'ouvrage',
-    designation:   `Acompte sur devis ${devis.numero}${devis.objet ? ' – ' + devis.objet : ''}`,
-    unite:         'forfait',
-    quantite:      1,
-    prix_unitaire: montantHT,
-    tva_rate:      effectiveRate,
-  }]
+  const { lignes, autoLiq, amounts } = invoiceFromDevisParts(
+    devis, vatRegime, montantHT,
+    `Acompte sur devis ${devis.numero}${devis.objet ? ' – ' + devis.objet : ''}`,
+  )
   const invoice = {
     devis_id:       devis.id,
     client_id:      devis.client_id,
@@ -447,36 +452,25 @@ export async function createAcompteFromDevis(devis, montantHT, tvaRate = 20, vat
     operation_type: 'service',
     statut:         'brouillon',
     invoice_type:   'acompte',
-    montant_ht:     montantHT,
-    montant_tva,
-    montant_ttc,
+    ...amounts,
+    ...(autoLiq ? { auto_liquidation_btp: true } : {}),
     date_emission:  new Date().toISOString().split('T')[0],
     date_echeance:  new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
   }
   return createInvoice(invoice, lignes)
 }
 
-export async function createSoldeFromDevis(devis, acompteInvoices = [], tvaRate = 20, vatRegime) {
-  const numero = await nextInvoiceNumber()
-  const effectiveRate = vatRegime === 'franchise' ? 0 : tvaRate
-  const devisHT = (devis.lignes || [])
-    .filter(l => l.type_ligne === 'ouvrage')
-    .reduce((s, l) => s + (Number(l.quantite) || 0) * (Number(l.prix_unitaire) || 0), 0)
+export async function createSoldeFromDevis(devis, acompteInvoices = [], vatRegime) {
+  const devisHT = computeTotals(devis.lignes).ht
   const totalAcompteHT = acompteInvoices.reduce((s, a) => s + (Number(a.montant_ht) || 0), 0)
-  const montantHT = Math.round((devisHT - totalAcompteHT) * 100) / 100
+  const montantHT = round2(devisHT - totalAcompteHT)
   if (montantHT <= 0) throw new Error('Toutes les échéances ont déjà été facturées.')
+  const numero = await nextInvoiceNumber()
   const acompteRefs = acompteInvoices.map(a => a.numero).join(', ')
-  const designation = `Solde – devis ${devis.numero}${devis.objet ? ' – ' + devis.objet : ''}${acompteRefs ? ' (acomptes ' + acompteRefs + ')' : ''}`
-  const montant_tva = Math.round(montantHT * effectiveRate) / 100
-  const montant_ttc = montantHT + montant_tva
-  const lignes = [{
-    type_ligne:    'ouvrage',
-    designation,
-    unite:         'forfait',
-    quantite:      1,
-    prix_unitaire: montantHT,
-    tva_rate:      effectiveRate,
-  }]
+  const { lignes, autoLiq, amounts } = invoiceFromDevisParts(
+    devis, vatRegime, montantHT,
+    `Solde – devis ${devis.numero}${devis.objet ? ' – ' + devis.objet : ''}${acompteRefs ? ' (acomptes ' + acompteRefs + ')' : ''}`,
+  )
   const invoice = {
     devis_id:       devis.id,
     client_id:      devis.client_id,
@@ -485,9 +479,8 @@ export async function createSoldeFromDevis(devis, acompteInvoices = [], tvaRate 
     operation_type: 'service',
     statut:         'brouillon',
     invoice_type:   'solde',
-    montant_ht:     montantHT,
-    montant_tva,
-    montant_ttc,
+    ...amounts,
+    ...(autoLiq ? { auto_liquidation_btp: true } : {}),
     date_emission:  new Date().toISOString().split('T')[0],
     date_echeance:  new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
   }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { fmt } from "../lib/utils.js";
+import { computeTotals, isNoTva, splitByRate, ventilatedLines } from "../lib/invoiceCalc.js";
 import { I } from "./ui/icons.jsx";
 import Badge from "./ui/Badge.jsx";
 import LignesEditor from "./LignesEditor.jsx";
@@ -134,8 +135,15 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
     return a;
   }, {});
 
-  const franchise  = brand?.vatRegime === "franchise";
-  const tvaRate    = franchise ? 0 : (lignes.find(l => l.type_ligne === "ouvrage")?.tva_rate ?? 20);
+  // Acompte / solde : TVA ventilée sur les taux du devis (même calcul que la
+  // facture créée, cf. createAcompteFromDevis). 0 % en franchise ou autoliquidation.
+  const autoLiqDevis = !!d.auto_liquidation_btp;
+  const noTvaDevis   = isNoTva(brand?.vatRegime, autoLiqDevis);
+  const ttcOf = (amountHT) => computeTotals(
+    ventilatedLines(amountHT, lignes, { noTva: noTvaDevis, docRate: d.tva_rate }),
+  ).ttc;
+  const devisRates   = noTvaDevis ? [0] : splitByRate(ht, lignes, d.tva_rate).map(p => p.rate);
+  const tvaLabel     = devisRates.length === 1 ? `${String(devisRates[0]).replace(".", ",")}%` : "TVA ventilée";
   const canAcompte = onCreateAcompte && ht > 0 && ["envoye","en_signature","accepte"].includes(d.statut);
 
   // Acomptes et solde déjà créés pour ce devis
@@ -155,8 +163,8 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
   const freeHT         = Math.min(remainingHT, Math.max(0, Number(acompteMontantHT) || 0));
   const acompteHT      = acompteMode === "montant" ? freeHT : pctHT;
   const acompteEffPct  = ht > 0 ? Math.round(acompteHT / ht * 100) : 0;
-  const acompteTTC     = Math.round(acompteHT * (1 + tvaRate / 100) * 100) / 100;
-  const soldeTTC       = Math.round(remainingHT * (1 + tvaRate / 100) * 100) / 100;
+  const acompteTTC     = ttcOf(acompteHT);
+  const soldeTTC       = ttcOf(remainingHT);
 
   // Génère un PDF « facture pro forma » à partir du devis (document commercial
   // sans valeur fiscale). Aucun numéro légal consommé, aucun verrouillage.
@@ -183,7 +191,7 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
     if (!acompteHT || acompteLoading) return;
     setAcompteLoading(true);
     try {
-      await onCreateAcompte(d.id, acompteHT, tvaRate);
+      await onCreateAcompte(d.id, acompteHT);
       setAcompteModal(false);
     } finally {
       setAcompteLoading(false);
@@ -316,9 +324,9 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
                 )}
 
                 <div style={{ background: "#FAF7F2", borderRadius: 14, padding: "14px 16px", marginBottom: 16 }}>
-                  {franchise ? (
+                  {noTvaDevis ? (
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ fontSize: 13, color: "#6B6358" }}>Montant (TVA non applicable)</span>
+                      <span style={{ fontSize: 13, color: "#6B6358" }}>{autoLiqDevis ? "Montant (autoliquidation, sans TVA)" : "Montant (TVA non applicable)"}</span>
                       <span style={{ fontSize: 14, fontWeight: 700, color: ac }}>{fmt(acompteHT)}</span>
                     </div>
                   ) : (
@@ -328,7 +336,7 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
                         <span style={{ fontSize: 13, fontWeight: 700, color: "#1A1612" }}>{fmt(acompteHT)}</span>
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ fontSize: 13, color: "#6B6358" }}>Montant TTC ({tvaRate}%)</span>
+                        <span style={{ fontSize: 13, color: "#6B6358" }}>Montant TTC ({tvaLabel})</span>
                         <span style={{ fontSize: 14, fontWeight: 700, color: ac }}>{fmt(acompteTTC)}</span>
                       </div>
                     </>

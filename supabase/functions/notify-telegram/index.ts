@@ -379,12 +379,17 @@ async function uploadInvoicePdf(ownerId: string, numero: string, blob: Blob): Pr
       headers: {
         Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
         "Content-Type": "application/pdf",
-        "x-upsert": "true",
+        // Jamais d'écrasement : une fois la facture émise, le Factur-X déposé
+        // par /api/facturx fait foi. Ce brouillon ne sert que si rien n'existe.
+        "x-upsert": "false",
       },
       body: blob,
     });
     if (!r.ok) {
-      console.warn("[notify-telegram] upload invoice PDF failed:", r.status, await r.text());
+      const body = await r.text();
+      // Fichier déjà présent (archive Factur-X ou brouillon) : attendu.
+      if (/already exists|duplicate/i.test(body)) return true;
+      console.warn("[notify-telegram] upload invoice PDF failed:", r.status, body);
       return false;
     }
     return true;
