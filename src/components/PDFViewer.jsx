@@ -362,8 +362,8 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         {/* Toolbar inline */}
-        <div style={{ background: "#1A1612", padding: "8px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-          <span style={{ color: "#9A8E82", fontSize: 12, fontWeight: 500 }}>{d.numero}.pdf</span>
+        <div style={{ background: "#FBFAF7", borderBottom: "1px solid #D9D2C5", minHeight: 56, padding: "6px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, boxSizing: "border-box" }}>
+          <span style={{ color: "#5C544B", fontSize: 14, fontWeight: 600 }}>Aperçu · {d.numero}.pdf</span>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {onMarkSent && d.statut === "brouillon" && (
               <button onClick={() => { onMarkSent(); onClose?.() }}
@@ -395,8 +395,9 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
                   } finally { setGeneratingPdf(false) }
                 }}
                 disabled={generatingPdf}
-                style={{ background: "#22c55e", color: "white", border: "none", borderRadius: 8, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: generatingPdf ? "default" : "pointer" }}>
-                {generatingPdf ? "⏳" : "⬇ Aperçu PDF"}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 44, background: "none", color: "#A4461F", border: "none", padding: "0 4px", fontFamily: "inherit", fontSize: 15, fontWeight: 600, cursor: generatingPdf ? "default" : "pointer" }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+                {generatingPdf ? "Préparation…" : "Ouvrir le PDF"}
               </button>
             )}
           </div>
