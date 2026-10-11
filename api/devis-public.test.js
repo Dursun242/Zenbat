@@ -664,6 +664,46 @@ describe('POST actions client (accept/refuse/negotiate)', () => {
     // newTotal = 10*50 = 500 (l2 supprimée)
     expect(r.body.newTotal).toBe(500)
   })
+
+  it('negotiate ignore les lignes qui n\'appartiennent pas au devis', async () => {
+    const lignes = [{ id: 'l1', type_ligne: 'ouvrage', quantite: 10, prix_unitaire: 50 }]
+    const chains = []
+    let call = 0
+    supabaseMock.from = vi.fn(() => {
+      call++
+      if (call === 1) return makeChain({ data: { id: 's1', email_hash: 'x' }, error: null })
+      if (call === 2) return makeChain({ data: { id: 'd1', statut: 'envoye', owner_id: 'a1', client_id: 'c1', montant_ht: 500, lignes }, error: null })
+      const c = makeChain({ count: 0, data: null, error: null }); chains.push(c); return c
+    })
+    const r = res()
+    await handler(req('POST', {
+      action: 'negotiate', token: 'tok', session_id: 's1',
+      message: 'Retirer une ligne',
+      line_changes: [
+        { action: 'remove', ligne_id: 'ligne-autre-devis' },
+        { action: 'change_qty', ligne_id: 'l1', new_qty: 'abc' },
+      ],
+    }), r)
+    expect(r.statusCode).toBe(200)
+    expect(r.body.newTotal).toBe(500)
+    const inserted = chains.flatMap(c => c.insert.mock.calls.map(a => a[0])).find(x => 'line_changes' in x)
+    expect(inserted.line_changes).toBeNull()
+  })
+
+  it('negotiate avec uniquement des lignes étrangères et sans message → 400', async () => {
+    let call = 0
+    supabaseMock.from = vi.fn(() => {
+      call++
+      if (call === 1) return makeChain({ data: { id: 's1', email_hash: 'x' }, error: null })
+      return makeChain({ data: { id: 'd1', statut: 'envoye', owner_id: 'a1', client_id: 'c1', montant_ht: 0, lignes: [] }, error: null })
+    })
+    const r = res()
+    await handler(req('POST', {
+      action: 'negotiate', token: 'tok', session_id: 's1',
+      line_changes: [{ action: 'remove', ligne_id: 'ligne-autre-devis' }],
+    }), r)
+    expect(r.statusCode).toBe(400)
+  })
 })
 
 describe('POST artisan_respond', () => {
@@ -705,6 +745,30 @@ describe('POST artisan_respond', () => {
     expect(r.statusCode).toBe(200)
     expect(r.body.ok).toBe(true)
     expect(typeof r.body.newHt).toBe('number')
+  })
+
+  it('accept_client_changes ne touche que les lignes du devis (filtre devis_id)', async () => {
+    const changes = [
+      { action: 'remove', ligne_id: 'x1' },
+      { action: 'change_qty', ligne_id: 'x2', new_qty: 3 },
+    ]
+    const ligneChains = []
+    let call = 0
+    supabaseMock.from = vi.fn((table) => {
+      call++
+      if (call === 1) return makeChain({ data: { id: 'd1', numero: 'DEV-010', statut: 'en_negociation', owner_id: 'artisan-1', client_id: 'c1', lignes: [] }, error: null })
+      if (call === 2) return makeChain({ data: { id: 'n1', line_changes: changes, devis_id: 'd1' }, error: null })
+      const c = makeChain({ data: null, error: null })
+      if (table === 'lignes_devis') ligneChains.push(c)
+      return c
+    })
+    const r = res()
+    await handler(req('POST', { action: 'artisan_respond', token: 'tok', response: 'accept_client_changes', negotiation_id: 'n1' }), r)
+    expect(r.statusCode).toBe(200)
+    const del = ligneChains.find(c => c.delete.mock.calls.length)
+    const upd = ligneChains.find(c => c.update.mock.calls.length)
+    expect(del.eq).toHaveBeenCalledWith('devis_id', 'd1')
+    expect(upd.eq).toHaveBeenCalledWith('devis_id', 'd1')
   })
 
   it('accept_client_changes envoie email client si email disponible', async () => {

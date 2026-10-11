@@ -274,7 +274,7 @@ async function handleSendComptable({ req, res, user, admin }) {
 
     const invoiceIds = invoices.map(i => i.id)
     const { data: lignes = [] } = await admin.from('lignes_invoices')
-      .select('*').in('invoice_id', invoiceIds)
+      .select('*').in('invoice_id', invoiceIds).is('deleted_at', null)
 
     // Index clients pour join lisible
     const clientById = new Map(clients.map(c => [c.id, c]))

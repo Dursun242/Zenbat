@@ -265,7 +265,7 @@ export default async function handler(req, res) {
       safe(admin.from('devis').select('*').eq('owner_id', userId).is('deleted_at', null).order('created_at', { ascending: false })),
       safe(admin.from('lignes_devis').select('*').eq('owner_id', userId).order('position')),
       safe(admin.from('invoices').select('*').eq('owner_id', userId).is('deleted_at', null).order('created_at', { ascending: false })),
-      safe(admin.from('lignes_invoices').select('*').eq('owner_id', userId).order('position')),
+      safe(admin.from('lignes_invoices').select('*').eq('owner_id', userId).is('deleted_at', null).order('position')),
       safe(admin.from('ia_conversations').select('*').eq('owner_id', userId).order('created_at', { ascending: true }).limit(500)),
       safe(admin.from('ia_error_logs').select('*').eq('owner_id', userId).order('created_at', { ascending: false }).limit(100)),
       safe(admin.from('ia_negative_logs').select('*').eq('owner_id', userId).order('created_at', { ascending: false }).limit(100)),

@@ -589,9 +589,10 @@ export default async function handler(req, res) {
       const removedIds = changes.filter(c => c.action === 'remove').map(c => c.ligne_id)
       const qtyChanges = changes.filter(c => c.action === 'change_qty')
 
-      if (removedIds.length) await admin.from('lignes_devis').delete().in('id', removedIds)
+      // Filtre devis_id : une négociation ne peut toucher que les lignes de ce devis.
+      if (removedIds.length) await admin.from('lignes_devis').delete().in('id', removedIds).eq('devis_id', devis.id)
       for (const qc of qtyChanges) {
-        await admin.from('lignes_devis').update({ quantite: Number(qc.new_qty) }).eq('id', qc.ligne_id)
+        await admin.from('lignes_devis').update({ quantite: Number(qc.new_qty) }).eq('id', qc.ligne_id).eq('devis_id', devis.id)
       }
 
       const { data: newLignes } = await admin.from('lignes_devis')
@@ -601,7 +602,7 @@ export default async function handler(req, res) {
         .reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0), 0) * 100) / 100
 
       await admin.from('devis').update({ statut: 'accepte', montant_ht: newHt, client_accepted_at: new Date().toISOString() }).eq('id', devis.id)
-      await admin.from('devis_negotiations').update({ status: 'accepted' }).eq('id', negotiation_id)
+      await admin.from('devis_negotiations').update({ status: 'accepted' }).eq('id', negotiation_id).eq('devis_id', devis.id)
       await admin.from('devis_audit_log').insert({ devis_id: devis.id, event: 'accepted', from_party: 'artisan', meta: { via: 'client_changes', negotiation_id } })
 
       const { data: client } = await admin.from('clients').select('email, nom, prenom, raison_sociale').eq('id', devis.client_id).maybeSingle()
@@ -613,7 +614,7 @@ export default async function handler(req, res) {
     }
 
     if (response === 'refuse_client_changes') {
-      await admin.from('devis_negotiations').update({ status: 'rejected' }).eq('id', negotiation_id)
+      await admin.from('devis_negotiations').update({ status: 'rejected' }).eq('id', negotiation_id).eq('devis_id', devis.id)
       await admin.from('devis').update({ statut: 'envoye' }).eq('id', devis.id)
       await admin.from('devis_audit_log').insert({ devis_id: devis.id, event: 'artisan_responded', from_party: 'artisan', meta: { response: 'refused', message: artisan_message || null } })
 
@@ -906,13 +907,20 @@ export default async function handler(req, res) {
   // ── negotiate ──────────────────────────────────────────────────────────
   if (action === 'negotiate') {
     const { message, line_changes, budget_target } = body
-    const changes = Array.isArray(line_changes) ? line_changes : []
+    const ouvrages   = (devis.lignes || []).filter(l => l.type_ligne === 'ouvrage')
+    // On ne garde que les changements qui portent sur une ligne de CE devis :
+    // accept_client_changes les applique ensuite en service role.
+    const ouvrageIds = new Set(ouvrages.map(l => l.id))
+    const changes = (Array.isArray(line_changes) ? line_changes : []).filter(c =>
+      c && ouvrageIds.has(c.ligne_id) && (
+        c.action === 'remove' ||
+        (c.action === 'change_qty' && Number.isFinite(Number(c.new_qty)) && Number(c.new_qty) >= 0)
+      ))
     if (!message?.trim() && changes.length === 0 && !budget_target)
       return res.status(400).json({ error: 'Précisez vos modifications, un budget cible ou un message' })
 
     const removedIds = changes.filter(c => c.action === 'remove').map(c => c.ligne_id)
     const qtyChanges = changes.filter(c => c.action === 'change_qty')
-    const ouvrages   = (devis.lignes || []).filter(l => l.type_ligne === 'ouvrage')
     const oldTotal   = Math.round(ouvrages.reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0), 0) * 100) / 100
     const newTotal   = Math.round(ouvrages
       .filter(l => !removedIds.includes(l.id))
