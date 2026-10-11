@@ -258,7 +258,36 @@ async function sendWelcome(email: string, firstName: string): Promise<{ ok: bool
   return { ok: true };
 }
 
+// Appelée uniquement par le DB Webhook profiles INSERT et par
+// /api/admin-stats (renvoi du tuto), tous deux avec la clé service_role.
+// verify_jwt seul laissait passer la clé anon publique : n'importe qui
+// pouvait renvoyer le mail de bienvenue à un utilisateur (owner_id exposé
+// par la page publique des devis) avec un nom injecté.
+function isServiceCaller(authHeader: string | null): boolean {
+  if (!authHeader?.startsWith("Bearer ")) return false;
+  const token = authHeader.slice(7).trim();
+  if (SERVICE_ROLE && token.length === SERVICE_ROLE.length) {
+    let diff = 0;
+    for (let i = 0; i < token.length; i++) diff |= token.charCodeAt(i) ^ SERVICE_ROLE.charCodeAt(i);
+    if (diff === 0) return true;
+  }
+  // Signature vérifiée par la passerelle (verify_jwt) : le rôle est fiable.
+  try {
+    const b64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const claims = JSON.parse(atob(b64.padEnd(b64.length + (4 - (b64.length % 4)) % 4, "=")));
+    return claims?.role === "service_role";
+  } catch {
+    return false;
+  }
+}
+
 Deno.serve(async (req: Request) => {
+  if (!isServiceCaller(req.headers.get("authorization"))) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,

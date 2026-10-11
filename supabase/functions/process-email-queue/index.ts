@@ -1,8 +1,10 @@
 // process-email-queue — traite la file d'envoi programmée CRM
 //
 // Déclenchement : pg_cron toutes les 5 minutes (voir migration 0046 instructions)
-// Auth : verify_jwt = false (déployer avec --no-verify-jwt)
-//        Accès protégé par le fait que pg_cron est interne au projet Supabase.
+// Auth : verify_jwt = false (déployer avec --no-verify-jwt), MAIS en-tête
+//        obligatoire : « Authorization: Bearer <CRON_SECRET> » (secret de la
+//        fonction) ou la clé service_role. Sans lui, n'importe qui sur Internet
+//        pouvait déclencher la file (l'URL est publique).
 //
 // Variables d'env requises (Supabase Dashboard → Settings → Edge Functions secrets) :
 //   RESEND_API_KEY      — clé Resend (déjà présente pour welcome-email)
@@ -19,7 +21,7 @@
 //        $$
 //        select net.http_post(
 //          url := 'https://<PROJECT_REF>.supabase.co/functions/v1/process-email-queue',
-//          headers := '{"Content-Type":"application/json"}'::jsonb,
+//          headers := '{"Content-Type":"application/json","Authorization":"Bearer <CRON_SECRET>"}'::jsonb,
 //          body := '{}'::jsonb
 //        );
 //        $$
@@ -30,9 +32,25 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const BATCH_SIZE = 10
 
-Deno.serve(async (_req) => {
+function sameSecret(a: string, b: string): boolean {
+  if (!a || !b || a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
+
+Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const cronSecret  = Deno.env.get('CRON_SECRET') ?? ''
+  const auth  = req.headers.get('authorization') ?? ''
+  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : ''
+  if (!sameSecret(token, cronSecret) && !sameSecret(token, serviceKey)) {
+    console.warn('[process-email-queue] appel refusé : en-tête Authorization absent ou invalide')
+    return new Response(JSON.stringify({ error: 'unauthorized' }), {
+      status: 401, headers: { 'Content-Type': 'application/json' },
+    })
+  }
   const resendKey   = Deno.env.get('RESEND_API_KEY')
   const fromAddr    = Deno.env.get('RESEND_FROM') || 'Dursun <zenbat76@gmail.com>'
 

@@ -448,6 +448,39 @@ describe('POST send (artisan)', () => {
     expect(r.body.token).toBe('tok')
   })
 
+  it('couleur et logo du profil malveillants : rien n\'est injecté dans le mail', async () => {
+    let call = 0
+    supabaseMock.from = vi.fn(() => {
+      call++
+      if (call === 1) return makeChain({ data: { id: 'd1', numero: 'DEV-001', objet: null, montant_ht: 100, public_token: 'tok', client_id: 'c1', owner_id: 'artisan-1', statut: 'brouillon' }, error: null })
+      if (call === 2) return makeChain({ data: { email: 'c@test.fr', nom: 'A', prenom: '', raison_sociale: '' }, error: null })
+      if (call === 3) return makeChain({ data: { company_name: 'X', brand_data: { color: 'red"><a href="https://phish.example">', logo: 'javascript:alert(1)' } }, error: null })
+      return makeChain({ data: null, error: null })
+    })
+    await handler(req('POST', { action: 'send', devis_id: 'd1' }), res())
+    const html = sendMailMock.mock.calls[0][0].html
+    expect(html).not.toContain('phish.example')
+    expect(html).not.toContain('javascript:')
+    expect(html).toContain('background:#22c55e')
+  })
+
+  it('limite d\'envoi du jour atteinte → 429, aucun mail', async () => {
+    supabaseMock.rpc = vi.fn(async () => ({ data: null, error: null }))
+    let call = 0
+    supabaseMock.from = vi.fn(() => {
+      call++
+      if (call === 1) return makeChain({ data: { id: 'd1', numero: 'DEV-001', objet: null, montant_ht: 100, public_token: 'tok', client_id: 'c1', owner_id: 'artisan-1', statut: 'brouillon' }, error: null })
+      if (call === 2) return makeChain({ data: { email: 'c@test.fr', nom: 'A', prenom: '', raison_sociale: '' }, error: null })
+      if (call === 3) return makeChain({ data: { company_name: 'X', brand_data: {} }, error: null })
+      return makeChain({ data: null, error: null })
+    })
+    const r = res()
+    await handler(req('POST', { action: 'send', devis_id: 'd1' }), r)
+    expect(r.statusCode).toBe(429)
+    expect(supabaseMock.rpc).toHaveBeenCalledWith('daily_quota_consume', { p_user: 'artisan-1', p_kind: 'email', p_limit: 60 })
+    expect(sendMailMock).not.toHaveBeenCalled()
+  })
+
   it('logo base64 → attachment CID inclus dans sendMail', async () => {
     const b64Logo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQ=='
     let call = 0

@@ -23,6 +23,7 @@ const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN") ?? "";
 const TELEGRAM_CHAT_ID   = Deno.env.get("TELEGRAM_CHAT_ID")   ?? "";
 const SUPABASE_URL       = Deno.env.get("SUPABASE_URL")       ?? "";
 const SERVICE_ROLE_KEY   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const ANON_KEY           = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
 const TG_API = (method: string) =>
   `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${method}`;
@@ -399,6 +400,63 @@ async function uploadInvoicePdf(ownerId: string, numero: string, blob: Blob): Pr
   }
 }
 
+// ─── Appelant ─────────────────────────────────────────────────────────────
+// verify_jwt laisse passer la clé anon publique (un JWT valide, rôle anon) :
+// n'importe qui pouvait envoyer de fausses notifications (« paiement reçu »…).
+// Désormais :
+//   • service  : clé service_role (API Vercel, DB Webhooks) → tout est permis ;
+//   • user     : session utilisateur vérifiée auprès de Supabase Auth → seuls
+//                les événements émis par l'application (PDF généré, escalade
+//                support) ;
+//   • sinon    : refusé.
+type Caller = { kind: "service" } | { kind: "user"; id: string; email: string | null } | null;
+
+function jwtClaims(token: string): Record<string, unknown> | null {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(b64.padEnd(b64.length + (4 - (b64.length % 4)) % 4, "=")));
+  } catch {
+    return null;
+  }
+}
+
+function sameSecret(a: string, b: string): boolean {
+  if (!a || !b || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+async function identifyCaller(authHeader: string | null): Promise<Caller> {
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  const token = authHeader.slice(7).trim();
+  if (sameSecret(token, SERVICE_ROLE_KEY)) return { kind: "service" };
+  // Signature déjà vérifiée par la passerelle (verify_jwt) : le rôle est fiable.
+  if (jwtClaims(token)?.role === "service_role") return { kind: "service" };
+  if (!SUPABASE_URL || !ANON_KEY) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${token}`, apikey: ANON_KEY },
+    });
+    if (!r.ok) return null;
+    const u = await r.json();
+    return u?.id ? { kind: "user", id: String(u.id), email: u.email ?? null } : null;
+  } catch {
+    return null;
+  }
+}
+
+const USER_JSON_KINDS = new Set(["support_escalation"]);
+
+function deny(status: number, error: string) {
+  return new Response(
+    JSON.stringify({ ok: false, error }),
+    { status, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
+}
+
 // ─── Handler ──────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -417,6 +475,12 @@ Deno.serve(async (req: Request) => {
     );
   }
 
+  const caller = await identifyCaller(req.headers.get("authorization"));
+  if (!caller) {
+    console.warn("[notify-telegram] appel refusé : ni clé service, ni session utilisateur valide");
+    return deny(401, "unauthorized");
+  }
+
   try {
     const ctype = req.headers.get("content-type") || "";
 
@@ -424,6 +488,7 @@ Deno.serve(async (req: Request) => {
     if (ctype.startsWith("multipart/form-data")) {
       const fd = await req.formData();
       const kind = (String(fd.get("kind") || "pdf_generated")) as EventKind;
+      if (caller.kind === "user" && kind !== "pdf_generated") return deny(403, "forbidden_kind");
       let payload: Record<string, unknown> = {};
       try {
         payload = JSON.parse(String(fd.get("payload") || "{}"));
@@ -444,7 +509,7 @@ Deno.serve(async (req: Request) => {
         payload?.numero &&
         file instanceof File
       ) {
-        const ownerId = userIdFromJwt(req.headers.get("authorization"));
+        const ownerId = caller.kind === "user" ? caller.id : userIdFromJwt(req.headers.get("authorization"));
         if (ownerId) {
           uploadPromise = uploadInvoicePdf(ownerId, String(payload.numero), file)
             .catch((e) => { console.warn("[notify-telegram] upload failed:", e); });
@@ -471,8 +536,13 @@ Deno.serve(async (req: Request) => {
     // ── Cas 2 : JSON ──────────────────────────────────────────────────
     const body = await req.json() as Record<string, unknown>;
 
+    // Un utilisateur n'envoie que les événements prévus par l'application.
+    if (caller.kind === "user" && !USER_JSON_KINDS.has(String(body.kind ?? ""))) {
+      return deny(403, "forbidden_kind");
+    }
+
     // 2a. Supabase DB Webhook
-    const webhook = fromSupabaseWebhook(body);
+    const webhook = caller.kind === "service" ? fromSupabaseWebhook(body) : null;
     if (webhook) {
       const text = await formatEvent(webhook.kind, webhook.payload);
       const ok = await sendText(text);
@@ -485,6 +555,8 @@ Deno.serve(async (req: Request) => {
     // 2b. Appel direct : { kind, payload }
     const kind    = String(body.kind ?? "raw") as EventKind;
     const payload = (body.payload as Record<string, unknown>) ?? {};
+    // Email de l'appelant vérifié, pas celui déclaré dans la requête.
+    if (caller.kind === "user") payload.user_email = caller.email;
     const text = await formatEvent(kind, payload);
     const ok = await sendText(text);
     return new Response(

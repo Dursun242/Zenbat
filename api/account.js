@@ -5,7 +5,8 @@
 
 import { cors } from "./_cors.js"
 import { authenticate, notifyTelegram } from "./_withAuth.js"
-import { sendEmail } from "./_email.js"
+import { sendEmail, escapeHtml } from "./_email.js"
+import { consumeDailyQuota, refundDailyQuota, EMAIL_DAILY_LIMIT } from "./_quota.js"
 
 // Regex RFC 5322 simplifiée, alignée sur contact.js / newsletter.js
 const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/
@@ -356,7 +357,7 @@ async function handleSendComptable({ req, res, user, admin }) {
 <!doctype html><html><body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#1A1612;line-height:1.5;max-width:560px;margin:0 auto;padding:24px">
   <h2 style="margin:0 0 16px;font-size:20px;color:#1A1612">Export comptable Zenbat</h2>
   <p>Bonjour,</p>
-  <p>Voici l'export des factures de <strong>${profile?.company_name || profile?.full_name || user.email}</strong> sur la période <strong>${periodTxt}</strong>.</p>
+  <p>Voici l'export des factures de <strong>${escapeHtml(profile?.company_name || profile?.full_name || user.email)}</strong> sur la période <strong>${periodTxt}</strong>.</p>
   <table style="width:100%;border-collapse:collapse;margin:16px 0;background:#FAF7F2;border-radius:8px;overflow:hidden">
     <tr><td style="padding:10px 14px;color:#6B6358">Nombre de factures</td><td style="padding:10px 14px;text-align:right;font-weight:600">${invoices.length}</td></tr>
     <tr><td style="padding:10px 14px;color:#6B6358;border-top:1px solid #E8E2D8">Total HT</td><td style="padding:10px 14px;text-align:right;font-weight:600;border-top:1px solid #E8E2D8">${fmtEur(totalHT)}</td></tr>
@@ -373,9 +374,11 @@ async function handleSendComptable({ req, res, user, admin }) {
   ${pdfAttachments.length < invoices.length && !pdfsTruncated ? `<p style="color:#6B6358;font-size:12px">Note : ${invoices.length - pdfAttachments.length} facture(s) n'ont pas encore de PDF généré (PDF disponibles uniquement pour les factures déjà ouvertes/exportées dans Zenbat).</p>` : ''}
   <p style="color:#6B6358;font-size:13px;margin-top:24px">CSV : encodage UTF-8 avec BOM, séparateur point-virgule (compatible Excel France).</p>
   <hr style="border:none;border-top:1px solid #E8E2D8;margin:24px 0"/>
-  <p style="color:#9A8E82;font-size:12px">Envoyé depuis Zenbat — l'assistant commercial vocal des artisans.<br/>Pour répondre, écrivez directement à ${user.email}.</p>
+  <p style="color:#9A8E82;font-size:12px">Envoyé depuis Zenbat — l'assistant commercial vocal des artisans.<br/>Pour répondre, écrivez directement à ${escapeHtml(user.email)}.</p>
 </body></html>`.trim()
 
+    const emailQuota = await consumeDailyQuota(admin, user.id, 'email', EMAIL_DAILY_LIMIT)
+    if (!emailQuota.allowed) return res.status(429).json({ error: `Limite d'envoi d'emails atteinte pour aujourd'hui (${EMAIL_DAILY_LIMIT}). Réessayez demain ou contactez le support.` })
     await sendEmail({
       to:       comptableEmail,
       subject:  `Export factures ${profile?.company_name || profile?.full_name || ''} — ${periodTxt}`.trim(),
@@ -386,7 +389,7 @@ async function handleSendComptable({ req, res, user, admin }) {
         { filename: `lignes-${slug}-${dateTag}.csv`,   content: Buffer.from(csvLignes,   'utf-8').toString('base64'), contentType: 'text/csv' },
         ...pdfAttachments,
       ],
-    })
+    }).catch(e => { refundDailyQuota(admin, user.id, 'email', emailQuota); throw e })
 
     notifyTelegram('comptable_export', {
       email:        user.email,
