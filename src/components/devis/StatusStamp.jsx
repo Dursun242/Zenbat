@@ -4,18 +4,10 @@
 import { STATUT } from "../../lib/constants.js";
 import { ZB } from "../../lib/theme.js";
 
-const STAMP = {
-  brouillon:      { color: ZB.ink3,   label: "Brouillon" },
-  envoye:         { color: ZB.ink2,   label: "Envoyé" },
-  en_signature:   { color: ZB.ink,    label: "À signer" },
-  en_negociation: { color: ZB.ink,    label: "Modifications demandées" },
-  accepte:        { color: ZB.stamp,  label: "Signé" },
-  refuse:         { color: ZB.danger, label: "Refusé" },
-  remplace:       { color: ZB.ink3,   label: "Remplacé" },
-};
 
 export default function StatusStamp({ statut }) {
-  const s = STAMP[statut] || { color: ZB.ink3, label: STATUT[statut]?.label || statut };
+  const st = STATUT[statut];
+  const s = { color: ZB[st?.tone] || ZB.ink3, label: st?.label || statut };
   return (
     <span className="zb-stamp" style={{
       display: "inline-block", padding: "5px 10px", border: `4px double ${s.color}`, borderRadius: 4,

@@ -41,24 +41,26 @@ export const UNITE_ALIASES = { m2: "m²", m3: "m³" };
 export const TVA_RATES = [20, 10, 5.5, 2.1, 0];
 
 // ── Statuts devis ─────────────────────────────────────────
+// Libellé + ton (jeton ZB de src/lib/theme.js) : encre pour ce qui attend,
+// vert tampon pour ce qui est acquis, rouge pour un refus (cf. DESIGN.md).
 export const STATUT = {
-  brouillon:      { label: "Brouillon",      bg: "#f1f5f9", color: "#64748b", dot: "#94a3b8" },
-  envoye:         { label: "Envoyé",         bg: "#eff6ff", color: "#1d4ed8", dot: "#3b82f6" },
-  en_signature:   { label: "En signature",   bg: "#fffbeb", color: "#b45309", dot: "#f59e0b" },
-  en_negociation: { label: "Négociation",    bg: "#fff7ed", color: "#c2410c", dot: "#f97316" },
-  accepte:        { label: "Accepté",        bg: "#ecfdf5", color: "#065f46", dot: "#10b981" },
-  refuse:         { label: "Refusé",         bg: "#fef2f2", color: "#991b1b", dot: "#ef4444" },
-  remplace:       { label: "Remplacé",       bg: "#f5f3ff", color: "#6b21a8", dot: "#a855f7" },
+  brouillon:      { label: "Brouillon",               tone: "ink3" },
+  envoye:         { label: "Envoyé",                  tone: "ink2" },
+  en_signature:   { label: "À signer",                tone: "ink" },
+  en_negociation: { label: "Modifications demandées", short: "Modifications", tone: "ink" },
+  accepte:        { label: "Signé",                   tone: "stamp" },
+  refuse:         { label: "Refusé",                  tone: "danger" },
+  remplace:       { label: "Remplacé",                tone: "ink3" },
 };
 
 // ── Statuts factures ─────────────────────────────────────
 export const STATUT_FACTURE = {
-  brouillon: { label: "Brouillon", bg: "#f1f5f9", color: "#64748b", dot: "#94a3b8" },
-  envoyee:   { label: "Émise",     bg: "#eff6ff", color: "#1d4ed8", dot: "#3b82f6" },
-  recue:     { label: "Reçue",     bg: "#ecfeff", color: "#0e7490", dot: "#06b6d4" },
-  payee:     { label: "Payée",     bg: "#ecfdf5", color: "#065f46", dot: "#10b981" },
-  rejetee:   { label: "Rejetée",   bg: "#fef2f2", color: "#991b1b", dot: "#ef4444" },
-  annulee:   { label: "Annulée",   bg: "#f5f5f4", color: "#57534e", dot: "#a8a29e" },
+  brouillon: { label: "Brouillon", tone: "ink3" },
+  envoyee:   { label: "Émise",     tone: "ink2" },
+  recue:     { label: "Reçue",     tone: "ink2" },
+  payee:     { label: "Payée",     tone: "stamp" },
+  rejetee:   { label: "Rejetée",   tone: "danger" },
+  annulee:   { label: "Annulée",   tone: "ink3" },
 };
 
 // ── Marque par défaut ─────────────────────────────────────

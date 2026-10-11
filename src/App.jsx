@@ -272,14 +272,8 @@ export default function App() {
   const devisThisWeekCount  = isFreemium ? Math.max(weekCount, stickyDevisThisWeek, countDevisThisWeek(devis)) : 0;
   const freemiumQuotaReached = isFreemium && devisThisWeekCount >= FREEMIUM_WEEKLY_DEVIS_LIMIT;
 
-  const stats = {
-    clients:  clients.length,
-    acceptes: devis.filter(d => d.statut === "accepte").length,
-    ca:       devis.filter(d => d.statut === "accepte").reduce((s, d) => s + (Number(d.montant_ht) || 0), 0),
-    enCours:  devis.filter(d => ["envoye", "en_signature"].includes(d.statut)).length,
-  };
-
-  const activeNav = NAV.find(n => tab.startsWith(n.id))?.id || "dashboard";
+  // Les fiches gardent l'onglet de leur liste allumé (client_detail → clients).
+  const activeNav = tab === "client_detail" ? "clients" : (NAV.find(n => tab.startsWith(n.id))?.id || "dashboard");
 
   // Compteurs pour les pastilles des onglets de la BottomNav.
   // - Devis : en attente de signature ou en négociation (le client a
@@ -595,7 +589,7 @@ export default function App() {
 
         {/* Contenu principal */}
         <div ref={contentRef} className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: keyboardOpen ? 0 : NAV_RESERVED_CSS }}>
-          {tab === "dashboard"     && <Dashboard stats={stats} devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} brand={brand}
+          {tab === "dashboard"     && <Dashboard devis={devis} invoices={invoices} clients={clients} goDevis={goDevis} goInvoice={goInvoice} setTab={setTab} brand={brand}
                                          onOpenProfile={() => setScreen("onboarding")}
                                          onOpenPWAInstall={() => setScreen("pwa_install")}/>}
           {tab === "clients"       && <ClientsList clients={clients} onSave={onSaveClient} onDelete={onDeleteClient} onRestore={onRestoreClient} goClient={id => { setSelC(id); setTab("client_detail"); }} showUndo={showUndo}/>}
@@ -606,7 +600,8 @@ export default function App() {
               onBack={() => setTab("clients")}
               goDevis={goDevis}
               onUpdate={onSaveClient}
-              onDelete={async () => { await onDeleteClient(selC); setTab("clients"); }}/>
+              onDelete={async () => { await onDeleteClient(selC); setTab("clients"); }}
+              onNewDevis={() => setTab("agent")}/>
           )}
           {tab === "devis"         && <DevisList devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} onDelete={onDeleteDevis} onDuplicate={onDuplicateDevis}/>}
           {tab === "devis_detail"  && selD && (() => {

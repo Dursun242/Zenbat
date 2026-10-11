@@ -1,96 +1,102 @@
+// Fiche client (système « Bordereau ») : coordonnées tracées, appel et mail
+// d'un appui, devis du client en registre.
 import { useState } from "react";
-import { displayName } from "../lib/utils.js";
-import { fmt } from "../lib/utils.js";
+import { displayName, fmt } from "../lib/utils.js";
 import { saveContactToPhone } from "../lib/vcard.js";
-import { I } from "./ui/icons.jsx";
+import { ZB } from "../lib/theme.js";
 import Badge from "./ui/Badge.jsx";
 import ContactEditor from "./ContactEditor.jsx";
+import { LIST_CSS, Sheet, EmptyRow, RegisterRow, RowMenu, btnPrimary } from "./ui/Register.jsx";
+import { I } from "./ui/icons.jsx";
 
-export default function ClientDetail({ c, clientDevis, onBack, goDevis, onUpdate, onDelete }) {
+const TYPE_LABEL = { particulier: "Particulier", artisan: "Artisan", entreprise: "Entreprise" };
+const BackIcon = <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>;
+
+export default function ClientDetail({ c, clientDevis, onBack, goDevis, onUpdate, onDelete, onNewDevis }) {
   const [editing, setEditing] = useState(false);
 
-  // Le 3e élément est un href : si défini, la valeur devient cliquable
-  // (tel: ouvre l'app téléphone, mailto: l'app mail).
+  if (!c) return null;
+
+  // Le 3e élément est un lien : tel: ouvre le téléphone, mailto: le mail.
   const telHref = (n) => n ? `tel:${String(n).replace(/[^\d+]/g, "")}` : null;
   const fields = [
     ["Email",         c.email,          c.email ? `mailto:${c.email}` : null],
     ["Mobile",        c.telephone,      telHref(c.telephone)],
     ["Fixe",          c.telephone_fixe, telHref(c.telephone_fixe)],
-    ["Adresse",       [c.adresse, [c.code_postal, c.ville].filter(Boolean).join(" ")].filter(Boolean).join(" — "), null],
+    ["Adresse",       [c.adresse, [c.code_postal, c.ville].filter(Boolean).join(" ")].filter(Boolean).join(", "), null],
     ["SIRET",         c.siret,          null],
     ["TVA intracom.", c.tva_intra,      null],
     ["Code NAF",      c.naf,            null],
     ["Activité",      c.activite,       null],
     ["Notes",         c.notes,          null],
   ].filter(([, v]) => v);
+  const name = displayName(c);
 
   return (
-    <div style={{ padding: 18 }} className="fu">
-      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#6B6358", fontSize: 13, marginBottom: 14, cursor: "pointer" }}>
-        {I.back} Retour
+    <div className="zb-list" style={{ maxWidth: 960, margin: "0 auto", padding: "8px 12px 28px", fontFamily: ZB.font, color: ZB.ink }}>
+      <style>{LIST_CSS}</style>
+      <button type="button" onClick={onBack}
+        style={{ display: "flex", alignItems: "center", gap: 4, minHeight: 44, padding: "0 4px", marginBottom: 6, background: "none", border: "none", color: ZB.ink, fontFamily: "inherit", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+        {BackIcon} Clients
       </button>
 
-      <div style={{ background: "white", borderRadius: 14, border: "1px solid #F0EBE3", padding: 18, marginBottom: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-          <div style={{ width: 46, height: 46, borderRadius: 14, background: c.type === "particulier" ? "#eff6ff" : "#fef3c7", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: c.type === "particulier" ? "#1d4ed8" : "#b45309", fontSize: 20 }}>
-            {displayName(c).charAt(0).toUpperCase()}
-          </div>
+      <div style={{ background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 8, padding: "16px 18px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 16, color: "#1A1612", overflow: "hidden", textOverflow: "ellipsis" }}>{displayName(c)}</div>
-            <div style={{ fontSize: 11, color: "#9A8E82", marginTop: 2 }}>
-              {c.type === "particulier" ? "Particulier" : c.type === "artisan" ? "Artisan" : "Entreprise"}
-              {c.ville ? ` · ${c.ville}` : ""}
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, overflowWrap: "anywhere" }}>{name}</h2>
+            <div style={{ fontSize: 14, color: ZB.ink2, marginTop: 2 }}>
+              {TYPE_LABEL[c.type] || "Client"}{c.ville ? ` · ${c.ville}` : ""}
             </div>
           </div>
-          <button onClick={() => setEditing(true)} style={{ background: "#F0EBE3", border: "none", borderRadius: 10, width: 36, height: 36, cursor: "pointer", fontSize: 15, color: "#6B6358" }} aria-label="Modifier">✏️</button>
+          <button type="button" onClick={() => setEditing(true)}
+            style={{ minHeight: 44, padding: "0 6px", background: "none", border: "none", color: ZB.accent, fontFamily: "inherit", fontSize: 15, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
+            Modifier
+          </button>
+          <RowMenu label={`Plus d'actions pour ${name}`} items={[
+            { key: "vcard", label: "Ajouter à mon répertoire", onClick: () => saveContactToPhone(c) },
+            { key: "del", label: "Supprimer le client", danger: true, confirmLabel: "Appuie encore pour supprimer", onClick: onDelete },
+          ]}/>
         </div>
 
-        {fields.map(([k, v, href]) => (
-          <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "8px 0", borderTop: "1px solid #FAF7F2" }}>
-            <span style={{ fontSize: 12, color: "#9A8E82", flexShrink: 0 }}>{k}</span>
-            {href ? (
-              <a href={href} style={{ fontSize: 12, color: "#1d4ed8", fontWeight: 500, textAlign: "right", wordBreak: "break-word", textDecoration: "none" }}>{v}</a>
-            ) : (
-              <span style={{ fontSize: 12, color: "#1A1612", fontWeight: 500, textAlign: "right", wordBreak: "break-word" }}>{v}</span>
-            )}
-          </div>
-        ))}
-
-        <button onClick={() => saveContactToPhone(c)}
-          style={{ marginTop: 12, width: "100%", background: "#1A1612", color: "white", border: "none", borderRadius: 10, padding: 10, fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-          📇 Ajouter à mon répertoire
-        </button>
-
-        <button onClick={() => { if (window.confirm("Supprimer définitivement ce contact ?")) onDelete(); }}
-          style={{ marginTop: 8, width: "100%", background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", borderRadius: 10, padding: 10, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-          🗑️ Supprimer le contact
-        </button>
-      </div>
-
-      {/* Devis du client */}
-      <div style={{ background: "white", borderRadius: 14, border: "1px solid #F0EBE3", overflow: "hidden" }}>
-        <div style={{ padding: "12px 16px", borderBottom: "1px solid #FAF7F2", fontWeight: 600, fontSize: 13, color: "#1A1612" }}>
-          Devis ({clientDevis.length})
-        </div>
-        {clientDevis.length === 0 && (
-          <div style={{ padding: "14px 16px", fontSize: 12, color: "#9A8E82" }}>Aucun devis pour ce contact</div>
+        {fields.length > 0 ? (
+          <dl style={{ margin: "14px 0 0", borderTop: `2px solid ${ZB.ink}` }}>
+            {fields.map(([k, v, href]) => (
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 16, padding: "10px 0", borderBottom: `1px solid ${ZB.ruleSoft}` }}>
+                <dt style={{ fontSize: 14, color: ZB.ink2, flexShrink: 0 }}>{k}</dt>
+                <dd style={{ margin: 0, fontSize: 15, textAlign: "right", overflowWrap: "anywhere", whiteSpace: k === "Notes" ? "pre-wrap" : undefined }}>
+                  {href ? <a href={href} style={{ color: ZB.accent, fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3 }}>{v}</a> : v}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p style={{ margin: "14px 0 0", fontSize: 15, color: ZB.ink2 }}>Aucune coordonnée : ajoute-les avec « Modifier ».</p>
         )}
-        {clientDevis.map(d => (
-          <div key={d.id} onClick={() => goDevis(d.id)}
-            style={{ padding: "12px 16px", borderBottom: "1px solid #FAF7F2", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
-            onMouseOver={e => e.currentTarget.style.background = "#fafafa"}
-            onMouseOut={e => e.currentTarget.style.background = "white"}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1612" }}>{d.objet}</div>
-              <div style={{ fontSize: 10, fontFamily: "monospace", color: "#9A8E82", marginTop: 2 }}>{d.numero}</div>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 13, fontWeight: 700 }}>{fmt(d.montant_ht)}</div>
-              <div style={{ marginTop: 4 }}><Badge s={d.statut}/></div>
-            </div>
-          </div>
-        ))}
+
+        {onNewDevis && (
+          <button type="button" className="zb-primary" style={{ ...btnPrimary, width: "100%", minHeight: 52, marginTop: 16 }} onClick={onNewDevis}>
+            {I.spark} Nouveau devis
+          </button>
+        )}
       </div>
+
+      <section style={{ marginTop: 24 }}>
+        <h3 style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 700 }}>
+          Devis <span style={{ fontWeight: 500, color: ZB.ink2 }}>· {clientDevis.length}</span>
+        </h3>
+        <Sheet>
+          {clientDevis.length === 0 && <EmptyRow>Aucun devis pour ce client.</EmptyRow>}
+          {clientDevis.map((d, i) => (
+            <RegisterRow key={d.id} last={i === clientDevis.length - 1}
+              onOpen={() => goDevis(d.id)} openLabel={`Ouvrir le devis ${d.objet || d.numero}`}
+              title={d.objet || d.numero}
+              sub={<span style={{ fontVariantNumeric: "tabular-nums" }}>{d.numero}{d.indice ? ` · indice ${d.indice}` : ""}</span>}
+              amount={fmt(d.montant_ht)}
+              status={<Badge s={d.statut} short/>}
+              menu={<span style={{ width: 8 }}/>}/>
+          ))}
+        </Sheet>
+      </section>
 
       {editing && <ContactEditor c={c} onSave={u => { onUpdate(u); setEditing(false); }} onClose={() => setEditing(false)}/>}
     </div>

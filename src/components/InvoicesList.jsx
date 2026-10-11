@@ -1,103 +1,59 @@
+// Liste des factures (système « Bordereau ») : registre tracé, filtres en
+// onglets, statut en petit tampon, montant TTC.
 import { useState } from "react";
 import { STATUT_FACTURE } from "../lib/constants.js";
 import { fmt } from "../lib/utils.js";
+import { ZB } from "../lib/theme.js";
 import Badge from "./ui/Badge.jsx";
+import { LIST_CSS, ListHeader, FilterTabs, Sheet, EmptyRow, RowMenu, RegisterRow, btnPrimary, ProTag, PlusIcon } from "./ui/Register.jsx";
+
+const TYPE_LABEL = { acompte: "acompte", solde: "solde", avoir: "avoir" };
 
 export default function InvoicesList({ invoices, clients, goInvoice, onCreateEmpty, onDelete, isFreemium = false, onPaywall = () => {} }) {
   const [filtre, setFiltre] = useState("tous");
-  const [confirmDelete, setConfirmDelete] = useState(null);
   const filtered = filtre === "tous" ? invoices : invoices.filter(i => i.statut === filtre);
-
-  const handleDelete = async (id) => {
-    if (onDelete) await onDelete(id);
-    setConfirmDelete(null);
-  };
+  const options = ["tous", "brouillon", "envoyee", "payee", "rejetee"].map(s => ({
+    value: s, label: s === "tous" ? "Toutes" : STATUT_FACTURE[s].label,
+  }));
 
   return (
-    <div style={{ padding: 18 }} className="fu">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <div>
-          <p style={{ color: "#5C544B", fontSize: 14 }}>
-            {invoices.length} facture{invoices.length > 1 ? "s" : ""} · Facturation électronique 2026
-          </p>
-        </div>
+    <div className="zb-list" style={{ maxWidth: 960, margin: "0 auto", padding: "16px 12px 24px", fontFamily: ZB.font, color: ZB.ink }}>
+      <style>{LIST_CSS}</style>
+      <ListHeader count={`${invoices.length} facture${invoices.length > 1 ? "s" : ""}`}>
         {isFreemium ? (
-          <button onClick={onPaywall}
-            title="Disponible en Pro — 9,50 €/mois"
-            style={{ background: "#E8E2D8", color: "#6B6358", border: "none", borderRadius: 12, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-            + Nouvelle · Pro
-          </button>
+          <button type="button" style={btnPrimary} onClick={onPaywall}>{PlusIcon} Nouvelle facture <ProTag/></button>
         ) : (
-          <button onClick={onCreateEmpty}
-            style={{ background: "#1A1612", color: "white", border: "none", borderRadius: 12, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-            + Nouvelle
-          </button>
+          <button type="button" className="zb-primary" style={btnPrimary} onClick={onCreateEmpty}>{PlusIcon} Nouvelle facture</button>
         )}
-      </div>
+      </ListHeader>
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 14, overflowX: "auto", paddingBottom: 4 }}>
-        {["tous", "brouillon", "envoyee", "payee", "rejetee"].map(s => (
-          <button key={s} onClick={() => setFiltre(s)}
-            style={{ flexShrink: 0, padding: "5px 12px", borderRadius: 20, border: "none", fontSize: 11, fontWeight: 600, cursor: "pointer", background: filtre === s ? "#1A1612" : "white", color: filtre === s ? "white" : "#6B6358", boxShadow: filtre === s ? "none" : "0 1px 3px rgba(0,0,0,.06)" }}>
-            {s === "tous" ? "Toutes" : STATUT_FACTURE[s]?.label}
-          </button>
-        ))}
-      </div>
+      <FilterTabs label="Filtrer par statut" options={options} value={filtre} onChange={setFiltre}/>
 
-      <div style={{ background: "white", borderRadius: 14, border: "1px solid #F0EBE3", overflow: "hidden" }}>
+      <Sheet>
         {filtered.length === 0 && (
-          <div style={{ padding: "28px 16px", textAlign: "center", color: "#9A8E82", fontSize: 12 }}>
-            Aucune facture. Convertissez un devis accepté ou créez-en une depuis zéro.
-          </div>
+          <EmptyRow>
+            {invoices.length === 0
+              ? "Aucune facture pour l'instant. Elles se créent depuis un devis signé (bouton « Facturer »), ou à partir de zéro."
+              : "Aucune facture avec ce statut."}
+          </EmptyRow>
         )}
-        {filtered.map(i => {
+        {filtered.map((i, idx) => {
           const cl = clients.find(c => c.id === i.client_id);
+          const name = cl?.raison_sociale || `${cl?.prenom || ""} ${cl?.nom || ""}`.trim() || "Sans client";
+          const type = TYPE_LABEL[i.invoice_type];
           return (
-            <div key={i.id} style={{ position: "relative" }}>
-              <div
-                style={{ padding: "13px 16px", borderBottom: "1px solid #FAF7F2", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
-                onMouseOver={e => e.currentTarget.style.background = "#fafafa"}
-                onMouseOut={e => e.currentTarget.style.background = "white"}>
-                <div onClick={() => goInvoice(i.id)} style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1612" }}>{i.numero}</div>
-                  <div style={{ fontSize: 11, color: "#9A8E82", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {cl?.raison_sociale || `${cl?.prenom || ""} ${cl?.nom || ""}`.trim() || "—"}
-                    {i.objet && ` · ${i.objet}`}
-                  </div>
-                </div>
-                <div style={{ textAlign: "right", marginLeft: 12, flexShrink: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#1A1612" }}>{fmt(i.montant_ttc)}</div>
-                  <div style={{ marginTop: 5, display: "flex", gap: 5, justifyContent: "flex-end", alignItems: "center" }}>
-                    {i.invoice_type === "acompte" && (
-                      <span style={{ fontSize: 9, fontWeight: 700, color: "#c2410c", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 6, padding: "1px 5px" }}>ACOMPTE</span>
-                    )}
-                    <Badge s={i.statut} kind="facture"/>
-                  </div>
-                </div>
-                {i.statut === "brouillon" && onDelete && (
-                  confirmDelete === i.id ? (
-                    <>
-                      <button onClick={e => { e.stopPropagation(); setConfirmDelete(null); }}
-                        style={{ marginLeft: 8, padding: "4px 8px", borderRadius: 6, border: "1px solid #e5e7eb", background: "white", color: "#1A1612", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
-                        Annuler
-                      </button>
-                      <button onClick={e => { e.stopPropagation(); handleDelete(i.id); }}
-                        style={{ marginLeft: 4, padding: "4px 8px", borderRadius: 6, border: "none", background: "#dc2626", color: "white", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
-                        Supprimer
-                      </button>
-                    </>
-                  ) : (
-                    <button onClick={e => { e.stopPropagation(); setConfirmDelete(i.id); }}
-                      style={{ marginLeft: 8, padding: "4px 8px", borderRadius: 6, border: "none", background: "#fee2e2", color: "#dc2626", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
-                      ✕
-                    </button>
-                  )
-                )}
-              </div>
-            </div>
+            <RegisterRow key={i.id} last={idx === filtered.length - 1}
+              onOpen={() => goInvoice(i.id)} openLabel={`Ouvrir la facture ${i.numero || ""}`}
+              title={<span style={{ fontVariantNumeric: "tabular-nums" }}>{i.numero || "Facture brouillon"}{type && <span style={{ fontWeight: 500, color: ZB.ink2 }}> · {type}</span>}</span>}
+              sub={<>{name}{i.objet && ` · ${i.objet}`}</>}
+              amount={fmt(i.montant_ttc)}
+              status={<Badge s={i.statut} kind="facture"/>}
+              menu={<RowMenu label={`Actions pour la facture ${i.numero || ""}`} items={[
+                i.statut === "brouillon" && onDelete && { key: "del", label: "Supprimer le brouillon", danger: true, confirmLabel: "Appuie encore pour supprimer", onClick: () => onDelete(i.id) },
+              ]}/>}/>
           );
         })}
-      </div>
+      </Sheet>
     </div>
   );
 }
