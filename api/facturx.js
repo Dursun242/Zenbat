@@ -19,6 +19,7 @@ import { cors } from "./_cors.js"
 import { authenticate } from "./_withAuth.js"
 import { sendEmail } from "./_email.js"
 import { logServerError } from "./_serverLog.js"
+import { computeTotals, isNoTva, lineRate, lineTotal, round2 } from "../src/lib/invoiceCalc.js"
 
 const XML_FILENAME    = "factur-x.xml";
 // Profil EN 16931 (norme européenne, obligatoire PPF/PDP à partir de 09/2026).
@@ -26,6 +27,7 @@ const XML_FILENAME    = "factur-x.xml";
 const PROFILE         = "urn:cen.eu:en16931:2017";
 const CONFORMANCE_LABEL = "EN 16931";
 const FRANCHISE_NOTE  = "TVA non applicable, art. 293 B du CGI";
+const AUTOLIQ_NOTE    = "Autoliquidation — TVA due par le preneur, art. 283-2 nonies CGI";
 
 // Codes de type de document (UNTDID 1001) :
 //   380 = Commercial invoice (facture standard)
@@ -56,27 +58,32 @@ const fmtDate = d => {
   return `${x.getFullYear()}${String(x.getMonth()+1).padStart(2,"0")}${String(x.getDate()).padStart(2,"0")}`;
 };
 
-function buildXML({ invoice, client, brand, sourceInvoice }) {
+// montant_ht / montant_tva / montant_ttc calculés depuis les lignes reçues.
+function emittedAmounts(invoice, brand) {
+  const t = computeTotals(invoice.lignes, { noTva: isNoTva(brand?.vatRegime, invoice.auto_liquidation_btp) });
+  return { montant_ht: t.ht, montant_tva: t.tva, montant_ttc: t.ttc };
+}
+
+export function buildXML({ invoice, client, brand, sourceInvoice }) {
   const ouvrages   = (invoice.lignes || []).filter(l => l.type_ligne === "ouvrage");
-  const franchise  = brand.vatRegime === "franchise";
+  const autoLiq    = !!invoice.auto_liquidation_btp;
+  const noTva      = isNoTva(brand.vatRegime, autoLiq);
   const isAvoir    = !!invoice.avoir_of_invoice_id || !!sourceInvoice;
   const typeCode   = isAvoir ? TYPE_CREDIT : TYPE_INVOICE;
+  // Catégorie TVA (EN 16931) : AE = autoliquidation, E = exonéré (franchise),
+  // S = taux normal.
+  const categoryOf = (rate) => (autoLiq ? "AE" : rate > 0 ? "S" : "E");
+  const rateOf     = (l) => (noTva ? 0 : lineRate(l));
 
-  const taxByRate = {};
-  for (const l of ouvrages) {
-    const rate = Number(l.tva_rate ?? (franchise ? 0 : 20));
-    const ht   = (Number(l.quantite)||0) * (Number(l.prix_unitaire)||0);
-    if (!taxByRate[rate]) taxByRate[rate] = { base: 0, montant: 0 };
-    taxByRate[rate].base    += ht;
-    taxByRate[rate].montant += ht * rate / 100;
-  }
-  if (!Object.keys(taxByRate).length) taxByRate[franchise ? 0 : 20] = { base: 0, montant: 0 };
-
-  const totalHT  = Number(invoice.montant_ht)  || ouvrages.reduce((s,l)=>s+(Number(l.quantite)||0)*(Number(l.prix_unitaire)||0),0);
-  const totalTVA = Number(invoice.montant_tva) || Object.values(taxByRate).reduce((s,t)=>s+t.montant,0);
-  const totalTTC = Number(invoice.montant_ttc) || totalHT + totalTVA;
+  // Montants recalculés depuis les lignes (calcul commun avec l'écran et le
+  // PDF) : les montant_* reçus peuvent être périmés.
+  const totals   = computeTotals(invoice.lignes, { noTva });
+  const taxRows  = totals.tvaRows.length ? totals.tvaRows : [{ rate: noTva ? 0 : 20, base: 0, montant: 0 }];
+  const totalHT  = totals.ht;
+  const totalTVA = totals.tva;
+  const totalTTC = totals.ttc;
   const retenue  = Number(invoice.retenue_garantie_eur) || 0;
-  const duePayable = totalTTC - retenue;
+  const duePayable = round2(totalTTC - retenue);
 
   const sellerSiret = (brand.siret||"").replace(/\s+/g,"").slice(0,14);
   const sellerSiren = sellerSiret.slice(0,9);
@@ -100,8 +107,8 @@ function buildXML({ invoice, client, brand, sourceInvoice }) {
   const lineBlocks = ouvrages.map((l,i) => {
     const qty = Number(l.quantite)||0;
     const pu  = Number(l.prix_unitaire)||0;
-    const rate= Number(l.tva_rate ?? (franchise?0:20));
-    const cat = rate>0 ? "S" : "E";
+    const rate= rateOf(l);
+    const cat = categoryOf(rate);
     return `
     <ram:IncludedSupplyChainTradeLineItem>
       <ram:AssociatedDocumentLineDocument><ram:LineID>${i+1}</ram:LineID></ram:AssociatedDocumentLineDocument>
@@ -114,14 +121,14 @@ function buildXML({ invoice, client, brand, sourceInvoice }) {
           <ram:CategoryCode>${cat}</ram:CategoryCode>
           <ram:RateApplicablePercent>${num(rate)}</ram:RateApplicablePercent>
         </ram:ApplicableTradeTax>
-        <ram:SpecifiedTradeSettlementLineMonetarySummation><ram:LineTotalAmount>${num(qty*pu)}</ram:LineTotalAmount></ram:SpecifiedTradeSettlementLineMonetarySummation>
+        <ram:SpecifiedTradeSettlementLineMonetarySummation><ram:LineTotalAmount>${num(lineTotal(l))}</ram:LineTotalAmount></ram:SpecifiedTradeSettlementLineMonetarySummation>
       </ram:SpecifiedLineTradeSettlement>
     </ram:IncludedSupplyChainTradeLineItem>`;
   }).join("");
 
-  const taxBlocks = Object.entries(taxByRate).map(([rate,t]) => {
-    const r = Number(rate), cat = r>0 ? "S" : "E";
-    const exempt = cat==="E" ? `<ram:ExemptionReason>${esc(FRANCHISE_NOTE)}</ram:ExemptionReason>` : "";
+  const taxBlocks = taxRows.map(t => {
+    const r = t.rate, cat = categoryOf(r);
+    const exempt = cat==="S" ? "" : `<ram:ExemptionReason>${esc(cat === "AE" ? AUTOLIQ_NOTE : FRANCHISE_NOTE)}</ram:ExemptionReason>`;
     return `
     <ram:ApplicableTradeTax>
       <ram:CalculatedAmount>${num(t.montant)}</ram:CalculatedAmount>
@@ -382,11 +389,14 @@ export default async function handler(req, res) {
   // un proxy Factur-X non authentifié pour n'importe quel PDF.
   const { data: row } = await admin
     .from("invoices")
-    .select("id")
+    .select("id, locked")
     .eq("id", invoice.id)
     .eq("owner_id", user.id)
     .maybeSingle();
   if (!row) return res.status(403).json({ error: "Accès refusé à cette facture" });
+  // Facture déjà émise : le Factur-X archivé fait foi (CGI art. 289), on ne
+  // l'écrase pas. Le PDF régénéré est seulement renvoyé au navigateur.
+  const wasLocked = !!row.locked;
 
   try {
     const pdfBytes = Uint8Array.from(Buffer.from(pdf_base64, "base64"));
@@ -436,8 +446,8 @@ export default async function handler(req, res) {
       const path = `${user.id}/invoices/${safeNumero}.pdf`;
       const { error: upErr } = await admin.storage
         .from("devis-pdfs")
-        .upload(path, Buffer.from(out), { contentType: "application/pdf", upsert: true });
-      if (upErr) console.warn("[facturx] storage upload:", upErr.message);
+        .upload(path, Buffer.from(out), { contentType: "application/pdf", upsert: !wasLocked });
+      if (upErr && !wasLocked) console.warn("[facturx] storage upload:", upErr.message);
     }
 
     // Émission : transition brouillon → envoyee + locked=true, faite
@@ -472,7 +482,9 @@ export default async function handler(req, res) {
           // de détecter ce cas et de remonter l'échec au client.
           const { data: updated, error: lockErr } = await admin
             .from("invoices")
-            .update({ statut: "envoyee", locked: true })
+            // Montants figés à l'émission, recalculés depuis les lignes
+            // émises (mêmes chiffres que le PDF et le XML).
+            .update({ statut: "envoyee", locked: true, ...emittedAmounts(invoice, brand) })
             .eq("id", invoice.id)
             .eq("owner_id", user.id)
             .eq("statut", "brouillon")

@@ -32,9 +32,10 @@ L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - Prévenir l'utilisateur à chaque nouvelle migration créée.
 - **État : toutes les migrations 0001→0056 sont appliquées** (contrôle complet exécuté le 2026-06-11 : tracking 13/13 sur 0044→0056, contraintes CHECK, tables, colonnes, index et fonctions vérifiés un par un).
 - **En attente : `0057_security_urgences_audit.sql`** (audit du 2026-10-11) : colonnes d'abonnement de `profiles` non modifiables depuis le navigateur (trigger `protect_profile_columns`), RLS sur les tables du CRM de prospection, droits EXECUTE retirés à anon/authenticated sur les fonctions de purge/admin, `create_avoir_from()` ignore les lignes supprimées. Une fois appliquée, le diagnostic `schema_migrations` doit montrer `0057`.
+- **En attente : `0058_invoice_immutability.sql`** (audit, 2ᵉ série) : factures émises immuables — lignes non modifiables depuis l'app (trigger `protect_locked_invoice_lines`), numéro / montants / dates / client figés pour tous les rôles une fois `locked` (trigger `protect_locked_invoice_fields`), insertion forcée en brouillon depuis l'app, dossier Storage `{user}/invoices/` (archives Factur-X) réservé au service_role. Restent modifiables par le serveur : statut de paiement, envoi au client, `deleted_at`. Une facture émise se corrige par un avoir.
 - Subtilité de tracking héritée de la collision 0053 : l'essai Pro avait été appliqué sous l'ancien numéro `0053`, puis `0053_invoice_type_solde` a vu son auto-enregistrement ignoré (`on conflict do nothing`), puis `0056` s'est enregistrée normalement. Correctif (réétiquetage, PAS de changement de version — `0056` existe déjà) : `update public.schema_migrations set label='invoice_type_solde' where version='0053' and label='pro_trial_until';`.
 - Jobs pg_cron attendus actifs : `purge-support-tickets-36h` (0050) et `expire-pro-trials-daily` (0056). Diagnostic : `SELECT jobname, schedule, active FROM cron.job;` et `SELECT * FROM cron.job_run_details WHERE jobname = '...' ORDER BY start_time DESC LIMIT 10;`.
-- Prochaine migration à créer : préfixer avec `0058_`.
+- Prochaine migration à créer : préfixer avec `0059_`.
 
 **Tracking depuis 0043** : la table `public.schema_migrations(version, label, applied_at)` est créée par la migration `0043`. À partir de là, chaque nouvelle migration **doit** se terminer par un INSERT idempotent qui s'auto-enregistre :
 ```sql
@@ -161,6 +162,9 @@ Variables d'env Edge Functions (Supabase Dashboard → Project Settings → Edge
 4. URL : `https://<project-ref>.supabase.co/functions/v1/welcome-email`
 5. HTTP Headers : `Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>` (Supabase l'ajoute automatiquement si on coche "Use service role key")
 6. HTTP Params : laisser vide
+
+### Montants (devis, factures, Factur-X)
+Un seul calcul : `src/lib/invoiceCalc.js` (`computeTotals`, `invoiceAmounts`, `ventilatedLines`). Utilisé par l'écran facture, l'aperçu (`PDFViewer`), le PDF (`pdfBuilder`), la création des factures (acompte / solde ventilés par taux de TVA du devis) et le XML Factur-X serveur (`api/facturx.js` l'importe via `../src/lib/`). Lignes arrondies au centime, TVA arrondie par taux, 0 % en franchise (293 B) ou autoliquidation (code AE). Ne pas recopier ces formules ailleurs.
 
 ### Base de données (Supabase)
 Tables principales : `profiles`, `clients`, `devis`, `lignes_devis`, `invoices`, `lignes_invoices`

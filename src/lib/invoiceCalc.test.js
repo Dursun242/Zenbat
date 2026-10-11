@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcInvoiceTotals } from "./invoiceCalc.js";
+import { calcInvoiceTotals, invoiceAmounts, splitByRate, ventilatedLines } from "./invoiceCalc.js";
 
 const ouvrage = (quantite, prix_unitaire, tva_rate = 20) => ({
   type_ligne: "ouvrage",
@@ -118,5 +118,69 @@ describe("calcInvoiceTotals — cas limites réels BTP", () => {
     const { ht, tva } = calcInvoiceTotals([ouvrage(1, 142500, 20)], "normal");
     expect(ht).toBe(142500);
     expect(tva).toBe(28500);
+  });
+});
+
+describe("calcInvoiceTotals — autoliquidation et arrondis", () => {
+  it("autoliquidation BTP : TVA à 0 même avec des lignes à 20 %", () => {
+    const { tva, ttc, tvaRows } = calcInvoiceTotals([ouvrage(10, 100, 20)], "normal", true);
+    expect(tva).toBe(0);
+    expect(ttc).toBe(1000);
+    expect(tvaRows).toEqual([{ rate: 0, base: 1000, montant: 0 }]);
+  });
+
+  it("arrondit la TVA par taux, pas par ligne (BR-CO-14)", () => {
+    // 2 lignes de 0,05 € à 10 % : par ligne on aurait 0,01 + 0,01 ;
+    // par taux : base 0,10 € → TVA 0,01 €.
+    const { ht, tva, ttc } = calcInvoiceTotals([ouvrage(1, 0.05, 10), ouvrage(1, 0.05, 10)], "normal");
+    expect(ht).toBe(0.1);
+    expect(tva).toBe(0.01);
+    expect(ttc).toBe(0.11);
+  });
+
+  it("arrondit chaque total de ligne au centime", () => {
+    const { ht } = calcInvoiceTotals([ouvrage(3, 0.333, 20)], "normal");
+    expect(ht).toBe(1); // 0,999 → 1,00
+  });
+
+  it("utilise le taux du document pour une ligne sans taux", () => {
+    const ligne = { type_ligne: "ouvrage", quantite: 1, prix_unitaire: 100 };
+    expect(calcInvoiceTotals([ligne], "normal", false, 10).tva).toBe(10);
+  });
+});
+
+describe("invoiceAmounts", () => {
+  it("renvoie les trois montants à enregistrer", () => {
+    expect(invoiceAmounts([ouvrage(2, 50, 10)], "normal")).toEqual({ montant_ht: 100, montant_tva: 10, montant_ttc: 110 });
+  });
+});
+
+describe("splitByRate / ventilatedLines — acompte et solde", () => {
+  const devis = [ouvrage(1, 3000, 10), ouvrage(1, 1000, 20)]; // 4000 HT : 75 % à 10 %, 25 % à 20 %
+
+  it("ventile au prorata des taux du devis", () => {
+    expect(splitByRate(1200, devis)).toEqual([{ rate: 10, ht: 900 }, { rate: 20, ht: 300 }]);
+  });
+
+  it("la somme retombe juste au centime", () => {
+    const parts = splitByRate(100, [ouvrage(1, 1, 5.5), ouvrage(1, 1, 10), ouvrage(1, 1, 20)]);
+    expect(parts.reduce((s, p) => s + p.ht, 0)).toBeCloseTo(100, 10);
+  });
+
+  it("une ligne par taux, TVA correcte sur un acompte de 30 % d'un devis à 10/20 %", () => {
+    const lignes = ventilatedLines(1200, devis, { designation: "Acompte" });
+    expect(lignes).toHaveLength(2);
+    expect(lignes[0].designation).toBe("Acompte — part TVA 10 %");
+    expect(invoiceAmounts(lignes, "normal")).toEqual({ montant_ht: 1200, montant_tva: 150, montant_ttc: 1350 });
+  });
+
+  it("devis à un seul taux : une seule ligne, libellé inchangé", () => {
+    const lignes = ventilatedLines(500, [ouvrage(1, 2000, 5.5)], { designation: "Solde" });
+    expect(lignes).toEqual([expect.objectContaining({ designation: "Solde", tva_rate: 5.5, prix_unitaire: 500 })]);
+  });
+
+  it("franchise ou autoliquidation : une ligne à 0 %", () => {
+    const lignes = ventilatedLines(1200, devis, { noTva: true, designation: "Acompte" });
+    expect(lignes).toEqual([expect.objectContaining({ tva_rate: 0, prix_unitaire: 1200 })]);
   });
 });

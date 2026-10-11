@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import { fmt, fmtD } from "./utils.js";
+import { computeTotals, isNoTva, lineRate } from "./invoiceCalc.js";
 import { notifyAdminPdf } from "./telegramNotify.js";
 
 // Polices embarquées dans jsPDF — indispensable pour la conformité PDF/A-3 du
@@ -265,19 +266,11 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
     const grp  = nli === -1 ? rest : rest.slice(0, nli);
     return grp.some(x => x.type_ligne === "ouvrage");
   });
-  const ouvrages  = filteredLignes.filter(l => l.type_ligne === "ouvrage");
-  const rateOf    = (l) => Number(l.tva_rate ?? d.tva_rate ?? 20);
-  const ht        = ouvrages.reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0), 0);
-  const tvaGroups = ouvrages.reduce((acc, l) => {
-    const r = rateOf(l);
-    acc[r] = (acc[r] || 0) + (l.quantite || 0) * (l.prix_unitaire || 0);
-    return acc;
-  }, {});
-  const tvaRows = Object.keys(tvaGroups).map(Number).sort((a, b) => a - b).map(r => ({
-    rate: r, base: tvaGroups[r], montant: tvaGroups[r] * (r / 100),
-  }));
-  const tva = tvaRows.reduce((s, r) => s + r.montant, 0);
-  const ttc = ht + tva;
+  // Franchise (293 B) ou autoliquidation BTP : aucune TVA facturée, comme
+  // l'aperçu écran et le XML Factur-X (calcul commun : invoiceCalc.js).
+  const noTva = isNoTva(brand?.vatRegime, d?.auto_liquidation_btp);
+  const { ht, tva, ttc, tvaRows } = computeTotals(filteredLignes, { noTva, docRate: d.tva_rate });
+  const rateOf = (l) => (noTva ? 0 : lineRate(l, d.tva_rate));
 
   const clientName  = cl?.raison_sociale || `${cl?.prenom || ""} ${cl?.nom || ""}`.trim() || "—";
   const clientLines = [

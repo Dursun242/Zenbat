@@ -124,12 +124,14 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
       // déjà retenté 3×), on préfère un échec propre à un numéro potentiellement
       // en collision ou hors séquence (conformité CGI art. 289).
       const numero = await nextInvoiceNumber();
-      const { ht, tva } = calcInvoiceTotals(d.lignes, brand.vatRegime);
+      const autoLiq = !!d.auto_liquidation_btp;
+      const { ht, tva, ttc } = calcInvoiceTotals(d.lignes, brand.vatRegime, autoLiq, d.tva_rate);
       const saved = await apiCreateInvoice(
         {
           devis_id: d.id, client_id: d.client_id, numero, objet: d.objet,
           operation_type: "service", statut: "brouillon",
-          montant_ht: ht, montant_tva: tva, montant_ttc: ht + tva,
+          montant_ht: ht, montant_tva: tva, montant_ttc: ttc,
+          ...(autoLiq ? { auto_liquidation_btp: true } : {}),
           ville_chantier: d.ville_chantier,
           date_emission: new Date().toISOString().split("T")[0],
           date_echeance: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
@@ -169,12 +171,12 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
     }
   };
 
-  const onCreateAcompte = async (devisId, montantHT, tvaRate) => {
+  const onCreateAcompte = async (devisId, montantHT) => {
     if (!user) { showErr("Vous devez être connecté."); return; }
     try {
       const found = devis.find(d => d.id === devisId);
       if (!found) throw new Error("Devis introuvable");
-      const saved = await apiCreateAcompte(found, montantHT, tvaRate, brand?.vatRegime);
+      const saved = await apiCreateAcompte(found, montantHT, brand?.vatRegime);
       const fresh = await listInvoices();
       setInvoices(fresh);
       goInvoice(saved.id);
@@ -190,8 +192,7 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
     try {
       const found = devis.find(d => d.id === devisId);
       if (!found) throw new Error("Devis introuvable");
-      const tvaRate = brand?.vatRegime === "franchise" ? 0 : 20;
-      const saved = await apiCreateSolde(found, acompteInvoices, tvaRate, brand?.vatRegime);
+      const saved = await apiCreateSolde(found, acompteInvoices, brand?.vatRegime);
       const fresh = await listInvoices();
       setInvoices(fresh);
       goInvoice(saved.id);
