@@ -535,6 +535,10 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
   // ── Signatures (devis only) ───────────────────────────────────────────────
   if (kind !== "facture") {
     const isSigned    = d.statut === "accepte" && d.signed_at;
+    // Signature électronique : seulement si le client a signé sur la page
+    // publique (client_accepted_at, posé par le serveur). Un devis marqué
+    // signé à la main n'affiche ni tracé manuscrit ni mention électronique.
+    const isESigned   = isSigned && !!d.client_accepted_at;
     const signerLabel = s(d.signed_by || clientName);
     const sigColor    = isSigned ? GREEN : BORDER2;
 
@@ -551,7 +555,13 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
     txt(pdf, "DATE",                               dtX, y + 3, { size: 7.5, bold: true, color: lColor });
     y += 8;
 
-    if (isSigned) {
+    if (isSigned && !isESigned) {
+      txt(pdf, "Accord du client enregistré par l'entreprise", X, y + 6, { size: 9, bold: true, color: GREEN });
+      if (d.signed_by) txt(pdf, s(d.signed_by), X, y + 10.5, { size: 8, color: GREEN });
+      hline(pdf, X, X + sigW, y + 13, GREEN);
+      txt(pdf, fmtD(d.signed_at), dtX, y + 7, { size: 10, bold: true, color: GREEN });
+      hline(pdf, dtX, dtX + dtW - 5, y + 13, GREEN);
+    } else if (isSigned) {
       // Tracé "manuscrit" du nom en Caveat. Auto-shrink si trop long pour la
       // largeur disponible (sigW - 2mm de marge), borné entre 14pt et 22pt.
       const MAX_SIG_PT = 22, MIN_SIG_PT = 14;

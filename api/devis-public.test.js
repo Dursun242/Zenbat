@@ -135,7 +135,7 @@ describe('GET /api/devis-public', () => {
       statut: 'envoye', date_emission: '2026-01-01', date_validite: '2026-02-01',
       public_token: 'tok', client_id: 'c1', owner_id: 'a1',
       client_accepted_at: null, client_refused_at: null, client_refusal_reason: null,
-      lignes: [{ id: 'l1', type_ligne: 'ouvrage', quantite: 2, prix_unitaire: 500, position: 0 }],
+      lignes: [{ id: 'l1', type_ligne: 'ouvrage', quantite: 2, prix_unitaire: 500, position: 0, owner_id: 'a1', devis_id: 'd1' }],
     }
     const profileData = { company_name: 'Mon Entreprise', brand_data: { color: '#ff0000', logo: '' } }
     const clientData  = { raison_sociale: 'Client SA', nom: '', prenom: '', email: 'client@test.fr' }
@@ -157,6 +157,9 @@ describe('GET /api/devis-public', () => {
     // sans OTP (l'OTP reste requis pour signer, imposé côté POST).
     expect(Array.isArray(r.body.lignes)).toBe(true)
     expect(r.body.lignes).toHaveLength(1)
+    // Identifiants internes jamais exposés au client (migration 0061).
+    expect(r.body.lignes[0]).not.toHaveProperty('owner_id')
+    expect(r.body.lignes[0]).not.toHaveProperty('devis_id')
     expect(r.body.client?.name).toBe('Client SA')
     // Les données secondaires restent réservées à une session vérifiée.
     expect(r.body.docs).toBeUndefined()

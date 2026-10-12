@@ -505,6 +505,7 @@ export default function DevisPublicPage({ token }) {
         date_validite:        data.date_validite,
         statut:               'accepte',
         signed_at:            acceptedAt || new Date().toISOString(),
+        client_accepted_at:   acceptedAt || new Date().toISOString(),
         signed_by:            signerName,
         tva_rate:             data.tva_rate,
         auto_liquidation_btp: data.auto_liquidation_btp,

@@ -426,7 +426,12 @@ export default async function handler(req, res) {
 
     const session = session_id ? await verifySession(admin, token, session_id) : null
 
-    const ligneList = (devis.lignes || []).sort((a, b) => (a.position || 0) - (b.position || 0))
+    // owner_id / devis_id retirés : la page publique n'en a pas besoin, et un
+    // identifiant de devis exposé facilitait l'écriture dans le devis d'autrui
+    // (fermée côté base par la migration 0061).
+    const ligneList = (devis.lignes || [])
+      .sort((a, b) => (a.position || 0) - (b.position || 0))
+      .map(({ owner_id, devis_id, ...l }) => l)
     // Consultation libre : depuis l'ouverture de la lecture sans OTP, les
     // lignes, le client et les champs PDF DOIVENT être renvoyés même sans
     // session — sinon la page (et le PDF) s'affichent vides / à 0 €. L'OTP
