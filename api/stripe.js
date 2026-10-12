@@ -129,6 +129,18 @@ async function handleWebhook(req, res, rawBody) {
       return res.status(200).json({ received: true })
     }
 
+    // Abonnement 6 mois : l'annulation en fin de période est posée AVANT le
+    // passage en Pro. Si Stripe échoue ici, on rend la main pour un nouvel
+    // essai (sinon l'événement était marqué traité et l'abonnement se
+    // renouvelait tous les 6 mois). Poser l'annulation deux fois est sans effet.
+    if (plan === 'biannual') {
+      try {
+        await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true })
+      } catch (err) {
+        return abortForRetry('checkout.completed annulation fin de période échouée', err)
+      }
+    }
+
     // pro_until = null : un abonnement Stripe payant ne doit jamais être
     // rétrogradé par le job expire_pro_trials. Indispensable si le client
     // souscrit pendant un essai Pro offert (pro_until était daté).
@@ -149,10 +161,6 @@ async function handleWebhook(req, res, rawBody) {
       return abortForRetry('checkout.completed UPDATE profil échoué', upErr)
     }
 
-    if (plan === 'biannual') {
-      await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true })
-    }
-
     console.log(`[stripe webhook] checkout.completed → user ${profile.id} plan=pro (${plan})`)
 
     await notifyTelegram('payment_success', {
@@ -160,6 +168,32 @@ async function handleWebhook(req, res, rawBody) {
       plan,
       amount: typeof session.amount_total === 'number' ? session.amount_total / 100 : null,
     })
+  }
+
+  // Impayé définitif : un abonnement « unpaid », « canceled » ou
+  // « incomplete_expired » repasse en gratuit sans attendre l'événement
+  // deleted (qui dépend des réglages de relance Stripe). « past_due » garde
+  // le Pro pendant que Stripe relance le paiement. Seul l'abonnement
+  // enregistré sur le profil compte (pas un ancien abonnement).
+  if (event.type === 'customer.subscription.updated') {
+    const subscription = event.data.object
+    const ended = ['unpaid', 'canceled', 'incomplete_expired'].includes(subscription.status)
+    if (ended) {
+      const { data: profile } = await admin
+        .from('profiles')
+        .select('id, stripe_subscription_id')
+        .eq('stripe_customer_id', subscription.customer)
+        .maybeSingle()
+      if (profile && (!profile.stripe_subscription_id || profile.stripe_subscription_id === subscription.id)) {
+        const { error: upErr } = await admin.from('profiles').update({
+          plan:                   'free',
+          billing_cycle:          null,
+          stripe_subscription_id: null,
+        }).eq('id', profile.id)
+        if (upErr) return abortForRetry('subscription.updated UPDATE profil échoué', upErr)
+        console.log(`[stripe webhook] subscription.updated (${subscription.status}) → user ${profile.id} plan=free`)
+      }
+    }
   }
 
   if (event.type === 'customer.subscription.deleted') {
