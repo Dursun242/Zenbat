@@ -8,7 +8,6 @@ import {
   updateInvoice as apiUpdateInvoice,
   replaceInvoiceLignes,
   deleteInvoice as apiDeleteInvoice,
-  nextInvoiceNumber,
   createAvoirFromInvoice as apiCreateAvoir,
   createAcompteFromDevis as apiCreateAcompte,
   createSoldeFromDevis   as apiCreateSolde,
@@ -42,6 +41,9 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
   // second tombe en RLS 42501 parce que la closure ne voit pas le verrou.
   const invoicesRef = useRef(invoices);
   invoicesRef.current = invoices;
+  // Dernier enregistrement en cours par facture : l'émission l'attend pour
+  // que le serveur relise en base les lignes affichées à l'écran.
+  const pendingSaves = useRef(new Map());
 
   useEffect(() => {
     if (!user) return;
@@ -98,11 +100,14 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
     // Retry une fois sur "verrou volé" du Web Locks Supabase (transitoire) :
     // l'UPDATE est avorté quand une requête concurrente vole le verrou de
     // refresh token. Un second essai aboutit presque toujours.
-    persist()
+    const saving = persist()
       .catch(e => {
         if (!isLockAbort(e)) throw e;
         return new Promise(r => setTimeout(r, 800)).then(persist);
-      })
+      });
+    pendingSaves.current.set(inv.id, saving);
+    saving
+      .finally(() => { if (pendingSaves.current.get(inv.id) === saving) pendingSaves.current.delete(inv.id); })
       .then(
         () => markSaved(),
         (e) => {
@@ -120,15 +125,12 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
     const d = devis.find(x => x.id === devisId);
     if (!d) { showErr("Devis introuvable"); return; }
     try {
-      // Plus de numéro « fabriqué » en fallback : si la RPC échoue (elle a
-      // déjà retenté 3×), on préfère un échec propre à un numéro potentiellement
-      // en collision ou hors séquence (conformité CGI art. 289).
-      const numero = await nextInvoiceNumber();
       const autoLiq = !!d.auto_liquidation_btp;
       const { ht, tva, ttc } = calcInvoiceTotals(d.lignes, brand.vatRegime, autoLiq, d.tva_rate);
       const saved = await apiCreateInvoice(
         {
-          devis_id: d.id, client_id: d.client_id, numero, objet: d.objet,
+          // Pas de numéro : il est attribué à l'émission (migration 0060).
+          devis_id: d.id, client_id: d.client_id, objet: d.objet,
           operation_type: "service", statut: "brouillon",
           montant_ht: ht, montant_tva: tva, montant_ttc: ttc,
           ...(autoLiq ? { auto_liquidation_btp: true } : {}),
@@ -150,13 +152,9 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
 
   const onCreateEmptyInvoice = async () => {
     try {
-      // Plus de numéro « fabriqué » en fallback : si la RPC échoue (elle a
-      // déjà retenté 3×), on préfère un échec propre à un numéro potentiellement
-      // en collision ou hors séquence (conformité CGI art. 289).
-      const numero = await nextInvoiceNumber();
       const saved = await apiCreateInvoice(
         {
-          numero, objet: "Nouvelle facture", operation_type: "service", statut: "brouillon",
+          objet: "Nouvelle facture", operation_type: "service", statut: "brouillon",
           montant_ht: 0, montant_tva: 0, montant_ttc: 0,
           date_emission: new Date().toISOString().split("T")[0],
           date_echeance: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
@@ -230,8 +228,13 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
     }
   };
 
+  // Attend la fin de l'enregistrement en cours d'une facture. Rejette si
+  // cet enregistrement a échoué : on n'émet pas une facture dont l'écran et
+  // la base divergent.
+  const flushInvoiceSave = (id) => pendingSaves.current.get(id) || Promise.resolve();
+
   return {
-    invoices, setInvoices, selI,
+    invoices, setInvoices, selI, flushInvoiceSave,
     onSaveInvoice, onCreateInvoiceFromDevis, onCreateEmptyInvoice,
     onCreateAcompte, onCreateSolde, onCreateAvoir, onDeleteInvoice, goInvoice,
   };

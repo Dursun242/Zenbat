@@ -33,7 +33,7 @@ function forcePendingSWUpdateOrReload() {
   return tryReloadOnce();
 }
 
-export default function InvoiceDetail({ invoice, client, clients = [], brand, invoices, onBack, onChange, onCreateAvoir, onDelete }) {
+export default function InvoiceDetail({ invoice, client, clients = [], brand, invoices, onBack, onChange, onCreateAvoir, onDelete, flushSave }) {
   const [showPDF,        setShowPDF]        = useState(false);
   const [exporting,      setExporting]      = useState(false);
   const [exportMsg,      setExportMsg]      = useState(null);
@@ -87,12 +87,43 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
     if (!lignes.length) { setExportMsg({ error: true, text: "Ajoute au moins une ligne avant d'émettre." }); return; }
     setExporting(true); setExportMsg(null);
     const wasLocked = isLocked;
+    let current = invoice;
     try {
+      const token = await getToken();
+      const authHeaders = {
+        "Content-Type": "application/json",
+        ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+      };
+
+      // 1. Émission : le serveur relit les lignes en base, attribue le numéro
+      //    suivant et la date du jour, fige les montants et verrouille la
+      //    facture, en une transaction (migration 0060). La dernière
+      //    modification à l'écran doit donc être enregistrée avant.
+      if (!wasLocked) {
+        try { await flushSave?.(); }
+        catch { throw new Error("la dernière modification n'est pas enregistrée. Vérifie ta connexion, puis réessaie."); }
+        const r = await fetch("/api/facturx", {
+          method: "POST", headers: authHeaders,
+          body: JSON.stringify({ action: "emit", invoice_id: invoice.id }),
+        });
+        const e = await r.json().catch(() => ({}));
+        if (!r.ok || !e?.numero) throw new Error(e?.error || `HTTP ${r.status}`);
+        current = {
+          ...invoice,
+          numero: e.numero, date_emission: e.date_emission, date_echeance: e.date_echeance,
+          statut: e.statut || "envoyee", locked: true,
+          ...(e.montant_ttc != null ? { montant_ht: e.montant_ht, montant_tva: e.montant_tva, montant_ttc: e.montant_ttc } : {}),
+        };
+        // La base est à jour : on synchronise l'écran sans ré-enregistrer.
+        onChange(current, false, true);
+      }
+
+      // 2. PDF Factur-X de la facture émise (numéro et date définitifs).
       const [{ renderDataToPdf }, { downloadBlob }] = await Promise.all([
         import("../lib/pdf.js"),
         import("../lib/facturx.js"),
       ]);
-      const { base64 } = await renderDataToPdf(asDevisShape, client, brand, "facture", { filename: `${invoice.numero}.pdf` });
+      const { base64 } = await renderDataToPdf({ ...current, lignes, montant_ht: ht, tva_rate: 20 }, client, brand, "facture", { filename: `${current.numero}.pdf` });
 
       // Appelle le serveur pour l'assemblage PDF/A-3 (OutputIntent, XMP, XML embed)
       // Si la facture est un avoir, on transmet les infos de la facture d'origine
@@ -101,16 +132,12 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
         ? { numero: sourceInvoice.numero, date_emission: sourceInvoice.date_emission }
         : undefined;
 
-      const token = await getToken();
       const res = await fetch("/api/facturx", {
         method:  "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
-        },
+        headers: authHeaders,
         body:    JSON.stringify({
           pdf_base64: base64,
-          invoice:    { ...invoice, lignes },
+          invoice:    { ...current, lignes },
           client,
           brand,
           sourceInvoice: sourcePayload,
@@ -132,38 +159,15 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
       // préfère un message d'erreur qu'un téléchargement de fichier cassé
       // que l'artisan ne remarquerait qu'en l'ouvrant.
       if (blob.size < 1024) throw new Error("PDF reçu incomplet, réessaie l'émission.");
-      downloadBlob(blob, `${invoice.numero}-facturx.pdf`);
+      downloadBlob(blob, `${current.numero}-facturx.pdf`);
 
-      // Conformité : l'émission de la facture (transition brouillon → envoyee
-      // + locked=true) est désormais faite server-side par /api/facturx via
-      // admin/service_role pour bypasser la RLS. On synchronise juste le state
-      // local depuis la réponse, en sautant la persistance côté client (la DB
-      // est déjà à jour, et un UPDATE supabase-js échouerait avec USING (not
-      // locked) puisque la ligne vient d'être verrouillée).
-      if (data.locked && !invoice.locked) {
-        try {
-          onChange(
-            { ...invoice, statut: data.statut || "envoyee", locked: true },
-            false,
-            true, // skipPersist
-          );
-        } catch (lockErr) {
-          console.warn("[facturx/local-sync]", lockErr);
-        }
-      }
-
-      if (data.lock_warning) {
-        // Le serveur a renvoyé le PDF mais la transition brouillon → envoyée
-        // n'a pas été persistée (RLS, course concurrente, trigger…). On le
-        // dit honnêtement à l'utilisateur plutôt que d'afficher un succès.
-        console.error("[facturx/lock]", data.lock_warning);
-        setExportMsg({ error: true, text: "Le PDF Factur-X est téléchargé, mais l'émission n'est pas finalisée : " + data.lock_warning + " Réessaie « Émettre », ou contacte le support." });
-      } else {
-        if (!data.icc_applied) console.warn("[facturx] profil sRGB absent (public/icc/sRGB.icc) : PDF/A-3 non strict.");
-        setExportMsg({ error: false, text: wasLocked
-          ? "PDF Factur-X téléchargé."
-          : (isAvoir ? "Avoir émis et verrouillé. " : "Facture émise et verrouillée. ") + "Le PDF Factur-X (EN 16931) est téléchargé." });
-      }
+      if (!data.icc_applied) console.warn("[facturx] profil sRGB absent (public/icc/sRGB.icc) : PDF/A-3 non strict.");
+      const done = wasLocked
+        ? "PDF Factur-X téléchargé."
+        : `${isAvoir ? "Avoir émis" : "Facture émise"} sous le n° ${current.numero}. Le PDF Factur-X (EN 16931) est téléchargé.`;
+      setExportMsg(data.archive_warning
+        ? { error: true, text: `${wasLocked ? "" : done + " "}${data.archive_warning}` }
+        : { error: false, text: done });
     } catch (err) {
       console.error("[facturx]", err);
       // 1) Chunk JS introuvable après redéploiement (Vercel a changé les
@@ -175,7 +179,9 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
       if (isChunkLoadError(err) || isLegacyCacheError(err) || window.__zenbatSWUpdateReady__) {
         if (forcePendingSWUpdateOrReload()) return;
       }
-      setExportMsg({ error: true, text: "Le PDF Factur-X n'a pas pu être généré : " + (err.message || err) });
+      setExportMsg({ error: true, text: current.locked && !wasLocked
+        ? `${isAvoir ? "Avoir émis" : "Facture émise"} sous le n° ${current.numero}, mais le PDF Factur-X n'a pas pu être généré : ${err.message || err}. Réessaie depuis la facture.`
+        : (wasLocked ? "Le PDF Factur-X n'a pas pu être généré : " : "L'émission a échoué : ") + (err.message || err) });
     } finally {
       setExporting(false);
     }
@@ -330,8 +336,8 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
     actionBar = (
       <div role="group" aria-label="Confirmer l'émission" style={{ display: "grid", gap: 10 }}>
         <p style={{ margin: 0, fontSize: 15, lineHeight: 1.45 }}>
-          Émettre {isAvoir ? "l'avoir" : "la facture"} <strong>{invoice.numero}</strong> (<span style={NUM}>{fmt(ttc)}</span> TTC){clientName ? <> pour <strong>{clientName}</strong></> : null} ?
-          Elle sera <strong>verrouillée</strong> : plus aucune modification possible (CGI art. 289). Pour corriger ensuite, il faudra un avoir.
+          Émettre {isAvoir ? "l'avoir" : "la facture"} (<span style={NUM}>{fmt(ttc)}</span> TTC){clientName ? <> pour <strong>{clientName}</strong></> : null} ?
+          {isAvoir ? "Il" : "Elle"} recevra le numéro suivant et la date d'aujourd'hui, puis sera <strong>{isAvoir ? "verrouillé" : "verrouillée"}</strong> : plus aucune modification possible (CGI art. 289). Pour corriger ensuite, il faudra un avoir.
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 8 }}>
           <button type="button" style={btnSecondary} onClick={() => setConfirm(null)}>Annuler</button>
@@ -498,7 +504,7 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
                 style={{ background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 8, padding: "18px 18px 20px" }}>
                 <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, ...NUM }}>{invoice.numero || typeLabel}</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, ...NUM }}>{invoice.numero || "Brouillon"}</div>
                     <div style={{ fontSize: 13, color: ZB.ink2, marginTop: 4 }}>
                       {typeLabel}{dateLabel && <> · <span style={{ whiteSpace: "nowrap" }}>{dateLabel}</span></>}{invoice.devis_numero && <> · <span style={{ whiteSpace: "nowrap" }}>devis {invoice.devis_numero}</span></>}
                     </div>

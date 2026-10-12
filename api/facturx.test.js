@@ -64,60 +64,127 @@ describe("buildXML — TVA", () => {
   });
 });
 
-describe("handler — archivage du Factur-X", () => {
-  let upload, update;
-
-  async function call(locked) {
-    const doc = await PDFDocument.create();
-    doc.addPage();
-    const pdf_base64 = Buffer.from(await doc.save()).toString("base64");
-    upload = vi.fn(async () => ({ error: null }));
-    update = vi.fn(() => chain({ data: [{ statut: "envoyee", locked: true }], error: null }));
-    function chain(result) {
-      const c = { then: (r, j) => Promise.resolve(result).then(r, j) };
-      for (const m of ["select", "eq", "maybeSingle"]) c[m] = vi.fn(() => (m === "maybeSingle" ? Promise.resolve(result) : c));
-      return c;
-    }
-    adminMock = {
-      from: vi.fn(() => {
-        const c = chain({ data: { id: "inv-1", locked, statut: locked ? "envoyee" : "brouillon" }, error: null });
-        c.update = update;
-        return c;
-      }),
-      storage: { from: () => ({ upload }) },
+// Mock minimal de supabase-js : chaque table renvoie ses données ; les
+// méthodes de filtre se chaînent, maybeSingle() rend une ligne, await rend
+// la liste.
+function makeAdmin({ invoice, lignes = [], profile = { brand_data: { vatRegime: "normal" } }, rpc }) {
+  const updates = [];
+  const upload = vi.fn(async () => ({ error: null }));
+  const chain = (table) => {
+    const rows = table === "invoices" ? invoice : table === "lignes_invoices" ? lignes : profile;
+    const c = {
+      then: (r, j) => Promise.resolve({ data: rows, error: null }).then(r, j),
+      maybeSingle: vi.fn(async () => ({ data: rows, error: null })),
+      update: vi.fn((patch) => { updates.push({ table, patch }); return chain(table); }),
     };
-    const res = { statusCode: 0, body: null };
-    res.status = (c) => { res.statusCode = c; return res; };
-    res.json = (b) => { res.body = b; return res; };
-    res.setHeader = () => {};
-    res.end = () => res;
-    await handler({
-      method: "POST",
-      headers: {},
-      body: {
-        pdf_base64,
-        invoice: { id: "inv-1", numero: "FAC-9", lignes: [ligne(1, 100, 10)] },
-        brand: { vatRegime: "normal" },
-      },
-    }, res);
-    return res;
-  }
+    for (const m of ["select", "eq", "is", "order"]) c[m] = vi.fn(() => c);
+    return c;
+  };
+  return {
+    admin: { from: vi.fn(chain), rpc: rpc || vi.fn(), storage: { from: () => ({ upload }) } },
+    updates, upload,
+  };
+}
 
+async function callHandler(body) {
+  const res = { statusCode: 0, body: null };
+  res.status = (c) => { res.statusCode = c; return res; };
+  res.json = (b) => { res.body = b; return res; };
+  res.setHeader = () => {};
+  res.end = () => res;
+  await handler({ method: "POST", headers: {}, body }, res);
+  return res;
+}
+
+async function blankPdf() {
+  const doc = await PDFDocument.create();
+  doc.addPage();
+  return Buffer.from(await doc.save()).toString("base64");
+}
+
+describe("handler — génération et archivage du Factur-X", () => {
   beforeEach(() => vi.clearAllMocks());
+  const emitted = { id: "inv-1", owner_id: "artisan-1", statut: "envoyee", locked: true, numero: "FAC-2026-0007", date_emission: "2026-10-12" };
 
-  it("brouillon : archive le PDF et fige les montants recalculés à l'émission", async () => {
-    const res = await call(false);
-    expect(res.statusCode).toBe(200);
-    expect(upload.mock.calls[0][2]).toMatchObject({ upsert: true });
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({
-      statut: "envoyee", locked: true, montant_ht: 100, montant_tva: 10, montant_ttc: 110,
-    }));
+  it("brouillon : refusé, l'émission doit passer d'abord (ancienne version de l'app)", async () => {
+    const m = makeAdmin({ invoice: { id: "inv-1", statut: "brouillon", locked: false, numero: null } });
+    adminMock = m.admin;
+    const res = await callHandler({ pdf_base64: await blankPdf(), invoice: { id: "inv-1", numero: "FAC-2026-0099" } });
+    expect(res.statusCode).toBe(409);
+    expect(res.body.code).toBe("emit_first");
+    expect(m.upload).not.toHaveBeenCalled();
   });
 
-  it("facture déjà émise : n'écrase pas le Factur-X archivé", async () => {
-    const res = await call(true);
+  it("première archive : numéro lu en base (pas celui du navigateur), PDF de travail remplacé, archivage noté", async () => {
+    const m = makeAdmin({ invoice: { ...emitted, facturx_archived_at: null }, lignes: [ligne(1, 100, 10)] });
+    adminMock = m.admin;
+    const res = await callHandler({
+      pdf_base64: await blankPdf(),
+      invoice: { id: "inv-1", numero: "FAC-2026-0001", lignes: [ligne(1, 999, 20)] },
+      brand: { vatRegime: "normal" },
+    });
     expect(res.statusCode).toBe(200);
-    expect(upload.mock.calls[0][2]).toMatchObject({ upsert: false });
-    expect(update).not.toHaveBeenCalled();
+    expect(res.body.numero).toBe("FAC-2026-0007");
+    expect(m.upload.mock.calls[0][0]).toBe("artisan-1/invoices/FAC-2026-0007.pdf");
+    expect(m.upload.mock.calls[0][2]).toMatchObject({ upsert: true });
+    expect(m.updates).toEqual([{ table: "invoices", patch: { facturx_archived_at: expect.any(String) } }]);
+  });
+
+  it("archive déjà faite : jamais écrasée", async () => {
+    const m = makeAdmin({ invoice: { ...emitted, facturx_archived_at: "2026-10-12T08:00:00Z" }, lignes: [ligne(1, 100, 10)] });
+    adminMock = m.admin;
+    const res = await callHandler({ pdf_base64: await blankPdf(), invoice: { id: "inv-1" }, brand: { vatRegime: "normal" } });
+    expect(res.statusCode).toBe(200);
+    expect(m.upload.mock.calls[0][2]).toMatchObject({ upsert: false });
+    expect(m.updates).toEqual([]);
+  });
+});
+
+describe("handler — émission (numéro attribué par le serveur)", () => {
+  beforeEach(() => vi.clearAllMocks());
+  const draft = { id: "inv-1", statut: "brouillon", locked: false, deleted_at: null, auto_liquidation_btp: false };
+
+  it("brouillon : montants recalculés depuis les lignes en base, numéro et date pris par emit_invoice", async () => {
+    const rpc = vi.fn(async () => ({ data: { numero: "FAC-2026-0008", date_emission: "2026-10-12", date_echeance: "2026-11-11", statut: "envoyee", locked: true }, error: null }));
+    const m = makeAdmin({ invoice: draft, lignes: [ligne(1, 100, 10)], rpc });
+    adminMock = m.admin;
+    const res = await callHandler({ action: "emit", invoice_id: "inv-1" });
+    expect(res.statusCode).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("emit_invoice", { p_invoice_id: "inv-1", p_owner_id: "artisan-1", p_ht: 100, p_tva: 10, p_ttc: 110 });
+    expect(res.body).toMatchObject({ numero: "FAC-2026-0008", locked: true, montant_ttc: 110 });
+  });
+
+  it("franchise en base : pas de TVA, quel que soit le taux des lignes", async () => {
+    const rpc = vi.fn(async () => ({ data: { numero: "FAC-2026-0009", locked: true }, error: null }));
+    const m = makeAdmin({ invoice: draft, lignes: [ligne(2, 50, 20)], profile: { brand_data: { vatRegime: "franchise" } }, rpc });
+    adminMock = m.admin;
+    await callHandler({ action: "emit", invoice_id: "inv-1" });
+    expect(rpc.mock.calls[0][1]).toMatchObject({ p_ht: 100, p_tva: 0, p_ttc: 100 });
+  });
+
+  it("sans ligne : refusé, aucun numéro consommé", async () => {
+    const rpc = vi.fn();
+    const m = makeAdmin({ invoice: draft, lignes: [], rpc });
+    adminMock = m.admin;
+    const res = await callHandler({ action: "emit", invoice_id: "inv-1" });
+    expect(res.statusCode).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("facture d'un autre artisan : 403", async () => {
+    const rpc = vi.fn();
+    const m = makeAdmin({ invoice: null, rpc });
+    adminMock = m.admin;
+    const res = await callHandler({ action: "emit", invoice_id: "inv-x" });
+    expect(res.statusCode).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("migration 0060 absente : message clair, pas d'erreur brute", async () => {
+    const rpc = vi.fn(async () => ({ data: null, error: { code: "PGRST202", message: "Could not find the function" } }));
+    const m = makeAdmin({ invoice: draft, lignes: [ligne(1, 100, 10)], rpc });
+    adminMock = m.admin;
+    const res = await callHandler({ action: "emit", invoice_id: "inv-1" });
+    expect(res.statusCode).toBe(503);
   });
 });

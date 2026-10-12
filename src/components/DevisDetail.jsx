@@ -427,7 +427,7 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
               <div style={{ marginBottom: 16, borderTop: `1px solid ${ZB.rule}` }}>
                 {devisAcomptes.map(a => (
                   <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, padding: "8px 0", borderBottom: `1px solid ${ZB.ruleSoft}`, fontSize: 14, ...NUM }}>
-                    <span><strong>{a.numero}</strong> <span style={{ color: ZB.ink2 }}>· {Math.round((Number(a.montant_ht) || 0) / ht * 100)} % · {a.statut === "envoyee" ? "émise" : a.statut === "payee" ? "payée" : "brouillon"}</span></span>
+                    <span><strong>{a.numero || "Brouillon"}</strong> <span style={{ color: ZB.ink2 }}>· {Math.round((Number(a.montant_ht) || 0) / ht * 100)} % · {a.statut === "envoyee" ? "émise" : a.statut === "payee" ? "payée" : "brouillon"}</span></span>
                     <span style={{ fontWeight: 700 }}>{fmt(Number(a.montant_ht) || 0)} HT</span>
                   </div>
                 ))}

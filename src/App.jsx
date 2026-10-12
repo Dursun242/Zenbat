@@ -184,7 +184,7 @@ export default function App() {
     onSaveDevis, onCreateDevis, onDuplicateDevis, onCreateIndice, onDeleteDevis, goDevis,
   } = useDevis(user, { ...saveCallbacks, setTab, effectivePlan, weekCount, stickyDevisThisWeek, onDevisCreated, onQuotaReached, isAdmin });
   const {
-    invoices, selI, onSaveInvoice, onCreateInvoiceFromDevis, onCreateEmptyInvoice,
+    invoices, selI, flushInvoiceSave, onSaveInvoice, onCreateInvoiceFromDevis, onCreateEmptyInvoice,
     onCreateAcompte, onCreateSolde, onCreateAvoir, onDeleteInvoice, goInvoice,
   } = useInvoices(user, devis, brand, { ...saveCallbacks, setTab, clients });
 
@@ -664,7 +664,8 @@ export default function App() {
                   onBack={() => setTab("factures")}
                   onChange={onSaveInvoice}
                   onCreateAvoir={onCreateAvoir}
-                  onDelete={() => onDeleteInvoice(inv.id)}/>
+                  onDelete={() => onDeleteInvoice(inv.id)}
+                  flushSave={() => flushInvoiceSave(inv.id)}/>
               </Suspense>
             );
           })()}

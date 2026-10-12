@@ -417,16 +417,6 @@ export async function listInvoices() {
   })
 }
 
-export async function nextInvoiceNumber() {
-  // withRetry sûr : la RPC est un pur SELECT (max+1), sans effet de bord —
-  // aucun risque de trou dans la séquence de numérotation.
-  return withRetry(async () => {
-    const { data, error } = await supabase.rpc('next_invoice_number')
-    if (error) throw error
-    return data
-  })
-}
-
 // Acompte et solde : le montant HT est ventilé sur les taux de TVA du devis
 // (devis à 5,5 / 10 / 20 % mélangés), une ligne par taux. Franchise ou
 // autoliquidation du devis : une ligne à 0 %, le flag est propagé.
@@ -439,7 +429,6 @@ function invoiceFromDevisParts(devis, vatRegime, montantHT, designation) {
 }
 
 export async function createAcompteFromDevis(devis, montantHT, vatRegime) {
-  const numero = await nextInvoiceNumber()
   const { lignes, autoLiq, amounts } = invoiceFromDevisParts(
     devis, vatRegime, montantHT,
     `Acompte sur devis ${devis.numero}${devis.objet ? ' – ' + devis.objet : ''}`,
@@ -447,7 +436,6 @@ export async function createAcompteFromDevis(devis, montantHT, vatRegime) {
   const invoice = {
     devis_id:       devis.id,
     client_id:      devis.client_id,
-    numero,
     objet:          `Acompte – ${devis.objet || devis.numero}`,
     operation_type: 'service',
     statut:         'brouillon',
@@ -465,8 +453,8 @@ export async function createSoldeFromDevis(devis, acompteInvoices = [], vatRegim
   const totalAcompteHT = acompteInvoices.reduce((s, a) => s + (Number(a.montant_ht) || 0), 0)
   const montantHT = round2(devisHT - totalAcompteHT)
   if (montantHT <= 0) throw new Error('Toutes les échéances ont déjà été facturées.')
-  const numero = await nextInvoiceNumber()
-  const acompteRefs = acompteInvoices.map(a => a.numero).join(', ')
+  // Seuls les acomptes émis ont un numéro (attribué à l'émission).
+  const acompteRefs = acompteInvoices.map(a => a.numero).filter(Boolean).join(', ')
   const { lignes, autoLiq, amounts } = invoiceFromDevisParts(
     devis, vatRegime, montantHT,
     `Solde – devis ${devis.numero}${devis.objet ? ' – ' + devis.objet : ''}${acompteRefs ? ' (acomptes ' + acompteRefs + ')' : ''}`,
@@ -474,7 +462,6 @@ export async function createSoldeFromDevis(devis, acompteInvoices = [], vatRegim
   const invoice = {
     devis_id:       devis.id,
     client_id:      devis.client_id,
-    numero,
     objet:          `Solde – ${devis.objet || devis.numero}`,
     operation_type: 'service',
     statut:         'brouillon',

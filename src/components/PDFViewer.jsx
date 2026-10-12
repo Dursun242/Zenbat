@@ -34,6 +34,8 @@ function openPdfPreview(blob, filename = "document.pdf") {
 export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageReady, kind="devis", noDownload=false, inline=false, onMarkSent, onMarkSignature }) {
   const isAvoir  = kind === "facture" && !!d?.avoir_of_invoice_id;
   const docLabel = isAvoir ? "FACTURE D'AVOIR" : kind === "facture" ? "FACTURE" : "DEVIS";
+  // Une facture brouillon n'a pas de numéro : il est attribué à l'émission.
+  const fileBase = d?.numero || (kind === "facture" ? "Facture-brouillon" : "Devis");
   const MM_TO_PX = 3.7795275591
   const A4_PX = 210 * MM_TO_PX
   const wrapRef = useRef(null)
@@ -137,7 +139,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
         </div>
         <div style={{textAlign:"right"}}>
           <div style={{color:"#9A8E82",fontSize:10,fontWeight:600,letterSpacing:"2px"}}>{docLabel}</div>
-          <div style={{color:navy,fontWeight:800,fontSize:20,marginTop:2}}>{d.numero}</div>
+          <div style={{color:navy,fontWeight:800,fontSize:20,marginTop:2}}>{d.numero || "Brouillon"}</div>
           <div style={{color:"#6B6358",fontSize:10,marginTop:6}}>Émis le <strong style={{color:"#1a1a1a"}}>{fmtD(d.date_emission)}</strong></div>
           {kind === "facture"
             ? d.date_echeance && <div style={{color:"#6B6358",fontSize:10}}>Échéance <strong style={{color:"#1a1a1a"}}>{fmtD(d.date_echeance)}</strong></div>
@@ -363,7 +365,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         {/* Toolbar inline */}
         <div style={{ background: "#FBFAF7", borderBottom: "1px solid #D9D2C5", minHeight: 56, padding: "6px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, boxSizing: "border-box" }}>
-          <span style={{ color: "#5C544B", fontSize: 14, fontWeight: 600 }}>Aperçu · {d.numero}.pdf</span>
+          <span style={{ color: "#5C544B", fontSize: 14, fontWeight: 600 }}>Aperçu · {fileBase}.pdf</span>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {onMarkSent && d.statut === "brouillon" && (
               <button onClick={() => { onMarkSent(); onClose?.() }}
@@ -383,7 +385,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
                   setGeneratingPdf(true)
                   try {
                     const { renderDataToPdf } = await import("../lib/pdf.js")
-                    const filename = `${d.numero}.pdf`
+                    const filename = `${fileBase}.pdf`
                     const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename })
                     openPdfPreview(blob, filename)
                   } catch (e) {
@@ -442,7 +444,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
       <div className="pdf-toolbar" style={{background:"#1A1612",padding:"calc(12px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 12px calc(18px + env(safe-area-inset-left))",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{color:"#22c55e"}}>{Ix.pdf}</div>
-          <span style={{color:"white",fontSize:13,fontWeight:600}}>{d.numero}.pdf</span>
+          <span style={{color:"white",fontSize:13,fontWeight:600}}>{fileBase}.pdf</span>
         </div>
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
           <div style={{display:"flex",background:"#2A231C",borderRadius:10,overflow:"hidden"}}>
@@ -469,7 +471,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
                 setGeneratingPdf(true)
                 try {
                   const { renderDataToPdf } = await import("../lib/pdf.js")
-                  const filename = `${d.numero}.pdf`
+                  const filename = `${fileBase}.pdf`
                   const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename })
                   openPdfPreview(blob, filename)
                 } catch (e) {
