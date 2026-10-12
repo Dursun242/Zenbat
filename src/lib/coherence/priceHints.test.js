@@ -20,20 +20,20 @@ describe("buildPriceHints", () => {
   it("donne la fourchette €/m² et le total attendu pour la surface annoncée", () => {
     const hints = buildPriceHints(["rénovation peinture appartement 65 m²"]);
     expect(hints).toContain("REPÈRES DE PRIX");
-    expect(hints).toContain("22–55 € HT par m²");
-    expect(hints).toMatch(/Pour 65 m² : total entre 1[\s ]430 et 3[\s ]575 € HT/);
+    expect(hints).toContain("23–57 € HT par m²");
+    expect(hints).toMatch(/Pour 65 m² : total entre 1[\s ]495 et 3[\s ]705 € HT/);
   });
 
   it("liste les lots attendus et les prix unitaires de référence", () => {
     const hints = buildPriceHints(["extension 30 m² gros oeuvre"]);
-    expect(hints).toContain("Fouilles en rigoles : 15–50 €/m³ (courant : 30 €)");
+    expect(hints).toContain("Fouilles en rigoles : 16–52 €/m³ (courant : 31 €)");
     const sdb = buildPriceHints(["rénovation salle de bain 6 m²"]);
     expect(sdb).toContain("Lots attendus : Démolition et dépose");
   });
 
   it("n'applique pas la surface du logement à une pièce (SdB, cuisine)", () => {
     const sdb = buildPriceHints(["rénovation salle de bain dans un T3"]);
-    expect(sdb).toMatch(/600–1[\s\u202f]800 € HT par m²/);
+    expect(sdb).toMatch(/625–1[\s\u202f]870 € HT par m²/);
     expect(sdb).not.toContain("total entre");
     expect(buildPriceHints(["isolation combles perdus maison"])).not.toContain("total entre");
     expect(buildPriceHints(["isolation combles perdus 80 m²"])).toContain("Pour 80 m²");

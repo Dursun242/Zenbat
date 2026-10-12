@@ -81,7 +81,7 @@ export default function TradesQuickPicker({ brand, setBrand, onDone, onSkip }) {
           </p>
           <ul style={{listStyle:"none",display:"flex",flexDirection:"column",gap:8,fontSize:15,color:ZB.ink,lineHeight:1.4}}>
             <li style={{display:"flex",gap:8}}><span style={{color:ZB.ink2}}>{checkIcon}</span>Vocabulaire technique exact à ton métier</li>
-            <li style={{display:"flex",gap:8}}><span style={{color:ZB.ink2}}>{checkIcon}</span>Tarifs du marché 2025 pré-calibrés</li>
+            <li style={{display:"flex",gap:8}}><span style={{color:ZB.ink2}}>{checkIcon}</span>Tarifs du marché 2026 pré-calibrés</li>
             <li style={{display:"flex",gap:8}}><span style={{color:ZB.ink2}}>{checkIcon}</span>Unités et lots adaptés (m², ml, forfait, h…)</li>
           </ul>
         </div>

@@ -1,7 +1,7 @@
 {
   "pack_id": "btp_v1",
   "pack_name": "BTP — Bâtiment résidentiel",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "typologies": [
     {
       "typology_id": "renovation_plomberie_partielle",
@@ -9,7 +9,7 @@
       "keywords": ["rénovation plomberie", "renovation plomberie", "remplacement complet plomberie", "réfection plomberie", "refection plomberie", "plomberie maison", "plomberie appartement"],
       "main_dimension": { "name": "surface_sol", "unit": "m²", "label": "Surface habitable" },
       "default_params": {},
-      "envelope": { "min_per_unit": 70, "max_per_unit": 150, "tolerance_pct": 20 },
+      "envelope": { "min_per_unit": 73, "max_per_unit": 155, "tolerance_pct": 20 },
       "required_lots": [],
       "optional_lots": [],
       "derived_quantities": [],
@@ -21,7 +21,7 @@
       "keywords": ["rénovation électrique", "renovation electrique", "rénovation elec", "renovation elec", "mise aux normes électrique", "mise aux normes electrique", "refonte tableau électrique"],
       "main_dimension": { "name": "surface_sol", "unit": "m²", "label": "Surface habitable" },
       "default_params": {},
-      "envelope": { "min_per_unit": 100, "max_per_unit": 170, "tolerance_pct": 10 },
+      "envelope": { "min_per_unit": 105, "max_per_unit": 175, "tolerance_pct": 10 },
       "required_lots": [],
       "optional_lots": [],
       "derived_quantities": [],
@@ -33,7 +33,7 @@
       "keywords": ["rénovation peinture", "renovation peinture", "peinture intérieure appartement", "peinture interieure appartement", "peinture appartement", "peinture intérieure maison", "peinture interieure maison", "peinture maison"],
       "main_dimension": { "name": "surface_sol", "unit": "m²", "label": "Surface habitable" },
       "default_params": {},
-      "envelope": { "min_per_unit": 22, "max_per_unit": 55, "tolerance_pct": 25 },
+      "envelope": { "min_per_unit": 23, "max_per_unit": 57, "tolerance_pct": 25 },
       "required_lots": [],
       "optional_lots": [],
       "derived_quantities": [],
@@ -45,7 +45,7 @@
       "keywords": ["démolition cloisons", "demolition cloisons", "dépose cloisons", "depose cloisons", "abattre cloisons"],
       "main_dimension": { "name": "surface_sol", "unit": "m²", "label": "Surface de cloisons" },
       "default_params": {},
-      "envelope": { "min_per_unit": 30, "max_per_unit": 90, "tolerance_pct": 25 },
+      "envelope": { "min_per_unit": 31, "max_per_unit": 94, "tolerance_pct": 25 },
       "required_lots": [],
       "optional_lots": [],
       "derived_quantities": [],
@@ -57,7 +57,7 @@
       "keywords": ["ite", "isolation thermique extérieure", "isolation thermique exterieure", "isolation par l'extérieur", "isolation par l'exterieur", "isolation extérieure"],
       "main_dimension": { "name": "surface_facade", "unit": "m²", "label": "Surface de façade" },
       "default_params": {},
-      "envelope": { "min_per_unit": 110, "max_per_unit": 220, "tolerance_pct": 20 },
+      "envelope": { "min_per_unit": 115, "max_per_unit": 230, "tolerance_pct": 20 },
       "required_lots": [],
       "optional_lots": [],
       "derived_quantities": [],
@@ -69,7 +69,7 @@
       "keywords": ["rénovation complète cuisine", "renovation complete cuisine", "rénovation cuisine clé en main", "renovation cuisine cle en main", "cuisine clé en main", "cuisine cle en main", "rénovation cuisine"],
       "main_dimension": { "name": "surface_sol", "unit": "m²", "label": "Surface cuisine" },
       "default_params": {},
-      "envelope": { "min_per_unit": 900, "max_per_unit": 1900, "tolerance_pct": 20 },
+      "envelope": { "min_per_unit": 935, "max_per_unit": 1975, "tolerance_pct": 20 },
       "required_lots": [],
       "optional_lots": [],
       "derived_quantities": [],
@@ -81,7 +81,7 @@
       "keywords": ["moe rénovation immeuble", "moe renovation immeuble", "maîtrise d'œuvre immeuble", "maitrise d'oeuvre immeuble", "honoraires moe immeuble"],
       "main_dimension": { "name": "nb_appartements", "unit": "appt", "label": "Nombre d'appartements" },
       "default_params": {},
-      "envelope": { "min_per_unit": 3333, "max_per_unit": 5833, "tolerance_pct": 5 },
+      "envelope": { "min_per_unit": 3465, "max_per_unit": 6065, "tolerance_pct": 5 },
       "required_lots": [],
       "optional_lots": [],
       "derived_quantities": [],
@@ -95,7 +95,7 @@
       "exclude_keywords": ["permis de construire", "dossier", "étude", "plans", "maîtrise d'œuvre", "moe", "mur de soutènement", "soutènement", "maison neuve", "construction maison", "construction d'une maison"],
       "main_dimension": { "name": "surface_sol", "unit": "m²", "label": "Surface au sol" },
       "default_params": { "hauteur_etage": 2.5, "coef_pente": 1.15, "section_semelle": 0.18 },
-      "envelope": { "min_per_unit": 800, "max_per_unit": 1200, "tolerance_pct": 15 },
+      "envelope": { "min_per_unit": 830, "max_per_unit": 1250, "tolerance_pct": 15 },
       "required_lots": [
         "terrassement_fondations",
         "elevation_maconnerie",
@@ -128,13 +128,13 @@
               "item_id": "fouilles_rigoles",
               "label": "Fouilles en rigoles",
               "unit": "m³",
-              "unit_price": { "min": 15, "max": 50, "typical": 30 }
+              "unit_price": { "min": 16, "max": 52, "typical": 31 }
             },
             {
               "item_id": "beton_fondations",
               "label": "Béton fondations C25/30",
               "unit": "m³",
-              "unit_price": { "min": 120, "max": 200, "typical": 160 }
+              "unit_price": { "min": 125, "max": 210, "typical": 165 }
             }
           ]
         },
@@ -149,13 +149,13 @@
               "label": "Élévation murs parpaings 20×20×50",
               "unit": "m²",
               "quantity_source": "surface_murs_elevation",
-              "unit_price": { "min": 35, "max": 70, "typical": 50 }
+              "unit_price": { "min": 36, "max": 73, "typical": 52 }
             },
             {
               "item_id": "dalle_beton",
               "label": "Dalle béton armé",
               "unit": "m²",
-              "unit_price": { "min": 40, "max": 80, "typical": 55 }
+              "unit_price": { "min": 42, "max": 83, "typical": 57 }
             }
           ]
         },
@@ -170,7 +170,7 @@
               "label": "Charpente fermettes industrielles",
               "unit": "m²",
               "quantity_source": "surface_toiture",
-              "unit_price": { "min": 40, "max": 100, "typical": 65 }
+              "unit_price": { "min": 42, "max": 105, "typical": 68 }
             }
           ]
         },
@@ -185,7 +185,7 @@
               "label": "Couverture tuiles terre cuite",
               "unit": "m²",
               "quantity_source": "surface_toiture",
-              "unit_price": { "min": 40, "max": 100, "typical": 65 }
+              "unit_price": { "min": 42, "max": 105, "typical": 68 }
             }
           ]
         },
@@ -209,7 +209,7 @@
       "keywords": ["salle de bain", "salle de bains", "sdb", "salle d'eau"],
       "main_dimension": { "name": "surface_sol", "unit": "m²", "label": "Surface au sol" },
       "default_params": {},
-      "envelope": { "min_per_unit": 600, "max_per_unit": 1800, "tolerance_pct": 20 },
+      "envelope": { "min_per_unit": 625, "max_per_unit": 1870, "tolerance_pct": 20 },
       "required_lots": [
         "demolition_sdb",
         "plomberie_sanitaire",
@@ -251,7 +251,7 @@
       "keywords": ["isolation combles", "combles perdus", "isolation toiture", "combles aménageables", "isolation thermique combles"],
       "main_dimension": { "name": "surface", "unit": "m²", "label": "Surface à isoler" },
       "default_params": {},
-      "envelope": { "min_per_unit": 15, "max_per_unit": 60, "tolerance_pct": 25 },
+      "envelope": { "min_per_unit": 16, "max_per_unit": 62, "tolerance_pct": 25 },
       "required_lots": [
         "preparation_combles",
         "isolation_thermique"
@@ -279,7 +279,7 @@
       "keywords": ["ravalement", "façade", "facade", "enduit extérieur", "enduit exterieur", "crépi façade", "crep facade"],
       "main_dimension": { "name": "surface", "unit": "m²", "label": "Surface de façade" },
       "default_params": {},
-      "envelope": { "min_per_unit": 30, "max_per_unit": 120, "tolerance_pct": 25 },
+      "envelope": { "min_per_unit": 31, "max_per_unit": 125, "tolerance_pct": 25 },
       "required_lots": [
         "echafaudage",
         "preparation_support",
@@ -316,7 +316,7 @@
       "exclude_keywords": ["salle de bain", "salle de bains", "sdb", "salle d'eau", "cuisine", "plomberie", "électrique", "peinture", "toiture", "façade"],
       "main_dimension": { "name": "surface_sol", "unit": "m²", "label": "Surface au sol" },
       "default_params": {},
-      "envelope": { "min_per_unit": 200, "max_per_unit": 900, "tolerance_pct": 20 },
+      "envelope": { "min_per_unit": 210, "max_per_unit": 935, "tolerance_pct": 20 },
       "required_lots": [
         "demolition",
         "electricite",
