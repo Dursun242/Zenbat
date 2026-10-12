@@ -19,12 +19,40 @@ const REVIEW_URL       = import.meta.env.VITE_TRUSTPILOT_REVIEW_URL || 'https://
 // Réf. : https://support.trustpilot.com/hc/en-us/articles/115011421468
 const TEMPLATE_ID = '53aa8912dec7e10d38f59f36'
 
+// Scripts Trustpilot, injectés une seule fois au montage de la vitrine
+// (auparavant dans index.html, donc chargés aussi dans l'application et sur
+// la page de signature client) :
+//  - bootstrap TrustBox : seulement si un widget est configuré ;
+//  - AFS (invitations d'avis) : file tp() + enregistrement de l'intégration,
+//    comme l'ancien snippet. tp('createInvitation', …) n'est appelé nulle part
+//    dans le code à ce jour.
+function injectScript(id, src) {
+  if (document.getElementById(id)) return
+  const el = document.createElement('script')
+  el.id = id
+  el.async = true
+  el.src = src
+  document.head.appendChild(el)
+}
+function loadTrustpilotScripts() {
+  if (typeof window === 'undefined') return
+  if (BUSINESS_UNIT_ID) {
+    injectScript('tp-widget-bootstrap', 'https://widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js')
+  }
+  if (!window.tp) {
+    window.TrustpilotObject = 'tp'
+    window.tp = function () { (window.tp.q = window.tp.q || []).push(arguments) }
+    window.tp('register', 'wXmwGF7UnNEwrVCk')
+  }
+  injectScript('tp-afs', 'https://invitejs.trustpilot.com/tp.min.js')
+}
+
 export default function LandingTrustpilot() {
   const widgetRef = useRef(null)
 
   useEffect(() => {
-    // Le bootstrap Trustpilot est chargé en async dans index.html.
-    // On déclenche le rendu du widget dès qu'il est disponible.
+    loadTrustpilotScripts()
+    // Rendu du widget dès que le bootstrap (async) est disponible.
     if (!BUSINESS_UNIT_ID || !widgetRef.current) return
     if (window.Trustpilot) {
       window.Trustpilot.loadFromElement(widgetRef.current, true)

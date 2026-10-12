@@ -1,87 +1,108 @@
-import { lazy, Suspense, useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useAuth } from './lib/auth.jsx'
-import { isChunkLoadError, tryReloadOnce } from './lib/chunkReload.js'
-import App from './App.jsx'
-import Login from './pages/Login.jsx'
-import Signup from './pages/Signup.jsx'
-import AuthCallback from './pages/AuthCallback.jsx'
-import ResetPassword from './pages/ResetPassword.jsx'
-import Landing from './pages/Landing.jsx'
-import CGU from './pages/CGU.jsx'
-import DevisPublicPage from './pages/DevisPublicPage.jsx'
-import ContactPage from './pages/ContactPage.jsx'
+import { lazyWithReload } from './lib/lazyWithReload.js'
+import { ZB } from './lib/theme.js'
 import EmailVerificationGate from './components/EmailVerificationGate.jsx'
-// CRM en import sync (utilisé par l'admin au quotidien — éliminer les
-// chunk errors prime sur les ~80 Ko de bundle initial supplémentaire).
-import CRM from './pages/CRM.jsx'
 
-// Pages SEO publiques uniquement — conservées en lazy car prerenderées
-// statiquement par vitePrerenderPlugin (un visiteur Google qui arrive
-// sur /villes/paris reçoit le HTML final pré-rendu, le JS n'est lazy
-// que pour l'hydratation côté navigateur), et pour ne pas charger les
-// ~36 Ko de data/villes.js dans le bundle principal des artisans.
+// Chaque grande surface est un chunk séparé, chargé à la demande : un
+// client qui ouvre /d/<token> ne télécharge ni la vitrine, ni l'application,
+// ni le CRM ; un artisan connecté ne télécharge pas la vitrine ; le CRM
+// (admin seulement) ne pèse plus sur personne.
 //
-// lazyWithReload : ces deux imports restaient la dernière source possible
-// de « Failed to fetch dynamically imported module » (chunk périmé après
-// redéploiement Vercel chez un client au cache PWA obsolète). Plutôt que
-// laisser l'erreur remonter à l'ErrorBoundary (écran crash + log), on
-// l'attrape dans la factory : si c'est bien un chunk error, on déclenche
-// le reload via tryReloadOnce (debounce 30s + escalade nuke gérés là-bas)
-// et on renvoie une promesse pendante → le fallback Suspense s'affiche
-// pendant que la page recharge le nouvel index.html. Si tryReloadOnce a
-// déjà abandonné (false), on relance l'erreur pour laisser l'ErrorBoundary
-// proposer le reload manuel.
-function lazyWithReload(factory) {
-  return lazy(() => factory().catch(err => {
-    if (isChunkLoadError(err) && tryReloadOnce()) return new Promise(() => {})
-    throw err
-  }))
-}
-const VillesIndex = lazyWithReload(() => import('./pages/VillesIndex.jsx'))
-const VillePage   = lazyWithReload(() => import('./pages/VillePage.jsx'))
+// lazyWithReload (src/lib/lazyWithReload.js) couvre le chunk périmé après
+// redéploiement (« Failed to fetch dynamically imported module ») : reload
+// unique via tryReloadOnce, fallback Suspense affiché pendant ce temps. Ces
+// imports partent tous au démarrage (pas en pleine session), juste après le
+// chunk principal du même déploiement : la fenêtre de chunk périmé est
+// minime, contrairement aux écrans chargés au fil de la navigation (restés
+// en import synchrone dans App.jsx).
+//
+// VillesIndex / VillePage : prérendues au build (src/prerender.jsx), le JS
+// ne sert qu'à reprendre la main dans le navigateur.
+const loadApp     = () => import('./App.jsx')
+const loadLanding = () => import('./pages/Landing.jsx')
+const loadLogin   = () => import('./pages/Login.jsx')
+const loadSignup  = () => import('./pages/Signup.jsx')
 
-const loader = {
-  wrap: { minHeight:'100vh', display:'grid', placeItems:'center', background:'#FAF7F2', color:'#6B6358', fontFamily:'system-ui,sans-serif' },
+const App             = lazyWithReload(loadApp)
+const Landing         = lazyWithReload(loadLanding)
+const Login           = lazyWithReload(loadLogin)
+const Signup          = lazyWithReload(loadSignup)
+const AuthCallback    = lazyWithReload(() => import('./pages/AuthCallback.jsx'))
+const ResetPassword   = lazyWithReload(() => import('./pages/ResetPassword.jsx'))
+const CGU             = lazyWithReload(() => import('./pages/CGU.jsx'))
+const ContactPage     = lazyWithReload(() => import('./pages/ContactPage.jsx'))
+const DevisPublicPage = lazyWithReload(() => import('./pages/DevisPublicPage.jsx'))
+const CRM             = lazyWithReload(() => import('./pages/CRM.jsx'))
+const VillesIndex     = lazyWithReload(() => import('./pages/VillesIndex.jsx'))
+const VillePage       = lazyWithReload(() => import('./pages/VillePage.jsx'))
+
+// Sur « / », on lance tout de suite le téléchargement de l'écran probable
+// (application si une session Supabase est stockée, vitrine sinon) sans
+// attendre la fin de getSession() : un aller-retour réseau de gagné. Le
+// lazy() réutilise ensuite le même module. Côté vitrine, connexion et
+// inscription suivent quand le navigateur est libre (pas d'attente au clic).
+// Erreurs ignorées ici : elles seront traitées par lazyWithReload au rendu.
+function hasStoredSession() {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      if (/^sb-.+-auth-token$/.test(localStorage.key(i) || '')) return true
+    }
+  } catch { /* stockage indisponible */ }
+  return false
+}
+if (typeof window !== 'undefined' && window.location.pathname === '/') {
+  if (hasStoredSession()) {
+    loadApp().catch(() => {})
+  } else {
+    loadLanding().then(() => {
+      const idle = window.requestIdleCallback || (cb => setTimeout(cb, 1500))
+      idle(() => { loadLogin().catch(() => {}); loadSignup().catch(() => {}) })
+    }).catch(() => {})
+  }
+}
+
+// Fallback sobre (couleurs Bordereau) pendant le chargement d'un chunk ou de
+// la session : fond papier, libellé discret. Police système et non Archivo
+// (ZB.font) : sinon ce seul libellé ferait télécharger la police de
+// l'application (~88 Ko) sur la vitrine, les CGU et les pages villes.
+const loaderStyle = {
+  minHeight: '100vh', display: 'grid', placeItems: 'center',
+  background: ZB.paper, color: ZB.ink3, fontFamily: 'system-ui, sans-serif', fontSize: 14,
+}
+function PageLoader() {
+  return <div style={loaderStyle} role="status" aria-live="polite">Chargement…</div>
 }
 
 const EMAIL_VERIFY_GRACE_DAYS = 7
 
 export default function Root() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <RootRoutes />
+    </Suspense>
+  )
+}
+
+function RootRoutes() {
   const { session, loading, recovery } = useAuth()
   const [mode, setMode] = useState(null) // null = landing, 'login', 'signup'
 
   const path = typeof window !== 'undefined' ? window.location.pathname : '/'
 
-  if (path === '/crm') return (
-    <Suspense fallback={<div style={loader.wrap}>Chargement…</div>}>
-      <CRM />
-    </Suspense>
-  )
+  if (path === '/crm') return <CRM />
   if (path === '/auth/callback') return <AuthCallback />
   if (path === '/reset-password' || recovery) return <ResetPassword />
   if (path === '/cgu')     return <CGU />
   if (path === '/contact') return <ContactPage />
   if (path.startsWith('/d/')) return <DevisPublicPage token={path.slice(3)} />
-  if (path === '/villes' || path === '/villes/') {
-    return (
-      <Suspense fallback={<div style={loader.wrap}>Chargement…</div>}>
-        <VillesIndex />
-      </Suspense>
-    )
-  }
+  if (path === '/villes' || path === '/villes/') return <VillesIndex />
   if (path.startsWith('/villes/')) {
     const slug = path.slice('/villes/'.length).replace(/\/$/, '')
-    return (
-      <Suspense fallback={<div style={loader.wrap}>Chargement…</div>}>
-        <VillePage slug={slug} />
-      </Suspense>
-    )
+    return <VillePage slug={slug} />
   }
 
-  if (loading) {
-    return <div style={loader.wrap}>Chargement…</div>
-  }
-
+  if (loading) return <PageLoader />
   if (session) {
     const user = session.user
     const isConfirmed = !!user.email_confirmed_at

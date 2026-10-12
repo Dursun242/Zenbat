@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 import { HelmetProvider } from 'react-helmet-async'
-import '@fontsource-variable/archivo/wdth.css'
+import './styles/archivo.css'
 import './index.css'
 import { AuthProvider } from './lib/auth.jsx'
 import Root from './Root.jsx'
@@ -20,7 +20,14 @@ import ErrorBoundary from './components/ErrorBoundary.jsx'
 //
 // On stocke updateSW sur window pour que le toast puisse l'appeler avec
 // l'argument true (skipWaiting + reload propre via le plugin lui-même).
-const updateSW = registerSW({
+//
+// Page publique de signature (/d/<token>) : pas d'enregistrement du SW. Le
+// client de l'artisan n'utilise pas l'application ; l'installation du SW lui
+// ferait télécharger tout le précache (application, vitrine, admin, CRM :
+// ~2,4 Mo) en arrière-plan. Un navigateur déjà contrôlé par le SW (artisan
+// qui ouvre son propre lien) le reste.
+const isPublicDevisPage = window.location.pathname.startsWith('/d/')
+const updateSW = isPublicDevisPage ? () => {} : registerSW({
   immediate: true,
   onNeedRefresh() {
     window.__zenbatSWUpdateReady__ = true
