@@ -633,6 +633,54 @@ describe('POST actions client (accept/refuse/negotiate)', () => {
     expect(r.body.ok).toBe(true)
   })
 
+  it("accept : devis modifié depuis l'ouverture → 409, rien n'est signé", async () => {
+    let call = 0
+    const updates = []
+    supabaseMock.from = vi.fn(() => {
+      call++
+      if (call === 1) return makeChain({ data: { id: 's1', email_hash: 'x' }, error: null })
+      if (call === 2) return makeChain({ data: { id: 'd1', numero: 'DEV-001', objet: 'Test', statut: 'envoye', owner_id: 'a1', client_id: 'c1', lignes: [{ id: 'l1', type_ligne: 'ouvrage', designation: 'Peinture', quantite: 2, prix_unitaire: 500, tva_rate: 10, position: 0 }] }, error: null })
+      const c = makeChain({ data: null, error: null }); updates.push(c); return c
+    })
+    const r = res()
+    await handler(req('POST', { action: 'accept', token: 'tok', session_id: 's1', client_name: 'Marie', content_sha256: 'empreinte-de-la-version-vue' }), r)
+    expect(r.statusCode).toBe(409)
+    expect(r.body.code).toBe('content_changed')
+    expect(updates.some(c => c.update.mock.calls.length)).toBe(false)
+  })
+
+  it("accept : empreinte du contenu et navigateur gardés dans le journal d'audit", async () => {
+    const devisRow = { id: 'd1', numero: 'DEV-001', objet: 'Test', statut: 'envoye', owner_id: 'a1', client_id: 'c1', lignes: [{ id: 'l1', type_ligne: 'ouvrage', designation: 'Peinture', quantite: 2, prix_unitaire: 500, tva_rate: 10, position: 0 }] }
+    // Même empreinte que celle renvoyée par la page publique (GET).
+    let call = 0
+    supabaseMock.from = vi.fn(() => {
+      call++
+      if (call === 1) return makeChain({ data: devisRow, error: null })
+      if (call === 2) return makeChain({ data: { company_name: 'X', brand_data: {} }, error: null })
+      return makeChain({ data: { raison_sociale: 'C', email: 'c@x.fr' }, error: null })
+    })
+    const g = res()
+    await handler(req('GET', {}, { token: 'tok' }), g)
+    const seen = g.body.content_sha256
+    expect(seen).toMatch(/^[0-9a-f]{64}$/)
+
+    call = 0
+    const inserts = []
+    supabaseMock.from = vi.fn(() => {
+      call++
+      if (call === 1) return makeChain({ data: { id: 's1', email_hash: 'x' }, error: null })
+      if (call === 2) return makeChain({ data: devisRow, error: null })
+      const c = makeChain({ data: null, error: null }); inserts.push(c); return c
+    })
+    const r = res()
+    const rq = req('POST', { action: 'accept', token: 'tok', session_id: 's1', client_name: 'Marie', content_sha256: seen })
+    rq.headers['user-agent'] = 'Mozilla/5.0 (iPhone)'
+    await handler(rq, r)
+    expect(r.statusCode).toBe(200)
+    const audit = inserts.flatMap(c => c.insert.mock.calls).map(a => a[0]).find(x => x?.event === 'accepted')
+    expect(audit.meta).toMatchObject({ content_sha256: seen, user_agent: 'Mozilla/5.0 (iPhone)', montant_ht: 1000 })
+  })
+
   it('refuse succès → 200', async () => {
     let call = 0
     supabaseMock.from = vi.fn(() => {

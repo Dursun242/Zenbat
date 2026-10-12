@@ -5,7 +5,7 @@ import { fmt } from "../lib/utils.js";
 import { ZB, NUM } from "../lib/theme.js";
 import { todoItems, ledger } from "../lib/todo.js";
 import PWAInstallBanner from "./PWAInstallBanner.jsx";
-import { LIST_CSS, Sheet } from "./ui/Register.jsx";
+import { LIST_CSS, Sheet, LoadingRows, LoadErrorRow } from "./ui/Register.jsx";
 
 const MAX_TODO = 6;
 
@@ -23,7 +23,9 @@ function Section({ title, aside, children }) {
   );
 }
 
-export default function Dashboard({ devis = [], invoices = [], clients = [], goDevis, goInvoice, setTab, brand = {}, onOpenProfile, onOpenPWAInstall }) {
+// loaded / loadError / onRetry : devis et factures chargés ? Tant que ce n'est
+// pas le cas, ni « Rien en attente » ni montants à 0,00 € (ce serait faux).
+export default function Dashboard({ devis = [], invoices = [], clients = [], goDevis, goInvoice, setTab, brand = {}, onOpenProfile, onOpenPWAInstall, loaded = true, loadError = null, onRetry }) {
   const firstName = brand.firstName?.trim() || brand.companyName?.trim().split(" ")[0];
   const todo = todoItems({ devis, invoices, clients, brand });
   const money = ledger({ devis, invoices });
@@ -47,6 +49,15 @@ export default function Dashboard({ devis = [], invoices = [], clients = [], goD
 
       <div style={{ marginTop: 16 }}><PWAInstallBanner onOpenInstall={onOpenPWAInstall}/></div>
 
+      {!loaded ? (
+        <Section title="À faire">
+          <Sheet>
+            {loadError
+              ? <LoadErrorRow message="Impossible de charger tes devis et tes factures." onRetry={onRetry}/>
+              : <LoadingRows label="Chargement de ton activité…" rows={2}/>}
+          </Sheet>
+        </Section>
+      ) : (<>
       <Section title="À faire" aside={todo.length > 0 && <span style={{ fontSize: 15, color: ZB.ink2, ...NUM }}>{todo.length}</span>}>
         <Sheet>
           {todo.length === 0 ? (
@@ -92,6 +103,7 @@ export default function Dashboard({ devis = [], invoices = [], clients = [], goD
           ))}
         </div>
       </Section>
+      </>)}
     </div>
   );
 }

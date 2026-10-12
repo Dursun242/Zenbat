@@ -5,7 +5,7 @@ import { ZB } from "../lib/theme.js";
 import { useModalGuard } from "../hooks/useModalGuard.js";
 
 const labelStyle = { display: "block", fontSize: 13, fontWeight: 600, color: ZB.ink2, marginBottom: 6 };
-const inputStyle = { width: "100%", minHeight: 44, background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 8, padding: "10px 12px", fontSize: 16, color: ZB.ink, outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
+const inputStyle = { width: "100%", minHeight: 44, background: ZB.sheet, border: `1px solid ${ZB.field}`, borderRadius: 8, padding: "10px 12px", fontSize: 16, color: ZB.ink, outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
 
 // Composant champ de formulaire générique
 function Field({ label, val, onChange, type = "text", placeholder = "" }) {

@@ -16,6 +16,11 @@ import {
 export function useInvoices(user, devis, brand, { markSaving, markSaved, setSaveState, showErr, setTab, clients = [] }) {
   const [invoices, setInvoices] = useState([]);
   const [selI,     setSelI]     = useState(null);
+  // État du chargement de la liste (cf. useDevis) : la liste n'affiche
+  // « Aucune facture » qu'une fois le chargement réussi.
+  const [loaded,    setLoaded]    = useState(!user);
+  const [loadError, setLoadError] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Génère le PDF (brouillon) d'une facture juste créée et le pousse en pièce
   // jointe dans Telegram : buildPdf appelle notifyAdminPdf('pdf_generated') en
@@ -49,9 +54,14 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
     if (!user) return;
     let cancelled = false;
     listInvoices()
-      .then(inv => { if (!cancelled) setInvoices(inv || []); })
+      .then(inv => {
+        if (cancelled) return;
+        setInvoices(inv || []);
+        setLoaded(true); setLoadError(null);
+      })
       .catch(err => {
         if (cancelled) return;
+        setLoadError(err || new Error("load invoices failed"));
         console.warn("[Zenbat] factures indisponibles :", err.message);
         // Avant : échec 100 % silencieux → l'utilisateur voyait une liste
         // vide et croyait n'avoir aucune facture. On le prévient (listInvoices
@@ -59,7 +69,10 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
         showErr("Factures momentanément indisponibles — vérifie ta connexion");
       });
     return () => { cancelled = true; };
-  }, [user?.id]);
+  }, [user?.id, reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Relance le chargement de la liste (bouton « Réessayer »).
+  const reload = () => { setLoadError(null); setReloadKey(k => k + 1); };
 
   const goInvoice = (id) => { setSelI(id); setTab("factures_detail"); };
 
@@ -235,6 +248,7 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
 
   return {
     invoices, setInvoices, selI, flushInvoiceSave,
+    loaded, loadError, reload,
     onSaveInvoice, onCreateInvoiceFromDevis, onCreateEmptyInvoice,
     onCreateAcompte, onCreateSolde, onCreateAvoir, onDeleteInvoice, goInvoice,
   };

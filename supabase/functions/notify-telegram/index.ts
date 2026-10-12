@@ -486,6 +486,13 @@ Deno.serve(async (req: Request) => {
 
     // ── Cas 1 : multipart/form-data → PDF en pièce jointe ─────────────
     if (ctype.startsWith("multipart/form-data")) {
+      // Envoi depuis le navigateur d'un artisan : PDF seulement, 5 Mo au plus
+      // (un devis ou une facture pèse quelques centaines de Ko). Sans borne,
+      // n'importe quel compte pouvait remplir le chat admin de gros fichiers.
+      const MAX_USER_UPLOAD = 5 * 1024 * 1024;
+      if (caller.kind === "user" && Number(req.headers.get("content-length") || 0) > MAX_USER_UPLOAD + 64 * 1024) {
+        return deny(413, "file_too_large");
+      }
       const fd = await req.formData();
       const kind = (String(fd.get("kind") || "pdf_generated")) as EventKind;
       if (caller.kind === "user" && kind !== "pdf_generated") return deny(403, "forbidden_kind");
@@ -495,6 +502,11 @@ Deno.serve(async (req: Request) => {
       } catch { /* payload invalide → on continue avec {} */ }
 
       const file = fd.get("pdf");
+      if (caller.kind === "user" && file instanceof File) {
+        if (file.size > MAX_USER_UPLOAD) return deny(413, "file_too_large");
+        const head = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+        if (String.fromCharCode(...head) !== "%PDF-") return deny(400, "pdf_expected");
+      }
       const caption = (await formatEvent(kind, payload)) || "📎 PDF";
 
       // Persiste le PDF dans Storage si c'est une facture (utilisé ensuite

@@ -64,6 +64,11 @@
         "displayName": "Ocre « à chiffrer »",
         "canonical": "#8A5A00"
       },
+      "field": {
+        "role": "neutral",
+        "displayName": "Bordure de champ",
+        "canonical": "#8F857A"
+      },
       "on-ink": {
         "role": "neutral",
         "displayName": "Sur encre",
@@ -155,7 +160,7 @@
       "refersTo": "input",
       "description": "Champ sur feuille, 16px pour éviter le zoom iOS.",
       "html": "<input class=\"ds-input\" placeholder=\"Décris tes travaux…\">",
-      "css": ".ds-input{min-height:48px;padding:0 12px;border:1px solid #D9D2C5;border-radius:8px;background:#fff;color:#1A1612;font:16px var(--zb-font,system-ui)}.ds-input::placeholder{color:#6E655B}.ds-input:focus{outline:none;border-color:#A4461F}"
+      "css": ".ds-input{min-height:48px;padding:0 12px;border:1px solid #8F857A;border-radius:8px;background:#fff;color:#1A1612;font:16px var(--zb-font,system-ui)}.ds-input::placeholder{color:#6E655B}.ds-input:focus{outline:none;border-color:#A4461F}"
     },
     {
       "name": "Ligne du bordereau",

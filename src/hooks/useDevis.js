@@ -15,7 +15,14 @@ import { logError } from "../lib/logger.js";
 import { isLockAbort } from "../lib/authLock.js";
 
 export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, setTab, effectivePlan, weekCount = 0, stickyDevisThisWeek = 0, onDevisCreated = () => {}, onQuotaReached = () => {}, isAdmin = false }) {
-  const [devis,        setDevis]        = useState(DEMO_DEVIS);
+  // Connecté : liste vide jusqu'au premier chargement (les exemples ne
+  // servent qu'hors connexion, ils ne doivent pas passer pour des devis).
+  const [devis,        setDevis]        = useState(() => (user ? [] : DEMO_DEVIS));
+  // État du chargement de la liste : `loaded` passe à true au premier succès,
+  // `loadError` porte l'échec (les listes affichent alors « Réessayer »).
+  const [loaded,       setLoaded]       = useState(!user);
+  const [loadError,    setLoadError]    = useState(null);
+  const [reloadKey,    setReloadKey]    = useState(0);
   // Ref synchronisée : permet aux callbacks async (goDevis) de lire l'état
   // COURANT sans passer par un setState-updater (dont les effets de bord
   // seraient doublés en StrictMode). Même pattern que invoicesRef.
@@ -25,6 +32,7 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
   const [loadingDevis, setLoadingDevis] = useState(new Set());
   const [autoOpenPDF,  setAutoOpenPDF]  = useState(null);
   const saveTimers = useRef({});
+  const pendingLignes = useRef({});
 
   useEffect(() => {
     if (!user) return;
@@ -41,16 +49,25 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
       }
     };
     loadWithRetry()
-      .then(ds => { if (!cancelled) setDevis(ds.length ? ds : []); })
+      .then(ds => {
+        if (cancelled) return;
+        setDevis(ds.length ? ds : []);
+        setLoaded(true); setLoadError(null);
+      })
       .catch(err => {
         if (cancelled) return;
-        // Verrou volé même après retry → bénin, ne pas alarmer l'utilisateur.
+        setLoadError(err || new Error("load devis failed"));
+        // Verrou volé même après retry → bénin, pas de toast ni de log ; la
+        // liste propose simplement « Réessayer ».
         if (isLockAbort(err)) { console.warn("[load devis] lock volé, ignoré", err); return; }
         console.error("[load devis]", err); showErr("Erreur de chargement — vérifie ta connexion");
         logError("load devis failed", err?.stack, { area: "devis-load", code: err?.code, msg: err?.message });
       });
     return () => { cancelled = true; };
-  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id, reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Relance le chargement de la liste (bouton « Réessayer »).
+  const reload = () => { setLoadError(null); setReloadKey(k => k + 1); };
 
   // Re-fetch des devis quand l'onglet redevient visible : capture les
   // changements pilotés côté serveur dont le front n'est pas au courant
@@ -67,7 +84,7 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
       // diffère jusqu'au prochain focus quand la file est vide.
       if (Object.keys(saveTimers.current).length > 0) return;
       listDevisWithLignes()
-        .then(ds => { if (ds) setDevis(ds.length ? ds : []); })
+        .then(ds => { if (ds) { setDevis(ds.length ? ds : []); setLoaded(true); setLoadError(null); } })
         .catch(err => {
           if (isLockAbort(err)) return; // verrou Supabase volé — transitoire
           console.error("[refresh devis]", err);
@@ -83,12 +100,20 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
 
   const scheduleDevisSave = (d, immediate = false, saveLignes = false) => {
     if (!user) return;
+    // Lignes à réécrire si UN des appels regroupés par l'attente de 800 ms
+    // les a modifiées : sinon une ligne éditée juste avant un changement de
+    // statut était perdue (seul le dernier appel comptait).
+    const withLignes = saveLignes || !!pendingLignes.current[d.id];
+    pendingLignes.current[d.id] = withLignes;
     const run = async () => {
       markSaving();
+      delete pendingLignes.current[d.id];
       const { lignes: dl, client, created_at, updated_at, id: _id, ...fields } = d;
+      // Lignes d'abord, statut ensuite : un devis passé « accepté » a ses
+      // lignes verrouillées en base (migration 0062).
       const persist = async () => {
+        if (withLignes) await replaceLignes(d.id, (dl || []).map(({ id, created_at, ...l }) => l));
         await apiUpdateDevis(d.id, fields);
-        if (saveLignes) await replaceLignes(d.id, (dl || []).map(({ id, created_at, ...l }) => l));
       };
       try {
         try {
@@ -276,6 +301,7 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
 
   return {
     devis, setDevis, selD, setSelD, loadingDevis, autoOpenPDF, setAutoOpenPDF,
+    loaded, loadError, reload,
     onSaveDevis, onCreateDevis, onDuplicateDevis, onCreateIndice, onDeleteDevis, goDevis,
   };
 }

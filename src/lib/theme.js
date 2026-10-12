@@ -14,6 +14,7 @@ export const ZB = {
   ink3:       "#6E655B",
   rule:       "#D9D2C5",
   ruleSoft:   "#ECE7DE",
+  field:      "#8F857A",  // bordure des champs de saisie (3,6:1 sur la feuille, 3,5:1 sur le papier)
   accent:     "#A4461F",
   accentSoft: "#F6E7DF",
   stamp:      "#1E7B3C",

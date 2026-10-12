@@ -9,6 +9,9 @@ export const LIST_CSS = `
   @media (hover: hover) { .zb-row:hover { background: ${ZB.paper} !important; } }
   .zb-list input::placeholder { color: ${ZB.ink3}; opacity: 1; }
   .zb-tabs { scrollbar-width: none; } .zb-tabs::-webkit-scrollbar { display: none; }
+  @keyframes zbSkel { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+  .zb-skel { animation: zbSkel 1.4s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) { .zb-skel { animation: none; } }
 `;
 
 export const btnPrimary = {
@@ -64,6 +67,37 @@ export function Sheet({ children }) {
 
 export function EmptyRow({ children }) {
   return <p style={{ margin: 0, padding: "24px 16px", textAlign: "center", fontSize: 15, color: ZB.ink2, lineHeight: 1.45 }}>{children}</p>;
+}
+
+// Chargement de la liste : lignes squelettes discrètes (pas de « 0 devis »
+// ni d'état vide tant que les données ne sont pas arrivées).
+export function LoadingRows({ label = "Chargement…", rows = 3 }) {
+  const bar = (w, h) => <span className="zb-skel" style={{ display: "block", width: w, height: h, borderRadius: 4, background: ZB.paper2 }}/>;
+  return (
+    <div role="status" aria-live="polite">
+      <span className="zb-sr">{label}</span>
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} aria-hidden="true" style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "10px 12px", alignItems: "center", minHeight: 64, padding: "14px 16px",
+          borderBottom: i < rows - 1 ? `1px solid ${ZB.ruleSoft}` : "none" }}>
+          {bar(`${[62, 48, 55][i % 3]}%`, 14)}
+          {bar(72, 14)}
+          <span style={{ gridColumn: "1 / -1" }}>{bar(`${[38, 30, 44][i % 3]}%`, 11)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Échec du chargement : message clair et « Réessayer » (action secondaire,
+// la terre cuite reste à l'action principale de l'écran).
+export function LoadErrorRow({ message, onRetry }) {
+  return (
+    <div role="alert" style={{ padding: "20px 16px", textAlign: "center" }}>
+      <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: ZB.ink, lineHeight: 1.45 }}>{message}</p>
+      <p style={{ margin: "4px 0 14px", fontSize: 14, color: ZB.ink2, lineHeight: 1.45 }}>Vérifie ta connexion, puis réessaie.</p>
+      {onRetry && <button type="button" style={btnSecondary} onClick={onRetry}>Réessayer</button>}
+    </div>
+  );
 }
 
 const MoreIcon = <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>;

@@ -405,7 +405,7 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
           <span className="zb-sr">Message au client (facultatif)</span>
           <textarea value={sendMessage} onChange={e => setSendMessage(e.target.value)} rows={2} disabled={sending}
             placeholder="Message au client (facultatif)"
-            style={{ width: "100%", boxSizing: "border-box", minHeight: 64, padding: "10px 12px", border: `1px solid ${ZB.rule}`, borderRadius: 8, background: ZB.sheet, fontFamily: "inherit", fontSize: 16, color: ZB.ink, resize: "vertical" }}/>
+            style={{ width: "100%", boxSizing: "border-box", minHeight: 64, padding: "10px 12px", border: `1px solid ${ZB.field}`, borderRadius: 8, background: ZB.sheet, fontFamily: "inherit", fontSize: 16, color: ZB.ink, resize: "vertical" }}/>
         </label>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 8 }}>
           <button type="button" style={btnSecondary} disabled={sending} onClick={() => { setShowSendForm(false); setSendMessage(""); }}>Annuler</button>
@@ -542,7 +542,7 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
                   <label htmlFor="fa-lieu" style={{ fontSize: 13, color: ZB.ink2, flexShrink: 0 }}>Lieu du chantier</label>
                   <input id="fa-lieu" value={invoice.ville_chantier || ""} readOnly={isLocked} placeholder="À préciser"
                     onChange={e => !isLocked && onChange({ ...invoice, ville_chantier: e.target.value })}
-                    style={{ flex: 1, minWidth: 0, minHeight: 36, padding: "4px 0", border: "none", borderBottom: `1px dotted ${ZB.rule}`, background: "none", fontFamily: "inherit", fontSize: 16, color: ZB.ink, outline: "none" }}/>
+                    style={{ flex: 1, minWidth: 0, minHeight: 36, padding: "4px 0", border: "none", borderBottom: `1px dotted ${ZB.field}`, background: "none", fontFamily: "inherit", fontSize: 16, color: ZB.ink, outline: "none" }}/>
                 </div>}
 
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: 18, paddingBottom: 8, borderBottom: `2px solid ${ZB.ink}`, fontSize: 13, fontWeight: 600, color: ZB.ink2 }}>
@@ -649,7 +649,7 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
                         const pct = Number(e.target.value) || 0;
                         onChange({ ...invoice, retenue_garantie_pct: pct, retenue_garantie_eur: Math.round(ht * pct) / 100 }, false);
                       }}
-                      style={{ width: 88, minHeight: 44, padding: "0 10px", border: `1px solid ${ZB.rule}`, borderRadius: 8, background: isLocked ? ZB.paper2 : ZB.sheet, fontFamily: "inherit", fontSize: 16, textAlign: "right", color: ZB.ink, ...NUM }}/>
+                      style={{ width: 88, minHeight: 44, padding: "0 10px", border: `1px solid ${ZB.field}`, borderRadius: 8, background: isLocked ? ZB.paper2 : ZB.sheet, fontFamily: "inherit", fontSize: 16, textAlign: "right", color: ZB.ink, ...NUM }}/>
                   </label>
                   <label style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 0", borderBottom: `1px solid ${ZB.ruleSoft}`, cursor: isLocked ? "default" : "pointer", opacity: isLocked ? 0.7 : 1 }}>
                     <input type="checkbox" checked={!!invoice.auto_liquidation_btp} disabled={isLocked}

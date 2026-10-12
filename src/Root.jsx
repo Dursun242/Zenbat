@@ -2,7 +2,6 @@ import { Suspense, useState } from 'react'
 import { useAuth } from './lib/auth.jsx'
 import { lazyWithReload } from './lib/lazyWithReload.js'
 import { ZB } from './lib/theme.js'
-import EmailVerificationGate from './components/EmailVerificationGate.jsx'
 
 // Chaque grande surface est un chunk séparé, chargé à la demande : un
 // client qui ouvre /d/<token> ne télécharge ni la vitrine, ni l'application,
@@ -109,7 +108,8 @@ function RootRoutes() {
     if (!isConfirmed) {
       const ageDays = (Date.now() - new Date(user.created_at).getTime()) / 86_400_000
       const isBlocking = ageDays >= EMAIL_VERIFY_GRACE_DAYS
-      return <EmailVerificationGate blocking={isBlocking}><App /></EmailVerificationGate>
+      // Le bandeau est rendu par App, sous la barre du haut (cf. EmailVerificationBanner).
+      return <App emailVerification={{ blocking: isBlocking }} />
     }
     return <App />
   }

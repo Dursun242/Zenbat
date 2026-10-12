@@ -44,7 +44,7 @@ const PAGE_CSS = `
   @media (prefers-reduced-motion: reduce) { .dp-stamp-in, .dp-spin { animation: none !important } }
 `
 
-const field = { width: '100%', minHeight: 48, padding: '10px 12px', border: `1px solid ${ZB.rule}`, borderRadius: 8, background: ZB.sheet, fontSize: 16, color: ZB.ink, outline: 'none' }
+const field = { width: '100%', minHeight: 48, padding: '10px 12px', border: `1px solid ${ZB.field}`, borderRadius: 8, background: ZB.sheet, fontSize: 16, color: ZB.ink, outline: 'none' }
 const label = { display: 'block', fontSize: 14, fontWeight: 600, color: ZB.ink2, marginBottom: 6 }
 const btnMain = accent => ({ minHeight: 52, padding: '0 20px', borderRadius: 10, border: 'none', background: accent, color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer' })
 const btnSecond = { minHeight: 48, padding: '0 16px', borderRadius: 10, border: `1px solid ${ZB.rule}`, background: ZB.sheet, color: ZB.ink, fontSize: 15, fontWeight: 600, cursor: 'pointer' }
@@ -544,7 +544,7 @@ export default function DevisPublicPage({ token }) {
     // signature, double email, audit log dupliqué).
     if (busy || phase === 'signing' || phase === 'accepted') return
     if (!clientName.trim()) { setErr('Indiquez votre nom pour signer.'); return }
-    const ok = await post({ action: 'accept', client_name: clientName })
+    const ok = await post({ action: 'accept', client_name: clientName, content_sha256: data?.content_sha256 })
     if (!ok) return
     setPhase('signing')
     const result = await sendSignedPdf(clientName, ok.signed_at)

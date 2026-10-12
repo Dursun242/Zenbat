@@ -7,12 +7,13 @@ import { ZB } from "../lib/theme.js";
 import ContactEditor from "./ContactEditor.jsx";
 import { getToken } from "../lib/getToken.js";
 import { useDebouncedValue } from "../hooks/useDebouncedValue.js";
-import { LIST_CSS, ListHeader, Sheet, EmptyRow, RowMenu, btnPrimary, btnSecondary, SearchIcon, PlusIcon, CameraIcon } from "./ui/Register.jsx";
+import { LIST_CSS, ListHeader, Sheet, EmptyRow, LoadingRows, LoadErrorRow, RowMenu, btnPrimary, btnSecondary, SearchIcon, PlusIcon, CameraIcon } from "./ui/Register.jsx";
 
 const TYPE_LABEL = { particulier: "Particulier", artisan: "Artisan", entreprise: "Entreprise" };
 
 
-export default function ClientsList({ clients, onSave, onDelete, onRestore, goClient, showUndo }) {
+// loaded / loadError / onRetry : état du chargement de la liste (useClients).
+export default function ClientsList({ clients, onSave, onDelete, onRestore, goClient, showUndo, loaded = true, loadError = null, onRetry }) {
   const [query,       setQuery]       = useState("");
   const [editing,     setEditing]     = useState(null);
   const [importing,   setImporting]   = useState(false);
@@ -98,7 +99,7 @@ Règles :
   return (
     <div className="zb-list" style={{ maxWidth: 960, margin: "0 auto", padding: "16px 12px 24px", fontFamily: ZB.font, color: ZB.ink }}>
       <style>{LIST_CSS + "@keyframes spin{to{transform:rotate(360deg)}}"}</style>
-      <ListHeader count={`${clients.length} client${clients.length > 1 ? "s" : ""}`}/>
+      <ListHeader count={loaded ? `${clients.length} client${clients.length > 1 ? "s" : ""}` : ""}/>
       <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: "none" }}/>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
         <button type="button" style={{ ...btnSecondary, padding: "0 10px", opacity: importing ? 0.7 : 1 }} disabled={importing} onClick={() => fileRef.current?.click()}>
@@ -115,15 +116,18 @@ Règles :
         <span aria-hidden="true" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: ZB.ink3, display: "inline-flex" }}>{SearchIcon}</span>
         <input value={query} onChange={e => setQuery(e.target.value)} type="search"
           placeholder="Nom, société, ville, email…"
-          style={{ width: "100%", boxSizing: "border-box", minHeight: 48, padding: "0 14px 0 42px", background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 10,
+          style={{ width: "100%", boxSizing: "border-box", minHeight: 48, padding: "0 14px 0 42px", background: ZB.sheet, border: `1px solid ${ZB.field}`, borderRadius: 10,
             fontFamily: "inherit", fontSize: 16, color: ZB.ink }}/>
       </label>
 
       <Sheet>
-        {filtered.length === 0 && (
+        {!loaded && (loadError
+          ? <LoadErrorRow message="Impossible de charger tes clients." onRetry={onRetry}/>
+          : <LoadingRows label="Chargement de tes clients…"/>)}
+        {loaded && filtered.length === 0 && (
           <EmptyRow>{clients.length === 0 ? "Aucun client pour l'instant. Ajoute-le à la main ou depuis une photo de sa carte." : "Aucun client ne correspond à ta recherche."}</EmptyRow>
         )}
-        {filtered.map((c, i) => {
+        {loaded && filtered.map((c, i) => {
           const contactLine  = [c.email, c.telephone].filter(Boolean).join(" · ");
           const locationLine = [c.code_postal, c.ville].filter(Boolean).join(" ");
           const sub = [c.activite || contactLine, locationLine].filter(Boolean).join(" · ") || "Pas de coordonnées";
