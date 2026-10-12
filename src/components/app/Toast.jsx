@@ -1,11 +1,17 @@
 // Toast applicatif (Undo pour les suppressions, erreurs réseau).
 import { ZB } from "../../lib/theme.js";
+import { ABOVE_NAV_CSS } from "./BottomNav.jsx";
+
+// Mobile : 12 px au-dessus de la barre du bas (64 px + zone du home
+// indicator). Ordinateur : la barre du bas est masquée, `.app-toast` est
+// replacé en bas à droite par la feuille de style d'App.jsx (≥ 1024 px).
+const TOAST_BOTTOM = `calc(${ABOVE_NAV_CSS} + 12px)`;
 
 export default function Toast({ toast, onDismiss }) {
   if (!toast) return null;
   return (
     <div className="app-toast" role={toast.isError ? "alert" : "status"}
-      style={{ position: "fixed", bottom: "88px", left: 12, right: 12, background: toast.isError ? ZB.danger : ZB.ink, color: "white", borderRadius: 10, padding: "8px 8px 8px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, boxShadow: "0 10px 30px rgba(26,22,18,.25)", zIndex: 100, animation: "fadeUp .18s ease both", fontFamily: ZB.font }}>
+      style={{ position: "fixed", bottom: TOAST_BOTTOM, left: 12, right: 12, background: toast.isError ? ZB.danger : ZB.ink, color: "white", borderRadius: 10, padding: "8px 8px 8px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, boxShadow: "0 10px 30px rgba(26,22,18,.25)", zIndex: 100, animation: "fadeUp .18s ease both", fontFamily: ZB.font }}>
       <span style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.35 }}>{toast.label}</span>
       <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
         {!toast.isError && (

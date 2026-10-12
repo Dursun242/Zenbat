@@ -42,7 +42,7 @@ export default function ResetPassword() {
       if (cancelled) return
       if (ok) setPhase('ready')
       else {
-        setInvalidMsg(msg || "Ce lien de réinitialisation est invalide ou a expiré. Redemandez-en un depuis l'écran de connexion.")
+        setInvalidMsg(msg || "Ce lien de réinitialisation est invalide ou a expiré. Redemandes-en un depuis l'écran de connexion.")
         setPhase('invalid')
       }
     }
@@ -120,7 +120,7 @@ export default function ResetPassword() {
 
         {phase === 'verifying' && (
           <>
-            <p style={styles.sub}>Vérification de votre lien de réinitialisation…</p>
+            <p style={styles.sub}>Vérification de ton lien de réinitialisation…</p>
             <div style={styles.spin}/>
           </>
         )}
@@ -137,14 +137,14 @@ export default function ResetPassword() {
 
         {phase === 'done' && (
           <>
-            <p style={styles.sub}>Choisissez un nouveau mot de passe pour votre compte Zenbat.</p>
+            <p style={styles.sub}>Choisis un nouveau mot de passe pour ton compte Zenbat.</p>
             <div style={styles.ok}>Mot de passe mis à jour ✓ Redirection…</div>
           </>
         )}
 
         {phase === 'ready' && (
           <>
-            <p style={styles.sub}>Choisissez un nouveau mot de passe pour votre compte Zenbat.</p>
+            <p style={styles.sub}>Choisis un nouveau mot de passe pour ton compte Zenbat.</p>
             <form onSubmit={onSubmit}>
               <label style={styles.label}>Nouveau mot de passe</label>
               <input type="password" required value={password} onChange={e=>setPassword(e.target.value)} style={styles.input} autoComplete="new-password" />

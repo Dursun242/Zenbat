@@ -687,8 +687,9 @@ function AutoTextarea({ value, onChange, readOnly, ...rest }) {
     <textarea ref={ref} rows={1} value={value} readOnly={readOnly}
       onChange={e => !readOnly && onChange(e.target.value)}
       onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } }}
+      className="zb-focus-ring"
       style={{ display: "block", width: "100%", margin: "14px 0 0", padding: "4px 0", border: "none", resize: "none", overflow: "hidden",
-        background: "none", fontFamily: "inherit", fontSize: 21, fontWeight: 700, lineHeight: 1.25, color: ZB.ink, outline: "none" }}
+        background: "none", fontFamily: "inherit", fontSize: 21, fontWeight: 700, lineHeight: 1.25, color: ZB.ink }}
       {...rest}/>
   );
 

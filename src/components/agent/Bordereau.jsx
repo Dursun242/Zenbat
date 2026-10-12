@@ -109,9 +109,9 @@ export default function Bordereau({
       <label htmlFor="zb-objet" className="zb-sr">Objet du devis</label>
       <textarea id="zb-objet" ref={objetRef} rows={1} value={objet} onChange={e => onObjetChange(e.target.value)}
         onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } }}
-        placeholder={empty ? "Objet du devis" : "Ajoute un objet"}
+        placeholder={empty ? "Objet du devis" : "Ajoute un objet"} className="zb-focus-ring"
         style={{ display: "block", width: "100%", margin: "16px 0 0", padding: "4px 0", border: "none", resize: "none", overflow: "hidden",
-          background: "none", fontFamily: "inherit", fontSize: 21, fontWeight: 700, lineHeight: 1.25, color: ZB.ink, outline: "none" }}/>
+          background: "none", fontFamily: "inherit", fontSize: 21, fontWeight: 700, lineHeight: 1.25, color: ZB.ink }}/>
       {!empty && (
         <div style={{ fontSize: 13, color: ZB.ink2, marginTop: 4, ...NUM }}>
           {shownCount} ligne{shownCount > 1 ? "s" : ""}{shownHt > 0 ? ` · ${fmt(shownHt)} HT` : ""}

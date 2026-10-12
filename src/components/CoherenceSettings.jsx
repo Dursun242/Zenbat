@@ -3,6 +3,7 @@ import { getAllTypologies } from "../lib/coherence/engine.js";
 import { loadUserCoherenceSettings, saveUserCoherenceSettings, DEFAULT_SETTINGS } from "../lib/coherence/userOverrides.js";
 import { ZB, NUM } from "../lib/theme.js";
 import { btnPrimary, btnSecondary } from "./ui/Register.jsx";
+import { useModalGuard } from "../hooks/useModalGuard.js";
 
 const CloseIcon = <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>;
 const CheckIcon = <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>;
@@ -15,6 +16,9 @@ export default function CoherenceSettings({ onClose, onSave }) {
   const [saving,    setSaving]    = useState(false);
   const [saved,     setSaved]     = useState(false);
   const allTypologies = getAllTypologies();
+
+  // Échap, retour du téléphone : ferment comme le bouton ✕.
+  useModalGuard(true, onClose);
 
   useEffect(() => {
     loadUserCoherenceSettings().then(s => setSettings(s));

@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useModalGuard } from "../../hooks/useModalGuard.js";
 import { ZB, NUM } from "../../lib/theme.js";
 import { btnPrimary, btnSecondary } from "../ui/Register.jsx";
@@ -15,12 +14,8 @@ const CSS = `
 // `fontFamily` et `ac` sont conservés pour la compatibilité des appels : la
 // modale suit le système « Bordereau » (ZB), pas la couleur de l'artisan.
 export default function CelebrateModal({ seconds, fontFamily, ac, onClose, onSave }) {
+  // Échap géré par useModalGuard (seule la fenêtre la plus haute réagit).
   useModalGuard(true, onClose);
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
 
   return (
     <div onClick={onClose}

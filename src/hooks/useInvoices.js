@@ -56,7 +56,7 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
         // Avant : échec 100 % silencieux → l'utilisateur voyait une liste
         // vide et croyait n'avoir aucune facture. On le prévient (listInvoices
         // a déjà retenté 3× via withRetry — si on arrive ici c'est durable).
-        showErr("Factures momentanément indisponibles — vérifiez votre connexion");
+        showErr("Factures momentanément indisponibles — vérifie ta connexion");
       });
     return () => { cancelled = true; };
   }, [user?.id]);
@@ -146,7 +146,7 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
     } catch (err) {
       console.error("[create invoice from devis]", err);
       logError("create invoice from devis failed", err?.stack, { area: "invoice-create-from-devis", devis_id: devisId, code: err?.code, msg: err?.message });
-      showErr(err.message?.includes("does not exist") ? "Migration 0005 non appliquée côté Supabase" : "Impossible de créer la facture");
+      showErr("Impossible de créer la facture. Réessaie dans un instant.");
     }
   };
 
@@ -165,12 +165,12 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
       goInvoice(saved.id);
     } catch (err) {
       console.error("[create empty invoice]", err);
-      showErr(err.message?.includes("does not exist") ? "Migration 0005 non appliquée côté Supabase" : "Impossible de créer la facture");
+      showErr("Impossible de créer la facture. Réessaie dans un instant.");
     }
   };
 
   const onCreateAcompte = async (devisId, montantHT) => {
-    if (!user) { showErr("Vous devez être connecté."); return; }
+    if (!user) { showErr("Tu dois être connecté."); return; }
     try {
       const found = devis.find(d => d.id === devisId);
       if (!found) throw new Error("Devis introuvable");
@@ -186,7 +186,7 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
   };
 
   const onCreateSolde = async (devisId, acompteInvoices) => {
-    if (!user) { showErr("Vous devez être connecté."); return; }
+    if (!user) { showErr("Tu dois être connecté."); return; }
     try {
       const found = devis.find(d => d.id === devisId);
       if (!found) throw new Error("Devis introuvable");
@@ -202,7 +202,7 @@ export function useInvoices(user, devis, brand, { markSaving, markSaved, setSave
   };
 
   const onCreateAvoir = async (invoiceId) => {
-    if (!user) { showErr("Vous devez être connecté."); return; }
+    if (!user) { showErr("Tu dois être connecté."); return; }
     try {
       const newId = await apiCreateAvoir(invoiceId);
       const fresh = await listInvoices();

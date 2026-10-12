@@ -46,7 +46,7 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
         if (cancelled) return;
         // Verrou volé même après retry → bénin, ne pas alarmer l'utilisateur.
         if (isLockAbort(err)) { console.warn("[load devis] lock volé, ignoré", err); return; }
-        console.error("[load devis]", err); showErr("Erreur de chargement — vérifiez votre connexion");
+        console.error("[load devis]", err); showErr("Erreur de chargement — vérifie ta connexion");
         logError("load devis failed", err?.stack, { area: "devis-load", code: err?.code, msg: err?.message });
       });
     return () => { cancelled = true; };
@@ -214,7 +214,7 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
       .catch(err => {
         setLoadingDevis(prev => { const n = new Set(prev); n.delete(id); return n; });
         console.error("[goDevis reload]", err);
-        showErr("Impossible de charger le devis — vérifiez votre connexion");
+        showErr("Impossible de charger le devis — vérifie ta connexion");
       });
   };
 
@@ -240,7 +240,7 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
   };
 
   const onCreateIndice = async (sourceId) => {
-    if (!user) { showErr("Vous devez être connecté."); return; }
+    if (!user) { showErr("Tu dois être connecté."); return; }
     const wkCount = Math.max(weekCount, stickyDevisThisWeek, countDevisThisWeek(devis));
     if (!isAdmin && effectivePlan === "free" && wkCount >= FREEMIUM_WEEKLY_DEVIS_LIMIT) {
       onQuotaReached();

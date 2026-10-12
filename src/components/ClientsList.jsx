@@ -116,7 +116,7 @@ Règles :
         <input value={query} onChange={e => setQuery(e.target.value)} type="search"
           placeholder="Nom, société, ville, email…"
           style={{ width: "100%", boxSizing: "border-box", minHeight: 48, padding: "0 14px 0 42px", background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 10,
-            fontFamily: "inherit", fontSize: 16, color: ZB.ink, outline: "none" }}/>
+            fontFamily: "inherit", fontSize: 16, color: ZB.ink }}/>
       </label>
 
       <Sheet>

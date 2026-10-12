@@ -100,27 +100,27 @@ export function useSpeechRecognition({ input, setInput }) {
       case "not-allowed":
         if (isIOS()) {
           return isStandalone()
-            ? "Micro bloqué. Ouvrez Réglages iOS → Zenbat → Microphone et autorisez-le, puis rouvrez l'app."
-            : "Micro bloqué. Touchez « aA » à gauche de la barre d'adresse → Réglages du site web → Microphone → Autoriser (ou Réglages iOS → Safari → Microphone)."
+            ? "Micro bloqué. Ouvre Réglages iOS → Zenbat → Microphone et autorise-le, puis rouvre l'app."
+            : "Micro bloqué. Touche « aA » à gauche de la barre d'adresse → Réglages du site web → Microphone → Autoriser (ou Réglages iOS → Safari → Microphone)."
         }
-        return "Microphone bloqué. Autorisez-le via l'icône à gauche de la barre d'adresse."
+        return "Microphone bloqué. Autorise-le via l'icône à gauche de la barre d'adresse."
       case "service-not-allowed":
         return typeof window !== "undefined" && !window.isSecureContext
           ? "La dictée vocale exige une connexion sécurisée (HTTPS)."
           : "Reconnaissance vocale indisponible sur ce navigateur ou ce réseau."
       case "audio-capture":
-        return "Micro indisponible : il est peut-être utilisé par une autre application ou un appel. Fermez-la, puis réessayez."
+        return "Micro indisponible : il est peut-être utilisé par une autre application ou un appel. Ferme-la, puis réessaie."
       case "network":
         return isEdgeDesktop()
-          ? "Le service vocal de Edge est instable sur ordinateur. Essayez Chrome (la dictée y est nettement plus fiable)."
-          : "Service de reconnaissance vocale injoignable. Vérifiez votre connexion ou essayez un autre navigateur."
+          ? "Le service vocal de Edge est instable sur ordinateur. Essaie Chrome (la dictée y est nettement plus fiable)."
+          : "Service de reconnaissance vocale injoignable. Vérifie ta connexion ou essaie un autre navigateur."
       case "language-not-supported":
-        return "Langue non supportée par votre navigateur. Essayez Français."
+        return "Langue non prise en charge par ton navigateur. Essaie le français."
       case "no-speech":
       case "aborted":
         return null
       default:
-        return "Problème de reconnaissance vocale. Réessayez."
+        return "Problème de reconnaissance vocale. Réessaie."
     }
   }
 
@@ -244,7 +244,7 @@ export function useSpeechRecognition({ input, setInput }) {
 
   const startListening = async () => {
     if (!SRClass) {
-      setError("Reconnaissance vocale indisponible. Essayez Chrome, Edge, ou Safari récent (≥ 14.1).")
+      setError("Reconnaissance vocale indisponible. Essaie Chrome, Edge ou un Safari récent (≥ 14.1).")
       return
     }
     if (typeof window !== "undefined" && !window.isSecureContext) {

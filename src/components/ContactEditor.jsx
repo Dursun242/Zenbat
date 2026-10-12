@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { searchEntreprises } from "../lib/insee";
 import { ZB } from "../lib/theme.js";
+import { useModalGuard } from "../hooks/useModalGuard.js";
 
 const labelStyle = { display: "block", fontSize: 13, fontWeight: 600, color: ZB.ink2, marginBottom: 6 };
 const inputStyle = { width: "100%", minHeight: 44, background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 8, padding: "10px 12px", fontSize: 16, color: ZB.ink, outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
@@ -40,6 +41,12 @@ export default function ContactEditor({ c, onSave, onClose }) {
     try { await onSave(form); } finally { setSaving(false); }
   };
   const abortRef = useRef(null);
+
+  // Échap, retour du téléphone : ferment comme le bouton ✕. Échap referme
+  // d'abord la liste de suggestions INSEE si elle est ouverte.
+  useModalGuard(true, onClose, {
+    onEscape: () => { if (inseeOpen && inseeResults.length > 0) setInseeOpen(false); else onClose?.(); },
+  });
 
   useEffect(() => {
     if (form.type === "particulier") return;

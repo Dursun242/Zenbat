@@ -44,7 +44,7 @@ export default class ErrorBoundary extends Component {
               Mise à jour de l'application…
             </h2>
             <p style={{ fontSize: 13, color: '#6B6358', maxWidth: 320 }}>
-              Une nouvelle version est disponible. Patientez quelques secondes.
+              Une nouvelle version est disponible. Encore quelques secondes.
             </p>
           </div>
         )
@@ -56,7 +56,8 @@ export default class ErrorBoundary extends Component {
             Une erreur inattendue s'est produite
           </h2>
           <p style={{ fontSize: 14, color: '#6B6358', marginBottom: 28, maxWidth: 380 }}>
-            L'application a rencontré un problème. Vos données sont en sécurité.
+            {/* Tournure neutre : cet écran couvre aussi la page publique du client et le site vitrine (vouvoiement). */}
+            L'application a rencontré un problème. Les données enregistrées sont en sécurité.
           </p>
           <button
             onClick={() => { this.setState({ error: null, isChunkErr: false }); window.location.reload(); }}

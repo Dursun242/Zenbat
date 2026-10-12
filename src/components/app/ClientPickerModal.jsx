@@ -21,13 +21,9 @@ export default function ClientPickerModal({ clients = [], current, onSelect, onC
   const debouncedQ = useDebouncedValue(q, 180);
   const inputRef  = useRef(null);
 
+  // Échap géré par useModalGuard (seule la fenêtre la plus haute réagit).
   useModalGuard(true, onClose);
   useEffect(() => { inputRef.current?.focus(); }, []);
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
 
   // Filtre memoizé sur la valeur debounced : la liste ne se recalcule pas
   // à chaque frappe (visible côté UX comme un lag sur les comptes ayant
