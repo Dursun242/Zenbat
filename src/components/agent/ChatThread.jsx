@@ -36,7 +36,7 @@ function ReasonPicker({ idx, fb, setFeedback, saveFeedback }) {
           return (
             <button key={tag} type="button" aria-pressed={on}
               onClick={() => setFeedback(prev => ({ ...prev, [idx]: { ...prev[idx], reason: on ? "" : tag } }))}
-              style={{ minHeight: 40, padding: "0 12px", borderRadius: 20, border: `1px solid ${on ? C.accent : C.rule}`,
+              style={{ minHeight: 44, padding: "0 12px", borderRadius: 22, border: `1px solid ${on ? C.accent : C.rule}`,
                 background: on ? C.accentSoft : C.sheet, color: on ? C.accent : C.ink, fontFamily: "inherit", fontSize: 14,
                 fontWeight: on ? 700 : 500, cursor: "pointer" }}>
               {tag}
@@ -75,11 +75,11 @@ export default function ChatThread({ msgs, feedback, setFeedback, saveFeedback, 
               ) : (
                 <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                   <button type="button" onClick={() => { setFeedback(prev => ({ ...prev, [i]: { vote: 1 } })); saveFeedback(i, 1); }}
-                    style={{ minHeight: 40, padding: "0 12px", borderRadius: 8, border: `1px solid ${C.rule}`, background: C.sheet, color: C.ink, fontFamily: "inherit", fontSize: 14, cursor: "pointer" }}>
+                    style={{ minHeight: 44, padding: "0 12px", borderRadius: 8, border: `1px solid ${C.rule}`, background: C.sheet, color: C.ink, fontFamily: "inherit", fontSize: 14, cursor: "pointer" }}>
                     Utile
                   </button>
                   <button type="button" onClick={() => setFeedback(prev => ({ ...prev, [i]: { vote: -1, showReason: true } }))}
-                    style={{ minHeight: 40, padding: "0 12px", borderRadius: 8, border: `1px solid ${C.rule}`, background: C.sheet, color: C.ink, fontFamily: "inherit", fontSize: 14, cursor: "pointer" }}>
+                    style={{ minHeight: 44, padding: "0 12px", borderRadius: 8, border: `1px solid ${C.rule}`, background: C.sheet, color: C.ink, fontFamily: "inherit", fontSize: 14, cursor: "pointer" }}>
                     À améliorer
                   </button>
                 </div>

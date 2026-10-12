@@ -3,7 +3,7 @@
 // (confirmé : la facture devient immuable), Envoyer au client, Marquer comme
 // payée — dans une barre collée en bas.
 import { useEffect, useRef, useState } from "react";
-import { fmt, uid } from "../lib/utils.js";
+import { fmt, uid, downloadBlob } from "../lib/utils.js";
 import { computeTotals, invoiceAmounts } from "../lib/invoiceCalc.js";
 import { ZB, NUM } from "../lib/theme.js";
 import { I } from "./ui/icons.jsx";
@@ -119,10 +119,7 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
       }
 
       // 2. PDF Factur-X de la facture émise (numéro et date définitifs).
-      const [{ renderDataToPdf }, { downloadBlob }] = await Promise.all([
-        import("../lib/pdf.js"),
-        import("../lib/facturx.js"),
-      ]);
+      const { renderDataToPdf } = await import("../lib/pdf.js");
       const { base64 } = await renderDataToPdf({ ...current, lignes, montant_ht: ht, tva_rate: 20 }, client, brand, "facture", { filename: `${current.numero}.pdf` });
 
       // Appelle le serveur pour l'assemblage PDF/A-3 (OutputIntent, XMP, XML embed)
@@ -193,10 +190,7 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
     if (proformaBusy || !lignes.length) return;
     setProformaBusy(true);
     try {
-      const [{ renderDataToPdf }, { downloadBlob }] = await Promise.all([
-        import("../lib/pdf.js"),
-        import("../lib/facturx.js"),
-      ]);
+      const { renderDataToPdf } = await import("../lib/pdf.js");
       const safe = String(invoice.numero || "facture").replace(/[^a-zA-Z0-9._-]/g, "_");
       const name = `Pro-forma-${safe}.pdf`;
       const { blob } = await renderDataToPdf(asDevisShape, client, brand, "proforma", { filename: name });
@@ -363,6 +357,21 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
         </div>
       </div>
     );
+  } else if (confirm === "payee") {
+    actionBar = (
+      <div role="group" aria-label="Confirmer le paiement" style={{ display: "grid", gap: 10 }}>
+        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.45 }}>
+          Noter <strong>{invoice.numero}</strong> (<span style={NUM}>{fmt(ttc)}</span> TTC) comme payée{clientName ? <> par <strong>{clientName}</strong></> : null} ? Tu pourras la remettre en attente.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 8 }}>
+          <button type="button" style={btnSecondary} onClick={() => setConfirm(null)}>Annuler</button>
+          <button type="button" style={{ ...btnPrimary, opacity: statusUpdating ? 0.7 : 1 }} disabled={statusUpdating}
+            onClick={async () => { await changeStatus("payee"); setConfirm(null); }}>
+            {statusUpdating ? "Mise à jour…" : "Oui, elle est payée"}
+          </button>
+        </div>
+      </div>
+    );
   } else if (confirm === "avoir") {
     actionBar = (
       <div role="group" aria-label="Confirmer l'avoir" style={{ display: "grid", gap: 10 }}>
@@ -419,7 +428,7 @@ export default function InvoiceDetail({ invoice, client, clients = [], brand, in
         <div style={{ display: "grid", gap: 10 }}>
           {sentLine && <p style={{ margin: 0, fontSize: 14, color: ZB.ink2 }}>{sentLine}</p>}
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <button type="button" className="zb-primary" style={{ ...btnPrimary, flex: 1, opacity: statusUpdating ? 0.7 : 1 }} disabled={statusUpdating} onClick={() => changeStatus("payee")}>
+            <button type="button" className="zb-primary" style={{ ...btnPrimary, flex: 1, opacity: statusUpdating ? 0.7 : 1 }} disabled={statusUpdating} onClick={() => setConfirm("payee")}>
               {statusUpdating ? "Mise à jour…" : "Marquer comme payée"}
             </button>
             <button type="button" style={{ minHeight: 44, padding: "0 4px", background: "none", border: "none", color: ZB.accent, fontFamily: "inherit", fontSize: 15, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}

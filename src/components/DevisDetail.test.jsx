@@ -57,4 +57,20 @@ describe("Fiche devis", () => {
     fireEvent.click(screen.getByRole("button", { name: "Oui, il est refusé" }));
     expect(onChange.mock.calls.at(-1)[0].statut).toBe("refuse");
   });
+
+  it("brouillon : « Marquer comme envoyé » et « à signer » demandent confirmation", () => {
+    const onChange = renderDevis("brouillon");
+    fireEvent.click(screen.getByRole("button", { name: "Plus d'actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Marquer comme envoyé/ }));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("group", { name: "Confirmer le statut" })).toHaveTextContent(/DEV-2026-014.*Claire Durand.*Aucun email/);
+    fireEvent.click(screen.getByRole("button", { name: "Annuler" }));
+    expect(onChange).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Plus d'actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Marquer comme à signer" }));
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Oui, à signer" }));
+    expect(onChange.mock.calls.at(-1)[0].statut).toBe("en_signature");
+  });
 });

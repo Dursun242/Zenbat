@@ -52,14 +52,14 @@ function Note({ note, loading, onOpenHistory, feedback, onVote }) {
         {note.hasDevis && !feedback?.saved && !feedback?.showReason && (
           <>
             <button type="button" onClick={() => onVote(1)} aria-label="Réponse utile"
-              style={{ width: 40, height: 40, display: "grid", placeItems: "center", background: "none", border: "none", color: ZB.ink2, cursor: "pointer" }}>{ThumbUp}</button>
+              style={{ width: 44, height: 44, display: "grid", placeItems: "center", background: "none", border: "none", color: ZB.ink2, cursor: "pointer" }}>{ThumbUp}</button>
             <button type="button" onClick={() => onVote(-1)} aria-label="Réponse à améliorer"
-              style={{ width: 40, height: 40, display: "grid", placeItems: "center", background: "none", border: "none", color: ZB.ink2, cursor: "pointer" }}>{ThumbDown}</button>
+              style={{ width: 44, height: 44, display: "grid", placeItems: "center", background: "none", border: "none", color: ZB.ink2, cursor: "pointer" }}>{ThumbDown}</button>
           </>
         )}
         {feedback?.saved && <span style={{ fontSize: 13, color: ZB.stamp, padding: "0 6px" }}>Merci</span>}
         <button type="button" onClick={onOpenHistory}
-          style={{ minHeight: 40, padding: "0 6px", background: "none", border: "none", color: ZB.accent, fontFamily: "inherit", fontSize: 14, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+          style={{ minHeight: 44, padding: "0 6px", background: "none", border: "none", color: ZB.accent, fontFamily: "inherit", fontSize: 14, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
           Historique
         </button>
       </div>
@@ -106,7 +106,7 @@ const DictationBar = forwardRef(function DictationBar({
             {currentLang.code.slice(0, 2).toUpperCase()}
           </button>
 
-          <div className="zb-dict-field" style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "flex-end", gap: 6, minHeight: 48, padding: "4px 4px 4px 12px",
+          <div className="zb-dict-field" style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "flex-end", gap: 6, minHeight: 48, padding: "1px 1px 1px 12px",
             borderRadius: 10, border: `1px solid ${micActive ? ZB.danger : ZB.rule}`, background: ZB.sheet, boxSizing: "border-box" }}>
             <label htmlFor="zb-dictation" className="zb-sr">Décris tes travaux</label>
             <textarea id="zb-dictation" ref={inputRef} value={input} rows={1}
@@ -116,9 +116,11 @@ const DictationBar = forwardRef(function DictationBar({
               style={{ flex: 1, minWidth: 0, width: "100%", alignSelf: "center", padding: "8px 0", border: "none", outline: "none", resize: "none", background: "none",
                 fontFamily: "inherit", fontSize: 16, lineHeight: 1.4, color: ZB.ink, maxHeight: 120, overflowY: "auto" }}/>
             {canSend && (
+              // Cible de 44 px (le champ fait 48 px) ; le carré encre visible reste à 40 px.
               <button type="button" onClick={onSend} aria-label="Envoyer"
-                style={{ width: 40, height: 40, flexShrink: 0, display: "grid", placeItems: "center", borderRadius: 8, border: "none",
-                  background: ZB.ink, color: ZB.paper, cursor: "pointer" }}>{SendIcon}</button>
+                style={{ width: 44, height: 44, flexShrink: 0, display: "grid", placeItems: "center", padding: 0, border: "none", background: "none", cursor: "pointer" }}>
+                <span style={{ width: 40, height: 40, display: "grid", placeItems: "center", borderRadius: 8, background: ZB.ink, color: ZB.paper }}>{SendIcon}</span>
+              </button>
             )}
           </div>
 

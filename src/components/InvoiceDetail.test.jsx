@@ -5,7 +5,7 @@ vi.mock("./PDFViewer.jsx", () => ({ default: () => null }));
 vi.mock("../lib/getToken.js", () => ({ getToken: async () => "t" }));
 const renderDataToPdf = vi.fn(async () => ({ base64: "JVBERi0=" }));
 vi.mock("../lib/pdf.js", () => ({ renderDataToPdf: (...a) => renderDataToPdf(...a) }));
-vi.mock("../lib/facturx.js", () => ({ downloadBlob: vi.fn() }));
+vi.mock("../lib/utils.js", async (importOriginal) => ({ ...(await importOriginal()), downloadBlob: vi.fn() }));
 
 import InvoiceDetail from "./InvoiceDetail.jsx";
 
@@ -69,5 +69,28 @@ describe("Fiche facture", () => {
     expect(screen.getByRole("button", { name: "Marquer comme payée" })).toBeInTheDocument();
     expect(screen.getByText("Envoyée")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Modifier :/ })).toBeNull();
+  });
+
+  it("« Marquer comme payée » demande une confirmation avant d'appeler le serveur", async () => {
+    const onChange = vi.fn();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => (
+      { ok: true, status: 200, json: async () => ({ statut: "payee" }) }));
+    renderInvoice({ statut: "envoyee", locked: true, sent_to_client_at: "2026-10-11T10:00:00Z" }, { onChange });
+    fireEvent.click(screen.getByRole("button", { name: "Marquer comme payée" }));
+    const group = screen.getByRole("group", { name: "Confirmer le paiement" });
+    expect(group).toHaveTextContent(/FAC-2026-009/);
+    expect(group).toHaveTextContent(/Claire Durand/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    // Annuler : rien ne part, l'action revient.
+    fireEvent.click(screen.getByRole("button", { name: "Annuler" }));
+    expect(screen.getByRole("button", { name: "Marquer comme payée" })).toBeInTheDocument();
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Marquer comme payée" }));
+    fireEvent.click(screen.getByRole("button", { name: "Oui, elle est payée" }));
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+    expect(JSON.parse(fetchSpy.mock.calls[0][1].body)).toMatchObject({ action: "set_status", statut: "payee" });
+    fetchSpy.mockRestore();
   });
 });

@@ -3,7 +3,7 @@
 // dans la marge, appui sur une ligne pour la modifier, une seule action
 // principale selon le statut, dans une barre collée en bas (au pouce).
 import { useState, useEffect, useRef } from "react";
-import { fmt, uid } from "../lib/utils.js";
+import { fmt, uid, downloadBlob } from "../lib/utils.js";
 import { computeTotals, isNoTva, splitByRate, ventilatedLines } from "../lib/invoiceCalc.js";
 import { ZB, NUM } from "../lib/theme.js";
 import { I } from "./ui/icons.jsx";
@@ -220,10 +220,7 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
     if (proformaBusy || !lignes.length) return;
     setProformaBusy(true);
     try {
-      const [{ renderDataToPdf }, { downloadBlob }] = await Promise.all([
-        import("../lib/pdf.js"),
-        import("../lib/facturx.js"),
-      ]);
+      const { renderDataToPdf } = await import("../lib/pdf.js");
       const safe = String(d.numero || "devis").replace(/[^a-zA-Z0-9._-]/g, "_");
       const name = `Pro-forma-${safe}.pdf`;
       const { blob } = await renderDataToPdf(d, cl, brand, "proforma", { filename: name });
@@ -262,6 +259,8 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
     onChange({ ...d, statut: "accepte", signed_at: new Date().toISOString(), signed_by: clientName(cl) || "" });
   };
   const markRefused = () => { setStatutBusy(true); setConfirmStatus(null); onChange({ ...d, statut: "refuse" }); };
+  // Statuts posés à la main sans email (envoyé hors Zenbat, à signer).
+  const markStatus = statut => { setStatutBusy(true); setConfirmStatus(null); onChange({ ...d, statut }); };
 
   // ── Zone d'action : une seule action principale selon le statut ─────────
   const email = cl?.email;
@@ -356,7 +355,24 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
     );
   }
 
-  if (confirmStatus) {
+  if (confirmStatus === "envoye" || confirmStatus === "en_signature") {
+    const sent = confirmStatus === "envoye";
+    actionBar = (
+      <div role="group" aria-label="Confirmer le statut" style={{ display: "grid", gap: 10 }}>
+        <p style={{ margin: 0, fontSize: 15, color: ZB.ink, lineHeight: 1.45 }}>
+          {sent
+            ? <>Marquer le devis <strong>{d.numero}</strong> (<span style={NUM}>{fmt(totals.ttc)}</span> TTC) comme envoyé{cl ? <> à <strong>{clientName(cl)}</strong></> : null} ? Aucun email ne part de Zenbat.</>
+            : <>Passer le devis <strong>{d.numero}</strong> (<span style={NUM}>{fmt(totals.ttc)}</span> TTC) en « À signer »{cl ? <> pour <strong>{clientName(cl)}</strong></> : null} ? Aucun email ne part de Zenbat.</>}
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 8 }}>
+          <button type="button" style={btnSecondary} onClick={() => setConfirmStatus(null)}>Annuler</button>
+          <button type="button" disabled={statutBusy} onClick={() => markStatus(confirmStatus)} style={btnPrimary}>
+            {sent ? "Oui, marquer envoyé" : "Oui, à signer"}
+          </button>
+        </div>
+      </div>
+    );
+  } else if (confirmStatus) {
     const signed = confirmStatus === "accepte";
     actionBar = (
       <div role="group" aria-label="Confirmer le statut" style={{ display: "grid", gap: 10 }}>
@@ -381,8 +397,8 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
     onDuplicate && { key: "dup", label: "Dupliquer le devis", onClick: () => runAction(() => onDuplicate()) },
     onCreateIndice && d.statut !== "accepte" && !isRemplace && d.statut !== "refuse" && { key: "ind", label: "Créer un nouvel indice", onClick: () => runAction(() => onCreateIndice()) },
     lignes.length > 0 && { key: "pro", label: proformaBusy ? "Pro forma en cours…" : "Télécharger une pro forma", onClick: handleProforma },
-    d.statut === "brouillon" && !isRemplace && { key: "sent", label: "Marquer comme envoyé (envoyé hors Zenbat)", onClick: () => onChange({ ...d, statut: "envoye" }) },
-    d.statut === "brouillon" && !isRemplace && { key: "sig", label: "Marquer comme à signer", onClick: () => onChange({ ...d, statut: "en_signature" }) },
+    d.statut === "brouillon" && !isRemplace && { key: "sent", label: "Marquer comme envoyé (envoyé hors Zenbat)", onClick: () => setConfirmStatus("envoye") },
+    d.statut === "brouillon" && !isRemplace && { key: "sig", label: "Marquer comme à signer", onClick: () => setConfirmStatus("en_signature") },
     canAcompte && { key: "aco", label: "Créer une facture d'acompte", onClick: () => setAcompteModal(true) },
     ["envoye", "en_signature"].includes(d.statut) && !isRemplace && { key: "ok", label: "Marquer comme signé (signé en direct)", onClick: () => setConfirmStatus("accepte") },
     ["envoye", "en_signature"].includes(d.statut) && !isRemplace && { key: "ko", label: "Marquer comme refusé", onClick: () => setConfirmStatus("refuse"), danger: true },

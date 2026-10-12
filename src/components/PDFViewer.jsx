@@ -3,6 +3,8 @@ import { fmt, fmtD } from "../lib/utils.js"
 import { computeTotals, isNoTva, lineRate, lineTotal } from "../lib/invoiceCalc.js"
 import { useModalGuard } from "../hooks/useModalGuard.js"
 import { paymentPenaltiesText } from "../lib/constants.js"
+import { ZB, NUM } from "../lib/theme.js"
+import { I } from "./ui/icons.jsx"
 
 // Délais pour stabiliser la mesure de hauteur après changement de scale ;
 // le 1er essai capture le 1er layout, le 2nd attrape les ajustements
@@ -12,7 +14,6 @@ const PAGE_READY_DELAY_MS   = 400
 
 const Ix = {
   pdf:  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><path d="M8 13h8M8 17h5"/></svg>,
-  x:    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
 }
 
 // Ouvre le PDF généré. Le <a download> cliqué programmatiquement affiche
@@ -50,6 +51,29 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
   const scale = hidden ? 1 : fitScale * userZoom
   const [pageH, setPageH] = useState(null)
   const [generatingPdf, setGeneratingPdf] = useState(false)
+  const [pdfError, setPdfError] = useState(null)
+  // Statut en attente de confirmation dans la barre ("envoye" | "en_signature").
+  const [pendingStatus, setPendingStatus] = useState(null)
+
+  // Génère le PDF puis l'ouvre. Après un déploiement, un ancien chunk peut
+  // manquer : on recharge la page plutôt que d'afficher une erreur.
+  const handleDownload = async () => {
+    if (generatingPdf) return
+    setGeneratingPdf(true); setPdfError(null)
+    try {
+      const { renderDataToPdf } = await import("../lib/pdf.js")
+      const filename = `${fileBase}.pdf`
+      const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename })
+      openPdfPreview(blob, filename)
+    } catch (e) {
+      console.error("[pdf preview]", e)
+      if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
+        window.location.reload()
+      } else {
+        setPdfError(`Impossible de générer le PDF : ${e?.message || e}. Réessaie.`)
+      }
+    } finally { setGeneratingPdf(false) }
+  }
 
   // Mode plein-écran uniquement : bouton retour navigateur / swipe back iOS
   // ferme la modale, scroll body bloqué tant qu'elle est ouverte.
@@ -377,50 +401,105 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
     </div>
   ) : null
 
+  // ── Barre d'outils (plein écran et aperçu intégré) ─────────────────────
+  // dark = barre encre de la fenêtre plein écran ; sinon barre papier de
+  // l'aperçu intégré. Une seule action terre cuite : ouvrir le PDF.
+  const canMarkSent = !!onMarkSent && d.statut === "brouillon"
+  const canMarkSign = !!onMarkSignature && ["brouillon","envoye"].includes(d.statut)
+
+  const confirmPending = () => {
+    const act = pendingStatus === "envoye" ? onMarkSent : onMarkSignature
+    setPendingStatus(null)
+    act?.()
+    onClose?.()
+  }
+
+  const iconBtn = (dark) => ({
+    width: 44, height: 44, display: "grid", placeItems: "center", flexShrink: 0, padding: 0,
+    background: "none", border: "none", borderRadius: 8, cursor: "pointer",
+    color: dark ? ZB.onInk : ZB.ink2, fontFamily: "inherit",
+  })
+
+  const statusButtons = (dark) => (
+    <>
+      {canMarkSent && (
+        <button type="button" onClick={() => setPendingStatus("envoye")} aria-label="Marquer comme envoyé" title="Marquer comme envoyé"
+          aria-pressed={pendingStatus === "envoye"} style={iconBtn(dark)}>
+          {I.send}
+        </button>
+      )}
+      {canMarkSign && (
+        <button type="button" onClick={() => setPendingStatus("en_signature")} aria-label="Marquer comme à signer" title="Marquer comme à signer"
+          aria-pressed={pendingStatus === "en_signature"} style={iconBtn(dark)}>
+          {I.sign}
+        </button>
+      )}
+    </>
+  )
+
+  const downloadButton = (labelled) => !noDownload && (
+    <button type="button" onClick={handleDownload} disabled={generatingPdf}
+      aria-label={labelled ? undefined : "Ouvrir le PDF"} title="Ouvrir le PDF"
+      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 44, minWidth: 44, flexShrink: 0,
+        padding: labelled ? "0 14px" : 0, background: ZB.accent, color: ZB.sheet, border: "none", borderRadius: 10,
+        fontFamily: "inherit", fontSize: 15, fontWeight: 600, cursor: generatingPdf ? "default" : "pointer", opacity: generatingPdf ? 0.7 : 1 }}>
+      {I.download}
+      {labelled && (generatingPdf ? "Préparation…" : "Ouvrir le PDF")}
+    </button>
+  )
+
+  // Confirmation dans la barre : un statut posé à la main engage (DESIGN.md).
+  const confirmRow = (dark) => pendingStatus && (
+    <div role="group" aria-label="Confirmer le statut"
+      style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingTop: 10, marginTop: 8,
+        borderTop: `1px solid ${dark ? "rgba(243,240,233,.18)" : ZB.rule}` }}>
+      <p style={{ flex: "1 1 200px", margin: 0, fontSize: 14, lineHeight: 1.4, color: dark ? ZB.onInk : ZB.ink }}>
+        {pendingStatus === "envoye"
+          ? <>Marquer <strong>{fileBase}</strong> comme envoyé ? Aucun email ne part de Zenbat.</>
+          : <>Passer <strong>{fileBase}</strong> en « À signer » ? Aucun email ne part de Zenbat.</>}
+      </p>
+      <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+        <button type="button" onClick={() => setPendingStatus(null)}
+          style={{ minHeight: 44, padding: "0 12px", background: "none", border: "none", color: dark ? ZB.onInk : ZB.ink2, fontFamily: "inherit", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+          Annuler
+        </button>
+        <button type="button" onClick={confirmPending}
+          style={{ minHeight: 44, padding: "0 14px", background: dark ? ZB.sheet : ZB.ink, color: dark ? ZB.ink : ZB.sheet, border: "none", borderRadius: 10, fontFamily: "inherit", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
+          {pendingStatus === "envoye" ? "Oui, marquer envoyé" : "Oui, à signer"}
+        </button>
+      </div>
+    </div>
+  )
+
+  // Erreur de génération : message dans l'écran (plus d'alert()).
+  const errorBand = pdfError && (
+    <div role="alert" style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 4px 4px 14px", background: ZB.dangerSoft, color: ZB.danger, fontFamily: ZB.font, fontSize: 14, lineHeight: 1.4, flexShrink: 0 }}>
+      <span style={{ flex: 1, minWidth: 0 }}>{pdfError}</span>
+      <button type="button" onClick={() => setPdfError(null)} aria-label="Masquer le message" style={{ ...iconBtn(false), color: ZB.danger }}>{I.close}</button>
+    </div>
+  )
+
   if (inline) {
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         {/* Toolbar inline */}
-        <div style={{ background: "#FBFAF7", borderBottom: "1px solid #D9D2C5", minHeight: 56, padding: "6px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, boxSizing: "border-box" }}>
-          <span style={{ color: "#5C544B", fontSize: 14, fontWeight: 600 }}>Aperçu · {fileBase}.pdf</span>
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            {onMarkSent && d.statut === "brouillon" && (
-              <button onClick={() => { onMarkSent(); onClose?.() }}
-                style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                ✉️ Marquer envoyé
-              </button>
-            )}
-            {onMarkSignature && ["brouillon","envoye"].includes(d.statut) && (
-              <button onClick={() => { onMarkSignature(); onClose?.() }}
-                style={{ background: "#faf5ff", color: "#6b21a8", border: "1px solid #e9d5ff", borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                🖊 Passer en signature
-              </button>
-            )}
-            {!noDownload && (
-              <button
-                onClick={async () => {
-                  setGeneratingPdf(true)
-                  try {
-                    const { renderDataToPdf } = await import("../lib/pdf.js")
-                    const filename = `${fileBase}.pdf`
-                    const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename })
-                    openPdfPreview(blob, filename)
-                  } catch (e) {
-                    if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
-                      window.location.reload()
-                    } else {
-                      alert("Impossible de générer le PDF : " + (e.message || e))
-                    }
-                  } finally { setGeneratingPdf(false) }
-                }}
-                disabled={generatingPdf}
-                style={{ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 44, background: "none", color: "#A4461F", border: "none", padding: "0 4px", fontFamily: "inherit", fontSize: 15, fontWeight: 600, cursor: generatingPdf ? "default" : "pointer" }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
-                {generatingPdf ? "Préparation…" : "Ouvrir le PDF"}
-              </button>
-            )}
+        <div style={{ background: ZB.paper, borderBottom: `1px solid ${ZB.rule}`, minHeight: 56, padding: "6px 14px", flexShrink: 0, boxSizing: "border-box", fontFamily: ZB.font }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minHeight: 44 }}>
+            <span style={{ color: ZB.ink2, fontSize: 14, fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Aperçu · {fileBase}.pdf</span>
+            <div style={{ display: "flex", gap: 4, alignItems: "center", flexShrink: 0 }}>
+              {statusButtons(false)}
+              {!noDownload && (
+                <button type="button" onClick={handleDownload} disabled={generatingPdf}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 44, background: "none", color: ZB.accent, border: "none", padding: "0 4px", fontFamily: "inherit", fontSize: 15, fontWeight: 600, cursor: generatingPdf ? "default" : "pointer" }}>
+                  {I.download}
+                  {generatingPdf ? "Préparation…" : "Ouvrir le PDF"}
+                </button>
+              )}
+            </div>
           </div>
+          {confirmRow(false)}
         </div>
+        {errorBand}
         {/* PDF scroll */}
         <div ref={wrapRef} style={{ background: "#dde1e7", padding: "20px 14px", overflowY: "auto", flex: 1, boxSizing: "border-box" }}>
           <div style={{ position: "relative", width: `calc(210mm * ${fitScale})`, height: pageH ? `${pageH}px` : "auto", margin: "0 auto" }}>
@@ -444,10 +523,19 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
     )
   }
 
+  const zoomBtn = { ...iconBtn(true), color: ZB.onInk }
+
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",zIndex:200,display:"flex",flexDirection:"column"}} className="fu pdf-modal">
+    <div role="dialog" aria-modal="true" aria-label={`Aperçu ${fileBase}.pdf`}
+      style={{position:"fixed",inset:0,background:"rgba(26,22,18,.85)",zIndex:200,display:"flex",flexDirection:"column",fontFamily:ZB.font}} className="fu pdf-modal">
       <style>{`
         @page { size: A4; margin: 0; }
+        @keyframes spin { to { transform: rotate(360deg) } }
+        @media (prefers-reduced-motion: reduce) { .pdf-spinner { animation-duration: 3s !important; } }
+        .pdf-tb-grid { display: grid; grid-template-columns: minmax(0,1fr) auto; grid-template-areas: "title close" "tools tools"; align-items: center; column-gap: 8px; }
+        @media (min-width: 640px) { .pdf-tb-grid { grid-template-columns: minmax(0,1fr) auto auto; grid-template-areas: "title tools close"; } }
+        .pdf-toolbar button:focus-visible { outline: 2px solid ${ZB.accent}; outline-offset: 2px; }
+        @media (hover: hover) { .pdf-toolbar .pdf-tool:hover { background: rgba(243,240,233,.1) !important; } }
         @media print {
           body > *:not(.pdf-modal) { display: none !important; }
           .pdf-modal { position: static !important; background: white !important; }
@@ -458,57 +546,28 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
         }
       `}</style>
 
-      <div className="pdf-toolbar" style={{background:"#1A1612",padding:"calc(12px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 12px calc(18px + env(safe-area-inset-left))",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{color:"#22c55e"}}>{Ix.pdf}</div>
-          <span style={{color:"white",fontSize:13,fontWeight:600}}>{fileBase}.pdf</span>
-        </div>
-        <div style={{display:"flex",gap:6,alignItems:"center"}}>
-          <div style={{display:"flex",background:"#2A231C",borderRadius:10,overflow:"hidden"}}>
-            <button onClick={()=>setUserZoom(z=>Math.max(0.5,+(z-0.25).toFixed(2)))} style={{background:"none",border:"none",color:"#9A8E82",width:30,height:30,fontSize:16,cursor:"pointer",padding:0}} aria-label="Dézoomer">−</button>
-            <button onClick={()=>setUserZoom(1)} style={{background:"none",border:"none",color:"#9A8E82",padding:"0 8px",fontSize:11,fontWeight:600,cursor:"pointer",minWidth:44}} aria-label="Réinitialiser zoom">{Math.round(scale*100)}%</button>
-            <button onClick={()=>setUserZoom(z=>Math.min(3,+(z+0.25).toFixed(2)))} style={{background:"none",border:"none",color:"#9A8E82",width:30,height:30,fontSize:16,cursor:"pointer",padding:0}} aria-label="Zoomer">+</button>
+      <div className="pdf-toolbar" style={{background:ZB.ink,padding:"calc(6px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) 6px calc(14px + env(safe-area-inset-left))",flexShrink:0}}>
+        {/* Téléphone : nom + Fermer sur la 1re ligne, outils dessous ; plus large : une seule ligne. */}
+        <div className="pdf-tb-grid">
+          <div style={{gridArea:"title",display:"flex",alignItems:"center",gap:8,minWidth:0,minHeight:44}}>
+            <span aria-hidden="true" style={{color:ZB.onInk2,display:"flex",flexShrink:0}}>{Ix.pdf}</span>
+            <span style={{color:ZB.onInk,fontSize:14,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fileBase}.pdf</span>
           </div>
-          {onMarkSent && d.statut === "brouillon" && (
-            <button onClick={() => { onMarkSent(); onClose?.() }}
-              style={{background:"#eff6ff",color:"#1d4ed8",border:"1px solid #bfdbfe",borderRadius:10,padding:"7px 10px",fontSize:12,fontWeight:700,cursor:"pointer"}}>
-              ✉️
-            </button>
-          )}
-          {onMarkSignature && ["brouillon","envoye"].includes(d.statut) && (
-            <button onClick={() => { onMarkSignature(); onClose?.() }}
-              style={{background:"#faf5ff",color:"#6b21a8",border:"1px solid #e9d5ff",borderRadius:10,padding:"7px 10px",fontSize:12,fontWeight:700,cursor:"pointer"}}
-              title="Passer en signature">
-              🖊
-            </button>
-          )}
-          {!noDownload && (
-            <button
-              onClick={async () => {
-                setGeneratingPdf(true)
-                try {
-                  const { renderDataToPdf } = await import("../lib/pdf.js")
-                  const filename = `${fileBase}.pdf`
-                  const { blob } = await renderDataToPdf(d, cl, brand, kind, { filename })
-                  openPdfPreview(blob, filename)
-                } catch (e) {
-                  console.error("[pdf preview]", e)
-                  if (/is not a valid JavaScript MIME type|Failed to fetch dynamically imported module|Loading chunk .* failed|Importing a module script failed/i.test(String(e?.message || e))) {
-                    window.location.reload()
-                  } else {
-                    alert("Impossible de générer le PDF : " + (e.message || e))
-                  }
-                } finally { setGeneratingPdf(false) }
-              }}
-              disabled={generatingPdf}
-              title="Aperçu PDF"
-              style={{background:generatingPdf?"#9ca3af":"#22c55e",color:"white",border:"none",borderRadius:10,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:generatingPdf?"default":"pointer"}}>
-              {generatingPdf ? "⏳" : "⬇"}
-            </button>
-          )}
-          <button onClick={onClose} aria-label="Fermer" style={{background:"#2A231C",color:"#9A8E82",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer"}}>{Ix.x}</button>
+          <div style={{gridArea:"tools",display:"flex",gap:2,alignItems:"center",flexWrap:"wrap",justifyContent:"flex-end",minWidth:0}}>
+            <div role="group" aria-label="Zoom" style={{display:"flex",alignItems:"center"}}>
+              <button type="button" className="pdf-tool" onClick={()=>setUserZoom(z=>Math.max(0.5,+(z-0.25).toFixed(2)))} style={zoomBtn} aria-label="Dézoomer">{I.minus}</button>
+              <button type="button" className="pdf-tool" onClick={()=>setUserZoom(1)} aria-label={`Zoom ${Math.round(scale*100)} %, revenir à la taille de l'écran`}
+                style={{...zoomBtn,width:"auto",minWidth:52,padding:"0 4px",fontSize:13,fontWeight:600,...NUM}}>{Math.round(scale*100)}%</button>
+              <button type="button" className="pdf-tool" onClick={()=>setUserZoom(z=>Math.min(3,+(z+0.25).toFixed(2)))} style={zoomBtn} aria-label="Zoomer">{I.plus}</button>
+            </div>
+            {statusButtons(true)}
+            {downloadButton(false)}
+          </div>
+          <button type="button" className="pdf-tool" onClick={onClose} aria-label="Fermer" style={{...zoomBtn,gridArea:"close"}}>{I.close}</button>
         </div>
+        {confirmRow(true)}
       </div>
+      {errorBand}
 
       <div className="pdf-scroll" ref={wrapRef} style={{flex:1,overflow:"auto",padding:"16px 16px calc(20px + env(safe-area-inset-bottom))",background:"#2A231C"}}>
         <div className="pdf-page-wrap" style={{width:`calc(210mm * ${scale})`,height:pageH?`${pageH}px`:"auto",margin:"0 auto",position:"relative"}}>
@@ -519,13 +578,13 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
         </div>
       </div>
 
-      {/* Loader overlay pendant la génération du PDF */}
+      {/* Loader pendant la génération du PDF */}
       {generatingPdf && (
-        <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300}}>
-          <div style={{background:"white",borderRadius:12,padding:"24px 32px",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,.3)"}}>
-            <div style={{display:"inline-block",width:32,height:32,border:"3px solid #e5e7eb",borderTopColor:"#22c55e",borderRadius:"50%",animation:"spin 1s linear infinite",marginBottom:16}}/>
-            <p style={{fontSize:14,fontWeight:600,color:"#1A1612",margin:"12px 0 4px"}}>Génération du PDF en cours…</p>
-            <p style={{fontSize:12,color:"#6B6358"}}>Cela peut prendre quelques secondes</p>
+        <div role="status" style={{position:"absolute",inset:0,background:"rgba(26,22,18,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300}}>
+          <div style={{background:ZB.sheet,borderRadius:10,padding:"24px 32px",textAlign:"center",maxWidth:"calc(100vw - 32px)",boxSizing:"border-box"}}>
+            <div className="pdf-spinner" style={{display:"inline-block",width:32,height:32,border:`3px solid ${ZB.ruleSoft}`,borderTopColor:ZB.accent,borderRadius:"50%",animation:"spin 1s linear infinite",marginBottom:4}}/>
+            <p style={{fontSize:15,fontWeight:600,color:ZB.ink,margin:"12px 0 4px"}}>Génération du PDF en cours…</p>
+            <p style={{fontSize:13,color:ZB.ink2,margin:0}}>Cela peut prendre quelques secondes.</p>
           </div>
         </div>
       )}
