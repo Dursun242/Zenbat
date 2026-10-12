@@ -19,10 +19,14 @@ import { getToken } from "../lib/getToken.js";
 import { CLAUDE_MODEL } from "../lib/constants.js";
 import { SUPPORT_SYSTEM_PROMPT } from "../lib/supportPrompts.js";
 import { useModalGuard } from "../hooks/useModalGuard.js";
+import { ZB } from "../lib/theme.js";
+import { btnPrimary, btnSecondary } from "./ui/Register.jsx";
 
 const MAX_INPUT_CHARS = 2000;
 
-export default function SupportChat({ accent = "#22c55e", open, onClose }) {
+// La prop `accent` passée par App est ignorée : l'interface garde la terre
+// cuite du système « Bordereau » (ZB.accent).
+export default function SupportChat({ open, onClose }) {
   const { user } = useAuth();
   const [ticket,   setTicket]   = useState(null);
   const [messages, setMessages] = useState([]);
@@ -232,35 +236,44 @@ export default function SupportChat({ accent = "#22c55e", open, onClose }) {
 
   if (!user || !open) return null;
 
+  const canSend = !busy && !!input.trim();
+
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-label="Support Zenbat"
+      className="zb-support"
       style={{
         position: "fixed", inset: 0, zIndex: 60,
-        background: "rgba(0,0,0,.4)",
+        background: "rgba(26,22,18,.55)",
         display: "flex", alignItems: "flex-end", justifyContent: "center",
+        fontFamily: ZB.font, color: ZB.ink,
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
     >
+          <style>{`
+            .zb-support button:focus-visible, .zb-support textarea:focus-visible { outline: 2px solid ${ZB.accent}; outline-offset: 2px; }
+            .zb-support textarea:focus { border-color: ${ZB.accent} !important; }
+            .zb-support textarea::placeholder { color: ${ZB.ink3}; opacity: 1; }
+            @media (hover: hover) { .zb-support .zb-support-send:not(:disabled):hover { background: var(--zb-accent-hover) !important; } }
+          `}</style>
           <div
             style={{
-              width: "100%", maxWidth: 480, height: "85%", maxHeight: 720,
-              background: "#FAF7F2", borderRadius: "16px 16px 0 0",
+              width: "100%", maxWidth: 520, height: "85%", maxHeight: 720,
+              background: ZB.paper, borderRadius: "10px 10px 0 0",
               display: "flex", flexDirection: "column", overflow: "hidden",
-              boxShadow: "0 -8px 32px rgba(0,0,0,.18)",
             }}
           >
             {/* Header */}
             <div style={{
-              flexShrink: 0, padding: "14px 18px",
-              background: accent, color: "white",
-              display: "flex", alignItems: "center", justifyContent: "space-between",
+              flexShrink: 0, padding: "6px 6px 6px 18px",
+              borderBottom: `1px solid ${ZB.rule}`,
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
             }}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 16 }}>Support Zenbat</div>
-                <div style={{ fontSize: 11, opacity: .85, marginTop: 2 }}>
+              <div style={{ minWidth: 0 }}>
+                <h2 style={{ margin: 0, fontWeight: 700, fontSize: 19 }}>Support Zenbat</h2>
+                <div style={{ fontSize: 13, color: ZB.ink2, marginTop: 2 }}>
                   {ticket?.status === "awaiting_admin"
                     ? "En attente d'un humain — tu seras notifié"
                     : "Zenbot répond en première ligne"}
@@ -270,61 +283,59 @@ export default function SupportChat({ accent = "#22c55e", open, onClose }) {
                 onClick={() => onClose?.()}
                 aria-label="Fermer"
                 style={{
-                  background: "rgba(255,255,255,.18)", border: "none", color: "white",
-                  width: 32, height: 32, borderRadius: 8, cursor: "pointer",
-                  fontSize: 20, lineHeight: 1,
+                  background: "none", border: "none", color: ZB.ink2,
+                  width: 44, height: 44, display: "grid", placeItems: "center",
+                  cursor: "pointer", flexShrink: 0,
                 }}
-              >×</button>
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+              </button>
             </div>
 
             {/* Messages */}
-            <div ref={scrollRef} style={{
-              flex: 1, overflowY: "auto", padding: 14,
-              display: "flex", flexDirection: "column", gap: 10,
+            <div ref={scrollRef} aria-live="polite" style={{
+              flex: 1, overflowY: "auto", padding: 12,
+              display: "flex", flexDirection: "column", gap: 8,
             }}>
               {messages.length === 0 && !busy && (
-                <div style={{
-                  textAlign: "center", color: "#78716c", fontSize: 13,
-                  padding: "32px 16px", lineHeight: 1.5,
+                <p style={{
+                  margin: 0, textAlign: "center", color: ZB.ink2, fontSize: 15,
+                  padding: "32px 16px", lineHeight: 1.45,
                 }}>
-                  Bonjour 👋<br/>
+                  Bonjour.<br/>
                   Pose ta question — je réponds tout de suite. Si je ne sais pas,
                   tu pourras contacter un humain en bas du chat.
-                </div>
+                </p>
               )}
 
-              {messages.map((m) => <MessageBubble key={m.id} message={m} accent={accent}/>)}
+              {messages.map((m) => <MessageEntry key={m.id} message={m}/>)}
 
               {busy && (
                 <div style={{
-                  alignSelf: "flex-start", background: "white", color: "#78716c",
-                  padding: "8px 12px", borderRadius: 12, fontSize: 13, fontStyle: "italic",
-                  border: "1px solid #F0EBE3",
+                  padding: "10px 12px", fontSize: 14, color: ZB.ink2, fontStyle: "italic",
                 }}>
-                  …
+                  Réponse en cours…
                 </div>
               )}
             </div>
 
             {/* Erreur */}
             {error && (
-              <div style={{
-                padding: "8px 14px", background: "#fef2f2", color: "#991b1b",
-                fontSize: 12, borderTop: "1px solid #fecaca",
+              <div role="alert" style={{
+                padding: "10px 16px", background: ZB.dangerSoft, color: ZB.danger,
+                fontSize: 14, borderTop: `1px solid ${ZB.danger}`,
               }}>{error}</div>
             )}
 
             {/* Bouton escalade */}
             {ticket && ticket.status === "open" && messages.some(m => m.role === "user") && (
-              <div style={{ padding: "8px 14px", borderTop: "1px solid #F0EBE3", background: "white" }}>
+              <div style={{ padding: "8px 12px", borderTop: `1px solid ${ZB.rule}`, background: ZB.paper }}>
                 <button
                   onClick={escalate}
                   disabled={busy}
                   style={{
-                    width: "100%", padding: "8px 12px",
-                    background: "#fef3c7", color: "#92400e",
-                    border: "1px solid #fde68a", borderRadius: 8,
-                    fontSize: 12, fontWeight: 600, cursor: busy ? "default" : "pointer",
+                    ...btnSecondary, width: "100%", minHeight: 44, fontSize: 14,
+                    cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1,
                   }}
                 >
                   Pas résolu — contacter le support humain
@@ -334,8 +345,9 @@ export default function SupportChat({ accent = "#22c55e", open, onClose }) {
 
             {/* Input */}
             <div style={{
-              flexShrink: 0, padding: 12, background: "white",
-              borderTop: "1px solid #F0EBE3", display: "flex", gap: 8,
+              flexShrink: 0, padding: "10px 12px", paddingBottom: "max(10px, env(safe-area-inset-bottom))",
+              background: ZB.paper, borderTop: `1px solid ${ZB.rule}`,
+              display: "flex", alignItems: "flex-end", gap: 8,
             }}>
               <textarea
                 value={input}
@@ -349,24 +361,27 @@ export default function SupportChat({ accent = "#22c55e", open, onClose }) {
                 placeholder={ticket?.status === "awaiting_admin"
                   ? "Ajoute une précision pour l'admin…"
                   : "Pose ta question…"}
-                rows={2}
+                aria-label="Ton message"
+                rows={1}
                 maxLength={MAX_INPUT_CHARS}
                 style={{
-                  flex: 1, resize: "none", padding: "8px 10px",
-                  border: "1px solid #E7E2D8", borderRadius: 10,
-                  fontFamily: "inherit", fontSize: 14, outline: "none",
-                  background: "#FAF7F2",
+                  flex: 1, minWidth: 0, resize: "none", minHeight: 48, maxHeight: 120,
+                  padding: "12px 12px", lineHeight: 1.4,
+                  border: `1px solid ${ZB.rule}`, borderRadius: 8,
+                  fontFamily: "inherit", fontSize: 16, color: ZB.ink, outline: "none",
+                  background: ZB.sheet,
                 }}
               />
               <button
                 onClick={sendMessage}
                 disabled={busy || !input.trim()}
                 aria-label="Envoyer"
+                className="zb-support-send"
                 style={{
-                  background: input.trim() && !busy ? accent : "#d6d3d1",
-                  color: "white", border: "none", borderRadius: 10,
-                  padding: "0 16px", cursor: busy || !input.trim() ? "default" : "pointer",
-                  fontWeight: 600, fontSize: 13,
+                  ...btnPrimary, minHeight: 48, padding: "0 16px",
+                  background: canSend ? ZB.accent : ZB.rule,
+                  color: canSend ? ZB.sheet : ZB.ink2,
+                  cursor: canSend ? "pointer" : "default",
                 }}
               >
                 Envoyer
@@ -377,32 +392,30 @@ export default function SupportChat({ accent = "#22c55e", open, onClose }) {
   );
 }
 
-function MessageBubble({ message, accent }) {
+// Un message du fil, tracé comme une entrée de registre : libellé
+// « Toi » / « Zenbot » / « Support » puis le texte, sans bulle colorée.
+function MessageEntry({ message }) {
   const isUser   = message.role === "user";
   const isClaude = message.role === "claude";
 
-  const bg = isUser   ? accent
-           : isClaude ? "white"
-           :            "#fef3c7"; // admin
-  const color = isUser ? "white" : "#1c1917";
-  const border = !isUser ? "1px solid #F0EBE3" : "none";
-  const align = isUser ? "flex-end" : "flex-start";
-
-  const label = isUser ? null
+  const label = isUser ? "Toi"
               : isClaude ? "Zenbot"
-              : "Support Zenbat";
+              : "Support";
 
   return (
-    <div style={{ alignSelf: align, maxWidth: "82%" }}>
-      {label && (
-        <div style={{ fontSize: 10, color: "#78716c", marginBottom: 3, marginLeft: 4 }}>
-          {label}
-        </div>
-      )}
+    <div style={{
+      background: isUser ? ZB.paper2 : ZB.sheet,
+      borderStyle: "solid",
+      borderColor: isUser ? ZB.paper2 : ZB.rule,
+      borderWidth: !isUser && !isClaude ? "1px 1px 1px 3px" : 1,
+      borderLeftColor: !isUser && !isClaude ? ZB.ink : (isUser ? ZB.paper2 : ZB.rule),
+      borderRadius: 8, padding: "10px 12px",
+    }}>
+      <div style={{ fontSize: 13, fontWeight: isUser || isClaude ? 600 : 700, color: isUser || isClaude ? ZB.ink2 : ZB.ink, marginBottom: 4 }}>
+        {label}
+      </div>
       <div style={{
-        background: bg, color, border,
-        padding: "8px 12px", borderRadius: 12,
-        fontSize: 14, lineHeight: 1.45,
+        fontSize: 15, lineHeight: 1.45, color: ZB.ink,
         whiteSpace: "pre-wrap", wordBreak: "break-word",
       }}>
         {message.content}

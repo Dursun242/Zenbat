@@ -1,16 +1,19 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase.js";
+import { ZB, NUM } from "../lib/theme.js";
+import { btnPrimary } from "../components/ui/Register.jsx";
 
 async function getToken() {
   const { data: { session } } = await supabase.auth.getSession()
   return session?.access_token ?? null
 }
 
-const CHECK = <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>;
+const CHECK = <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true"><polyline points="20,6 9,17 4,12"/></svg>;
+const BACK  = <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>;
 
 const FEATURES = [
   "Agent IA illimité (voix + texte)",
-  "PDF brandé avec votre logo",
+  "PDF brandé avec ton logo",
   "Signature électronique par OTP email",
   "Identification SIRET via Pappers",
   "Export Factur-X (PDF/A-3 + XML CII)",
@@ -73,7 +76,7 @@ export default function PaywallScreen({ quotaReached = false, weekCount = 0, wee
     setLoading(true); setCtaError(null)
     try {
       const token = await getToken()
-      if (!token) throw new Error("Vous devez être connecté.")
+      if (!token) throw new Error("Tu dois être connecté.")
       const res  = await fetch("/api/stripe-checkout", {
         method:  "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -88,32 +91,37 @@ export default function PaywallScreen({ quotaReached = false, weekCount = 0, wee
     }
   };
 
-  return (
-    <div style={{ minHeight: "100vh", background: "#1A1612", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "Inter, system-ui, sans-serif" }}>
-      <style>{`*{box-sizing:border-box;margin:0;padding:0}@keyframes popIn{0%{opacity:0;transform:scale(.94) translateY(4px)}100%{opacity:1;transform:scale(1) translateY(0)}}`}</style>
+  const fmtEur = n => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
 
-      <div style={{ width: "100%", maxWidth: 360, textAlign: "center" }}>
+  return (
+    <div className="zb-pay" style={{ minHeight: "100vh", background: ZB.paper, color: ZB.ink, fontFamily: ZB.font, padding: "24px 16px 32px", display: "flex", justifyContent: "center" }}>
+      <style>{`
+        .zb-pay button:focus-visible { outline: 2px solid ${ZB.accent}; outline-offset: 2px; }
+        @media (hover: hover) { .zb-pay .zb-pay-cta:not(:disabled):hover { background: var(--zb-accent-hover) !important; } .zb-pay .zb-pay-plan:hover { background: ${ZB.paper} !important; } }
+      `}</style>
+
+      <div style={{ width: "100%", maxWidth: 480 }}>
 
         {/* Logo */}
-        <div style={{ marginBottom: 20, fontSize: 32, fontWeight: 800, fontFamily: "'Syne', sans-serif", letterSpacing: '-1px' }}>
-          <span style={{ color: "#22c55e" }}>Zen</span><span style={{ color: "white" }}>bat</span>
+        <div style={{ marginBottom: 20, fontSize: 24, fontWeight: 800, letterSpacing: "-0.5px" }}>
+          <span style={{ color: ZB.accent }}>Zen</span><span style={{ color: ZB.ink }}>bat</span>
         </div>
 
         {/* Titre */}
-        <h2 style={{ color: "white", fontSize: 20, fontWeight: 600, marginBottom: 8, fontFamily: "'Syne', sans-serif", letterSpacing: '-0.3px' }}>
+        <h1 style={{ margin: "0 0 8px", fontSize: 21, fontWeight: 700, lineHeight: 1.25 }}>
           {quotaReached
             ? `Limite de ${weekLimit} devis atteinte`
-            : "Passez Pro"}
-        </h2>
-        <p style={{ color: "#6B6358", fontSize: 13, marginBottom: 24, lineHeight: 1.6 }}>
+            : "Passe Pro"}
+        </h1>
+        <p style={{ margin: "0 0 18px", color: ZB.ink2, fontSize: 15, lineHeight: 1.45 }}>
           {quotaReached
-            ? `Vous avez utilisé vos ${weekLimit} devis offerts cette semaine. Le compteur repart à zéro lundi prochain — ou passez Pro maintenant pour un nombre illimité.`
-            : `Le forfait gratuit vous permet de créer ${weekLimit} devis par semaine. Passez Pro pour des devis illimités, les factures et la conformité 2026.`}
+            ? `Tu as utilisé tes ${weekLimit} devis offerts cette semaine. Le compteur repart à zéro lundi prochain — ou passe Pro maintenant pour un nombre illimité.`
+            : `Le forfait gratuit te permet de créer ${weekLimit} devis par semaine. Passe Pro pour des devis illimités, les factures et la conformité 2026.`}
         </p>
 
         {/* Indicateur usage hebdo (freemium uniquement) */}
         {weekCount > 0 && !quotaReached && (
-          <p style={{ color: "#9A8E82", fontSize: 11, marginBottom: 12 }}>
+          <p style={{ margin: "0 0 14px", color: ZB.ink2, fontSize: 14, ...NUM }}>
             {weekCount}/{weekLimit} devis créés cette semaine
           </p>
         )}
@@ -121,118 +129,116 @@ export default function PaywallScreen({ quotaReached = false, weekCount = 0, wee
         {/* Bandeau personnalisé — données du mois courant */}
         {myStats && myStats.count > 0 && (() => {
           const projected = Math.round((myStats.avg || DEFAULT_AVG_DEVIS) * myStats.count * 5);
-          const fmtEur = n => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
           return (
-            <div style={{ background: "#2A231C", border: "1px solid #3D3028", borderRadius: 16, padding: "14px 16px", marginBottom: 16, textAlign: "left" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#6B6358", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 }}>Ce mois-ci en freemium</div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontSize: 12, color: "#9A8E82" }}>Devis créés</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "white" }}>{myStats.count}</span>
+            <section aria-label="Ce mois-ci en freemium" style={{ background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 8, padding: "4px 16px", marginBottom: 18 }}>
+              <h2 style={{ margin: 0, padding: "12px 0 10px", fontSize: 14, fontWeight: 700, borderBottom: `2px solid ${ZB.ink}` }}>Ce mois-ci en freemium</h2>
+              <div style={rowStyle}>
+                <span style={{ color: ZB.ink2 }}>Devis créés</span>
+                <span style={{ fontWeight: 700, ...NUM }}>{myStats.count}</span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-                <span style={{ fontSize: 12, color: "#9A8E82" }}>CA généré</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "white" }}>{fmtEur(myStats.ca)}</span>
+              <div style={rowStyle}>
+                <span style={{ color: ZB.ink2 }}>CA généré</span>
+                <span style={{ fontWeight: 700, ...NUM }}>{fmtEur(myStats.ca)}</span>
               </div>
-              <div style={{ height: 1, background: "#3D3028", marginBottom: 12 }} />
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontSize: 11, color: "#9A8E82" }}>Avec Pro (×5 devis)</div>
-                  <div style={{ fontSize: 10, color: "#6B6358" }}>votre potentiel ce mois</div>
-                </div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: "#22c55e" }}>{fmtEur(projected)}</div>
+              <div style={{ ...rowStyle, borderBottom: "none" }}>
+                <span>
+                  <span style={{ display: "block", fontWeight: 600 }}>Avec Pro (×5 devis)</span>
+                  <span style={{ display: "block", fontSize: 13, color: ZB.ink2 }}>ton potentiel ce mois</span>
+                </span>
+                <span style={{ fontWeight: 700, ...NUM }}>{fmtEur(projected)}</span>
               </div>
-            </div>
+            </section>
           );
         })()}
 
-        {/* Sélecteur mensuel / 6 mois */}
-        <div style={{ display: "flex", background: "#2A231C", borderRadius: 14, padding: 4, marginBottom: 16, position: "relative" }}>
-          {Object.values(PLANS).map(p => {
-            const active = billing === p.id;
-            return (
-              <button key={p.id} onClick={() => setBilling(p.id)}
-                style={{
-                  flex: 1, padding: "9px 8px", border: "none", borderRadius: 10, cursor: "pointer",
-                  fontFamily: "inherit", fontSize: 13, fontWeight: 700, transition: "all .18s",
-                  background: active ? "white" : "transparent",
-                  color: active ? "#1A1612" : "#6B6358",
-                  boxShadow: active ? "0 1px 4px rgba(0,0,0,.15)" : "none",
-                  position: "relative",
-                }}>
-                {p.label}
-                {p.badge && (
-                  <span style={{
-                    marginLeft: 6, background: "#22c55e", color: "white",
-                    fontSize: 10, fontWeight: 800, padding: "1px 6px", borderRadius: 20,
-                  }}>
-                    {p.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        {/* Offre : bordereau des formules */}
+        <section style={{ background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 8, marginBottom: 14 }}>
 
-        {/* Carte offre */}
-        <div key={billing} style={{ background: "white", borderRadius: 24, padding: 22, textAlign: "left", marginBottom: 14, boxShadow: "0 24px 48px rgba(0,0,0,.3)", animation: "popIn .22s ease both" }}>
-
-          {/* En-tête prix */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 16, color: "#1A1612" }}>Zenbat Pro</div>
-              <div style={{ color: "#9A8E82", fontSize: 11, marginTop: 2 }}>Pour artisans et entreprises BTP</div>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 28, fontWeight: 800, color: "#22c55e", lineHeight: 1 }}>{plan.priceLabel}</div>
-              <div style={{ color: "#9A8E82", fontSize: 11, marginTop: 2 }}>{plan.unit}</div>
-            </div>
+          {/* En-tête */}
+          <div style={{ padding: "16px 16px 12px", borderBottom: `2px solid ${ZB.ink}` }}>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Zenbat Pro</h2>
+            <p style={{ margin: "2px 0 0", fontSize: 13, color: ZB.ink2 }}>Pour artisans et entreprises BTP</p>
           </div>
 
-          {/* Bandeau économie */}
+          {/* Sélecteur mensuel / 6 mois */}
+          <div role="radiogroup" aria-label="Formule">
+            {Object.values(PLANS).map(p => {
+              const active = billing === p.id;
+              return (
+                <button key={p.id} type="button" role="radio" aria-checked={active} className="zb-pay-plan" onClick={() => setBilling(p.id)}
+                  style={{
+                    display: "grid", gridTemplateColumns: "22px 1fr auto", gap: "2px 12px", alignItems: "center",
+                    width: "100%", minHeight: 64, padding: "12px 16px 12px 13px", textAlign: "left",
+                    background: active ? ZB.accentSoft : "none", border: "none", borderBottom: `1px solid ${ZB.ruleSoft}`,
+                    borderLeft: `3px solid ${active ? ZB.accent : "transparent"}`,
+                    fontFamily: "inherit", color: ZB.ink, cursor: "pointer",
+                  }}>
+                  <span aria-hidden="true" style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${active ? ZB.accent : ZB.rule}`, display: "grid", placeItems: "center" }}>
+                    {active && <span style={{ width: 10, height: 10, borderRadius: "50%", background: ZB.accent }}/>}
+                  </span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 15, fontWeight: 700 }}>
+                    {p.label}
+                    {p.badge && (
+                      <span style={{ fontSize: 12, fontWeight: 700, padding: "0 6px", borderRadius: 4, border: `1px solid ${ZB.ink2}`, color: ZB.ink2, lineHeight: "18px", ...NUM }}>
+                        {p.badge}
+                      </span>
+                    )}
+                  </span>
+                  <span style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                    <span style={{ fontSize: 17, fontWeight: 700, ...NUM }}>{p.priceLabel}</span>
+                    <span style={{ fontSize: 13, color: ZB.ink2 }}> {p.unit}</span>
+                  </span>
+                  <span style={{ gridColumn: "2 / -1", fontSize: 13, color: ZB.ink2, ...NUM }}>{p.billed}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Économie */}
           {plan.saving && (
-            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "8px 12px", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 16 }}>🎉</span>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#15803d" }}>Vous économisez {plan.saving} € TTC</div>
-                <div style={{ fontSize: 11, color: "#16a34a" }}>{plan.billed}</div>
-              </div>
-            </div>
-          )}
-          {!plan.saving && (
-            <div style={{ fontSize: 11, color: "#9A8E82", marginBottom: 14 }}>{plan.billed}</div>
+            <p style={{ margin: 0, padding: "10px 16px", borderBottom: `1px solid ${ZB.ruleSoft}`, fontSize: 14, fontWeight: 600, ...NUM }}>
+              Tu économises {plan.saving} € TTC
+            </p>
           )}
 
           {/* Features */}
-          {FEATURES.map(f => (
-            <div key={f} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "#22c55e" }}>
-                {CHECK}
-              </div>
-              <span style={{ fontSize: 13, color: "#3D3028" }}>{f}</span>
-            </div>
-          ))}
+          <ul style={{ listStyle: "none", margin: 0, padding: "6px 16px" }}>
+            {FEATURES.map((f, i) => (
+              <li key={f} style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 40, fontSize: 15, borderBottom: i < FEATURES.length - 1 ? `1px solid ${ZB.ruleSoft}` : "none" }}>
+                <span style={{ color: ZB.ink2, display: "grid", flexShrink: 0 }}>{CHECK}</span>
+                {f}
+              </li>
+            ))}
+          </ul>
 
-          {/* CTA */}
-          <button onClick={handleSubscribe} disabled={loading}
-            style={{ width: "100%", background: loading ? "#86efac" : "#22c55e", color: "white", border: "none", borderRadius: 12, padding: 14, fontSize: 14, fontWeight: 700, marginTop: 16, cursor: loading ? "default" : "pointer", transition: "background .15s" }}>
-            {loading ? "Redirection…" : plan.cta}
+          <div style={{ padding: "8px 16px 16px" }}>
+            {/* CTA */}
+            <button onClick={handleSubscribe} disabled={loading} className="zb-pay-cta"
+              style={{ ...btnPrimary, width: "100%", minHeight: 52, fontSize: 16, opacity: loading ? 0.7 : 1, cursor: loading ? "default" : "pointer", ...NUM }}>
+              {loading ? "Redirection…" : plan.cta}
+            </button>
+            {ctaError && (
+              <p role="alert" style={{ margin: "8px 0 0", textAlign: "center", fontSize: 14, color: ZB.danger }}>{ctaError}</p>
+            )}
+
+            {/* Garantie */}
+            <p style={{ margin: "10px 0 0", textAlign: "center", fontSize: 13, color: ZB.ink2 }}>
+              {billing === "biannual"
+                ? "Engagement 6 mois · Sans renouvellement automatique"
+                : "Sans engagement · Résiliable à tout moment"}
+            </p>
+          </div>
+        </section>
+
+        <div style={{ textAlign: "center" }}>
+          <button onClick={onBack}
+            style={{ display: "inline-flex", alignItems: "center", gap: 4, minHeight: 44, padding: "0 12px", background: "none", border: "none", color: ZB.ink2, fontFamily: "inherit", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+            {quotaReached ? "Continuer en freemium (5 devis/semaine)" : <>{BACK}Retour</>}
           </button>
-          {ctaError && (
-            <p style={{ textAlign: "center", fontSize: 11, color: "#ef4444", marginTop: 8 }}>{ctaError}</p>
-          )}
-
-          {/* Garantie */}
-          <p style={{ textAlign: "center", fontSize: 11, color: "#9A8E82", marginTop: 10 }}>
-            {billing === "biannual"
-              ? "Engagement 6 mois · Sans renouvellement automatique"
-              : "Sans engagement · Résiliable à tout moment"}
-          </p>
         </div>
-
-        <button onClick={onBack} style={{ background: "none", border: "none", color: "#6B6358", fontSize: 12, cursor: "pointer" }}>
-          {quotaReached ? "Continuer en freemium (5 devis/semaine)" : "← Retour"}
-        </button>
       </div>
     </div>
   );
 }
+
+const rowStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, minHeight: 44, padding: "8px 0", borderBottom: `1px solid ${ZB.ruleSoft}`, fontSize: 15 };

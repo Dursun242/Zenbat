@@ -7,6 +7,8 @@ import { useState, useEffect, useRef } from "react"
 import { getToken } from "../../lib/getToken.js"
 import { supabase } from "../../lib/supabase.js"
 import { useModalGuard } from "../../hooks/useModalGuard.js"
+import { ZB, NUM } from "../../lib/theme.js"
+import { btnPrimary, btnSecondary } from "../ui/Register.jsx"
 
 const PERIODS = [
   { id: 'last_month',   label: 'Mois dernier' },
@@ -28,6 +30,12 @@ export default function SendToComptableModal({ user, onClose }) {
   const emailRef = useRef(null)
 
   useModalGuard(true, onClose)
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape' && !loading) onClose?.() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [loading, onClose])
 
   // Préremplir l'email comptable depuis profiles
   useEffect(() => {
@@ -51,7 +59,7 @@ export default function SendToComptableModal({ user, onClose }) {
       return
     }
     if (period === 'custom' && (!from || !to)) {
-      setError('Sélectionnez une date de début et de fin')
+      setError('Choisis une date de début et de fin')
       return
     }
     setLoading(true)
@@ -72,52 +80,55 @@ export default function SendToComptableModal({ user, onClose }) {
     }
   }
 
-  const C = {
-    terra:     '#C97B5C',
-    terradark: '#A55F44',
-    cream:     '#FAF7F2',
-    ink:       '#1A1612',
-    muted:     '#6B6358',
-    border:    '#E8E2D8',
+  const labelStyle = { display: 'block', fontSize: 13, fontWeight: 600, color: ZB.ink2, marginBottom: 6 }
+  const inputStyle = {
+    width: '100%', minHeight: 44, boxSizing: 'border-box', padding: '10px 12px',
+    background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 8,
+    fontSize: 16, color: ZB.ink, outline: 'none', fontFamily: 'inherit',
   }
 
   return (
     <div
       onClick={e => { if (e.target === e.currentTarget && !loading) onClose() }}
       style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 300,
+        position: 'fixed', inset: 0, background: 'rgba(26,22,18,.55)', zIndex: 300,
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+        fontFamily: ZB.font, color: ZB.ink,
       }}>
-      <div style={{
-        background: 'white', borderRadius: 16, width: '100%', maxWidth: 480,
-        maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-        boxShadow: '0 12px 40px rgba(0,0,0,.2)',
-      }}>
+      <style>{`
+        .zb-compta input:focus { border-color: ${ZB.accent} !important; }
+        .zb-compta input::placeholder { color: ${ZB.ink3}; opacity: 1; }
+        .zb-compta button:focus-visible { outline: 2px solid ${ZB.accent}; outline-offset: 2px; }
+      `}</style>
+      <div role="dialog" aria-modal="true" aria-labelledby="comptable-title" className="zb-compta"
+        style={{
+          background: ZB.paper, border: `1px solid ${ZB.rule}`, borderRadius: 10, width: '100%', maxWidth: 480,
+          maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+          boxShadow: '0 10px 30px rgba(26,22,18,.16)',
+        }}>
         {/* Header */}
-        <div style={{ padding: '18px 20px 14px', borderBottom: `1px solid ${C.cream}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: C.terra, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 4 }}>
-              Comptable
-            </div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: C.ink }}>
-              Envoyer l'export factures
-            </div>
-          </div>
-          <button onClick={onClose} disabled={loading}
-            style={{ background: 'none', border: 'none', fontSize: 22, color: C.muted, cursor: loading ? 'wait' : 'pointer', lineHeight: 1, padding: 4 }}>
-            ×
+        <div style={{ padding: '6px 6px 6px 18px', borderBottom: `1px solid ${ZB.rule}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+          <h2 id="comptable-title" style={{ margin: 0, fontSize: 19, fontWeight: 700, color: ZB.ink }}>
+            Envoyer l'export à ton comptable
+          </h2>
+          <button type="button" onClick={onClose} disabled={loading} aria-label="Fermer"
+            style={{ width: 44, height: 44, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'none', border: 'none', color: ZB.ink2, cursor: loading ? 'wait' : 'pointer' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
           </button>
         </div>
 
         {/* Body */}
-        <div style={{ padding: 20, overflowY: 'auto' }}>
+        <div style={{ padding: 18, overflowY: 'auto' }}>
           {result ? (
-            <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 12, padding: 16, color: '#166534' }}>
-              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>✓ Email envoyé à {result.sent_to}</div>
-              <div style={{ fontSize: 13, lineHeight: 1.5 }}>
+            <div role="status" style={{ background: ZB.stampSoft, border: `1px solid ${ZB.stamp}`, borderRadius: 8, padding: 16, color: ZB.ink }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700, color: ZB.stamp, marginBottom: 8 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+                <span>Email envoyé à {result.sent_to}</span>
+              </div>
+              <div style={{ fontSize: 15, lineHeight: 1.5, ...NUM }}>
                 {result.count} facture{result.count > 1 ? 's' : ''} · Total TTC : {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(result.total_ttc || 0)}
                 {typeof result.pdfs === 'number' && (
-                  <div style={{ marginTop: 4, fontSize: 12, color: '#15803D' }}>
+                  <div style={{ marginTop: 4, fontSize: 14, color: ZB.ink2 }}>
                     {result.pdfs > 0
                       ? `+ ${result.pdfs} PDF${result.pdfs > 1 ? 's' : ''} en pièce jointe`
                       : 'CSV uniquement (aucun PDF disponible)'}
@@ -127,43 +138,43 @@ export default function SendToComptableModal({ user, onClose }) {
             </div>
           ) : (
             <>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: C.muted, marginBottom: 6 }}>
+              <label htmlFor="comptable-email" style={labelStyle}>
                 Email du comptable
               </label>
               <input
+                id="comptable-email"
                 ref={emailRef}
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="comptable@exemple.fr"
                 disabled={loading}
-                style={{
-                  width: '100%', boxSizing: 'border-box', padding: '10px 12px',
-                  border: `1.5px solid ${C.border}`, borderRadius: 10,
-                  fontSize: 14, color: C.ink, outline: 'none', fontFamily: 'inherit',
-                }}
+                style={inputStyle}
               />
-              <div style={{ fontSize: 11, color: C.muted, marginTop: 6, marginBottom: 18 }}>
+              <div style={{ fontSize: 13, color: ZB.ink2, marginTop: 6, marginBottom: 18 }}>
                 Mémorisé pour les prochains envois.
               </div>
 
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: C.muted, marginBottom: 6 }}>
+              <div id="comptable-period" style={labelStyle}>
                 Période
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              </div>
+              <div role="radiogroup" aria-labelledby="comptable-period" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                 {PERIODS.map(p => {
                   const active = p.id === period
                   return (
                     <button
                       key={p.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
                       onClick={() => setPeriod(p.id)}
                       disabled={loading}
                       style={{
-                        padding: '10px 12px', borderRadius: 10,
-                        border: `1.5px solid ${active ? C.terra : C.border}`,
-                        background: active ? '#FFF6F0' : 'white',
-                        color: active ? C.terradark : C.ink,
-                        fontSize: 13, fontWeight: active ? 600 : 500,
+                        minHeight: 44, padding: '8px 12px', borderRadius: 8,
+                        border: `1px solid ${active ? ZB.accent : ZB.rule}`,
+                        background: active ? ZB.accentSoft : ZB.sheet,
+                        color: active ? ZB.accent : ZB.ink,
+                        fontSize: 15, fontWeight: active ? 700 : 500,
                         cursor: loading ? 'wait' : 'pointer', textAlign: 'left',
                         fontFamily: 'inherit',
                       }}>
@@ -176,20 +187,20 @@ export default function SendToComptableModal({ user, onClose }) {
               {period === 'custom' && (
                 <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                   <div style={{ flex: 1 }}>
-                    <label style={{ display: 'block', fontSize: 11, color: C.muted, marginBottom: 4 }}>Du</label>
-                    <input type="date" value={from} onChange={e => setFrom(e.target.value)} disabled={loading}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: 10, border: `1.5px solid ${C.border}`, borderRadius: 10, fontSize: 13, fontFamily: 'inherit' }}/>
+                    <label htmlFor="comptable-from" style={labelStyle}>Du</label>
+                    <input id="comptable-from" type="date" value={from} onChange={e => setFrom(e.target.value)} disabled={loading}
+                      style={inputStyle}/>
                   </div>
                   <div style={{ flex: 1 }}>
-                    <label style={{ display: 'block', fontSize: 11, color: C.muted, marginBottom: 4 }}>Au</label>
-                    <input type="date" value={to} onChange={e => setTo(e.target.value)} disabled={loading}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: 10, border: `1.5px solid ${C.border}`, borderRadius: 10, fontSize: 13, fontFamily: 'inherit' }}/>
+                    <label htmlFor="comptable-to" style={labelStyle}>Au</label>
+                    <input id="comptable-to" type="date" value={to} onChange={e => setTo(e.target.value)} disabled={loading}
+                      style={inputStyle}/>
                   </div>
                 </div>
               )}
 
-              <div style={{ marginTop: 18, padding: 12, background: C.cream, borderRadius: 10, fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
-                Le comptable recevra un email avec <strong>2 fichiers CSV</strong> en pièce jointe :
+              <div style={{ marginTop: 18, padding: 12, background: ZB.paper2, border: `1px solid ${ZB.ruleSoft}`, borderRadius: 8, fontSize: 14, color: ZB.ink2, lineHeight: 1.5 }}>
+                Ton comptable recevra un email avec <strong style={{ color: ZB.ink }}>2 fichiers CSV</strong> en pièce jointe :
                 <ul style={{ margin: '6px 0 0 18px', padding: 0 }}>
                   <li>Liste des factures (HT, TVA, TTC, statut)</li>
                   <li>Détail des lignes</li>
@@ -197,7 +208,7 @@ export default function SendToComptableModal({ user, onClose }) {
               </div>
 
               {error && (
-                <div style={{ marginTop: 12, padding: '10px 12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, color: '#991B1B', fontSize: 13 }}>
+                <div role="alert" style={{ marginTop: 12, padding: '10px 12px', background: ZB.dangerSoft, border: `1px solid ${ZB.danger}`, borderRadius: 8, color: ZB.danger, fontSize: 14 }}>
                   {error}
                 </div>
               )}
@@ -206,20 +217,19 @@ export default function SendToComptableModal({ user, onClose }) {
         </div>
 
         {/* Footer */}
-        <div style={{ padding: 16, borderTop: `1px solid ${C.cream}`, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <div style={{ padding: '12px 16px', borderTop: `1px solid ${ZB.rule}`, display: 'flex', gap: 10, flexShrink: 0 }}>
           {result ? (
-            <button onClick={onClose}
-              style={{ padding: '10px 20px', borderRadius: 10, border: 'none', background: C.ink, color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <button type="button" onClick={onClose} style={{ ...btnSecondary, flex: 1 }}>
               Fermer
             </button>
           ) : (
             <>
-              <button onClick={onClose} disabled={loading}
-                style={{ padding: '10px 16px', borderRadius: 10, border: `1.5px solid ${C.border}`, background: 'white', color: C.muted, fontSize: 14, fontWeight: 500, cursor: loading ? 'wait' : 'pointer', fontFamily: 'inherit' }}>
+              <button type="button" onClick={onClose} disabled={loading}
+                style={{ ...btnSecondary, flex: 1, cursor: loading ? 'wait' : 'pointer' }}>
                 Annuler
               </button>
-              <button onClick={send} disabled={loading}
-                style={{ padding: '10px 20px', borderRadius: 10, border: 'none', background: loading ? C.terradark : C.terra, color: 'white', fontSize: 14, fontWeight: 600, cursor: loading ? 'wait' : 'pointer', fontFamily: 'inherit' }}>
+              <button type="button" onClick={send} disabled={loading}
+                style={{ ...btnPrimary, flex: 2, opacity: loading ? 0.7 : 1, cursor: loading ? 'wait' : 'pointer' }}>
                 {loading ? 'Envoi…' : 'Envoyer'}
               </button>
             </>

@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react"
 import { supabase } from "../lib/supabase.js"
+import { ZB, NUM } from "../lib/theme.js"
+import { btnPrimary } from "../components/ui/Register.jsx"
 
 async function getToken() {
   const { data: { session } } = await supabase.auth.getSession()
@@ -18,15 +20,23 @@ function formatPrice(amount, currency) {
   return `${v} ${c}`
 }
 
+// Tons des statuts (même code que les tampons) : vert tampon pour ce qui est
+// acquis, rouge pour un problème de paiement, encre sinon.
 const STATUS_LABELS = {
-  active:             { text: "Actif",                color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0" },
-  trialing:           { text: "Période d'essai",      color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" },
-  past_due:           { text: "Paiement en retard",   color: "#d97706", bg: "#fffbeb", border: "#fde68a" },
-  canceled:           { text: "Annulé",               color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
-  unpaid:             { text: "Impayé",               color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
-  incomplete:         { text: "Paiement incomplet",   color: "#d97706", bg: "#fffbeb", border: "#fde68a" },
-  incomplete_expired: { text: "Expiré",               color: "#6b7280", bg: "#f9fafb", border: "#e5e7eb" },
-  paused:             { text: "En pause",             color: "#6b7280", bg: "#f9fafb", border: "#e5e7eb" },
+  active:             { text: "Actif",                color: ZB.stamp },
+  trialing:           { text: "Période d'essai",      color: ZB.ink2 },
+  past_due:           { text: "Paiement en retard",   color: ZB.danger },
+  canceled:           { text: "Annulé",               color: ZB.ink3 },
+  unpaid:             { text: "Impayé",               color: ZB.danger },
+  incomplete:         { text: "Paiement incomplet",   color: ZB.danger },
+  incomplete_expired: { text: "Expiré",               color: ZB.ink3 },
+  paused:             { text: "En pause",             color: ZB.ink3 },
+}
+
+const BACK = <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+
+function Stamp({ color, children }) {
+  return <span style={{ ...s.badge, color, borderColor: color }}>{children}</span>
 }
 
 export default function SubscriptionScreen({ isAdmin, plan, billingCycle, onBack }) {
@@ -41,7 +51,7 @@ export default function SubscriptionScreen({ isAdmin, plan, billingCycle, onBack
     ;(async () => {
       try {
         const token = await getToken()
-        if (!token) throw new Error("Vous devez être connecté.")
+        if (!token) throw new Error("Tu dois être connecté.")
         const res  = await fetch("/api/stripe-checkout", {
           method:  "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -63,7 +73,7 @@ export default function SubscriptionScreen({ isAdmin, plan, billingCycle, onBack
     setOpening(true); setError(null)
     try {
       const token = await getToken()
-      if (!token) throw new Error("Vous devez être connecté.")
+      if (!token) throw new Error("Tu dois être connecté.")
       const res  = await fetch("/api/stripe-checkout", {
         method:  "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -79,26 +89,27 @@ export default function SubscriptionScreen({ isAdmin, plan, billingCycle, onBack
   }
 
   const sub        = info?.subscription
-  const statusInfo = sub ? (STATUS_LABELS[sub.status] || { text: sub.status, color: "#6b7280", bg: "#f9fafb", border: "#e5e7eb" }) : null
+  const statusInfo = sub ? (STATUS_LABELS[sub.status] || { text: sub.status, color: ZB.ink3 }) : null
   const planLabel  = sub?.planLabel === "biannual" ? "Pro · 6 mois" : (sub?.planLabel === "monthly" ? "Pro · Mensuel" : "Pro")
 
   return (
-    <div style={s.wrap}>
+    <div className="zb-sub" style={s.wrap}>
       <div style={s.shell}>
-        <button onClick={onBack} style={s.back}>← Retour</button>
+        <style>{`.zb-sub button:focus-visible { outline: 2px solid ${ZB.accent}; outline-offset: 2px; } @media (hover: hover) { .zb-sub .zb-sub-cta:not(:disabled):hover { background: var(--zb-accent-hover) !important; } }`}</style>
+        <button onClick={onBack} style={s.back}>{BACK}Retour</button>
 
         <div style={s.brandRow}>
-          <div style={s.logo}><span style={{ color: "#22c55e" }}>Zen</span><span style={{ color: "#fff" }}>bat</span></div>
+          <div style={s.logo}><span style={{ color: ZB.accent }}>Zen</span><span style={{ color: ZB.ink }}>bat</span></div>
         </div>
 
         <h1 style={s.title}>Mon abonnement</h1>
-        <p style={s.subtitle}>Gérez votre formule, votre moyen de paiement et vos factures.</p>
+        <p style={s.subtitle}>Gère ta formule, ton moyen de paiement et tes factures.</p>
 
         {/* ── Cas Admin ─────────────────────────────────── */}
         {isAdmin && (
           <div style={s.card}>
             <div style={s.cardHeader}>
-              <span style={{ ...s.badge, background: "rgba(34,197,94,.18)", color: "#86efac", border: "1px solid rgba(34,197,94,.3)" }}>ADMIN</span>
+              <Stamp color={ZB.ink}>ADMIN</Stamp>
             </div>
             <div style={s.row}><span style={s.label}>Statut</span><span style={s.value}>Pro permanent</span></div>
             <div style={s.row}><span style={s.label}>Facturation</span><span style={s.value}>Aucune — compte administrateur</span></div>
@@ -110,15 +121,15 @@ export default function SubscriptionScreen({ isAdmin, plan, billingCycle, onBack
         {/* ── Cas plan Pro ──────────────────────────────── */}
         {!isAdmin && plan === "pro" && (
           <>
-            {loading && <div style={s.loader}>Chargement de votre abonnement…</div>}
+            {loading && <div style={s.loader}>Chargement de ton abonnement…</div>}
 
             {!loading && !sub && (
               <div style={s.card}>
                 <div style={s.row}><span style={s.label}>Statut</span><span style={s.value}>Pro · abonnement non détecté</span></div>
                 <p style={s.note}>
-                  Votre profil est marqué « Pro » mais aucun abonnement Stripe n'est associé.
-                  Si vous avez payé récemment, le webhook Stripe peut prendre quelques secondes —
-                  rechargez la page. Sinon, contactez le support.
+                  Ton profil est marqué « Pro » mais aucun abonnement Stripe n'est associé.
+                  Si tu as payé récemment, le webhook Stripe peut prendre quelques secondes —
+                  recharge la page. Sinon, contacte le support.
                 </p>
               </div>
             )}
@@ -126,17 +137,17 @@ export default function SubscriptionScreen({ isAdmin, plan, billingCycle, onBack
             {!loading && sub && (
               <div style={s.card}>
                 <div style={s.cardHeader}>
-                  <span style={{ ...s.badge, background: statusInfo.bg, color: statusInfo.color, border: `1px solid ${statusInfo.border}` }}>
+                  <Stamp color={statusInfo.color}>
                     {statusInfo.text.toUpperCase()}
-                  </span>
+                  </Stamp>
                   {sub.cancelAtPeriodEnd && (
-                    <span style={{ ...s.badge, background: "#fff7ed", color: "#9a3412", border: "1px solid #fed7aa", marginLeft: 6 }}>
+                    <Stamp color={ZB.ink2}>
                       ANNULATION PROGRAMMÉE
-                    </span>
+                    </Stamp>
                   )}
                 </div>
                 <div style={s.row}><span style={s.label}>Formule</span><span style={s.value}>{planLabel}</span></div>
-                <div style={s.row}><span style={s.label}>Montant</span><span style={s.value}>
+                <div style={s.row}><span style={s.label}>Montant</span><span style={{ ...s.value, ...NUM }}>
                   {formatPrice(sub.unitAmount, sub.currency)}
                   {sub.intervalCount && sub.interval && (
                     <span style={s.muted}> · tous les {sub.intervalCount > 1 ? `${sub.intervalCount} ` : ""}{sub.interval === "month" ? "mois" : sub.interval === "year" ? "ans" : sub.interval}</span>
@@ -144,16 +155,16 @@ export default function SubscriptionScreen({ isAdmin, plan, billingCycle, onBack
                 </span></div>
                 <div style={s.row}>
                   <span style={s.label}>{sub.cancelAtPeriodEnd ? "Fin d'accès" : "Prochain prélèvement"}</span>
-                  <span style={s.value}>{formatDate(sub.currentPeriodEnd)}</span>
+                  <span style={{ ...s.value, ...NUM }}>{formatDate(sub.currentPeriodEnd)}</span>
                 </div>
               </div>
             )}
 
-            <button onClick={openPortal} disabled={opening} style={{ ...s.cta, opacity: opening ? 0.7 : 1, cursor: opening ? "default" : "pointer" }}>
+            <button onClick={openPortal} disabled={opening} className="zb-sub-cta" style={{ ...s.cta, opacity: opening ? 0.7 : 1, cursor: opening ? "default" : "pointer" }}>
               {opening ? "Ouverture du portail…" : "Gérer mon abonnement"}
             </button>
             <p style={s.help}>
-              Vous serez redirigé vers Stripe pour modifier votre moyen de paiement, télécharger vos factures ou annuler votre abonnement.
+              Tu seras redirigé vers Stripe pour modifier ton moyen de paiement, télécharger tes factures ou annuler ton abonnement.
             </p>
           </>
         )}
@@ -163,34 +174,34 @@ export default function SubscriptionScreen({ isAdmin, plan, billingCycle, onBack
           <div style={s.card}>
             <div style={s.row}><span style={s.label}>Statut</span><span style={s.value}>Freemium (gratuit à vie)</span></div>
             <div style={s.row}><span style={s.label}>Quota</span><span style={s.value}>5 devis par semaine</span></div>
-            <p style={s.note}>Le compteur repart à zéro chaque lundi. Passez Pro pour des devis illimités et l'accès aux factures.</p>
+            <p style={s.note}>Le compteur repart à zéro chaque lundi. Passe Pro pour des devis illimités et l'accès aux factures.</p>
           </div>
         )}
 
-        {error && <div style={s.error}>{error}</div>}
+        {error && <div role="alert" style={s.error}>{error}</div>}
       </div>
     </div>
   )
 }
 
 const s = {
-  wrap:   { minHeight: "100vh", background: "#1A1612", padding: "32px 20px", fontFamily: "Inter, system-ui, sans-serif", display: "flex", justifyContent: "center" },
+  wrap:   { minHeight: "100vh", background: ZB.paper, color: ZB.ink, padding: "16px 16px 32px", fontFamily: ZB.font, display: "flex", justifyContent: "center" },
   shell:  { width: "100%", maxWidth: 520 },
-  back:   { background: "none", border: "none", color: "#9A8E82", fontSize: 13, cursor: "pointer", marginBottom: 20, padding: 0 },
-  brandRow: { marginBottom: 20 },
-  logo:   { fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 800, letterSpacing: "-0.5px" },
-  title:  { color: "#fff", fontSize: 26, fontWeight: 700, fontFamily: "'Syne', sans-serif", letterSpacing: "-0.3px", marginBottom: 8 },
-  subtitle: { color: "#9A8E82", fontSize: 13, marginBottom: 24, lineHeight: 1.6 },
-  card:   { background: "#fff", borderRadius: 16, padding: 22, marginBottom: 16, boxShadow: "0 8px 24px rgba(0,0,0,.2)" },
-  cardHeader: { marginBottom: 14, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6 },
-  badge:  { display: "inline-block", fontSize: 10, fontWeight: 800, letterSpacing: "0.6px", padding: "4px 10px", borderRadius: 20 },
-  row:    { display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "10px 0", borderBottom: "1px solid #F0EBE3", gap: 12 },
-  label:  { color: "#9A8E82", fontSize: 12, fontWeight: 500 },
-  value:  { color: "#1A1612", fontSize: 13, fontWeight: 600, textAlign: "right" },
-  muted:  { color: "#9A8E82", fontWeight: 400 },
-  note:   { color: "#6B6358", fontSize: 12, lineHeight: 1.6, marginTop: 12 },
-  cta:    { width: "100%", padding: 14, borderRadius: 12, border: "none", background: "#22c55e", color: "#fff", fontSize: 14, fontWeight: 700, marginTop: 4, transition: "background .15s" },
-  help:   { color: "#9A8E82", fontSize: 11, textAlign: "center", marginTop: 8, lineHeight: 1.6 },
-  loader: { color: "#9A8E82", fontSize: 13, padding: 20, textAlign: "center" },
-  error:  { background: "#fef2f2", color: "#991b1b", padding: 12, borderRadius: 10, fontSize: 13, marginTop: 12 },
+  back:   { display: "inline-flex", alignItems: "center", gap: 4, minHeight: 44, background: "none", border: "none", color: ZB.ink2, fontFamily: "inherit", fontSize: 15, fontWeight: 600, cursor: "pointer", margin: "0 0 12px -8px", padding: "0 8px" },
+  brandRow: { marginBottom: 16 },
+  logo:   { fontSize: 24, fontWeight: 800, letterSpacing: "-0.5px" },
+  title:  { color: ZB.ink, fontSize: 21, fontWeight: 700, lineHeight: 1.25, margin: "0 0 6px" },
+  subtitle: { color: ZB.ink2, fontSize: 15, margin: "0 0 18px", lineHeight: 1.45 },
+  card:   { background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 8, padding: "6px 16px 14px", marginBottom: 16 },
+  cardHeader: { padding: "10px 0", display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, borderBottom: `2px solid ${ZB.ink}` },
+  badge:  { display: "inline-block", fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", padding: "2px 7px", borderRadius: 3, border: "1px solid currentColor" },
+  row:    { display: "flex", justifyContent: "space-between", alignItems: "baseline", minHeight: 44, padding: "12px 0", borderBottom: `1px solid ${ZB.ruleSoft}`, gap: 12 },
+  label:  { color: ZB.ink2, fontSize: 14, fontWeight: 600 },
+  value:  { color: ZB.ink, fontSize: 15, fontWeight: 600, textAlign: "right" },
+  muted:  { color: ZB.ink2, fontWeight: 500 },
+  note:   { color: ZB.ink2, fontSize: 14, lineHeight: 1.5, margin: "12px 0 0" },
+  cta:    { ...btnPrimary, width: "100%", minHeight: 52, fontSize: 16, marginTop: 4 },
+  help:   { color: ZB.ink2, fontSize: 13, textAlign: "center", margin: "8px 0 0", lineHeight: 1.5 },
+  loader: { color: ZB.ink2, fontSize: 15, padding: 20, textAlign: "center" },
+  error:  { background: ZB.dangerSoft, color: ZB.danger, border: `1px solid ${ZB.danger}`, padding: 12, borderRadius: 8, fontSize: 14, marginTop: 12 },
 }

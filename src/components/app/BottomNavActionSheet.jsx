@@ -8,8 +8,7 @@
 //   actions — [{ id, label, hint?, icon?, onClick }]
 import { useEffect } from "react";
 import { SAFE_BOTTOM_CSS, IOS_GAP_CSS } from "./BottomNav.jsx";
-
-const BRAND = "#22c55e";
+import { ZB } from "../../lib/theme.js";
 
 export default function BottomNavActionSheet({ open, onClose, actions = [] }) {
   // Esc ferme le sheet (desktop).
@@ -23,8 +22,11 @@ export default function BottomNavActionSheet({ open, onClose, actions = [] }) {
   return (
     <>
       <style>{`
-        @keyframes bn-sheet-in   { from { opacity: 0; transform: translateY(20px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes bn-sheet-in   { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes bn-overlay-in { from { opacity: 0; } to { opacity: 1; } }
+        .zb-bn-item:focus-visible { outline: 2px solid ${ZB.accent}; outline-offset: -2px; }
+        @media (hover: hover) { .zb-bn-item:hover { background: ${ZB.paper2} !important; } }
+        @media (prefers-reduced-motion: reduce) { .zb-bn-sheet, .zb-bn-overlay { animation: none !important; } }
       `}</style>
 
       {open && (
@@ -33,10 +35,11 @@ export default function BottomNavActionSheet({ open, onClose, actions = [] }) {
           <div
             onClick={onClose}
             aria-hidden="true"
+            className="zb-bn-overlay"
             style={{
               position: "fixed",
               inset: 0,
-              background: "rgba(0,0,0,.4)",
+              background: "rgba(26,22,18,.55)",
               zIndex: 60,
               animation: "bn-overlay-in .18s ease both",
             }}
@@ -46,16 +49,19 @@ export default function BottomNavActionSheet({ open, onClose, actions = [] }) {
           <div
             role="menu"
             aria-label="Actions rapides Agent IA"
+            className="zb-bn-sheet"
             style={{
               position: "fixed",
               left: 16, right: 16,
               bottom: `calc(80px + ${SAFE_BOTTOM_CSS} - ${IOS_GAP_CSS})`,
-              background: "white",
-              borderRadius: 18,
-              boxShadow: "0 20px 60px rgba(0,0,0,.35)",
-              padding: 6,
+              background: ZB.sheet,
+              border: `1px solid ${ZB.rule}`,
+              borderRadius: 10,
+              boxShadow: "0 10px 30px rgba(26,22,18,.16)",
+              padding: 4,
               zIndex: 61,
-              animation: "bn-sheet-in .22s cubic-bezier(.34, 1.56, .64, 1) both",
+              fontFamily: ZB.font,
+              animation: "bn-sheet-in .2s ease-out both",
               maxWidth: 420,
               marginLeft: "auto",
               marginRight: "auto",
@@ -64,40 +70,42 @@ export default function BottomNavActionSheet({ open, onClose, actions = [] }) {
             {actions.map((a, i) => (
               <button
                 key={a.id}
+                type="button"
                 role="menuitem"
+                className="zb-bn-item"
                 onClick={() => { onClose?.(); a.onClick?.(); }}
                 style={{
                   display: "flex",
                   alignItems: "center",
                   gap: 12,
                   width: "100%",
-                  padding: "12px 14px",
+                  minHeight: 56,
+                  padding: "10px 12px",
                   background: "transparent",
                   border: "none",
-                  borderRadius: 12,
+                  borderRadius: 8,
                   cursor: "pointer",
                   textAlign: "left",
+                  fontFamily: "inherit",
                   WebkitTapHighlightColor: "transparent",
-                  borderTop: i === 0 ? "none" : "1px solid #F0EBE3",
+                  borderTop: i === 0 ? "none" : `1px solid ${ZB.ruleSoft}`,
                 }}
               >
                 {a.icon && (
                   <span style={{
-                    width: 36, height: 36,
-                    borderRadius: 10,
-                    background: `${BRAND}18`,
-                    color: BRAND,
+                    width: 22,
+                    color: ZB.ink2,
                     display: "inline-flex",
                     alignItems: "center", justifyContent: "center",
                     flexShrink: 0,
                   }}>{a.icon}</span>
                 )}
                 <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#1A1612" }}>
+                  <span style={{ display: "block", fontSize: 15, fontWeight: 600, color: ZB.ink }}>
                     {a.label}
                   </span>
                   {a.hint && (
-                    <span style={{ display: "block", fontSize: 12, color: "#6B6358", marginTop: 2 }}>
+                    <span style={{ display: "block", fontSize: 13, color: ZB.ink2, marginTop: 2 }}>
                       {a.hint}
                     </span>
                   )}

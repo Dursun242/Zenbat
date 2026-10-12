@@ -1,5 +1,6 @@
 import { useRef } from "react"
-import { Iimg, Field } from "./shared.jsx"
+import { Iimg, Field, labelStyle, hintStyle, choiceStyle } from "./shared.jsx"
+import { ZB } from "../../lib/theme.js"
 import { compressLogoFile } from "../../lib/compressLogo.js"
 
 // Étape « Branding » (step===0) : logo, raison sociale, identité, SIRET, TVA.
@@ -22,53 +23,57 @@ export default function BrandingStep({ local, set, tryNext, setTryNext, step0Inv
 
   return (
     <div className="pop" style={{display:"flex",flexDirection:"column",gap:14}}>
-      <div style={{background:"#2A231C",borderRadius:16,padding:18,border:"2px dashed #3D3028",textAlign:"center",cursor:"pointer"}} onClick={()=>fileRef.current?.click()}>
-        {local.logo
-          ? <img src={local.logo} alt="logo" style={{maxHeight:80,maxWidth:"100%",borderRadius:8,margin:"0 auto",display:"block"}}/>
-          : <div>
-              <div style={{color:"#22c55e",marginBottom:8}}>{Iimg}</div>
-              <div style={{color:"#9A8E82",fontSize:13,fontWeight:500}}>Cliquez pour uploader votre logo</div>
-              <div style={{color:"#6B6358",fontSize:11,marginTop:4}}>PNG, JPG — recommandé 400×100px</div>
-            </div>
-        }
+      <div>
+        <span style={labelStyle}>Logo</span>
+        <button type="button" onClick={()=>fileRef.current?.click()} aria-label={local.logo ? "Changer le logo" : undefined}
+          style={{width:"100%",minHeight:96,background:ZB.sheet,borderRadius:8,padding:16,border:`1px dashed ${ZB.rule}`,textAlign:"center",cursor:"pointer",fontFamily:"inherit",display:"block"}}>
+          {local.logo
+            ? <img src={local.logo} alt="Ton logo" style={{maxHeight:80,maxWidth:"100%",margin:"0 auto",display:"block"}}/>
+            : <span style={{display:"block"}}>
+                <span style={{color:ZB.ink2,display:"inline-block",marginBottom:6}}>{Iimg}</span>
+                <span style={{display:"block",color:ZB.ink,fontSize:15,fontWeight:600}}>Appuie pour ajouter ton logo</span>
+                <span style={{display:"block",color:ZB.ink2,fontSize:13,marginTop:4}}>PNG, JPG — recommandé 400×100 px</span>
+              </span>
+          }
+        </button>
         <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleLogo}/>
+        {local.logo&&<button type="button" onClick={()=>set("logo",null)} style={{background:"none",border:"none",minHeight:44,padding:"0 4px",color:ZB.ink2,fontSize:15,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Supprimer le logo</button>}
       </div>
-      {local.logo&&<button onClick={()=>set("logo",null)} style={{background:"none",border:"1px solid #3D3028",borderRadius:10,padding:"7px",color:"#9A8E82",fontSize:12,cursor:"pointer"}}>Supprimer le logo</button>}
-      <Field dark required label="Nom de l'entreprise" val={local.companyName} onChange={v=>{set("companyName",v);setTryNext(false)}} placeholder="Ex : Maçonnerie Dupont SAS"
+      <Field required label="Nom de l'entreprise" val={local.companyName} onChange={v=>{set("companyName",v);setTryNext(false)}} placeholder="Ex : Maçonnerie Dupont SAS"
         invalid={tryNext && step0Invalid}
-        hint={tryNext && step0Invalid ? "Le nom est obligatoire pour générer vos devis." : "Apparaît en en-tête de tous vos devis."}/>
+        hint={tryNext && step0Invalid ? "Le nom est obligatoire pour générer tes devis." : "Apparaît en en-tête de tous tes devis."}/>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-        <Field dark label="Prénom" val={local.firstName} onChange={v=>set("firstName",v)} placeholder="Jean"/>
-        <Field dark label="Nom" val={local.lastName} onChange={v=>set("lastName",v)} placeholder="Dupont"/>
+        <Field label="Prénom" val={local.firstName} onChange={v=>set("firstName",v)} placeholder="Jean"/>
+        <Field label="Nom" val={local.lastName} onChange={v=>set("lastName",v)} placeholder="Dupont"/>
       </div>
-      <Field dark required label="SIRET" val={local.siret} onChange={v=>set("siret",v)} placeholder="12345678900010"
+      <Field required label="SIRET" val={local.siret} onChange={v=>set("siret",v)} placeholder="12345678900010"
         hint="Obligatoire sur un devis en France (art. L441-9 du code de commerce)."/>
 
       <div>
-        <label style={{display:"block",fontSize:11,fontWeight:600,color:"#9A8E82",marginBottom:6}}>RÉGIME DE TVA</label>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        <span style={labelStyle} id="onb-vat">Régime de TVA</span>
+        <div role="radiogroup" aria-labelledby="onb-vat" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
           {[
             { id:"normal",    title:"Assujetti à la TVA", sub:"Société, SARL, SAS…" },
             { id:"franchise", title:"Franchise en base",  sub:"Auto-entrepreneur (art. 293 B)" },
           ].map(opt => {
             const active = (local.vatRegime || "normal") === opt.id
             return (
-              <button key={opt.id} onClick={()=>set("vatRegime",opt.id)}
-                style={{background:active?"#1e3a2f":"#2A231C",border:`1.5px solid ${active?"#22c55e":"#3D3028"}`,borderRadius:12,padding:"10px 12px",textAlign:"left",cursor:"pointer",transition:"all .15s"}}>
-                <div style={{fontSize:12,fontWeight:700,color:active?"#86efac":"white"}}>{opt.title}</div>
-                <div style={{fontSize:10,color:"#9A8E82",marginTop:2,lineHeight:1.3}}>{opt.sub}</div>
+              <button key={opt.id} type="button" role="radio" aria-checked={active} onClick={()=>set("vatRegime",opt.id)}
+                style={{...choiceStyle(active),padding:"10px 12px",textAlign:"left"}}>
+                <span style={{display:"block",fontSize:15,fontWeight:700,color:ZB.ink}}>{opt.title}</span>
+                <span style={{display:"block",fontSize:13,color:ZB.ink2,marginTop:2,lineHeight:1.3}}>{opt.sub}</span>
               </button>
             )
           })}
         </div>
         {local.vatRegime === "franchise" && (
-          <div style={{fontSize:10,color:"#86efac",marginTop:6,lineHeight:1.4}}>💡 Tous les devis seront émis à TVA 0 % avec la mention "{`TVA non applicable, art. 293 B du CGI`}". Plafond 2026 : 39 100 € de CA pour les prestations BTP.</div>
+          <div style={hintStyle}>Tous les devis seront émis à TVA 0 % avec la mention "{`TVA non applicable, art. 293 B du CGI`}". Plafond 2026 : 39 100 € de CA pour les prestations BTP.</div>
         )}
       </div>
 
       {local.vatRegime !== "franchise" && (
-        <Field dark label="N° TVA intracommunautaire" val={local.tva} onChange={v=>set("tva",v)} placeholder="FR12345678901"
-          hint="Format : FR + 2 chiffres + 9 chiffres SIREN. Disponible sur votre extrait Kbis ou via le-sirene.insee.fr."/>
+        <Field label="N° TVA intracommunautaire" val={local.tva} onChange={v=>set("tva",v)} placeholder="FR12345678901"
+          hint="Format : FR + 2 chiffres + 9 chiffres SIREN. Disponible sur ton extrait Kbis ou via le-sirene.insee.fr."/>
       )}
     </div>
   )

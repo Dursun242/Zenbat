@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ZB } from "../../lib/theme.js";
 
 // Toast non bloquant affiché quand une nouvelle version du Service Worker
 // est prête à être activée (event 'zenbat:sw-needs-refresh' émis par
@@ -38,6 +39,7 @@ export default function UpdateAvailableToast() {
     <div
       role="status"
       aria-live="polite"
+      className="zb-update"
       style={{
         position: "fixed",
         // Au-dessus du BottomNav full-width style YouTube (~64px de bar
@@ -45,31 +47,34 @@ export default function UpdateAvailableToast() {
         bottom: "calc(76px + min(env(safe-area-inset-bottom, 0px), 20px) - var(--ios-viewport-gap, 0px))",
         left: 12, right: 12,
         zIndex: 200,
-        background: "#1A1612",
-        color: "white",
-        borderRadius: 12,
-        padding: "12px 14px",
-        display: "flex", alignItems: "center", gap: 12,
-        boxShadow: "0 10px 30px rgba(0,0,0,.25)",
+        background: ZB.ink,
+        color: ZB.onInk,
+        fontFamily: ZB.font,
+        borderRadius: 10,
+        padding: "6px 4px 6px 16px",
+        display: "flex", alignItems: "center", gap: 8,
+        boxShadow: "0 10px 30px rgba(26,22,18,.16)",
         maxWidth: 480,
         margin: "0 auto",
         animation: "fadeUp .2s ease both",
       }}
     >
-      <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>✨</span>
-      <div style={{ flex: 1, fontSize: 13, lineHeight: 1.4 }}>
+      <style>{`.zb-update button:focus-visible { outline: 2px solid ${ZB.onInk}; outline-offset: 2px; }`}</style>
+      <div style={{ flex: 1, fontSize: 15, fontWeight: 500, lineHeight: 1.4 }}>
         Nouvelle version disponible
       </div>
       <button
+        type="button"
         onClick={applyUpdate}
         disabled={refreshing}
         style={{
-          background: "#22c55e",
-          color: "white",
+          background: ZB.accent,
+          color: ZB.sheet,
           border: "none",
-          borderRadius: 8,
-          padding: "7px 12px",
-          fontSize: 12,
+          borderRadius: 10,
+          minHeight: 44,
+          padding: "0 14px",
+          fontSize: 15,
           fontWeight: 700,
           cursor: refreshing ? "default" : "pointer",
           opacity: refreshing ? 0.6 : 1,
@@ -79,20 +84,21 @@ export default function UpdateAvailableToast() {
         {refreshing ? "…" : "Actualiser"}
       </button>
       <button
+        type="button"
         onClick={() => setShow(false)}
         aria-label="Plus tard"
         style={{
+          width: 44, height: 44,
+          display: "grid", placeItems: "center",
           background: "none",
           border: "none",
-          color: "#9A8E82",
+          color: ZB.onInk2,
           cursor: "pointer",
-          padding: 4,
-          fontSize: 18,
-          lineHeight: 1,
+          padding: 0,
           flexShrink: 0,
         }}>
-        ×
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
-    </div>
-  );
+  </div>
+);
 }

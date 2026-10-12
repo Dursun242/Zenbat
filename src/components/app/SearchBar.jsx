@@ -1,15 +1,25 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
 
+import { ZB } from "../../lib/theme.js";
+
+const svg = { width: 22, height: 22, fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", viewBox: "0 0 24 24", "aria-hidden": true };
 const ICONS = {
-  client:  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>,
-  devis:   <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>,
-  facture: <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>,
-  search:  <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+  client:  <svg {...svg}><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>,
+  devis:   <svg {...svg}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>,
+  facture: <svg {...svg}><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/></svg>,
+  search:  <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>,
+  clear:   <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>,
 };
 
 const LABELS = { client: "Client", devis: "Devis", facture: "Facture" };
-const COLORS  = { client: "#3b82f6", devis: "#f59e0b", facture: "#8b5cf6" };
+
+const CSS = `
+  .zb-search input:focus { border-color: ${ZB.accent} !important; }
+  .zb-search input::placeholder { color: ${ZB.ink3}; opacity: 1; }
+  .zb-search button:focus-visible { outline: 2px solid ${ZB.accent}; outline-offset: 2px; }
+  @media (hover: hover) { .zb-search-row:hover { background: ${ZB.paper2} !important; } }
+`;
 
 function clientName(c) {
   return (c?.raison_sociale || `${c?.prenom || ""} ${c?.nom || ""}`.trim() || "—");
@@ -77,9 +87,10 @@ export default function SearchBar({ devis = [], clients = [], invoices = [], goD
   };
 
   return (
-    <div ref={wrapRef} style={{ position: "relative", padding: "10px 14px 0" }}>
+    <div ref={wrapRef} className="zb-search" style={{ position: "relative", padding: "10px 14px 0", fontFamily: ZB.font }}>
+      <style>{CSS}</style>
       <div style={{ position: "relative" }}>
-        <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "#9A8E82", pointerEvents: "none" }}>
+        <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: ZB.ink2, pointerEvents: "none", display: "flex" }}>
           {ICONS.search}
         </span>
         <input
@@ -89,19 +100,19 @@ export default function SearchBar({ devis = [], clients = [], invoices = [], goD
           onFocus={() => setOpen(true)}
           onKeyDown={onKey}
           placeholder="Rechercher client, devis, facture…"
+          aria-label="Rechercher un client, un devis ou une facture"
           style={{
-            width: "100%", boxSizing: "border-box",
-            paddingLeft: 34, paddingRight: 12, paddingTop: 9, paddingBottom: 9,
-            fontSize: 14, borderRadius: 12,
-            border: "1px solid #E8E2D8", background: "white",
-            outline: "none", color: "#1A1612", fontFamily: "inherit",
-            boxShadow: open && query.length >= 2 ? "0 0 0 2px #E8E2D8" : "none",
+            width: "100%", boxSizing: "border-box", minHeight: 44,
+            paddingLeft: 38, paddingRight: q ? 48 : 12, paddingTop: 10, paddingBottom: 10,
+            fontSize: 16, borderRadius: 8,
+            border: `1px solid ${ZB.rule}`, background: ZB.sheet,
+            outline: "none", color: ZB.ink, fontFamily: "inherit",
           }}
         />
         {q && (
-          <button onClick={() => { setQ(""); setOpen(false); inputRef.current?.focus(); }}
-            style={{ position: "absolute", right: 9, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#9A8E82", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: 2 }}>
-            ×
+          <button type="button" aria-label="Effacer la recherche" onClick={() => { setQ(""); setOpen(false); inputRef.current?.focus(); }}
+            style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)", width: 44, height: 44, display: "grid", placeItems: "center", background: "none", border: "none", color: ZB.ink2, cursor: "pointer", padding: 0 }}>
+            {ICONS.clear}
           </button>
         )}
       </div>
@@ -109,43 +120,36 @@ export default function SearchBar({ devis = [], clients = [], invoices = [], goD
       {open && query.length >= 2 && (
         <div style={{
           position: "absolute", top: "calc(100% + 4px)", left: 14, right: 14,
-          background: "white", borderRadius: 14, border: "1px solid #E8E2D8",
-          boxShadow: "0 8px 32px rgba(0,0,0,.12)", zIndex: 100, overflow: "hidden",
+          background: ZB.sheet, borderRadius: 10, border: `1px solid ${ZB.rule}`,
+          boxShadow: "0 10px 30px rgba(26,22,18,.16)", zIndex: 100, overflow: "hidden",
         }}>
           {results.length === 0 ? (
-            <div style={{ padding: "14px 16px", fontSize: 13, color: "#9A8E82", textAlign: "center" }}>
+            <div style={{ padding: "14px 16px", fontSize: 15, color: ZB.ink2, textAlign: "center" }}>
               Aucun résultat pour « {q} »
             </div>
           ) : results.map((r, i) => (
-            <button key={i} onClick={() => navigate(r)}
+            <button key={i} type="button" className="zb-search-row" onClick={() => navigate(r)}
               style={{
-                width: "100%", display: "flex", alignItems: "center", gap: 10,
-                padding: "10px 14px", background: "none", border: "none",
-                borderTop: i > 0 ? "1px solid #F0EBE3" : "none",
-                cursor: "pointer", textAlign: "left",
+                width: "100%", minHeight: 52, display: "flex", alignItems: "center", gap: 12,
+                padding: "8px 14px", background: "none", border: "none",
+                borderTop: i > 0 ? `1px solid ${ZB.ruleSoft}` : "none",
+                cursor: "pointer", textAlign: "left", fontFamily: "inherit", color: ZB.ink,
               }}
-              onMouseOver={e => e.currentTarget.style.background = "#FAF7F2"}
-              onMouseOut={e => e.currentTarget.style.background = "none"}
             >
-              <span style={{
-                width: 26, height: 26, borderRadius: 8, flexShrink: 0,
-                background: `${COLORS[r.type]}18`,
-                color: COLORS[r.type],
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
+              <span style={{ width: 22, height: 22, flexShrink: 0, color: ZB.ink2, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {ICONS[r.type]}
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1612", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: ZB.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {r.label}
                 </div>
                 {r.sub && (
-                  <div style={{ fontSize: 11, color: "#9A8E82", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <div style={{ fontSize: 13, color: ZB.ink2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {r.sub}
                   </div>
                 )}
               </div>
-              <span style={{ fontSize: 10, color: COLORS[r.type], fontWeight: 600, background: `${COLORS[r.type]}18`, padding: "2px 7px", borderRadius: 6, flexShrink: 0 }}>
+              <span style={{ fontSize: 13, color: ZB.ink2, fontWeight: 600, flexShrink: 0 }}>
                 {LABELS[r.type]}
               </span>
             </button>

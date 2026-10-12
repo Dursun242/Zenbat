@@ -1,5 +1,7 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { searchTrades, tradesLabels, TRADE_EXAMPLES } from "../../lib/trades.js"
+import { ZB } from "../../lib/theme.js"
+import { inputStyle, Iclose, Iplus, Isearch } from "./shared.jsx"
 
 const MAX_TRADES = 10
 const normalize = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
@@ -26,6 +28,19 @@ export default function TradesStep({ local, set }) {
 
   const removeTrade = (label) => set("trades", currentTrades.filter(t => t !== label))
 
+  // « Tout effacer » demande un second appui (annulé après 4 s).
+  const [armedClear, setArmedClear] = useState(false)
+  useEffect(() => {
+    if (!armedClear) return
+    const t = setTimeout(() => setArmedClear(false), 4000)
+    return () => clearTimeout(t)
+  }, [armedClear])
+  const clearAll = () => {
+    if (!armedClear) { setArmedClear(true); return }
+    setArmedClear(false)
+    set("trades", [])
+  }
+
   const handleTradeKey = (e) => {
     if (e.key === "Enter" || e.key === ",") {
       e.preventDefault()
@@ -43,31 +58,38 @@ export default function TradesStep({ local, set }) {
     : []
   const showExact = tradeInput.trim() && !dropdownSuggestions.some(s => normalize(s) === normalize(tradeInput.trim()))
 
+  const dropdownOpen = showSuggest && tradeInput.trim() && (dropdownSuggestions.length > 0 || showExact)
+
   return (
     <div className="pop" style={{display:"flex",flexDirection:"column",gap:14}}>
+      <style>{TRADES_CSS}</style>
 
       {/* Tags sélectionnés */}
       {currentTrades.length > 0 ? (
-        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6,alignItems:"center"}}>
           {currentTrades.map(t=>(
-            <span key={t} style={{display:"inline-flex",alignItems:"center",gap:5,background:"#1e3a2f",border:"1px solid #22c55e",borderRadius:20,padding:"5px 12px",fontSize:13,color:"#86efac",fontWeight:600}}>
+            <span key={t} style={{display:"inline-flex",alignItems:"center",minHeight:44,background:ZB.accentSoft,border:`1px solid ${ZB.rule}`,borderRadius:8,padding:"0 0 0 12px",fontSize:15,color:ZB.ink,fontWeight:600}}>
               {t}
-              <button onClick={()=>removeTrade(t)} style={{background:"none",border:"none",color:"#4ade80",cursor:"pointer",fontSize:16,lineHeight:1,padding:"0 0 0 2px"}}>×</button>
+              <button type="button" onClick={()=>removeTrade(t)} aria-label={`Retirer ${t}`}
+                style={{width:40,height:44,display:"grid",placeItems:"center",background:"none",border:"none",color:ZB.ink2,cursor:"pointer",padding:0}}>{Iclose}</button>
             </span>
           ))}
-          <button onClick={()=>set("trades",[])} style={{background:"none",border:"1px solid #3D3028",borderRadius:20,padding:"5px 10px",fontSize:11,color:"#6B6358",cursor:"pointer"}}>Tout effacer</button>
+          <button type="button" onClick={clearAll}
+            style={{background:"none",border:"none",minHeight:44,padding:"0 8px",fontSize:15,fontWeight:armedClear?700:600,color:armedClear?ZB.danger:ZB.ink2,cursor:"pointer",fontFamily:"inherit"}}>
+            {armedClear ? "Appuie encore pour tout effacer" : "Tout effacer"}
+          </button>
         </div>
       ) : (
-        <div style={{color:"#6B6358",fontSize:12,lineHeight:1.6}}>
-          ex : <span style={{color:"#6B6358"}}>{TRADE_EXAMPLES.slice(0,4).join(", ")}…</span>
+        <div style={{color:ZB.ink2,fontSize:14,lineHeight:1.5}}>
+          ex : {TRADE_EXAMPLES.slice(0,4).join(", ")}…
         </div>
       )}
 
       {/* Champ de saisie + dropdown */}
       {currentTrades.length < MAX_TRADES && (
         <div style={{position:"relative"}}>
-          <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:"#6B6358"}}>
-            <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:ZB.ink3,display:"flex"}}>
+            {Isearch}
           </span>
           <input
             ref={tradeRef}
@@ -76,32 +98,29 @@ export default function TradesStep({ local, set }) {
             onKeyDown={handleTradeKey}
             onFocus={()=>setShowSuggest(true)}
             onBlur={()=>setTimeout(()=>setShowSuggest(false),150)}
-            placeholder="Tapez votre métier… (Électricité, Coiffure, Dev web…)"
-            style={{width:"100%",background:"#2A231C",border:`1.5px solid ${showSuggest&&tradeInput?"#22c55e":"#3D3028"}`,borderRadius:showSuggest&&(dropdownSuggestions.length>0||showExact)?"10px 10px 0 0":"10px",padding:"11px 34px 11px 36px",fontSize:13,color:"white",outline:"none",boxSizing:"border-box",transition:"border-color .15s"}}
+            placeholder="Tape ton métier… (Électricité, Coiffure, Dev web…)"
+            aria-label="Ajouter un métier"
+            style={{...inputStyle,borderRadius:dropdownOpen?"8px 8px 0 0":8,padding:"11px 44px 11px 40px"}}
           />
           {tradeInput && (
-            <button onMouseDown={e=>{e.preventDefault();setTradeInput("");setShowSuggest(false)}}
-              style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#6B6358",cursor:"pointer",fontSize:18,lineHeight:1}}>×</button>
+            <button type="button" aria-label="Effacer la saisie" onMouseDown={e=>{e.preventDefault();setTradeInput("");setShowSuggest(false)}}
+              style={{position:"absolute",right:2,top:"50%",transform:"translateY(-50%)",width:44,height:44,display:"grid",placeItems:"center",background:"none",border:"none",color:ZB.ink2,cursor:"pointer",padding:0}}>{Iclose}</button>
           )}
 
           {/* Dropdown */}
-          {showSuggest && tradeInput.trim() && (dropdownSuggestions.length > 0 || showExact) && (
-            <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#2A231C",border:"1.5px solid #22c55e",borderTop:"none",borderRadius:"0 0 10px 10px",overflow:"hidden",zIndex:100,boxShadow:"0 8px 24px rgba(0,0,0,.4)"}}>
+          {dropdownOpen && (
+            <div style={{position:"absolute",top:"100%",left:0,right:0,background:ZB.sheet,border:`1px solid ${ZB.rule}`,borderTop:"none",borderRadius:"0 0 8px 8px",overflow:"hidden",zIndex:100,boxShadow:"0 10px 30px rgba(26,22,18,.16)"}}>
               {dropdownSuggestions.map((s,i)=>(
-                <button key={s} onMouseDown={()=>addTrade(s)}
-                  style={{width:"100%",background:"none",border:"none",padding:"10px 14px",textAlign:"left",color:"#cbd5e1",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:8,borderTop:i>0?"1px solid rgba(255,255,255,.05)":"none"}}
-                  onMouseEnter={e=>{e.currentTarget.style.background="#253448";e.currentTarget.style.color="white"}}
-                  onMouseLeave={e=>{e.currentTarget.style.background="none";e.currentTarget.style.color="#cbd5e1"}}>
-                  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{color:"#6B6358",flexShrink:0}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <button key={s} type="button" className="zb-opt" onMouseDown={()=>addTrade(s)}
+                  style={{width:"100%",minHeight:44,background:ZB.sheet,border:"none",padding:"10px 14px",textAlign:"left",color:ZB.ink,fontSize:15,cursor:"pointer",display:"flex",alignItems:"center",gap:10,borderTop:i>0?`1px solid ${ZB.ruleSoft}`:"none",fontFamily:"inherit"}}>
+                  <span style={{color:ZB.ink3,display:"flex",flexShrink:0}}>{Isearch}</span>
                   {s}
                 </button>
               ))}
               {showExact && (
-                <button onMouseDown={()=>addTrade(tradeInput)}
-                  style={{width:"100%",background:"#0f2318",border:"none",borderTop:"1px solid rgba(34,197,94,.2)",padding:"10px 14px",textAlign:"left",color:"#22c55e",fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:8}}
-                  onMouseEnter={e=>e.currentTarget.style.background="#1e3a2f"}
-                  onMouseLeave={e=>e.currentTarget.style.background="#0f2318"}>
-                  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <button type="button" className="zb-opt" onMouseDown={()=>addTrade(tradeInput)}
+                  style={{width:"100%",minHeight:44,background:ZB.sheet,border:"none",borderTop:`1px solid ${ZB.ruleSoft}`,padding:"10px 14px",textAlign:"left",color:ZB.accent,fontSize:15,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontFamily:"inherit"}}>
+                  {Iplus}
                   Ajouter « {tradeInput.trim()} »
                 </button>
               )}
@@ -111,15 +130,17 @@ export default function TradesStep({ local, set }) {
       )}
 
       {currentTrades.length === 0 && !tradeInput && (
-        <div style={{color:"#6B6358",fontSize:11,lineHeight:1.5}}>
-          Tous les métiers sont acceptés — BTP, artisanat, beauté, tech, transport, santé, créatif, événementiel, immobilier, mode… ou le vôtre. Tapez librement et cliquez sur « Ajouter » si votre métier n'est pas dans la liste.
+        <div style={{color:ZB.ink2,fontSize:14,lineHeight:1.5}}>
+          Tous les métiers sont acceptés — BTP, artisanat, beauté, tech, transport, santé, créatif, événementiel, immobilier, mode… ou le tien. Tape librement et appuie sur « Ajouter » si ton métier n'est pas dans la liste.
         </div>
       )}
 
-      <div style={{fontSize:11,color:currentTrades.length>=MAX_TRADES?"#f59e0b":"#6B6358",textAlign:"right"}}>
+      <div style={{fontSize:13,fontWeight:600,color:currentTrades.length>=MAX_TRADES?ZB.warn:ZB.ink2,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>
         {currentTrades.length} / {MAX_TRADES}
         {currentTrades.length>=MAX_TRADES&&" — maximum atteint"}
       </div>
     </div>
   )
 }
+
+const TRADES_CSS = `@media (hover: hover) { .zb-opt:hover { background: ${ZB.paper2} !important; } }`

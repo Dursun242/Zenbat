@@ -291,7 +291,7 @@ export default function App() {
     {
       id: "voice",
       label: "Démarrage vocal",
-      hint: "Dictez votre devis, l'IA le rédige",
+      hint: "Dicte ton devis, l'IA le rédige",
       icon: I.spark,
       onClick: () => { setTab("agent"); try { localStorage.setItem("agentIA_autoStartMic", "1"); } catch {} },
     },
