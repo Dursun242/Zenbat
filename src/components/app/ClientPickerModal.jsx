@@ -1,6 +1,16 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useModalGuard } from "../../hooks/useModalGuard.js";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
+import { ZB } from "../../lib/theme.js";
+
+const CSS = `
+  .zb-picker input:focus { border-color: ${ZB.accent} !important; }
+  .zb-picker input::placeholder { color: ${ZB.ink3}; opacity: 1; }
+  .zb-picker button:focus-visible { outline: 2px solid ${ZB.accent}; outline-offset: -2px; }
+  @media (hover: hover) { .zb-picker-row:not([aria-current="true"]):hover { background: ${ZB.paper2} !important; } }
+`;
+
+const CheckIcon = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>;
 
 function clientLabel(c) {
   return c?.raison_sociale || `${c?.prenom || ""} ${c?.nom || ""}`.trim() || "—";
@@ -13,6 +23,11 @@ export default function ClientPickerModal({ clients = [], current, onSelect, onC
 
   useModalGuard(true, onClose);
   useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   // Filtre memoizé sur la valeur debounced : la liste ne se recalcule pas
   // à chaque frappe (visible côté UX comme un lag sur les comptes ayant
@@ -28,47 +43,60 @@ export default function ClientPickerModal({ clients = [], current, onSelect, onC
     );
   }, [clients, debouncedQ]);
 
+  const rowStyle = {
+    width: "100%", minHeight: 56, padding: "10px 18px", border: "none", borderBottom: `1px solid ${ZB.ruleSoft}`,
+    cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 12, fontFamily: "inherit", color: ZB.ink,
+  };
+
   return (
     <div
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 300, display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+      style={{ position: "fixed", inset: 0, background: "rgba(26,22,18,.55)", zIndex: 300, display: "flex", alignItems: "flex-end", justifyContent: "center", fontFamily: ZB.font, color: ZB.ink }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ background: "white", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: 480, maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
+      <style>{CSS}</style>
+      <div role="dialog" aria-modal="true" aria-labelledby="client-picker-title" className="zb-picker"
+        style={{ background: ZB.paper, borderRadius: "10px 10px 0 0", width: "100%", maxWidth: 480, maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
         {/* Header */}
-        <div style={{ padding: "18px 18px 10px", borderBottom: "1px solid #F0EBE3", flexShrink: 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <span style={{ fontWeight: 700, fontSize: 15, color: "#1A1612" }}>Choisir un client</span>
-            <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, color: "#9A8E82", cursor: "pointer", lineHeight: 1 }}>×</button>
+        <div style={{ padding: "6px 6px 12px 18px", borderBottom: `1px solid ${ZB.rule}`, flexShrink: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <h2 id="client-picker-title" style={{ margin: 0, fontWeight: 700, fontSize: 19, color: ZB.ink }}>Choisir un client</h2>
+            <button type="button" onClick={onClose} aria-label="Fermer"
+              style={{ width: 44, height: 44, display: "grid", placeItems: "center", background: "none", border: "none", color: ZB.ink2, cursor: "pointer" }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
           </div>
-          <input
-            ref={inputRef}
-            value={q}
-            onChange={e => setQ(e.target.value)}
-            placeholder="Rechercher…"
-            style={{ width: "100%", boxSizing: "border-box", border: "1px solid #E8E2D8", borderRadius: 10, padding: "8px 12px", fontSize: 14, outline: "none", fontFamily: "inherit", color: "#1A1612" }}
-          />
+          <div style={{ paddingRight: 12 }}>
+            <input
+              ref={inputRef}
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="Rechercher…"
+              aria-label="Rechercher un client"
+              style={{ width: "100%", minHeight: 44, boxSizing: "border-box", background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 8, padding: "10px 12px", fontSize: 16, outline: "none", fontFamily: "inherit", color: ZB.ink }}
+            />
+          </div>
         </div>
 
         {/* Liste */}
-        <div style={{ overflowY: "auto", flex: 1 }}>
+        <div style={{ overflowY: "auto", flex: 1, background: ZB.sheet }}>
           {requireEmail && (
-            <div style={{ margin: "10px 14px 4px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10, padding: "10px 12px", display: "flex", alignItems: "flex-start", gap: 8 }}>
-              <span style={{ fontSize: 15, lineHeight: "1.3", flexShrink: 0 }}>✉️</span>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#92400e", marginBottom: 2 }}>Email requis</div>
-                <div style={{ fontSize: 11, color: "#b45309", lineHeight: "1.4" }}>Choisissez un client avec une adresse email pour la signature électronique.</div>
-              </div>
+            <div style={{ margin: "12px 14px 4px", background: ZB.paper2, border: `1px solid ${ZB.rule}`, borderRadius: 8, padding: "10px 12px" }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: ZB.ink, marginBottom: 2 }}>Email requis</div>
+              <div style={{ fontSize: 14, color: ZB.ink2, lineHeight: 1.4 }}>Choisis un client avec une adresse email pour la signature électronique.</div>
             </div>
           )}
           {/* Option "sans client" */}
           <button
+            type="button"
+            className="zb-picker-row"
+            aria-current={!current ? "true" : undefined}
             onClick={() => { onSelect(null); onClose(); }}
-            style={{ width: "100%", padding: "12px 18px", background: current ? "none" : "#f0fdf4", border: "none", borderBottom: "1px solid #FAF7F2", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ width: 32, height: 32, borderRadius: 10, background: "#F0EBE3", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>—</span>
-            <span style={{ fontSize: 13, color: "#6B6358", fontStyle: "italic" }}>Sans client</span>
+            style={{ ...rowStyle, background: current ? "none" : ZB.accentSoft }}>
+            <span style={{ flex: 1, fontSize: 15, color: ZB.ink2, fontStyle: "italic" }}>Sans client</span>
+            {!current && <span style={{ color: ZB.accent, display: "flex" }}>{CheckIcon}</span>}
           </button>
 
           {filtered.length === 0 && debouncedQ.trim() && (
-            <div style={{ padding: "20px 18px", fontSize: 13, color: "#9A8E82", textAlign: "center" }}>
+            <div style={{ padding: "20px 18px", fontSize: 15, color: ZB.ink2, textAlign: "center" }}>
               Aucun client trouvé pour « {debouncedQ} »
             </div>
           )}
@@ -80,19 +108,17 @@ export default function ClientPickerModal({ clients = [], current, onSelect, onC
             const noEmail    = requireEmail && !c.email;
             return (
               <button key={c.id}
+                type="button"
+                className="zb-picker-row"
+                aria-current={isCurrent ? "true" : undefined}
                 onClick={() => { onSelect(c); onClose(); }}
-                style={{ width: "100%", padding: "11px 18px", background: isCurrent ? "#f0fdf4" : "none", border: "none", borderBottom: "1px solid #FAF7F2", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 10, opacity: noEmail ? 0.65 : 1 }}
-                onMouseOver={e => { if (!isCurrent) e.currentTarget.style.background = "#FAF7F2"; }}
-                onMouseOut={e  => { if (!isCurrent) e.currentTarget.style.background = "none"; }}>
-                <span style={{ width: 32, height: 32, borderRadius: 10, background: isCurrent ? "#dcfce7" : "#F0EBE3", color: isCurrent ? "#16a34a" : "#6B6358", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
-                  {label.charAt(0).toUpperCase()}
-                </span>
+                style={{ ...rowStyle, background: isCurrent ? ZB.accentSoft : "none", opacity: noEmail ? 0.65 : 1 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1612", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</div>
-                  {sub && <div style={{ fontSize: 11, color: "#9A8E82", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</div>}
-                  {noEmail && <span style={{ display: "inline-block", fontSize: 10, fontWeight: 600, color: "#c2410c", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 20, padding: "1px 7px", marginTop: 3 }}>sans email</span>}
+                  <div style={{ fontSize: 15, fontWeight: 600, color: ZB.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</div>
+                  {sub && <div style={{ fontSize: 13, color: ZB.ink2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</div>}
+                  {noEmail && <span style={{ display: "inline-block", fontSize: 12, fontWeight: 600, color: ZB.ink2, border: `1px solid ${ZB.rule}`, borderRadius: 3, padding: "0 5px", marginTop: 4 }}>sans email</span>}
                 </div>
-                {isCurrent && <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 700, flexShrink: 0 }}>✓ actuel</span>}
+                {isCurrent && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13, color: ZB.accent, fontWeight: 700, flexShrink: 0 }}>{CheckIcon}actuel</span>}
               </button>
             );
           })}
