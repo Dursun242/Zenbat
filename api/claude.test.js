@@ -750,3 +750,140 @@ describe("quota IA compté côté serveur (migration 0059)", () => {
     expect(ko.statusCode).toBe(400);
   });
 });
+
+describe("comptes gratuits : modèle et max_tokens bornés", () => {
+  const authed = () => getUserMock.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.fr" } }, error: null });
+  const okAi = () => global.fetch.mockResolvedValue({ ok: true, status: 200, headers: { get: () => null }, json: async () => ({ content: [{ text: "ok" }] }) });
+  const sentPayload = () => JSON.parse(global.fetch.mock.calls[0][1].body);
+  const body = { model: "claude-sonnet-4-6", max_tokens: 8000, messages: [{ role: "user", content: "hi" }] };
+
+  beforeEach(() => { rpcMock.mockReset(); rpcMock.mockResolvedValue({ data: 1, error: null }); });
+  afterEach(() => rpcMock.mockReset());
+
+  it("free : Sonnet ramené à Haiku et max_tokens plafonné à 6000", async () => {
+    authed();
+    setupSupabaseProfile("free", 0);
+    okAi();
+    const res = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body }), res);
+    expect(res.statusCode).toBe(200);
+    expect(sentPayload()).toMatchObject({ model: "claude-haiku-4-5-20251001", max_tokens: 6000 });
+    expect(res.headers["X-AI-Model"]).toBe("claude-haiku-4-5-20251001");
+  });
+
+  it("free : une demande sous le plafond reste inchangée", async () => {
+    authed();
+    setupSupabaseProfile("free", 0);
+    okAi();
+    const res = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: { ...body, model: "claude-haiku-4-5-20251001", max_tokens: 800 } }), res);
+    expect(sentPayload()).toMatchObject({ model: "claude-haiku-4-5-20251001", max_tokens: 800 });
+  });
+
+  it("pro : modèle et max_tokens demandés conservés", async () => {
+    authed();
+    setupSupabaseProfile("pro", 0);
+    okAi();
+    const res = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body }), res);
+    expect(sentPayload()).toMatchObject({ model: "claude-sonnet-4-6", max_tokens: 8000 });
+  });
+
+  it("free en mode Mistral : max_tokens plafonné aussi", async () => {
+    process.env.MISTRAL_API_KEY = "mk";
+    authed();
+    setupSupabaseProfile("free", 0);
+    global.fetch.mockResolvedValue({ ok: true, status: 200, headers: { get: () => null }, json: async () => ({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }], usage: {} }) });
+    const res = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body }), res);
+    expect(sentPayload().max_tokens).toBe(6000);
+  });
+});
+
+describe("scrape_urls : quota par URL et redirections", () => {
+  const authed = () => getUserMock.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.fr" } }, error: null });
+  const html = () => {
+    let done = false;
+    return {
+      ok: true, status: 200,
+      headers: { get: (k) => (k.toLowerCase() === "content-type" ? "text/html" : null) },
+      body: {
+        getReader: () => ({
+          read: async () => {
+            if (done) return { done: true };
+            done = true;
+            return { done: false, value: new TextEncoder().encode("<html><body>Contact 06 12 34 56 78</body></html>") };
+          },
+          cancel: async () => {},
+        }),
+      },
+    };
+  };
+  const ai = () => ({ ok: true, status: 200, json: async () => ({ content: [{ text: '<CONTACT>{"nom":"X"}</CONTACT>' }], usage: { input_tokens: 1, output_tokens: 1 } }) });
+  const consumeCalls = () => rpcMock.mock.calls.filter(c => c[0] === "daily_quota_consume").length;
+  const refundCalls  = () => rpcMock.mock.calls.filter(c => c[0] === "daily_quota_refund").length;
+  const flush = () => new Promise(r => setTimeout(r, 0));
+
+  beforeEach(() => {
+    rpcMock.mockReset();
+    fromMock.mockImplementation((table) => {
+      if (table === "profiles") return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), single: vi.fn().mockResolvedValue({ data: { plan: "free" }, error: null }) };
+      if (table === "claude_api_logs") return { insert: vi.fn().mockResolvedValue({ data: null, error: null }) };
+      return { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), gte: vi.fn().mockResolvedValue({ count: 0 }) };
+    });
+  });
+  afterEach(() => rpcMock.mockReset());
+
+  it("consomme une unité par URL scrapée", async () => {
+    authed();
+    rpcMock.mockResolvedValue({ data: 1, error: null });
+    global.fetch.mockImplementation(async (url) => (String(url).includes("anthropic") ? ai() : html()));
+    const res = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: { scrape_urls: ["https://1.1.1.1/", "https://8.8.8.8/", "https://9.9.9.9/"] } }), res);
+    await flush();
+    expect(res.statusCode).toBe(200);
+    expect(res.body.results.every(r => r.contact)).toBe(true);
+    expect(consumeCalls()).toBe(3);
+    expect(refundCalls()).toBe(0);
+  });
+
+  it("quota épuisé en cours de lot : URLs en trop refusées, unités sans appel IA rendues", async () => {
+    authed();
+    let n = 0;
+    rpcMock.mockImplementation(async (fn) => ({ data: fn === "daily_quota_consume" ? (++n <= 2 ? n : null) : null, error: null }));
+    const res = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: { scrape_urls: ["http://127.0.0.1/", "ftp://x.fr/", "https://1.1.1.1/"] } }), res);
+    await flush();
+    expect(res.statusCode).toBe(200);
+    expect(consumeCalls()).toBe(3);
+    expect(res.body.results[2].error).toMatch(/Limite journalière/);
+    expect(refundCalls()).toBe(2); // les deux URLs refusées avant l'IA
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("aucune unité disponible → 429", async () => {
+    authed();
+    rpcMock.mockResolvedValue({ data: null, error: null });
+    const res = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: { scrape_urls: ["https://1.1.1.1/", "https://8.8.8.8/"] } }), res);
+    expect(res.statusCode).toBe(429);
+    expect(consumeCalls()).toBe(1);
+  });
+
+  it("refuse une redirection vers une IP privée (SSRF) sans appeler l'IA", async () => {
+    authed();
+    rpcMock.mockResolvedValue({ data: 1, error: null });
+    global.fetch.mockResolvedValueOnce({
+      ok: false, status: 302,
+      headers: { get: (k) => (k.toLowerCase() === "location" ? "http://169.254.169.254/latest/meta-data/" : null) },
+      body: { cancel: async () => {} },
+    });
+    const res = makeRes();
+    await handler(makeReq({ headers: { authorization: "Bearer t" }, body: { scrape_urls: ["https://1.1.1.1/"] } }), res);
+    await flush();
+    expect(res.body.results[0].error).toMatch(/privée/);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch.mock.calls[0][1].redirect).toBe("manual");
+    expect(refundCalls()).toBe(1);
+  });
+});

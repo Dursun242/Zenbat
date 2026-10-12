@@ -1,0 +1,45 @@
+# Intégration continue : tests (Vitest) + build de production (Vite) sur
+# chaque pull request et chaque push sur main. Aucun secret : le build n'a
+# besoin que de valeurs factices pour les variables VITE_* (sans elles il
+# passe aussi, avec des avertissements sur index.html).
+#
+# Node 22 : version de l'environnement de développement (le projet n'a ni
+# "engines" ni .nvmrc) ; Node 20 est en fin de vie depuis avril 2026.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Tests
+        run: npx vitest run
+
+      - name: Build
+        env:
+          VITE_SUPABASE_URL: https://ci-placeholder.supabase.co
+          VITE_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+        run: npm run build
