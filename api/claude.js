@@ -1,7 +1,7 @@
 import { cors } from "./_cors.js"
 import { consumeDailyQuota, refundDailyQuota } from "./_quota.js";
 import { authenticate, notifyTelegram } from "./_withAuth.js";
-import { assertPublicHost } from "./_ssrf.js";
+import { assertPublicHost, safeFetch } from "./_ssrf.js";
 import {
   aiProvider, missingAiKey, buildMistralBody, mistralFetchInit, mistralToAnthropic,
   mistralError, pipeMistralStream, completeText, MISTRAL_API_URL, mistralModel,
@@ -12,6 +12,13 @@ const ALLOWED_MODELS = [
   "claude-sonnet-4-6",
   "claude-sonnet-4-5",
 ];
+// Comptes gratuits : Haiku seulement (un modèle Sonnet demandé est ramené à
+// Haiku, sans erreur, pour ne pas casser un front configuré avec
+// VITE_CLAUDE_MODEL=sonnet) et max_tokens plafonné. 6000 = ce qu'envoie
+// l'Agent IA pour un devis complet (src/components/AgentIA.jsx).
+const FREE_MODEL       = "claude-haiku-4-5-20251001";
+const MAX_TOKENS_LIMIT = 8000;
+const FREE_MAX_TOKENS  = 6000;
 
 const MAX_SYSTEM_CHARS   = 80_000;
 const MAX_MESSAGES_CHARS = 40_000;
@@ -112,9 +119,10 @@ async function fetchHtml(url) {
   const ctrl = new AbortController();
   const timeout = setTimeout(() => ctrl.abort(), SCRAPE_FETCH_TIMEOUT_MS);
   try {
-    const resp = await fetch(url, {
+    // safeFetch : redirections suivies à la main (3 sauts max), chaque
+    // destination repassée par assertPublicHost (cf _ssrf.js).
+    const resp = await safeFetch(url, {
       signal: ctrl.signal,
-      redirect: "follow",
       headers: {
         "User-Agent":      "Mozilla/5.0 (compatible; ZenbatBot/1.0; +https://zenbat.fr)",
         "Accept":          "text/html,application/xhtml+xml",
@@ -145,7 +153,8 @@ async function fetchHtml(url) {
   }
 }
 
-async function scrapeOneUrl(rawUrl, { admin, user }) {
+async function scrapeOneUrl(rawUrl, { admin, user, reservation }) {
+  if (!reservation?.allowed) throw new Error("Limite journalière atteinte");
   let urlStr = String(rawUrl || "").trim();
   if (!urlStr) throw new Error("URL vide");
   // Si l'utilisateur a tapé un schéma explicite, on le respecte pour pouvoir
@@ -169,6 +178,9 @@ async function scrapeOneUrl(rawUrl, { admin, user }) {
     max_tokens:     800,
     anthropicModel: SCRAPE_MODEL,
   });
+  // L'IA a répondu : l'unité de quota est consommée même si l'extraction
+  // échoue ensuite.
+  reservation.consumed = true;
 
   if (usage) {
     admin.from("claude_api_logs").insert({
@@ -191,12 +203,29 @@ async function scrapeOneUrl(rawUrl, { admin, user }) {
   return { url: u.toString(), contact: parsed };
 }
 
-async function handleScrape(res, { urls, admin, user }) {
+// Une unité de quota IA par URL (chaque URL = un appel IA) : réservées une à
+// une avant le lot, puis rendues pour les URLs qui n'atteignent pas l'IA ou
+// dont l'appel IA échoue. Aucune unité disponible → 429.
+async function handleScrape(res, { urls, admin, user, reserve, release, quotaExceeded }) {
   if (!Array.isArray(urls) || urls.length === 0)
     return res.status(400).json({ error: "scrape_urls doit être un tableau non vide" });
   if (urls.length > SCRAPE_MAX_URLS)
     return res.status(400).json({ error: `Maximum ${SCRAPE_MAX_URLS} URLs par requête` });
-  const results = await Promise.allSettled(urls.map(u => scrapeOneUrl(u, { admin, user })));
+  const reservations = [];
+  for (let i = 0; i < urls.length; i++) {
+    const r = await reserve();
+    reservations.push(r);
+    if (!r.allowed) break; // quota épuisé : les URLs suivantes sont refusées
+  }
+  if (!reservations[0]?.allowed) return quotaExceeded();
+  const results = await Promise.allSettled(urls.map(async (u, i) => {
+    try {
+      return await scrapeOneUrl(u, { admin, user, reservation: reservations[i] });
+    } catch (err) {
+      if (reservations[i] && !reservations[i].consumed) release(reservations[i]);
+      throw err;
+    }
+  }));
   return res.status(200).json({
     results: results.map((r, i) => r.status === "fulfilled"
       ? { url: r.value.url, contact: r.value.contact }
@@ -286,10 +315,11 @@ export default async function handler(req, res) {
   // Détecté via la présence de `scrape_urls`. Court-circuite la validation
   // classique (model/messages/etc.) car le payload est différent.
   if (Array.isArray(req.body?.scrape_urls)) {
-    const reservation = await reserve();
-    if (!reservation.allowed) return quotaExceeded();
     try {
-      return await handleScrape(res, { urls: req.body.scrape_urls, admin, user });
+      return await handleScrape(res, {
+        urls: req.body.scrape_urls, admin, user, reserve, quotaExceeded,
+        release: (r) => releaseAiCall(admin, user.id, r),
+      });
     } catch (err) {
       console.error("[claude/scrape]", err?.message || err);
       return res.status(500).json({ error: "Erreur scrape" });
@@ -323,8 +353,8 @@ export default async function handler(req, res) {
 
   if (!model || typeof model !== "string" || !ALLOWED_MODELS.includes(model))
     return res.status(400).json({ error: "Paramètre 'model' manquant ou non autorisé" });
-  if (!max_tokens || typeof max_tokens !== "number" || max_tokens < 1 || max_tokens > 8000)
-    return res.status(400).json({ error: "Paramètre 'max_tokens' invalide (1–8000)" });
+  if (!max_tokens || typeof max_tokens !== "number" || max_tokens < 1 || max_tokens > MAX_TOKENS_LIMIT)
+    return res.status(400).json({ error: `Paramètre 'max_tokens' invalide (1–${MAX_TOKENS_LIMIT})` });
   if (!Array.isArray(messages) || messages.length === 0)
     return res.status(400).json({ error: "Paramètre 'messages' manquant ou vide" });
   if (temperature !== undefined && (typeof temperature !== "number" || temperature < 0 || temperature > 1))
@@ -343,6 +373,11 @@ export default async function handler(req, res) {
   if (images > MAX_IMAGES)
     return res.status(400).json({ error: `Trop d'images (max ${MAX_IMAGES})` });
 
+  // Compte gratuit : Haiku et max_tokens plafonné (coût par appel borné).
+  const isPro = effectivePlan === "pro";
+  const servedModel     = isPro ? model : FREE_MODEL;
+  const servedMaxTokens = isPro ? max_tokens : Math.min(max_tokens, FREE_MAX_TOKENS);
+
   const reservation = await reserve();
   if (!reservation.allowed) return quotaExceeded();
 
@@ -352,9 +387,9 @@ export default async function handler(req, res) {
   const isMistral = provider === "mistral";
   let payload;
   if (isMistral) {
-    payload = buildMistralBody({ system, messages, max_tokens, temperature, top_p, stream });
+    payload = buildMistralBody({ system, messages, max_tokens: servedMaxTokens, temperature, top_p, stream });
   } else {
-    payload = { model, max_tokens, messages };
+    payload = { model: servedModel, max_tokens: servedMaxTokens, messages };
     if (system && typeof system === "string")
       payload.system = [{ type: "text", text: system, cache_control: { type: "ephemeral" } }];
     if (stream === true) payload.stream = true;

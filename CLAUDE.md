@@ -9,7 +9,7 @@ Stack : React + Vite (frontend) · Vercel Serverless Functions (API) · Supabase
 
 ### Vercel : limite 12 fonctions serverless
 Le plan Hobby de Vercel autorise **maximum 12 fichiers** dans `/api/`.
-Fichiers actuels (11/12 — les helpers `_cors.js`, `_email.js`, `_rateLimit.js`, `_serverLog.js`, `_ssrf.js`, `_withAuth.js` ne comptent pas, `*.test.js` ignorés via `.vercelignore`, `fonts/` est un dossier d'assets) :
+Fichiers actuels (11/12 — les helpers `_ai.js`, `_cors.js`, `_email.js`, `_quota.js`, `_rateLimit.js`, `_serverLog.js`, `_ssrf.js`, `_withAuth.js` ne comptent pas, `*.test.js` ignorés via `.vercelignore`, `fonts/` est un dossier d'assets) :
 ```
 account.js             admin-delete-user.js   admin-stats.js     admin-user-detail.js
 claude.js              contact.js             crm.js             devis-public.js
@@ -74,6 +74,9 @@ async function getToken() {
 Ne jamais l'appliquer sur le padding-bottom (3e valeur du shorthand padding).
 Rappel : `padding: top right bottom left`.
 
+### CI GitHub
+`.github/workflows/ci.yml` lance `npm ci`, `npx vitest run` et `npm run build` (Node 22, sans secret) sur chaque pull request et chaque push sur `main`.
+
 ---
 
 ## Architecture
@@ -92,9 +95,9 @@ src/
   pages/
     Signup.jsx      — inscription 2 étapes (infos + métiers)
     Onboarding.jsx  — 6 étapes de configuration du profil
-    AdminPanel.jsx  — panel admin (accès réservé à ADMIN_EMAIL)
     DevisPublicPage.jsx — page publique de signature client. Phases : `loading` → `verify` (OTP) → `view` → `signing` (loader pendant génération + envoi PDF) → `accepted` / `refused`. Le PDF signé est généré côté navigateur (pdfBuilder) puis posté en base64 à `/api/devis-public` action `send_signed_pdf`.
   components/
+    AdminPanel.jsx  — panel admin (accès réservé à ADMIN_EMAIL)
     AgentIA.jsx     — agent IA de génération de devis (Claude API)
     Dashboard.jsx   — tableau de bord KPIs
     DevisDetail.jsx — détail + PDF d'un devis
@@ -111,12 +114,12 @@ Les endpoints admin vérifient en plus que `caller.email === ADMIN_EMAIL`.
 
 Helpers non déployés (préfixés `_`, importés par les endpoints) :
 - `_cors.js` — gestion CORS centralisée
-- `_email.js` — envoi email (Gmail SMTP via nodemailer, fallback Brevo)
+- `_email.js` — envoi email (Gmail SMTP via nodemailer, fallback Resend HTTP si `RESEND_API_KEY`)
 - `_withAuth.js` — middleware `authenticate(req, res, { adminOnly? })`
 - `_rateLimit.js` — rate-limiter in-memory par IP (utilisé sur `contact.js`, `newsletter.js`, `devis-public.js` action `request_otp`). Désactivé en env test (`VITEST`). ⚠ Best-effort : les compteurs sont remis à zéro à chaque recyclage d'instance Vercel.
 - `_serverLog.js` — log d'erreurs serveur vers la table `app_logs`.
 - `_ai.js` — sélection du fournisseur IA (`AI_PROVIDER`, sinon Mistral si `MISTRAL_API_KEY` posée, sinon Anthropic) + traduction Mistral ⇄ format Anthropic Messages (réponse, erreurs, flux SSE).
-- `_ssrf.js` — `assertPublicHost()` : bloque les URLs internes/privées avant un fetch sortant (utilisé par `crm.js` pour le scraping).
+- `_ssrf.js` — `assertPublicHost()` : bloque les URLs internes/privées avant un fetch sortant ; `safeFetch()` suit les redirections à la main (3 sauts max) en revérifiant chaque hôte (scraping de `claude.js` et `crm.js`).
 - `_quota.js` — quotas journaliers par utilisateur comptés en base (`consumeDailyQuota` / `refundDailyQuota`, migration 0059) : IA (`claude.js`) et emails envoyés par un artisan (`devis-public.js` send, `facturx.js` send, `account.js` export comptable).
 - `_email.js` exporte aussi `escapeHtml`, `safeColor`, `safeImageSrc` : toute donnée de `brand_data` insérée dans le HTML d'un email passe par eux.
 
@@ -126,7 +129,7 @@ Helpers non déployés (préfixés `_`, importés par les endpoints) :
 | `admin-delete-user.js` | Suppression compte par l'admin |
 | `admin-stats.js` | Stats globales + logs IA (conversations, erreurs, négatifs, feedback, newsletter, cohérence) — paramètre `?type=` |
 | `admin-user-detail.js` | Données complètes d'un utilisateur (profil, devis, factures, clients, IA) |
-| `claude.js` | Proxy IA (Claude **ou Mistral**, cf `_ai.js`) avec timeout 55s + AbortController. Le front parle toujours le format Anthropic ; en mode Mistral, requêtes/réponses/SSE sont traduites côté serveur. |
+| `claude.js` | Proxy IA (Claude **ou Mistral**, cf `_ai.js`) avec timeout 55s + AbortController. Le front parle toujours le format Anthropic ; en mode Mistral, requêtes/réponses/SSE sont traduites côté serveur. Comptes gratuits : modèle ramené à Haiku et `max_tokens` plafonné à 6000 (Pro : whitelist complète, 8000). `scrape_urls` consomme une unité de quota IA par URL. |
 | `contact.js` | Formulaire de contact public — POST avec honeypot anti-bot, envoie un email à l'admin |
 | `devis-public.js` | Endpoint public pour signature client de devis — token + OTP 8 chiffres + audit, multi-routes par `action` (`send`, `request_otp`, `verify_otp`, `accept`, `refuse`, `negotiate`, `artisan_respond`, `send_signed_pdf`). `send_signed_pdf` reçoit le PDF généré côté navigateur en base64 et l'email en pièce jointe au client + à l'artisan ; idempotence via audit log (`event = 'signed_pdf_sent'`). |
 | `facturx.js` | Génération PDF Factur-X (XML CII embarqué). Multi-actions par champ `action` du body : `action: 'emit'` = émission (montants recalculés depuis les lignes en base, puis `emit_invoice()` : numéro + date + verrou, migration 0060) ; par défaut = assemble + archive en Storage le Factur-X d'une facture **déjà émise** (numéro, dates, montants et lignes relus en base ; un brouillon reçoit 409 `emit_first`) ; `action: 'send'` = télécharge le PDF depuis Storage et l'envoie par email au client (au nom de `brand.companyName`, avec Reply-To = `brand.email`), met à jour `invoices.sent_to_client_at`. |

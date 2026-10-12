@@ -17,7 +17,7 @@
 import { cors }            from './_cors.js'
 import { authenticate }    from './_withAuth.js'
 import { sendEmail }       from './_email.js'
-import { assertPublicHost } from './_ssrf.js'
+import { assertPublicHost, safeFetch } from './_ssrf.js'
 import { timingSafeEqual } from 'crypto'
 import { createClient }    from '@supabase/supabase-js'
 
@@ -144,7 +144,8 @@ export default async function handler(req, res) {
           try {
             const ac = new AbortController()
             const t  = setTimeout(() => ac.abort(), 6000)
-            const r  = await fetch(pageUrl, {
+            // Redirections suivies à la main, chaque saut revérifié (SSRF).
+            const r  = await safeFetch(pageUrl, {
               signal: ac.signal,
               headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Zenbat/1.0 contact-finder)' }
             })
