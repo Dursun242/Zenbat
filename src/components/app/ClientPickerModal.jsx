@@ -95,7 +95,7 @@ export default function ClientPickerModal({
     cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 12, fontFamily: "inherit", color: ZB.ink,
   };
   const fieldStyle = {
-    width: "100%", minHeight: 48, boxSizing: "border-box", background: ZB.sheet, border: `1px solid ${ZB.rule}`,
+    width: "100%", minHeight: 48, boxSizing: "border-box", background: ZB.sheet, border: `1px solid ${ZB.field}`,
     borderRadius: 8, padding: "10px 12px", fontSize: 16, fontWeight: 500, outline: "none", fontFamily: "inherit", color: ZB.ink,
   };
 

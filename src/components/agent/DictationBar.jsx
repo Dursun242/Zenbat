@@ -107,7 +107,7 @@ const DictationBar = forwardRef(function DictationBar({
           </button>
 
           <div className="zb-dict-field" style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "flex-end", gap: 6, minHeight: 48, padding: "1px 1px 1px 12px",
-            borderRadius: 10, border: `1px solid ${micActive ? ZB.danger : ZB.rule}`, background: ZB.sheet, boxSizing: "border-box" }}>
+            borderRadius: 10, border: `1px solid ${micActive ? ZB.danger : ZB.field}`, background: ZB.sheet, boxSizing: "border-box" }}>
             <label htmlFor="zb-dictation" className="zb-sr">Décris tes travaux</label>
             <textarea id="zb-dictation" ref={inputRef} value={input} rows={1}
               onChange={e => setInput(e.target.value)}

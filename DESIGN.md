@@ -10,6 +10,7 @@ colors:
   ink-3: "#6E655B"
   rule: "#D9D2C5"
   rule-soft: "#ECE7DE"
+  field: "#8F857A"
   terre-cuite: "#A4461F"
   terre-cuite-deep: "#8E3B19"
   terre-cuite-soft: "#F6E7DF"
@@ -80,6 +81,7 @@ components:
   input:
     backgroundColor: "{colors.sheet}"
     textColor: "{colors.ink}"
+    borderColor: "{colors.field}"
     rounded: "{rounded.md}"
     height: "48px"
   mic-button:
@@ -128,7 +130,8 @@ Papier chaud, encre brun-noir, une terre cuite pour agir, un vert tampon pour ce
 - **Sur encre** (on-ink) et **sur encre 2** (on-ink-2) : texte actif et texte au repos sur les barres encre.
 - **Encre 2** (ink-2) : texte secondaire (date, sous-ligne « qté × PU », libellés de colonnes).
 - **Encre 3** (ink-3) : indications et valeurs vides (placeholder, total à 0,00 €, trait de plume).
-- **Filet** (rule) et **filet léger** (rule-soft) : séparations de lots et de lignes, bordures de champs.
+- **Filet** (rule) et **filet léger** (rule-soft) : séparations de lots et de lignes, contour de la feuille. Décoratifs (1,5:1), jamais seuls pour signaler un champ.
+- **Bordure de champ** (field, `--zb-field` / `ZB.field`, #8F857A) : contour des champs de saisie (input, textarea, select, trait pointillé des champs en ligne). 3,6:1 sur la feuille, 3,5:1 sur le papier, 3,2:1 sur le papier gris : au-dessus des 3:1 de WCAG 1.4.11, lisible en plein soleil.
 
 ### Semantic
 - **Rouge** (danger) : erreur de l'IA, micro en écoute (bouton stop), confirmation d'effacement.
@@ -186,13 +189,15 @@ Coins doux et sobres : 8px pour la feuille et les champs, 10px pour les boutons 
 - **Destructive:** « Tout effacer » en encre 2 ; premier appui → « Appuie encore pour tout effacer » en rouge, annulé après 4 s.
 
 ### Inputs / Fields
-- **Style:** fond feuille, filet de 1px, coins de 8px, texte 16px (pas de zoom iOS).
+- **Style:** fond feuille, bordure de 1px en `field` (pas en `rule`), coins de 8px, texte 16px (pas de zoom iOS).
 - **Focus:** la bordure passe en terre cuite.
 - **Error / Active:** bordure rouge pendant l'écoute du micro.
 
 ### Navigation
 - **Barre du haut :** fond papier, titre de l'écran en 22px/700 à gauche (« Devis », « Factures »…), indicateur d'enregistrement (vert tampon une fois enregistré) et bouton menu 44px à droite ; filet encre de 2px dessous. En PWA iOS, une bande encre de la hauteur de la barre d'état reste au-dessus (l'heure s'écrit en blanc). Les écrans ne répètent pas ce titre.
 - **Bandeau de quota (gratuit) :** papier gris sous la barre du haut, « N devis sur 5 cette semaine. » en encre 2 et lien terre cuite « Passer en Pro » ; fond rouge pâle une fois la limite atteinte.
+- **Bandeau « confirme ton email » :** sous la barre du haut, dans la colonne de l'app (il ne la rogne pas) ; papier gris et masquable les 7 premiers jours, terre cuite pâle et permanent ensuite ; texte encre 2 14px, lien terre cuite « Renvoyer l'email » (44px), pas d'icône emoji.
+- **Listes en chargement / en échec :** lignes squelettes papier gris (pulsation coupée en mouvement réduit), puis l'état vide seulement après un chargement réussi ; en échec, « Impossible de charger tes devis. » et un bouton secondaire « Réessayer ».
 - **Barre du bas (téléphone) :** 5 onglets encre (Accueil, Clients, Agent IA, Devis, Factures), libellés 12px sur encre 2, actif en blanc avec un trait terre cuite qui glisse en haut ; bouton central « Agent IA » en disque terre cuite cerné d'un anneau de la couleur de la barre, sans halo ; pastilles de compteur terre cuite.
 - **Barre latérale (ordinateur, 1024px et plus) :** même encre, rangées de 44px, actif en blanc gras souligné terre cuite sur un fond légèrement éclairci, pastilles terre cuite.
 - **Menu :** panneau feuille avec l'ombre des menus flottants, rangées de 44px avec icône 22px, déconnexion en rouge.

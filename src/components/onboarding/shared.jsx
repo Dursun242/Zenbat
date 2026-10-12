@@ -18,10 +18,10 @@ export function Logo({ size = 22, white = false }) {
   );
 }
 
-// Styles de formulaire communs (champs 48px, texte 16px, filet, 8px).
+// Styles de formulaire communs (champs 48px, texte 16px, bordure ZB.field ≥ 3:1, 8px).
 export const labelStyle = { display: "block", fontSize: 14, fontWeight: 600, color: ZB.ink2, marginBottom: 6 };
 export const inputStyle = {
-  width: "100%", minHeight: 48, background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 8,
+  width: "100%", minHeight: 48, background: ZB.sheet, border: `1px solid ${ZB.field}`, borderRadius: 8,
   padding: "11px 12px", fontSize: 16, color: ZB.ink, outline: "none", boxSizing: "border-box", fontFamily: "inherit",
 };
 export const textareaStyle = { ...inputStyle, minHeight: 0, resize: "vertical", lineHeight: 1.4 };
@@ -69,7 +69,7 @@ export function Field({ dark, label, val, onChange, placeholder, type = "text", 
       </span>
       <input type={type} value={val || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder}
         aria-required={required ? "true" : undefined} aria-invalid={invalid ? "true" : undefined}
-        style={{ ...inputStyle, borderColor: invalid ? ZB.danger : ZB.rule }}/>
+        style={{ ...inputStyle, borderColor: invalid ? ZB.danger : ZB.field }}/>
       {hint && <span style={{ ...hintStyle, display: "block", color: invalid ? ZB.danger : ZB.ink2, fontWeight: invalid ? 600 : 400 }}>{hint}</span>}
     </label>
   );

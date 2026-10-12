@@ -480,7 +480,7 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
                     <input type="range" min={1} max={maxAcomptePct} value={clampedPct} aria-label="Pourcentage de l'acompte"
                       onChange={e => setAcomptePct(Number(e.target.value))}
                       style={{ flex: 1, accentColor: ZB.accent, minHeight: 44 }}/>
-                    <label style={{ display: "flex", alignItems: "center", gap: 4, border: `1px solid ${ZB.rule}`, borderRadius: 8, padding: "0 10px", minHeight: 44 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 4, border: `1px solid ${ZB.field}`, borderRadius: 8, padding: "0 10px", minHeight: 44 }}>
                       <span className="zb-sr">Pourcentage</span>
                       <input type="number" inputMode="decimal" min={1} max={maxAcomptePct} value={clampedPct}
                         onChange={e => setAcomptePct(Math.min(maxAcomptePct, Math.max(1, Number(e.target.value))))}
@@ -490,7 +490,7 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
                   </div>
                 ) : (
                   <div style={{ marginBottom: 12 }}>
-                    <label style={{ display: "flex", alignItems: "center", gap: 8, border: `1px solid ${ZB.rule}`, borderRadius: 8, padding: "0 12px", minHeight: 48 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, border: `1px solid ${ZB.field}`, borderRadius: 8, padding: "0 12px", minHeight: 48 }}>
                       <span className="zb-sr">Montant HT de l'acompte</span>
                       <input type="number" inputMode="decimal" min={0} max={remainingHT} step="0.01"
                         value={acompteMontantHT} placeholder="0"
@@ -668,7 +668,7 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
                   <label htmlFor="dv-lieu" style={{ fontSize: 13, color: ZB.ink2, flexShrink: 0 }}>Lieu du chantier</label>
                   <input id="dv-lieu" value={d.ville_chantier || ""} readOnly={readOnly} placeholder="À préciser"
                     onChange={e => !readOnly && onChange({ ...d, ville_chantier: e.target.value })}
-                    style={{ flex: 1, minWidth: 0, minHeight: 36, padding: "4px 0", border: "none", borderBottom: `1px dotted ${ZB.rule}`, background: "none", fontFamily: "inherit", fontSize: 16, color: ZB.ink, outline: "none" }}/>
+                    style={{ flex: 1, minWidth: 0, minHeight: 36, padding: "4px 0", border: "none", borderBottom: `1px dotted ${ZB.field}`, background: "none", fontFamily: "inherit", fontSize: 16, color: ZB.ink, outline: "none" }}/>
                 </div>}
 
                 {/* Colonnes */}

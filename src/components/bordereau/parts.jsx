@@ -51,7 +51,7 @@ export const ICON = {
 
 export const fieldStyle = {
   width: "100%", minHeight: 44, padding: "10px 12px", boxSizing: "border-box",
-  border: `1px solid ${ZB.rule}`, borderRadius: 8, background: ZB.sheet,
+  border: `1px solid ${ZB.field}`, borderRadius: 8, background: ZB.sheet,
   fontFamily: "inherit", fontSize: 16, color: ZB.ink, outline: "none",
 };
 export const labelStyle = { display: "block", fontSize: 13, fontWeight: 600, color: ZB.ink2, marginBottom: 6 };

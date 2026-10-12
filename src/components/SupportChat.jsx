@@ -367,7 +367,7 @@ export default function SupportChat({ open, onClose }) {
                 style={{
                   flex: 1, minWidth: 0, resize: "none", minHeight: 48, maxHeight: 120,
                   padding: "12px 12px", lineHeight: 1.4,
-                  border: `1px solid ${ZB.rule}`, borderRadius: 8,
+                  border: `1px solid ${ZB.field}`, borderRadius: 8,
                   fontFamily: "inherit", fontSize: 16, color: ZB.ink, outline: "none",
                   background: ZB.sheet,
                 }}

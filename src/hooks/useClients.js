@@ -9,21 +9,33 @@ import { DEMO_CLIENTS } from "../lib/constants.js";
 import { logError } from "../lib/logger.js";
 
 export function useClients(user, { markSaving, markSaved, setSaveState, showErr }) {
-  const [clients, setClients] = useState(DEMO_CLIENTS);
+  // Connecté : liste vide jusqu'au premier chargement (cf. useDevis).
+  const [clients, setClients] = useState(() => (user ? [] : DEMO_CLIENTS));
+  const [loaded,    setLoaded]    = useState(!user);
+  const [loadError, setLoadError] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
     listClients()
-      .then(cs => { if (!cancelled) setClients(cs.length ? cs : []); })
+      .then(cs => {
+        if (cancelled) return;
+        setClients(cs.length ? cs : []);
+        setLoaded(true); setLoadError(null);
+      })
       .catch(err => {
         if (!cancelled) {
+          setLoadError(err || new Error("load clients failed"));
           console.error("[load clients]", err); showErr("Erreur de chargement — vérifie ta connexion");
           logError("load clients failed", err?.stack, { area: "clients-load", code: err?.code, msg: err?.message });
         }
       });
     return () => { cancelled = true; };
-  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id, reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Relance le chargement de la liste (bouton « Réessayer »).
+  const reload = () => { setLoadError(null); setReloadKey(k => k + 1); };
 
   const onSaveClient = async (c) => {
     const isNew = !clients.some(x => x.id === c.id);
@@ -60,5 +72,5 @@ export function useClients(user, { markSaving, markSaved, setSaveState, showErr 
     }
   };
 
-  return { clients, setClients, onSaveClient, onDeleteClient, onRestoreClient };
+  return { clients, setClients, loaded, loadError, reload, onSaveClient, onDeleteClient, onRestoreClient };
 }

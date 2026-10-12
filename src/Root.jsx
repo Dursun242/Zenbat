@@ -10,7 +10,6 @@ import Landing from './pages/Landing.jsx'
 import CGU from './pages/CGU.jsx'
 import DevisPublicPage from './pages/DevisPublicPage.jsx'
 import ContactPage from './pages/ContactPage.jsx'
-import EmailVerificationGate from './components/EmailVerificationGate.jsx'
 // CRM en import sync (utilisé par l'admin au quotidien — éliminer les
 // chunk errors prime sur les ~80 Ko de bundle initial supplémentaire).
 import CRM from './pages/CRM.jsx'
@@ -88,7 +87,8 @@ export default function Root() {
     if (!isConfirmed) {
       const ageDays = (Date.now() - new Date(user.created_at).getTime()) / 86_400_000
       const isBlocking = ageDays >= EMAIL_VERIFY_GRACE_DAYS
-      return <EmailVerificationGate blocking={isBlocking}><App /></EmailVerificationGate>
+      // Le bandeau est rendu par App, sous la barre du haut (cf. EmailVerificationBanner).
+      return <App emailVerification={{ blocking: isBlocking }} />
     }
     return <App />
   }
