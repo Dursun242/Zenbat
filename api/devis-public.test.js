@@ -783,6 +783,24 @@ describe('POST artisan_respond', () => {
     expect(typeof r.body.newHt).toBe('number')
   })
 
+  it("accept_client_changes : échec d'écriture en base → 500, devis pas déclaré accepté", async () => {
+    let call = 0
+    const devisUpdates = []
+    supabaseMock.from = vi.fn((table) => {
+      call++
+      if (call === 1) return makeChain({ data: { id: 'd1', numero: 'DEV-012', statut: 'en_negociation', owner_id: 'artisan-1', client_id: 'c1', lignes: [] }, error: null })
+      if (call === 2) return makeChain({ data: { id: 'n1', line_changes: [{ action: 'change_qty', ligne_id: 'x2', new_qty: 3 }], devis_id: 'd1' }, error: null })
+      if (table === 'lignes_devis') return makeChain({ data: null, error: { code: '23514', message: 'check violation' } })
+      const c = makeChain({ data: null, error: null })
+      if (table === 'devis') devisUpdates.push(c)
+      return c
+    })
+    const r = res()
+    await handler(req('POST', { action: 'artisan_respond', token: 'tok', response: 'accept_client_changes', negotiation_id: 'n1' }), r)
+    expect(r.statusCode).toBe(500)
+    expect(devisUpdates.some(c => c.update.mock.calls.length)).toBe(false)
+  })
+
   it('accept_client_changes ne touche que les lignes du devis (filtre devis_id)', async () => {
     const changes = [
       { action: 'remove', ligne_id: 'x1' },

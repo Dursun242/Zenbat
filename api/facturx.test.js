@@ -55,12 +55,43 @@ describe("buildXML — TVA", () => {
     expect(tag(xml, "ExemptionReason")[0]).toMatch(/283-2 nonies/);
   });
 
-  it("retenue de garantie déduite du net à payer", () => {
+  it("retenue de garantie : net à payer = TTC (BR-CO-16), retenue dans les conditions de paiement", () => {
     const xml = buildXML({
       invoice: { numero: "FAC-4", retenue_garantie_eur: 60, lignes: [ligne(1, 1000, 20)] },
       brand: brandNormal,
     });
-    expect(tag(xml, "DuePayableAmount")).toEqual(["1140.00"]);
+    expect(tag(xml, "DuePayableAmount")).toEqual(["1200.00"]);
+    expect(tag(xml, "Description")[0]).toMatch(/Retenue de garantie 60\.00 EUR/);
+  });
+
+  it("avoir : référence à la facture d'origine après les totaux (ordre du schéma CII)", () => {
+    const xml = buildXML({
+      invoice: { numero: "FAC-5", avoir_of_invoice_id: "x", lignes: [ligne(1, 100, 20)] },
+      brand: brandNormal,
+      sourceInvoice: { numero: "FAC-2", date_emission: "2026-10-01" },
+    });
+    expect(tag(xml, "TypeCode")).toContain("381");
+    const settlement = xml.slice(xml.indexOf("<ram:ApplicableHeaderTradeSettlement>"));
+    expect(settlement.indexOf("<ram:InvoiceCurrencyCode>")).toBeLessThan(settlement.indexOf("<ram:SpecifiedTradeSettlementHeaderMonetarySummation>"));
+    expect(settlement.indexOf("</ram:SpecifiedTradeSettlementHeaderMonetarySummation>")).toBeLessThan(settlement.indexOf("<ram:InvoiceReferencedDocument>"));
+  });
+
+  it("acheteur : n° de TVA (BT-48), exigé en autoliquidation", () => {
+    const xml = buildXML({
+      invoice: { numero: "FAC-6", auto_liquidation_btp: true, lignes: [ligne(1, 800, 20)] },
+      client: { raison_sociale: "Entreprise Générale", siret: "12345678900011", tva_intra: "FR12 345678901" },
+      brand: { ...brandNormal, siret: "98765432100022", tva: "FR98987654321" },
+    });
+    const buyer = xml.slice(xml.indexOf("<ram:BuyerTradeParty>"), xml.indexOf("</ram:BuyerTradeParty>"));
+    expect(buyer).toContain('<ram:ID schemeID="VA">FR12345678901</ram:ID>');
+  });
+
+  it("ligne à 0 % hors franchise : exonérée, sans citer l'art. 293 B", () => {
+    const xml = buildXML({
+      invoice: { numero: "FAC-7", lignes: [ligne(1, 100, 0), ligne(1, 100, 20)] },
+      brand: brandNormal,
+    });
+    expect(tag(xml, "ExemptionReason")).toEqual(["Opération exonérée de TVA"]);
   });
 });
 

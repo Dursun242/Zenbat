@@ -212,12 +212,10 @@ function NegotiateMode({ lignes, token, sessionId, accent, company, onDone, onCa
 
   const ouvrages = lignes.filter(l => l.type_ligne === 'ouvrage')
 
-  const newTotal = ouvrages
+  // Totaux HT par le calcul commun (lignes arrondies au centime).
+  const newTotal = computeTotals(ouvrages
     .filter(l => actions[l.id] !== 'remove')
-    .reduce((s, l) => {
-      const qty = qtys[l.id] !== undefined ? Number(qtys[l.id]) : (l.quantite || 0)
-      return s + qty * (l.prix_unitaire || 0)
-    }, 0)
+    .map(l => ({ ...l, quantite: qtys[l.id] !== undefined ? Number(qtys[l.id]) : (l.quantite || 0) }))).ht
 
   const buildChanges = () => {
     const changes = []
@@ -243,7 +241,7 @@ function NegotiateMode({ lignes, token, sessionId, accent, company, onDone, onCa
     } catch { setErr('Pas de connexion. Réessayez.') } finally { setBusy(false) }
   }
 
-  const origTotal = ouvrages.reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0), 0)
+  const origTotal = computeTotals(ouvrages).ht
   const diff = newTotal - origTotal
 
   return (

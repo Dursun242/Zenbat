@@ -184,6 +184,21 @@ export async function listDevis() {
   })
 }
 
+// Supabase (PostgREST) coupe une réponse à 1000 lignes par défaut, sans
+// erreur : au-delà, des devis s'afficheraient avec des lignes manquantes.
+// On lit donc par pages jusqu'à la dernière. `build` refait la requête à
+// chaque page (ordre stable : terminer par une colonne unique, ex. id).
+const PAGE_SIZE = 1000
+async function selectAll(build) {
+  const rows = []
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await build().range(from, from + PAGE_SIZE - 1)
+    if (error) return { data: null, error }
+    rows.push(...(data || []))
+    if (!data || data.length < PAGE_SIZE) return { data: rows, error: null }
+  }
+}
+
 // Liste les devis + leurs lignes en 2 requêtes (évite N+1).
 // withRetry : c'est LE chargement initial de l'app — un blip réseau ou une
 // base saturée ne doit pas afficher « Erreur de chargement » au 1er essai
@@ -191,8 +206,8 @@ export async function listDevis() {
 export async function listDevisWithLignes() {
   return withRetry(async () => {
     const [{ data: ds, error: e1 }, { data: ls, error: e2 }] = await Promise.all([
-      supabase.from('devis').select('*').is('deleted_at', null).order('created_at', { ascending: false }),
-      supabase.from('lignes_devis').select('*').order('position', { ascending: true }),
+      selectAll(() => supabase.from('devis').select('*').is('deleted_at', null).order('created_at', { ascending: false }).order('id')),
+      selectAll(() => supabase.from('lignes_devis').select('*').order('position', { ascending: true }).order('id')),
     ])
     if (e1) throw e1
     // Échec du SELECT lignes : on ne retourne PLUS silencieusement des devis
@@ -403,8 +418,8 @@ export async function listInvoices() {
     // anciennes (deleted_at) avant de réinsérer : sans ce filtre elles
     // revenaient en double au rechargement.
     const [{ data: inv, error: e1 }, { data: ls, error: e2 }] = await Promise.all([
-      supabase.from('invoices').select('*').is('deleted_at', null).order('created_at', { ascending: false }),
-      supabase.from('lignes_invoices').select('*').is('deleted_at', null).order('position'),
+      selectAll(() => supabase.from('invoices').select('*').is('deleted_at', null).order('created_at', { ascending: false }).order('id')),
+      selectAll(() => supabase.from('lignes_invoices').select('*').is('deleted_at', null).order('position').order('id')),
     ])
     if (e1) throw e1
     if (e2) throw e2

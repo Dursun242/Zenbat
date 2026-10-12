@@ -12,7 +12,8 @@ import { cors }         from './_cors.js'
 import { authenticate } from './_withAuth.js'
 import { rateLimit, sendRateLimited } from './_rateLimit.js'
 import { logServerError } from './_serverLog.js'
-import { safeColor, safeImageSrc } from './_email.js'
+import { safeColor, safeImageSrc, sendEmail } from './_email.js'
+import { computeTotals } from '../src/lib/invoiceCalc.js'
 import { consumeDailyQuota, refundDailyQuota, EMAIL_DAILY_LIMIT } from './_quota.js'
 import { createHash, randomInt } from 'crypto'
 import { createClient } from '@supabase/supabase-js'
@@ -30,46 +31,12 @@ const hashStr = s => createHash('sha256').update(String(s)).digest('hex')
 const genOtp  = () => randomInt(10_000_000, 100_000_000).toString()
 const fmtEur  = n => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n || 0)
 
-async function sendEmail({ to, subject, html, cc, fromName, attachments }) {
-  const gmailUser = process.env.GMAIL_USER
-  const gmailPass = process.env.GMAIL_APP_PASSWORD || process.env.GMAIL_APP_PASWORD
-  const displayName = fromName || 'Consulter votre devis'
-
-  if (gmailUser && gmailPass) {
-    const { createTransport } = await import('nodemailer')
-    const transporter = createTransport({
-      host: 'smtp.gmail.com', port: 587, secure: false,
-      auth: { user: gmailUser, pass: gmailPass },
-    })
-    await transporter.sendMail({
-      from: `${displayName} <${gmailUser}>`,
-      to, subject, html,
-      ...(cc ? { cc: Array.isArray(cc) ? cc.join(',') : cc } : {}),
-      ...(attachments?.length ? { attachments } : {}),
-    })
-    return
-  }
-
-  const key = process.env.RESEND_API_KEY
-  if (!key) throw new Error('Aucun service email configuré (GMAIL_USER+GMAIL_APP_PASSWORD ou RESEND_API_KEY)')
-  const payload = { from: process.env.RESEND_FROM || `${displayName} <onboarding@resend.dev>`, to, subject, html }
-  if (cc) payload.cc = Array.isArray(cc) ? cc : [cc]
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
-  if (!res.ok) {
-    const e = await res.json().catch(() => ({}))
-    throw new Error(e.message || `Resend ${res.status}`)
-  }
-}
 
 function notifyTg(kind, payload) {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) return
-  fetch(`${url}/functions/v1/notify-telegram`, {
+  if (!url || !key) return Promise.resolve()
+  return fetch(`${url}/functions/v1/notify-telegram`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify({ kind, payload }),
@@ -566,9 +533,10 @@ export default async function handler(req, res) {
       return res.status(502).json({ error: "Échec de l'envoi email. Vérifiez la configuration GMAIL ou réessayez." })
     }
 
-    await admin.from('devis').update({ statut: 'envoye', sent_to_client_at: new Date().toISOString() }).eq('id', devis.id)
+    const { error: sentErr } = await admin.from('devis').update({ statut: 'envoye', sent_to_client_at: new Date().toISOString() }).eq('id', devis.id)
+    if (sentErr) await logServerError('devis-public/send-status', sentErr, { devis_id: devis.id })
     await admin.from('devis_audit_log').insert({ devis_id: devis.id, event: 'sent', from_party: 'artisan', meta: { to: client.email } })
-    notifyTg('devis_sent', { numero: devis.numero, objet: devis.objet, montant_ht: devis.montant_ht, to: client.email, company })
+    await notifyTg('devis_sent', { numero: devis.numero, objet: devis.objet, montant_ht: devis.montant_ht, to: client.email, company })
 
     return res.status(200).json({ ok: true, publicUrl, token: publicToken })
   }
@@ -600,32 +568,48 @@ export default async function handler(req, res) {
       const qtyChanges = changes.filter(c => c.action === 'change_qty')
 
       // Filtre devis_id : une négociation ne peut toucher que les lignes de ce devis.
-      if (removedIds.length) await admin.from('lignes_devis').delete().in('id', removedIds).eq('devis_id', devis.id)
+      // supabase-js renvoie les erreurs sans les lever : chaque écriture est
+      // vérifiée, sinon le devis passerait « accepté » sur des lignes fausses.
+      const fail = async (step, err) => {
+        await logServerError(`devis-public/accept-changes/${step}`, err, { devis_id: devis.id, negotiation_id })
+        return res.status(500).json({ error: "Les modifications n'ont pas pu être appliquées. Réessaie." })
+      }
+      if (removedIds.length) {
+        const { error } = await admin.from('lignes_devis').delete().in('id', removedIds).eq('devis_id', devis.id)
+        if (error) return fail('delete', error)
+      }
       for (const qc of qtyChanges) {
-        await admin.from('lignes_devis').update({ quantite: Number(qc.new_qty) }).eq('id', qc.ligne_id).eq('devis_id', devis.id)
+        const { error } = await admin.from('lignes_devis').update({ quantite: Number(qc.new_qty) }).eq('id', qc.ligne_id).eq('devis_id', devis.id)
+        if (error) return fail('qty', error)
       }
 
-      const { data: newLignes } = await admin.from('lignes_devis')
+      const { data: newLignes, error: readErr } = await admin.from('lignes_devis')
         .select('quantite, prix_unitaire, type_ligne').eq('devis_id', devis.id)
-      const newHt = Math.round((newLignes || [])
-        .filter(l => l.type_ligne === 'ouvrage')
-        .reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0), 0) * 100) / 100
+      if (readErr) return fail('read', readErr)
+      // Même calcul que partout ailleurs (lignes arrondies au centime).
+      const newHt = computeTotals(newLignes || []).ht
 
-      await admin.from('devis').update({ statut: 'accepte', montant_ht: newHt, client_accepted_at: new Date().toISOString() }).eq('id', devis.id)
+      const { error: acceptErr } = await admin.from('devis').update({ statut: 'accepte', montant_ht: newHt, client_accepted_at: new Date().toISOString() }).eq('id', devis.id)
+      if (acceptErr) return fail('accept', acceptErr)
       await admin.from('devis_negotiations').update({ status: 'accepted' }).eq('id', negotiation_id).eq('devis_id', devis.id)
       await admin.from('devis_audit_log').insert({ devis_id: devis.id, event: 'accepted', from_party: 'artisan', meta: { via: 'client_changes', negotiation_id } })
 
       const { data: client } = await admin.from('clients').select('email, nom, prenom, raison_sociale').eq('id', devis.client_id).maybeSingle()
       if (client?.email) {
         const cName = (`${client.prenom || ''} ${client.nom || ''}`).trim() || client.raison_sociale || ''
-        sendEmail({ to: client.email, subject: `Devis ${devis.numero} accepté — vos modifications ont été prises en compte`, html: emailClientConfirm({ devis, clientName: cName, newHt }) }).catch(() => {})
+        await sendEmail({ to: client.email, subject: `Devis ${devis.numero} accepté — vos modifications ont été prises en compte`, html: emailClientConfirm({ devis, clientName: cName, newHt }) })
+          .catch(e => console.error('[accept-changes email]', e?.message))
       }
       return res.status(200).json({ ok: true, newHt })
     }
 
     if (response === 'refuse_client_changes') {
       await admin.from('devis_negotiations').update({ status: 'rejected' }).eq('id', negotiation_id).eq('devis_id', devis.id)
-      await admin.from('devis').update({ statut: 'envoye' }).eq('id', devis.id)
+      const { error: backErr } = await admin.from('devis').update({ statut: 'envoye' }).eq('id', devis.id)
+      if (backErr) {
+        await logServerError('devis-public/refuse-changes', backErr, { devis_id: devis.id, negotiation_id })
+        return res.status(500).json({ error: "La réponse n'a pas pu être enregistrée. Réessaie." })
+      }
       await admin.from('devis_audit_log').insert({ devis_id: devis.id, event: 'artisan_responded', from_party: 'artisan', meta: { response: 'refused', message: artisan_message || null } })
 
       // Notification client systématique : qu'il y ait un message libre
@@ -641,7 +625,7 @@ export default async function handler(req, res) {
         const company   = profile?.company_name || brand.companyName || ''
         const cName     = (`${client.prenom || ''} ${client.nom || ''}`).trim() || client.raison_sociale || ''
         const publicUrl = `${process.env.VITE_PUBLIC_URL || 'https://zenbat.vercel.app'}/d/${token}`
-        sendEmail({
+        await sendEmail({
           to: client.email,
           fromName: company ? `${company}` : 'Réponse devis',
           subject: `Votre demande de modification du devis ${devis.numero}${devis.objet ? ' — ' + devis.objet : ''}`,
@@ -747,9 +731,14 @@ export default async function handler(req, res) {
   const session = await verifySession(admin, token, body.session_id)
   if (!session) return res.status(401).json({ error: 'Session invalide ou expirée. Rafraîchissez la page.' })
 
-  const { data: devis } = await admin.from('devis')
-    .select('id, numero, objet, statut, owner_id, client_id, montant_ht, signed_at, signed_by, lignes:lignes_devis(*)')
-    .eq('public_token', token).maybeSingle()
+  // Repli 42703 : signed_by (migration 0007) manque sur certaines bases.
+  const CLIENT_DEVIS_SELECT = 'id, numero, objet, statut, owner_id, client_id, montant_ht, signed_at, signed_by, lignes:lignes_devis(*)'
+  let { data: devis, error: devisErr } = await admin.from('devis')
+    .select(CLIENT_DEVIS_SELECT).eq('public_token', token).maybeSingle()
+  if (devisErr?.code === '42703') {
+    ({ data: devis } = await admin.from('devis')
+      .select(CLIENT_DEVIS_SELECT.replace(', signed_by', '')).eq('public_token', token).maybeSingle())
+  }
   if (!devis) return res.status(404).json({ error: 'Devis introuvable' })
   // send_signed_pdf est exempt : il n'a de sens qu'après acceptation.
   if (action !== 'send_signed_pdf' && ['accepte', 'refuse', 'remplace'].includes(devis.statut))
@@ -894,7 +883,7 @@ export default async function handler(req, res) {
     }
     await admin.from('devis_negotiations').update({ status: 'superseded' }).eq('devis_id', devis.id).eq('status', 'pending')
     await admin.from('devis_audit_log').insert({ devis_id: devis.id, event: 'accepted', from_party: 'client', meta: { client_name: clean, ip } })
-    notifyTg('devis_accepted', { numero: devis.numero, objet: devis.objet, montant_ht: devis.montant_ht, client_name: clean })
+    await notifyTg('devis_accepted', { numero: devis.numero, objet: devis.objet, montant_ht: devis.montant_ht, client_name: clean })
     return res.status(200).json({ ok: true, signed_at: acceptedAt, signed_by: clean })
   }
 
@@ -910,7 +899,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Le refus n'a pas pu être enregistré, réessayez." })
     }
     await admin.from('devis_audit_log').insert({ devis_id: devis.id, event: 'refused', from_party: 'client', meta: { reason: reason.trim(), ip } })
-    notifyTg('devis_refused', { numero: devis.numero, objet: devis.objet, reason: reason.trim() })
+    await notifyTg('devis_refused', { numero: devis.numero, objet: devis.objet, reason: reason.trim() })
     return res.status(200).json({ ok: true })
   }
 
@@ -931,14 +920,14 @@ export default async function handler(req, res) {
 
     const removedIds = changes.filter(c => c.action === 'remove').map(c => c.ligne_id)
     const qtyChanges = changes.filter(c => c.action === 'change_qty')
-    const oldTotal   = Math.round(ouvrages.reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0), 0) * 100) / 100
-    const newTotal   = Math.round(ouvrages
+    // Totaux HT par le calcul commun (lignes arrondies au centime).
+    const oldTotal   = computeTotals(ouvrages).ht
+    const newTotal   = computeTotals(ouvrages
       .filter(l => !removedIds.includes(l.id))
-      .reduce((s, l) => {
-        const qc  = qtyChanges.find(c => c.ligne_id === l.id)
-        const qty = qc ? Number(qc.new_qty) : (l.quantite || 0)
-        return s + qty * (l.prix_unitaire || 0)
-      }, 0) * 100) / 100
+      .map(l => {
+        const qc = qtyChanges.find(c => c.ligne_id === l.id)
+        return { ...l, quantite: qc ? Number(qc.new_qty) : (l.quantite || 0) }
+      })).ht
 
     const { count: roundCount } = await admin.from('devis_negotiations')
       .select('id', { count: 'exact', head: true }).eq('devis_id', devis.id)
@@ -955,7 +944,7 @@ export default async function handler(req, res) {
     const { error: stUpdErr } = await admin.from('devis').update({ statut: 'en_negociation' }).eq('id', devis.id)
     if (stUpdErr) console.error('[negotiate] devis status update failed:', stUpdErr.code, stUpdErr.message, '— migration 0047 manquante ?')
     await admin.from('devis_audit_log').insert({ devis_id: devis.id, event: 'negotiation_sent', from_party: 'client', meta: { round: (roundCount || 0) + 1, new_total: newTotal, ip } })
-    notifyTg('devis_negotiation', { numero: devis.numero, objet: devis.objet, new_total: newTotal, message: message?.trim() || null, changes_count: changes.length })
+    await notifyTg('devis_negotiation', { numero: devis.numero, objet: devis.objet, new_total: newTotal, message: message?.trim() || null, changes_count: changes.length })
 
     // Email artisan — fire-and-forget : la négo est déjà enregistrée en
     // DB, l'email est une notification best-effort (ne bloque pas la
@@ -976,7 +965,7 @@ export default async function handler(req, res) {
       const clientName = (`${client?.prenom || ''} ${client?.nom || ''}`).trim() || client?.raison_sociale || ''
       const lignesMap  = new Map(ouvrages.map(l => [l.id, l]))
       const appUrl     = `${process.env.ZENBAT_APP_URL || process.env.VITE_PUBLIC_URL || 'https://zenbat.vercel.app'}/?tab=devis`
-      sendEmail({
+      await sendEmail({
         to: artisanEmail,
         fromName: 'Zenbat',
         subject: `Demande de modification — devis ${devis.numero}${devis.objet ? ' · ' + devis.objet : ''}`,

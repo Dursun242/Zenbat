@@ -29,7 +29,7 @@ export default function AdminQuotesSent({ data, loading, onRefresh }) {
             </span>
             {r.montant_ht ? (
               <span style={{ fontSize: 10, color: "#059669", fontWeight: 600 }}>
-                {fmtEur(r.montant_ht * 1.2)}
+                {fmtEur(r.montant_ht)} HT
               </span>
             ) : null}
             <span style={{ marginLeft: "auto", fontSize: 9, color: "#9A8E82" }}>

@@ -5,7 +5,8 @@
 //   await sendEmail({ to, subject, html, cc?, fromName?, replyTo?, attachments? })
 //
 // Format attachments (uniforme pour les deux providers) :
-//   [{ filename: 'foo.csv', content: '<base64-string>' }]
+//   [{ filename: 'foo.csv', content: '<base64-string>', contentType?, cid? }]
+// cid : image intégrée au HTML (<img src="cid:...">), ex. logo de l'artisan.
 // Le helper convertit pour chaque provider (nodemailer = encoding:'base64',
 // Resend HTTP = base64 brut).
 //
@@ -31,6 +32,7 @@ export async function sendEmail({ to, subject, html, cc, fromName, replyTo, atta
       content:  a.content,
       encoding: 'base64',
       ...(a.contentType ? { contentType: a.contentType } : {}),
+      ...(a.cid ? { cid: a.cid } : {}),
     }))
     await transporter.sendMail({
       from: `${displayName} <${gmailUser}>`,
@@ -55,6 +57,7 @@ export async function sendEmail({ to, subject, html, cc, fromName, replyTo, atta
     payload.attachments = attachments.map(a => ({
       filename: a.filename,
       content:  a.content, // base64
+      ...(a.cid ? { content_id: a.cid } : {}),
     }))
   }
 
