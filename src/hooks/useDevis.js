@@ -25,6 +25,7 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
   const [loadingDevis, setLoadingDevis] = useState(new Set());
   const [autoOpenPDF,  setAutoOpenPDF]  = useState(null);
   const saveTimers = useRef({});
+  const pendingLignes = useRef({});
 
   useEffect(() => {
     if (!user) return;
@@ -83,12 +84,20 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
 
   const scheduleDevisSave = (d, immediate = false, saveLignes = false) => {
     if (!user) return;
+    // Lignes à réécrire si UN des appels regroupés par l'attente de 800 ms
+    // les a modifiées : sinon une ligne éditée juste avant un changement de
+    // statut était perdue (seul le dernier appel comptait).
+    const withLignes = saveLignes || !!pendingLignes.current[d.id];
+    pendingLignes.current[d.id] = withLignes;
     const run = async () => {
       markSaving();
+      delete pendingLignes.current[d.id];
       const { lignes: dl, client, created_at, updated_at, id: _id, ...fields } = d;
+      // Lignes d'abord, statut ensuite : un devis passé « accepté » a ses
+      // lignes verrouillées en base (migration 0062).
       const persist = async () => {
+        if (withLignes) await replaceLignes(d.id, (dl || []).map(({ id, created_at, ...l }) => l));
         await apiUpdateDevis(d.id, fields);
-        if (saveLignes) await replaceLignes(d.id, (dl || []).map(({ id, created_at, ...l }) => l));
       };
       try {
         try {

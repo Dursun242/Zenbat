@@ -544,7 +544,7 @@ export default function DevisPublicPage({ token }) {
     // signature, double email, audit log dupliqué).
     if (busy || phase === 'signing' || phase === 'accepted') return
     if (!clientName.trim()) { setErr('Indiquez votre nom pour signer.'); return }
-    const ok = await post({ action: 'accept', client_name: clientName })
+    const ok = await post({ action: 'accept', client_name: clientName, content_sha256: data?.content_sha256 })
     if (!ok) return
     setPhase('signing')
     const result = await sendSignedPdf(clientName, ok.signed_at)
