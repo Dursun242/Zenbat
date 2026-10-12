@@ -20,7 +20,7 @@ import { authenticate } from "./_withAuth.js"
 import { sendEmail, safeColor } from "./_email.js"
 import { consumeDailyQuota, refundDailyQuota, EMAIL_DAILY_LIMIT } from "./_quota.js"
 import { logServerError } from "./_serverLog.js"
-import { computeTotals, isNoTva, lineRate, lineTotal, round2 } from "../src/lib/invoiceCalc.js"
+import { computeTotals, isNoTva, lineRate, lineTotal } from "../src/lib/invoiceCalc.js"
 
 const XML_FILENAME    = "factur-x.xml";
 // Profil EN 16931 (norme européenne, obligatoire PPF/PDP à partir de 09/2026).
@@ -29,6 +29,7 @@ const PROFILE         = "urn:cen.eu:en16931:2017";
 const CONFORMANCE_LABEL = "EN 16931";
 const FRANCHISE_NOTE  = "TVA non applicable, art. 293 B du CGI";
 const AUTOLIQ_NOTE    = "Autoliquidation — TVA due par le preneur, art. 283-2 nonies CGI";
+const EXEMPT_NOTE     = "Opération exonérée de TVA";
 
 // Codes de type de document (UNTDID 1001) :
 //   380 = Commercial invoice (facture standard)
@@ -71,9 +72,13 @@ export function buildXML({ invoice, client, brand, sourceInvoice }) {
   const noTva      = isNoTva(brand.vatRegime, autoLiq);
   const isAvoir    = !!invoice.avoir_of_invoice_id || !!sourceInvoice;
   const typeCode   = isAvoir ? TYPE_CREDIT : TYPE_INVOICE;
-  // Catégorie TVA (EN 16931) : AE = autoliquidation, E = exonéré (franchise),
-  // S = taux normal.
+  // Catégorie TVA (EN 16931) : AE = autoliquidation, E = exonéré (franchise
+  // ou ligne à 0 %), S = taux normal.
+  const franchise  = brand.vatRegime === "franchise";
   const categoryOf = (rate) => (autoLiq ? "AE" : rate > 0 ? "S" : "E");
+  // Motif d'exonération : la franchise cite l'art. 293 B ; une ligne à 0 %
+  // hors franchise (opération exonérée) ne doit pas s'en réclamer.
+  const exemptionOf = (cat) => (cat === "AE" ? AUTOLIQ_NOTE : franchise ? FRANCHISE_NOTE : EXEMPT_NOTE);
   const rateOf     = (l) => (noTva ? 0 : lineRate(l));
 
   // Montants recalculés depuis les lignes (calcul commun avec l'écran et le
@@ -84,7 +89,9 @@ export function buildXML({ invoice, client, brand, sourceInvoice }) {
   const totalTVA = totals.tva;
   const totalTTC = totals.ttc;
   const retenue  = Number(invoice.retenue_garantie_eur) || 0;
-  const duePayable = round2(totalTTC - retenue);
+  // BR-CO-16 : net à payer = TTC − déjà payé. La retenue de garantie n'est
+  // pas un paiement : elle est indiquée dans les conditions de paiement.
+  const duePayable = totalTTC;
 
   const sellerSiret = (brand.siret||"").replace(/\s+/g,"").slice(0,14);
   const sellerSiren = sellerSiret.slice(0,9);
@@ -129,7 +136,7 @@ export function buildXML({ invoice, client, brand, sourceInvoice }) {
 
   const taxBlocks = taxRows.map(t => {
     const r = t.rate, cat = categoryOf(r);
-    const exempt = cat==="S" ? "" : `<ram:ExemptionReason>${esc(cat === "AE" ? AUTOLIQ_NOTE : FRANCHISE_NOTE)}</ram:ExemptionReason>`;
+    const exempt = cat==="S" ? "" : `<ram:ExemptionReason>${esc(exemptionOf(cat))}</ram:ExemptionReason>`;
     return `
     <ram:ApplicableTradeTax>
       <ram:CalculatedAmount>${num(t.montant)}</ram:CalculatedAmount>
@@ -146,10 +153,17 @@ export function buildXML({ invoice, client, brand, sourceInvoice }) {
   const iban     = (brand?.iban || "").replace(/\s+/g, "");
   const bic      = (brand?.bic || "").trim();
 
+  // N° de TVA du vendeur (BT-31) et identifiant fiscal (BT-32, schemeID FC) :
+  // en franchise, sans n° de TVA, BT-32 est exigé par BR-E-02.
   const sellerTaxRegs = [
     brand.tva   ? `<ram:SpecifiedTaxRegistration><ram:ID schemeID="VA">${esc(brand.tva)}</ram:ID></ram:SpecifiedTaxRegistration>` : "",
     sellerSiret ? `<ram:SpecifiedTaxRegistration><ram:ID schemeID="FC">${esc(sellerSiret)}</ram:ID></ram:SpecifiedTaxRegistration>` : "",
   ].filter(Boolean).join("");
+  // N° de TVA de l'acheteur (BT-48), exigé en autoliquidation (BR-AE-02).
+  const buyerVat = (client?.tva_intra || "").replace(/\s+/g, "");
+  const buyerTaxReg = buyerVat
+    ? `<ram:SpecifiedTaxRegistration><ram:ID schemeID="VA">${esc(buyerVat)}</ram:ID></ram:SpecifiedTaxRegistration>`
+    : "";
 
   // Contact vendeur (BG-6) — requis en EN 16931 si un canal d'échange est connu.
   const sellerContactParts = [
@@ -224,13 +238,13 @@ export function buildXML({ invoice, client, brand, sourceInvoice }) {
           ${buyerAddr.city ? `<ram:CityName>${buyerAddr.city}</ram:CityName>` : ""}
           <ram:CountryID>FR</ram:CountryID>
         </ram:PostalTradeAddress>
+        ${buyerTaxReg}
       </ram:BuyerTradeParty>
     </ram:ApplicableHeaderTradeAgreement>
     <ram:ApplicableHeaderTradeDelivery>
       <ram:ActualDeliverySupplyChainEvent><ram:OccurrenceDateTime><udt:DateTimeString format="102">${issue}</udt:DateTimeString></ram:OccurrenceDateTime></ram:ActualDeliverySupplyChainEvent>
     </ram:ApplicableHeaderTradeDelivery>
     <ram:ApplicableHeaderTradeSettlement>
-      ${sourceRefBlock}
       <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
       ${iban ? `
       <ram:SpecifiedTradeSettlementPaymentMeans>
@@ -248,6 +262,7 @@ export function buildXML({ invoice, client, brand, sourceInvoice }) {
         <ram:GrandTotalAmount>${num(totalTTC)}</ram:GrandTotalAmount>
         <ram:DuePayableAmount>${num(duePayable)}</ram:DuePayableAmount>
       </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+      ${sourceRefBlock}
     </ram:ApplicableHeaderTradeSettlement>
   </rsm:SupplyChainTradeTransaction>
 </rsm:CrossIndustryInvoice>`;
