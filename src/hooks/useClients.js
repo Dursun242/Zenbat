@@ -18,7 +18,7 @@ export function useClients(user, { markSaving, markSaved, setSaveState, showErr 
       .then(cs => { if (!cancelled) setClients(cs.length ? cs : []); })
       .catch(err => {
         if (!cancelled) {
-          console.error("[load clients]", err); showErr("Erreur de chargement — vérifiez votre connexion");
+          console.error("[load clients]", err); showErr("Erreur de chargement — vérifie ta connexion");
           logError("load clients failed", err?.stack, { area: "clients-load", code: err?.code, msg: err?.message });
         }
       });

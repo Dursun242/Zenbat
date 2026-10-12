@@ -645,9 +645,9 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
 
                 <label htmlFor="dv-objet" className="zb-sr">Objet du devis</label>
                 <AutoTextarea id="dv-objet" value={d.objet || ""} readOnly={readOnly} placeholder="Objet du devis"
-                  onChange={v => onChange({ ...d, objet: v })}
+                  onChange={v => onChange({ ...d, objet: v })} className="zb-focus-ring"
                   style={{ display: "block", width: "100%", margin: "14px 0 0", padding: "4px 0", border: "none", resize: "none", overflow: "hidden",
-                    background: "none", fontFamily: "inherit", fontSize: 21, fontWeight: 700, lineHeight: 1.25, color: ZB.ink, outline: "none" }}/>
+                    background: "none", fontFamily: "inherit", fontSize: 21, fontWeight: 700, lineHeight: 1.25, color: ZB.ink }}/>
                 {(!readOnly || d.ville_chantier) && <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
                   <label htmlFor="dv-lieu" style={{ fontSize: 13, color: ZB.ink2, flexShrink: 0 }}>Lieu du chantier</label>
                   <input id="dv-lieu" value={d.ville_chantier || ""} readOnly={readOnly} placeholder="À préciser"

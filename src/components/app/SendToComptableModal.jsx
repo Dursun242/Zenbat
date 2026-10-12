@@ -29,13 +29,8 @@ export default function SendToComptableModal({ user, onClose }) {
   const [result, setResult]   = useState(null)
   const emailRef = useRef(null)
 
-  useModalGuard(true, onClose)
-
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape' && !loading) onClose?.() }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [loading, onClose])
+  // Échap ne ferme pas pendant l'envoi.
+  useModalGuard(true, onClose, { onEscape: () => { if (!loading) onClose?.() } })
 
   // Préremplir l'email comptable depuis profiles
   useEffect(() => {

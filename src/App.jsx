@@ -243,7 +243,7 @@ export default function App() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         const token = session?.access_token;
-        if (!token) throw new Error("Vous devez être connecté.");
+        if (!token) throw new Error("Tu dois être connecté.");
         const res  = await fetch('/api/stripe-checkout', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -413,7 +413,7 @@ export default function App() {
           {!checkoutError ? (
             <>
               <div style={{ fontSize: 16, color: "#1A1612", fontWeight: 600, marginBottom: 8 }}>Redirection vers le paiement…</div>
-              <div style={{ fontSize: 13, color: "#6B6358", lineHeight: 1.6 }}>Vous allez être redirigé vers Stripe pour finaliser votre abonnement.</div>
+              <div style={{ fontSize: 13, color: "#6B6358", lineHeight: 1.6 }}>Tu vas être redirigé vers Stripe pour finaliser ton abonnement.</div>
             </>
           ) : (
             <>
@@ -513,7 +513,9 @@ export default function App() {
         @media (max-width:1023px){.app-sidebar{display:none !important}}
         .app-sidebar button:hover{background:rgba(255,255,255,.06) !important;color:${ZB.onInk} !important}
         .app-sidebar button.active-nav:hover{background:rgba(255,255,255,.1) !important;color:#FFFFFF !important}
-        .app-sidebar button:focus-visible,.app-header button:focus-visible{outline:2px solid ${ZB.accent};outline-offset:2px}
+        .app-header button:focus-visible{outline:2px solid ${ZB.accent};outline-offset:2px}
+        /* Barre latérale encre : la terre cuite n'y atteint pas 3:1, anneau clair (comme la barre du bas) */
+        .app-sidebar button:focus-visible{outline:2px solid ${ZB.onInk};outline-offset:-2px}
       `}</style>
 
       {/* Header */}

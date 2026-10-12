@@ -1,4 +1,5 @@
 import { ZB } from "../../lib/theme.js";
+import { useModalGuard } from "../../hooks/useModalGuard.js";
 import { btnSecondary } from "../ui/Register.jsx";
 import { inputStyle, labelStyle } from "./shared.jsx";
 
@@ -8,6 +9,8 @@ export default function DeleteAccountModal({
   myEmail, confirm, setConfirm, busy, error, onClose, onConfirm,
 }) {
   const canConfirm = !busy && confirm.trim().toLowerCase() === (myEmail || "").toLowerCase();
+  // Échap, retour du téléphone : ferment comme « Annuler », sauf pendant la suppression.
+  useModalGuard(true, onClose, { onEscape: () => { if (!busy) onClose(); } });
   return (
     <div onClick={() => !busy && onClose()}
       style={{ position: "fixed", inset: 0, background: "rgba(26,22,18,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 200, fontFamily: ZB.font, color: ZB.ink }}>
