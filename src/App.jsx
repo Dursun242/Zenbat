@@ -44,12 +44,19 @@ import EmailVerificationBanner from "./components/app/EmailVerificationBanner.js
 import DevisDetail        from "./components/DevisDetail.jsx"
 import InvoiceDetail      from "./components/InvoiceDetail.jsx"
 import AgentIA            from "./components/AgentIA.jsx"
-import AdminPanel         from "./components/AdminPanel.jsx"
-import Onboarding         from "./pages/Onboarding.jsx"
 import TradesQuickPicker  from "./pages/TradesQuickPicker.jsx"
 import PaywallScreen      from "./pages/PaywallScreen.jsx"
 import PWAInstallScreen   from "./pages/PWAInstallScreen.jsx"
 import SubscriptionScreen from "./pages/SubscriptionScreen.jsx"
+
+// Exceptions, chargées à la demande : le panneau admin (une seule personne,
+// ~3 000 lignes avec admin/*) et l'onboarding (une fois par compte). Un
+// chunk périmé y est rattrapé par lazyWithReload (rechargement unique, cf.
+// src/lib/chunkReload.js) au lieu de remonter à l'ErrorBoundary.
+import { lazyWithReload } from "./lib/lazyWithReload.js"
+import { scheduleWarmPdfFonts } from "./lib/pdfFontsWarmup.js"
+const AdminPanel = lazyWithReload(() => import("./components/AdminPanel.jsx"))
+const Onboarding = lazyWithReload(() => import("./pages/Onboarding.jsx"))
 
 const ScreenLoader = () => (
   <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 200 }}>
@@ -94,6 +101,9 @@ function initialTabFromUrl() {
 export default function App({ emailVerification = null } = {}) {
   const [screen, setScreen] = useState("app");
   const [tab,    setTab]    = useState(initialTabFromUrl);
+  // Polices du PDF mises en cache local dès que le navigateur est libre
+  // (hors précache SW depuis l'allègement du premier chargement).
+  useEffect(() => scheduleWarmPdfFonts(), []);
   // Diagnostic d'affichage : 5 appuis rapides sur le logo de l'en-tête.
   const [diagOpen, setDiagOpen] = useState(false);
   const logoTapsRef = useRef([]);

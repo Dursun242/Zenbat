@@ -13,11 +13,27 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react':    ['react', 'react-dom'],
-          'vendor-supabase': ['@supabase/supabase-js'],
-          'vendor-pdf':      ['pdf-lib', '@pdf-lib/fontkit', 'jspdf'],
-          'vendor-motion':   ['framer-motion'],
+        // Fonction plutôt qu'objet : avec la forme objet, Rollup rangeait
+        // aussi dans ces chunks des modules partagés (helper de preload de
+        // Vite dans vendor-pdf, react/jsx-runtime dans vendor-motion), si
+        // bien que le chunk principal importait statiquement vendor-pdf
+        // (~115 Ko gzip) et vendor-motion (~44 Ko gzip) sur TOUTES les pages.
+        // Ici on ne range que les paquets nommés, le reste suit le graphe.
+        // Les helpers internes (preload de Vite, interop CommonJS) sont
+        // rangés d'office dans vendor-react, chargé au démarrage partout :
+        // sinon Rollup les absorbe dans le premier chunk manuel qui s'en
+        // sert (vendor-pdf, via les import() de jspdf).
+        manualChunks(id) {
+          if (id.includes('vite/preload-helper') || id.includes('commonjsHelpers')) return 'vendor-react'
+          if (!id.includes('/node_modules/')) return undefined
+          // react-dom/server ne sert qu'au prérendu (src/prerender.jsx,
+          // compilé dans le même build) : surtout pas dans vendor-react.
+          if (/\/react-dom\/(server|cjs\/react-dom-server)/.test(id)) return undefined
+          if (/\/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'vendor-react'
+          if (/\/node_modules\/@supabase\//.test(id)) return 'vendor-supabase'
+          if (/\/node_modules\/(pdf-lib|@pdf-lib|jspdf)\//.test(id)) return 'vendor-pdf'
+          if (/\/node_modules\/(framer-motion|motion-dom|motion-utils)\//.test(id)) return 'vendor-motion'
+          return undefined
         },
       },
     },
@@ -71,13 +87,28 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // ttf inclus : les fonts DejaVuSans + Caveat sont chargées via
-        // fetch() par pdfBuilder.js pour embarquement dans jsPDF. Sans ce
-        // precache, sur iOS Safari avec 4G lent ou si le SW intercepte
-        // mal, fetch peut renvoyer un timeout / HTML d'erreur → jsPDF
-        // plante avec "metadata.Unicode.widths undefined" à la 1re
-        // émission. Precaché = servi depuis le cache local, instantané.
+        // Polices du PDF (public/fonts : DejaVu + Caveat, ~1,8 Mo) : hors
+        // précache, en cache runtime CacheFirst (règle runtimeCaching plus
+        // bas). Le précache est téléchargé par TOUT navigateur qui enregistre
+        // le SW (visiteurs de la vitrine compris) alors que le PDF ne sert
+        // qu'aux artisans connectés. Historique : elles avaient été précachées
+        // parce qu'un fetch lent sur iOS 4G faisait planter jsPDF
+        // (« metadata.Unicode.widths undefined ») à la 1re émission. La
+        // garantie est conservée côté artisan : App.jsx met ces polices en
+        // cache au démarrage (src/lib/pdfFontsWarmup.js), et fetchFont
+        // (pdfBuilder.js) valide désormais statut, type et signature TTF.
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2,ttf}'],
+        // Hors précache (inutile hors ligne ou jamais chargé par le navigateur) :
+        // - villes/** : 36 pages SEO prérendues (~1,1 Mo) ; hors ligne,
+        //   index.html + le chunk VillePage suffisent à les afficher ;
+        // - fonts/** : polices du PDF, cache runtime (cf. ci-dessus) ;
+        // - assets/prerender-*.js : script de prérendu (build seulement).
+        globIgnores: [
+          '**/node_modules/**',
+          'villes/**',
+          'fonts/**',
+          'assets/prerender-*.js',
+        ],
         // Pas de fallback SPA pour : /api/, /sitemap.xml, /robots.txt,
         // /google*.html (vérification GSC). Sans ça, le Service Worker
         // intercepte ces requêtes et renvoie /index.html, ce qui casse
@@ -113,6 +144,18 @@ export default defineConfig({
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
             handler: 'NetworkOnly',
+          },
+          {
+            // Polices du PDF (DejaVu, Caveat) : réseau la première fois, puis
+            // cache local. Statuts 200 seulement (pas de page d'erreur HTML
+            // mise en cache, cf. fetchFont dans pdfBuilder.js).
+            urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/fonts/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'zenbat-pdf-fonts',
+              cacheableResponse: { statuses: [200] },
+              expiration: { maxEntries: 10 },
+            },
           },
         ],
       },

@@ -75,6 +75,9 @@ async function getToken() {
 Ne jamais l'appliquer sur le padding-bottom (3e valeur du shorthand padding).
 Rappel : `padding: top right bottom left`.
 
+### Découpage du bundle (chargement initial)
+`src/Root.jsx` charge chaque surface à la demande via `lazyWithReload` (`src/lib/lazyWithReload.js`, rechargement unique sur chunk périmé) : App, vitrine, connexion / inscription, CGU, contact, page publique `/d/`, CRM, villes. Dans `App.jsx`, seuls AdminPanel et Onboarding sont lazy ; les écrans du quotidien restent synchrones (pas de chunk error en pleine navigation). `manualChunks` est une fonction (`vite.config.js`) : ne pas revenir à la forme objet, qui faisait importer vendor-pdf et vendor-motion par le chunk principal. Trustpilot n'est chargé que par la vitrine (`LandingTrustpilot.jsx`) ; le SW n'est pas enregistré sur `/d/`.
+
 ### CI GitHub
 `.github/workflows/ci.yml` lance `npm ci`, `npx vitest run` et `npm run build` (Node 22, sans secret) sur chaque pull request et chaque push sur `main`.
 
@@ -108,6 +111,7 @@ src/
 Polices embarquées dans `/public/fonts/` (servies en TTF) :
 - `DejaVuSans.ttf` + `DejaVuSans-Bold.ttf` — police principale du PDF (Latin étendu, requise pour PDF/A-3 Factur-X).
 - `Caveat-Regular.ttf` — police manuscrite (OFL) utilisée uniquement pour le tracé du nom dans le cartouche signature client. Auto-shrink 22pt → 14pt si le nom déborde. Servie aussi en `@font-face` dans `src/index.css` pour que l'aperçu HTML matche le PDF exporté.
+- Hors précache PWA : cache runtime `zenbat-pdf-fonts` (CacheFirst, `vite.config.js`), rempli au démarrage de l'application par `src/lib/pdfFontsWarmup.js` (artisans connectés seulement).
 
 ### API Vercel (`/api`)
 Tous les endpoints vérifient le CORS via `ALLOWED_ORIGINS` et authentifient via `supabase.auth.getUser(token)`.
@@ -259,7 +263,7 @@ Pour changer de modèle : modifier la variable d'env `VITE_CLAUDE_MODEL` dans Ve
 ## Système de design « Bordereau »
 
 - `PRODUCT.md` : fiche produit (utilisateurs, ton, positionnement, accessibilité). `DESIGN.md` + `.impeccable/design.json` : système visuel (jetons, règles, composants). À lire avant tout travail d'interface.
-- Jetons : variables `--zb-*` dans `src/index.css`, miroir JS `ZB` / `NUM` dans `src/lib/theme.js`. Police Archivo Variable auto-hébergée (`@fontsource-variable/archivo`, importée dans `src/main.jsx`).
+- Jetons : variables `--zb-*` dans `src/index.css`, miroir JS `ZB` / `NUM` dans `src/lib/theme.js`. Police Archivo Variable auto-hébergée (`@fontsource-variable/archivo`, sous-ensembles latin + latin-ext déclarés dans `src/styles/archivo.css`, importé par `src/main.jsx`).
 - La couleur de l'artisan (`brand.color`) reste sur ses documents (PDF, page de signature) ; l'interface garde la terre cuite `#A4461F`.
 - Tutoiement dans l'application ; vouvoiement dans tout ce qui part chez le client (mails, PDF, page publique).
 - Pièces partagées : `src/components/bordereau/parts.jsx` (lignes, éditeur de ligne, lots, totaux — Agent IA, fiche devis, fiche facture, page client), `src/components/ui/Register.jsx` (listes : filtres en onglets, lignes de registre, menu « ⋯ »), `src/components/devis/StatusStamp.jsx` + `ui/Badge.jsx` (statuts : `STATUT` / `STATUT_FACTURE` = libellé + ton), `src/lib/todo.js` (liste « À faire » de l'accueil), `src/lib/color.js` (`readableAccent` : couleur de l'artisan lisible sur la page client).
