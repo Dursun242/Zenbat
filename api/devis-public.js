@@ -43,6 +43,18 @@ function notifyTg(kind, payload) {
   }).catch(e => console.error('[notifyTg]', e?.message))
 }
 
+// Empreinte du contenu signé : numéro, objet et lignes (ordre, désignation,
+// quantité, prix, TVA) + total HT. Conservée dans le journal d'audit à la
+// signature : on peut prouver plus tard que le devis n'a pas changé.
+function signedContentHash(devis) {
+  const lignes = [...(devis.lignes || [])]
+    .sort((a, b) => (a.position || 0) - (b.position || 0))
+    .map(l => [l.type_ligne || 'ouvrage', l.lot || '', l.designation || '', l.unite || '',
+      Number(l.quantite) || 0, Number(l.prix_unitaire) || 0, Number(l.tva_rate) || 0])
+  const canonical = JSON.stringify({ numero: devis.numero, objet: devis.objet || '', lignes, ht: computeTotals(devis.lignes || []).ht })
+  return createHash('sha256').update(canonical).digest('hex')
+}
+
 async function verifySession(admin, publicToken, sessionId) {
   if (!sessionId || !publicToken) return null
   const { data } = await admin.from('devis_otp_sessions')
@@ -417,6 +429,9 @@ export default async function handler(req, res) {
       client_refused_at:    devis.client_refused_at,
       client_refusal_reason: devis.client_refusal_reason,
       lignes:    ligneList,
+      // Empreinte du contenu affiché : renvoyée à la signature pour vérifier
+      // que le client signe bien ce qu'il a vu.
+      content_sha256:       signedContentHash(devis),
       tva_rate:             devis.tva_rate,
       auto_liquidation_btp: devis.auto_liquidation_btp,
       signed_at:            devis.signed_at,
@@ -801,6 +816,15 @@ export default async function handler(req, res) {
 
     const attachments = [{ filename, content: pdf_base64, encoding: 'base64', contentType: 'application/pdf' }]
 
+    // Archive du PDF signé côté serveur (dossier réservé au serveur,
+    // migration 0062) + empreinte, en plus de l'envoi par email.
+    const pdfBuffer   = Buffer.from(pdf_base64.replace(/\s/g, ''), 'base64')
+    const pdfSha256   = createHash('sha256').update(pdfBuffer).digest('hex')
+    const archivePath = `${devis.owner_id}/devis-signes/${String(devis.numero || 'devis').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80)}-${devis.id}.pdf`
+    const { error: archiveErr } = await admin.storage.from('devis-pdfs')
+      .upload(archivePath, pdfBuffer, { contentType: 'application/pdf', upsert: false })
+    if (archiveErr) await logServerError('devis-public/send_signed_pdf-archive', archiveErr, { devis_id: devis.id })
+
     const emailHtml = (greeting, intro) => `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
   <div style="max-width:520px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden">
     <div style="background:#22c55e;padding:24px;text-align:center">
@@ -846,7 +870,10 @@ export default async function handler(req, res) {
 
     // Finalise le log claimé plus haut avec le résultat réel des envois.
     await admin.from('devis_audit_log').update({
-      meta: { to_client: !!client?.email, to_artisan: !!artisanEmail, errors: errors.length ? errors : null, ip },
+      meta: {
+        to_client: !!client?.email, to_artisan: !!artisanEmail, errors: errors.length ? errors : null, ip,
+        pdf_sha256: pdfSha256, archive_path: archiveErr ? null : archivePath,
+      },
     }).eq('id', logRow.id)
     return res.status(200).json({ ok: true, sent: { client: !!client?.email && !errors.find(e => e.startsWith('client')), artisan: !!artisanEmail && !errors.find(e => e.startsWith('artisan')) }, errors: errors.length ? errors : undefined })
   }
@@ -855,6 +882,11 @@ export default async function handler(req, res) {
   if (action === 'accept') {
     const { client_name } = body
     if (!client_name?.trim()) return res.status(400).json({ error: 'Votre nom est requis pour accepter' })
+
+    // Le devis a changé depuis que le client l'a ouvert : il doit relire.
+    if (body.content_sha256 && body.content_sha256 !== signedContentHash(devis)) {
+      return res.status(409).json({ error: "Ce devis vient d'être modifié par l'entreprise. Rechargez la page pour voir la dernière version avant de signer.", code: 'content_changed' })
+    }
 
     const clean      = client_name.trim()
     const acceptedAt = new Date().toISOString()
@@ -882,7 +914,15 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "L'acceptation n'a pas pu être enregistrée, réessayez." })
     }
     await admin.from('devis_negotiations').update({ status: 'superseded' }).eq('devis_id', devis.id).eq('status', 'pending')
-    await admin.from('devis_audit_log').insert({ devis_id: devis.id, event: 'accepted', from_party: 'client', meta: { client_name: clean, ip } })
+    await admin.from('devis_audit_log').insert({
+      devis_id: devis.id, event: 'accepted', from_party: 'client',
+      meta: {
+        client_name: clean, ip,
+        user_agent: String(req.headers['user-agent'] || '').slice(0, 300) || null,
+        content_sha256: signedContentHash(devis),
+        montant_ht: computeTotals(devis.lignes || []).ht,
+      },
+    })
     await notifyTg('devis_accepted', { numero: devis.numero, objet: devis.objet, montant_ht: devis.montant_ht, client_name: clean })
     return res.status(200).json({ ok: true, signed_at: acceptedAt, signed_by: clean })
   }
