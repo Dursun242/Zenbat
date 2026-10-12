@@ -79,6 +79,8 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     return typeof d.objet === "string" ? d.objet : "";
   });
   const [visibleCount, setVisibleCount] = useState(0);
+  // Sous-traitance BTP signalée par l'IA : devis sans TVA, mention 283-2 nonies.
+  const [autoLiq,      setAutoLiq]      = useState(false);
   const [pickingClient, setPickingClient] = useState(false);
   // Suggestions cliquables adaptées au 1er secteur — anti-syndrome page blanche.
   // 4 exemples de devis typiques du métier pour démarrer en 1 clic.
@@ -187,7 +189,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   }, [lignes]);
 
   // Calcul commun (lib/invoiceCalc.js) : mêmes montants que le PDF et la facture.
-  const { ht, tvaRows, ttc } = computeTotals(lignes, { noTva: isNoTva(brand?.vatRegime) });
+  const { ht, tvaRows, ttc } = computeTotals(lignes, { noTva: isNoTva(brand?.vatRegime, autoLiq) });
 
 
   const send = async (overrideText) => {
@@ -330,6 +332,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
 
         if (resolvedObjet) setObjet(resolvedObjet);
         setLignes(resolvedLignes);
+        setAutoLiq(!!parsed.autoliquidation && brand?.vatRegime !== "franchise");
 
         if (validationResult.residual_issues?.length > 0) {
           residualWarning = "\n\nDevis vérifié automatiquement : quelques prix restent éloignés du marché, tu peux les ajuster.";
@@ -471,13 +474,14 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       statut: "brouillon",
       montant_ht: ht,
       tva_rate: 20,
+      ...(autoLiq ? { auto_liquidation_btp: true } : {}),
       date_emission: new Date().toISOString().split("T")[0],
       lignes,
     });
     setPickingClient(false);
     if (!ok) return;
     try { localStorage.removeItem(draftKey); } catch {}
-    setLignes([]); setObjet("");
+    setLignes([]); setObjet(""); setAutoLiq(false);
     setMsgs([{ role: "assistant", content: TX.quoteSaved }]);
     // Ouvre directement la vue PDF du devis fraîchement enregistré.
     // Fallback : redirige rapidement vers la liste (800 ms — le temps que
@@ -498,7 +502,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
     if (vote === 1) { setFeedback(prev => ({ ...prev, [noteIdx]: { vote: 1 } })); saveFeedback(noteIdx, 1); }
     else { setFeedback(prev => ({ ...prev, [noteIdx]: { vote: -1, showReason: true } })); setHistoryOpen(true); }
   };
-  const clearDevis = () => { try { localStorage.removeItem(draftKey); } catch {} setLignes([]); setObjet(""); setEditingId(null); };
+  const clearDevis = () => { try { localStorage.removeItem(draftKey); } catch {} setLignes([]); setObjet(""); setAutoLiq(false); setEditingId(null); };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: ZB.paper, fontFamily: ZB.font, color: ZB.ink }}>
@@ -506,6 +510,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
         <div style={{ maxWidth: 760, margin: "0 auto" }}>
           <Bordereau
             brand={brand}
+            autoLiq={autoLiq}
             objet={objet}
             onObjetChange={setObjet}
             lignes={lignes}

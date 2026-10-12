@@ -49,7 +49,7 @@ function WritingRows() {
 }
 
 export default function Bordereau({
-  brand, objet, onObjetChange, lignes, visibleCount, editingId, setEditingId,
+  brand, autoLiq = false, objet, onObjetChange, lignes, visibleCount, editingId, setEditingId,
   onLineChange, onLineDelete, onAddLine, ht, tvaRows, ttc, loading,
   quickStarts, onExample, onSave, onClear, onOpenCoherence, historySummary,
 }) {
@@ -76,7 +76,7 @@ export default function Bordereau({
   // Pendant la rédaction, le total des lignes déjà inscrites reste visible
   // en bas de l'écran (le bloc des totaux n'apparaît qu'à la fin).
   const writing = !empty && (!done || loading);
-  const running = writing ? computeTotals(lignes.slice(0, visibleCount), { noTva: isNoTva(brand?.vatRegime) }) : null;
+  const running = writing ? computeTotals(lignes.slice(0, visibleCount), { noTva: isNoTva(brand?.vatRegime, autoLiq) }) : null;
   const shownCount = writing ? lignes.slice(0, visibleCount).filter(l => l.type_ligne === "ouvrage").length : ouvrages;
   const shownHt = writing ? running.ht : ht;
 
@@ -186,13 +186,13 @@ export default function Bordereau({
       {writing && (
         <div style={{ position: "sticky", bottom: 0, zIndex: 1, margin: "0 -18px", padding: "12px 18px",
           display: "flex", justifyContent: "space-between", alignItems: "baseline", background: ZB.sheet, borderTop: `2px solid ${ZB.ink}` }}>
-          <span style={{ fontSize: 15, fontWeight: 700 }}>{franchise ? "Total" : "Total TTC"} <span style={{ fontWeight: 500, color: ZB.ink2 }}>en cours</span></span>
+          <span style={{ fontSize: 15, fontWeight: 700 }}>{franchise || autoLiq ? "Total HT" : "Total TTC"} <span style={{ fontWeight: 500, color: ZB.ink2 }}>en cours</span></span>
           <span style={{ fontSize: 22, fontWeight: 700, ...NUM }}>{fmt(running.ttc)}</span>
         </div>
       )}
 
       {/* Totaux */}
-      {done && ht > 0 && <Totals ht={ht} tvaRows={tvaRows} ttc={ttc} franchise={franchise}/>}
+      {done && ht > 0 && <Totals ht={ht} tvaRows={tvaRows} ttc={ttc} franchise={franchise} autoLiquidation={autoLiq}/>}
 
       {/* Actions */}
       {done && !loading && (

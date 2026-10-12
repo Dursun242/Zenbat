@@ -173,6 +173,8 @@ export function sanitizeDevisJson(parsed) {
     champs_a_completer: strArray(parsed.champs_a_completer),
     suggestions:        strArray(parsed.suggestions),
     target_total_ht:    parsed.target_total_ht ?? undefined,
+    // Sous-traitance BTP : la TVA est autoliquidée (art. 283-2 nonies CGI).
+    autoliquidation:    parsed.autoliquidation === true,
     project_params:     (parsed.project_params && typeof parsed.project_params === "object") ? parsed.project_params : {},
   };
 }

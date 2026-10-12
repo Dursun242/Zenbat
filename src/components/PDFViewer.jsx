@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react"
 import { fmt, fmtD } from "../lib/utils.js"
-import { computeTotals, isNoTva, lineRate } from "../lib/invoiceCalc.js"
+import { computeTotals, isNoTva, lineRate, lineTotal } from "../lib/invoiceCalc.js"
 import { useModalGuard } from "../hooks/useModalGuard.js"
+import { paymentPenaltiesText } from "../lib/constants.js"
 
 // Délais pour stabiliser la mesure de hauteur après changement de scale ;
 // le 1er essai capture le 1er layout, le 2nd attrape les ajustements
@@ -108,11 +109,16 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
   // Couleur d'accent du profil utilisateur, fallback terracotta historique.
   const terra = brand?.color || "#C97B5C"
   const baseDate = d.date_emission ? new Date(d.date_emission) : new Date()
-  const validUntil = isNaN(baseDate.getTime()) ? new Date() : baseDate
+  // Validité : la date enregistrée sur le devis si elle existe, sinon
+  // émission + délai de l'entreprise (même règle que pdfBuilder).
+  const savedValid = d.date_validite ? new Date(d.date_validite) : null
+  const validUntil = savedValid && !isNaN(savedValid.getTime())
+    ? savedValid
+    : new Date(isNaN(baseDate.getTime()) ? Date.now() : baseDate.getTime())
   // Cast Number explicite : si brand.validityDays vient d'un input mal
   // saisi (ex. "abc"), Number(...) || 30 retombe sur 30 au lieu d'un
   // setDate(NaN) qui rendrait validUntil invalide pour tout le PDF.
-  validUntil.setDate(validUntil.getDate() + (Number(brand.validityDays) || 30))
+  if (validUntil !== savedValid) validUntil.setDate(validUntil.getDate() + (Number(brand.validityDays) || 30))
   const clientName = cl?.raison_sociale || `${cl?.prenom||""}  ${cl?.nom||""}`.trim() || "—"
 
   const clientLines = [
@@ -120,6 +126,8 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
     [cl?.code_postal, cl?.ville].filter(Boolean).join(" "),
     cl?.email,
     cl?.telephone && `Tél : ${cl.telephone}`,
+    cl?.siret && `SIRET : ${cl.siret}`,
+    cl?.tva_intra && `TVA : ${cl.tva_intra}`,
   ].filter(Boolean)
 
   const companyLines = [
@@ -187,7 +195,7 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
                 <td colSpan={6} style={{padding:"6px 8px",fontWeight:700,fontSize:9.5,color:terra,textTransform:"uppercase",letterSpacing:".5px",borderBottom:`1px solid ${terra}44`,background:"#F0EBE3"}}>{l.designation}</td>
               </tr>
             )
-            const total = (l.quantite||0)*(l.prix_unitaire||0)
+            const total = lineTotal(l)
             return (
               <tr key={l.id} style={{background:i%2?"#f8f9fb":"white",borderBottom:"1px solid #e5e7eb"}}>
                 <td style={{padding:"5px 8px"}}>{l.designation}</td>
@@ -329,6 +337,9 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
           {d?.auto_liquidation_btp && (
             <div style={{fontWeight:600,color:"#6b7280",marginBottom:2}}>Autoliquidation — TVA due par le preneur, art. 283-2 nonies du CGI</div>
           )}
+          {!noTva && tvaRows.some(r => r.rate === 5.5 || r.rate === 10) && (
+            <div style={{marginBottom:2}}>Taux réduit de TVA : le client certifie que les travaux portent sur des locaux à usage d'habitation achevés depuis plus de deux ans (art. 278-0 bis A et 279-0 bis du CGI).</div>
+          )}
           {brand.mentionsLegales}
           {(() => {
             // Ligne identité légale consolidée : forme juridique + capital + SIRET + RCS + TVA intra
@@ -341,8 +352,8 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
             ].filter(Boolean).join(" · ");
             return parts ? <div>{parts}</div> : (brand.siret ? <div>SIRET {brand.siret}</div> : null);
           })()}
-          {kind === "facture" && brand.paymentPenalties && (
-            <div style={{marginTop:3}}>{brand.paymentPenalties}</div>
+          {kind === "facture" && paymentPenaltiesText(brand) && (
+            <div style={{marginTop:3}}>{paymentPenaltiesText(brand)}</div>
           )}
           {kind === "facture" && brand.escompte && (
             <div>{brand.escompte}</div>

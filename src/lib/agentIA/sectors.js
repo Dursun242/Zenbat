@@ -110,14 +110,14 @@ export const SECTOR_TVA = {
   Isolation thermique (combles, murs, plancher bas), PAC (air/air, air/eau, géothermique), chaudière biomasse, chauffe-eau thermodynamique, panneaux solaires thermiques, VMC double flux, fenêtres et portes-fenêtres double/triple vitrage, volets isolants. RGE souvent exigé pour accès aux aides clients.
 
 ▸ 10 % (art. 279-0 bis CGI) — Rénovation/entretien dans logement d'habitation achevé depuis > 2 ans :
-  Tous les autres travaux : plomberie, électricité, peinture, carrelage, couverture, maçonnerie d'entretien, menuiserie de remplacement (hors critères énergétiques), sanitaire, charpente de réfection. Les fournitures incluses dans la même facture sont aussi à 10 % si elles ne dépassent pas 30 % du prix total HT.
+  Tous les autres travaux : plomberie, électricité, peinture, carrelage, couverture, maçonnerie d'entretien, menuiserie de remplacement (hors critères énergétiques), sanitaire, charpente de réfection. Les fournitures posées par l'entreprise suivent le taux des travaux.
 
 ▸ 20 % — Taux normal :
   Construction neuve, extension, surélévation, locaux à usage professionnel/commercial, logement achevé depuis < 2 ans, fournitures vendues sans pose, modification de structure portante. Maçonnerie de gros œuvre même sur bâtiment existant si elle crée de la surface ou modifie la structure.
 
-⚠ Règle des 30 % : si les fournitures dépassent 30 % du prix total HT, facturer les fournitures à 20 % et la main-d'œuvre au taux réduit applicable. Séparer en lots distincts dans le JSON.
-⚠ Attestation simplifiée : le client doit remettre une attestation certifiant que le local est un logement à usage d'habitation achevé depuis > 2 ans. Sans attestation signée, applique 20 % par défaut.
-⚠ Autoliquidation sous-traitance (art. 283-2 nonies CGI) : si l'utilisateur mentionne l'un de ces signaux — "sous-traitant", "sous-traitance", "promoteur", "maître d'œuvre", "entreprise générale", "donneur d'ordre", "constructeur", "maître d'ouvrage délégué", ou si le client est clairement une société du bâtiment (SAS, SARL, EI assujettie à la TVA) — la TVA est autoliquidée par le donneur d'ordre. Dans ce cas : tva_rate = 0 sur TOUTES les lignes ET ajoute la mention "Autoliquidation de la TVA — art. 283-2 nonies CGI. TVA due par le preneur assujetti." dans l'objet du devis ou dans un lot dédié de type commentaire.
+⚠ Fournitures vendues sans pose : 20 %, même dans un logement ancien.
+⚠ Taux réduit (5,5 % ou 10 %) : depuis 2025, l'attestation papier est remplacée par une mention du client sur le devis ou la facture certifiant que le local est un logement d'habitation achevé depuis plus de 2 ans. Si l'âge ou l'usage du logement est inconnu, applique le taux réduit seulement s'il est très probable (rénovation d'une maison ou d'un appartement existant) et note-le dans "champs_a_completer".
+⚠ Autoliquidation (art. 283-2 nonies CGI) : UNIQUEMENT quand l'utilisateur dit travailler EN SOUS-TRAITANCE pour une autre entreprise du bâtiment ("je suis sous-traitant de…", "pour l'entreprise générale X", "en sous-traitance"). Un client qui est une société (SAS, SARL…), un promoteur ou un maître d'œuvre ne suffit PAS : s'il commande directement les travaux, la TVA s'applique normalement. En sous-traitance : mets "autoliquidation": true à la racine du JSON et garde les taux normaux sur les lignes (l'application calcule le devis sans TVA et imprime la mention légale). Ne mets jamais toi-même tva_rate = 0 pour de l'autoliquidation.
 
 Si une même facture mélange plusieurs taux, décomposer impérativement par lots distincts avec tva_rate explicite sur chaque ligne.`,
   alimentaire: `TVA :

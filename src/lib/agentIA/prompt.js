@@ -352,10 +352,11 @@ FORMAT DE SORTIE — bloc <DEVIS></DEVIS>
     }
   ],
   "champs_a_completer": ["champ manquant"],
-  "suggestions": ["prestation adjacente non demandée, à envisager"]
+  "suggestions": ["prestation adjacente non demandée, à envisager"],
+  "autoliquidation": false
 }
 
-Les clés "lignes", "champs_a_completer" et "suggestions" sont toujours présentes, même vides.
+Les clés "lignes", "champs_a_completer" et "suggestions" sont toujours présentes, même vides. "autoliquidation" vaut true seulement pour des travaux en sous-traitance (voir la TVA du secteur).
 
 project_params : extrais les dimensions principales du projet depuis la demande, sous forme numérique sans unité. Ne mets QUE les clés pertinentes pour la prestation (clés non utilisées : à omettre, pas null). Si AUCUNE clé n'est pertinente (ex : révision vélo, séance kiné, retouche couture, prestation sans dimension), tu mets project_params: {} et tu génères le devis NORMALEMENT — n'utilise JAMAIS un project_params vide comme prétexte pour poser une question. Exemples : "rénovation peinture appartement 65 m²" → {"surface_sol": 65} ; "rénovation peinture appartement 3 pièces" → {"surface_sol": 65} (T3 par défaut) ; "ITE 120 m²" → {"surface_facade": 120} ; "MOE 6 appartements" → {"nb_appartements": 6} ; "mandat vente 280 000 €" → {"prix_vente": 280000} ; "cuisine équipée 12 ml" → {"ml": 12} ; "révision vélo électrique" → {} ; "tatouage avant-bras" → {}.
 

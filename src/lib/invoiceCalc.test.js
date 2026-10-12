@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcInvoiceTotals, invoiceAmounts, splitByRate, ventilatedLines } from "./invoiceCalc.js";
+import { calcInvoiceTotals, computeTotals, invoiceAmounts, round2, splitByRate, ventilatedLines } from "./invoiceCalc.js";
 
 const ouvrage = (quantite, prix_unitaire, tva_rate = 20) => ({
   type_ligne: "ouvrage",
@@ -182,5 +182,29 @@ describe("splitByRate / ventilatedLines — acompte et solde", () => {
   it("franchise ou autoliquidation : une ligne à 0 %", () => {
     const lignes = ventilatedLines(1200, devis, { noTva: true, designation: "Acompte" });
     expect(lignes).toEqual([expect.objectContaining({ tva_rate: 0, prix_unitaire: 1200 })]);
+  });
+});
+
+describe("round2 — arrondi commercial au centime", () => {
+  it("demi-centimes arrondis vers le haut malgré l'erreur binaire", () => {
+    expect(round2(23 * 0.055)).toBe(1.27);   // 1,265
+    expect(round2(1.45 * 0.1)).toBe(0.15);   // 0,145
+    expect(round2(1.005)).toBe(1.01);
+    expect(round2(2.675)).toBe(2.68);
+  });
+  it("négatifs symétriques (avoirs), zéro sans signe", () => {
+    expect(round2(-1.265)).toBe(-1.27);
+    expect(round2(-0.001)).toBe(0);
+    expect(Object.is(round2(-0.001), -0)).toBe(false);
+  });
+  it("valeurs ordinaires inchangées", () => {
+    expect(round2(1234.5678)).toBe(1234.57);
+    expect(round2("12.344")).toBe(12.34);
+    expect(round2(null)).toBe(0);
+  });
+  it("TVA à 5,5 % sur 23 € : 1,27 € dans le total", () => {
+    const t = computeTotals([{ type_ligne: "ouvrage", quantite: 1, prix_unitaire: 23, tva_rate: 5.5 }]);
+    expect(t.tva).toBe(1.27);
+    expect(t.ttc).toBe(24.27);
   });
 });
