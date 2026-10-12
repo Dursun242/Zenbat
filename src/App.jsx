@@ -553,7 +553,7 @@ export default function App() {
       {/* Compteur quota devis freemium (hebdomadaire) */}
       {isFreemium && devisThisWeekCount > 0 && (
         <button onClick={() => setScreen("paywall")}
-          style={{ flexShrink: 0, width: "100%", minHeight: 36, background: freemiumQuotaReached ? ZB.dangerSoft : ZB.paper2, border: "none", borderBottom: `1px solid ${ZB.rule}`, padding: "6px 14px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", color: freemiumQuotaReached ? ZB.danger : ZB.ink2, fontSize: 13, fontWeight: 600 }}>
+          style={{ flexShrink: 0, width: "100%", minHeight: 44, background: freemiumQuotaReached ? ZB.dangerSoft : ZB.paper2, border: "none", borderBottom: `1px solid ${ZB.rule}`, padding: "6px 14px", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", color: freemiumQuotaReached ? ZB.danger : ZB.ink2, fontSize: 13, fontWeight: 600 }}>
           {freemiumQuotaReached
             ? `Limite atteinte : ${FREEMIUM_WEEKLY_DEVIS_LIMIT} devis sur ${FREEMIUM_WEEKLY_DEVIS_LIMIT} cette semaine.`
             : `${devisThisWeekCount} devis sur ${FREEMIUM_WEEKLY_DEVIS_LIMIT} cette semaine.`}

@@ -16,7 +16,7 @@ import { processDevisFromRaw } from "../lib/agentIA/extractDevis.js";
 import { streamClaude, requestClaude, visibleText, ClaudeApiError, getLastServedModel } from "../lib/agentIA/stream.js";
 import { runCoherenceLoop } from "../lib/agentIA/coherenceLoop.js";
 import { loadUserCoherenceSettings } from "../lib/coherence/userOverrides.js";
-import ClientPickerModal from "./ClientPickerModal.jsx";
+import ClientPickerModal from "./app/ClientPickerModal.jsx";
 import CelebrateModal from "./agent/CelebrateModal.jsx";
 import ChatThread from "./agent/ChatThread.jsx";
 import Bordereau from "./agent/Bordereau.jsx";
@@ -458,7 +458,7 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
   const finalizeSave = async (clientId) => {
     // Garde anti-double-clic : si une sauvegarde est déjà en cours, on
     // ignore le 2e appel — sinon le user qui clique deux fois sur le
-    // bouton final de ClientPickerModal pendant la latence réseau crée
+    // bouton de ClientPickerModal pendant la latence réseau crée
     // deux devis et consomme deux slots de son quota freemium.
     if (savingDevisRef.current) return;
     savingDevisRef.current = true;
@@ -580,10 +580,13 @@ export default function AgentIA({ devis, onCreateDevis, clients, onSaveClient, p
       {pickingClient && (
         <ClientPickerModal
           clients={clients}
-          ac={ZB.accent}
-          fontFamily={ZB.font}
-          onSaveClient={onSaveClient}
-          onPick={finalizeSave}
+          title="À quel client associer ce devis ?"
+          hint="Choisis un client, crée-le en quelques secondes ou enregistre sans client."
+          noClientLabel="Enregistrer sans client"
+          showCurrent={false}
+          onCreate={onSaveClient}
+          createLabel="Créer et enregistrer le devis"
+          onSelect={c => finalizeSave(c?.id ?? null)}
           onClose={() => setPickingClient(false)}
         />
       )}
