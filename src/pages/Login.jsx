@@ -8,7 +8,7 @@ const styles = {
   title:  { margin:0, fontSize:24, fontWeight:700, color:ZB.ink, letterSpacing:'-0.01em' },
   sub:    { marginTop:6, marginBottom:20, fontSize:15, color:ZB.ink2, lineHeight:1.45 },
   label:  { display:'block', fontSize:14, fontWeight:600, color:ZB.ink2, marginBottom:6 },
-  input:  { width:'100%', minHeight:48, padding:'0 12px', border:`1px solid ${ZB.rule}`, borderRadius:8, background:ZB.sheet, fontFamily:'inherit', fontSize:16, color:ZB.ink, outline:'none', boxSizing:'border-box' },
+  input:  { width:'100%', minHeight:48, padding:'0 12px', border:`1px solid ${ZB.field}`, borderRadius:8, background:ZB.sheet, fontFamily:'inherit', fontSize:16, color:ZB.ink, outline:'none', boxSizing:'border-box' },
   btn:    { width:'100%', minHeight:52, border:0, borderRadius:10, fontFamily:'inherit', fontSize:16, fontWeight:700, cursor:'pointer', background:ZB.accent, color:ZB.sheet, marginTop:16 },
   err:    { background:ZB.dangerSoft, color:ZB.danger, padding:'10px 12px', borderRadius:8, fontSize:15, marginTop:12, lineHeight:1.45 },
   ok:     { background:ZB.stampSoft, color:ZB.ink, padding:'10px 12px', borderRadius:8, fontSize:15, marginTop:12, lineHeight:1.45 },

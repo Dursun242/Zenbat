@@ -225,6 +225,6 @@ function Toggle({ active, onChange, small, labelledBy }) {
 }
 
 const inputStyle = {
-  width: 84, minHeight: 44, padding: "8px 10px", borderRadius: 8, border: `1px solid ${ZB.rule}`,
+  width: 84, minHeight: 44, padding: "8px 10px", borderRadius: 8, border: `1px solid ${ZB.field}`,
   fontSize: 16, textAlign: "right", background: ZB.sheet, color: ZB.ink, outline: "none", fontFamily: "inherit", ...NUM,
 };

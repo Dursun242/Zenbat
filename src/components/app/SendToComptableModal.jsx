@@ -78,7 +78,7 @@ export default function SendToComptableModal({ user, onClose }) {
   const labelStyle = { display: 'block', fontSize: 13, fontWeight: 600, color: ZB.ink2, marginBottom: 6 }
   const inputStyle = {
     width: '100%', minHeight: 44, boxSizing: 'border-box', padding: '10px 12px',
-    background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 8,
+    background: ZB.sheet, border: `1px solid ${ZB.field}`, borderRadius: 8,
     fontSize: 16, color: ZB.ink, outline: 'none', fontFamily: 'inherit',
   }
 

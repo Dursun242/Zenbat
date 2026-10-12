@@ -30,6 +30,8 @@
   --zb-ink-3:       #6E655B;  /* texte tertiaire (indications) */
   --zb-rule:        #D9D2C5;  /* filets */
   --zb-rule-soft:   #ECE7DE;  /* filets légers entre lignes */
+  --zb-field:       #8F857A;  /* bordure des champs de saisie : 3,6:1 sur la feuille,
+                                 3,5:1 sur le papier, 3,2:1 sur le papier gris (WCAG 1.4.11) */
   --zb-accent:      #A4461F;  /* terre cuite : action principale, sélection */
   --zb-accent-hover:#8E3B19;
   --zb-accent-soft: #F6E7DF;  /* fond de sélection / focus */

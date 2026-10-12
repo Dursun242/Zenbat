@@ -6,7 +6,7 @@ import { STATUT } from "../lib/constants.js";
 import { fmt } from "../lib/utils.js";
 import { ZB } from "../lib/theme.js";
 import Badge from "./ui/Badge.jsx";
-import { LIST_CSS, ListHeader, FilterTabs, Sheet, EmptyRow, RowMenu, RegisterRow, ChevronIcon } from "./ui/Register.jsx";
+import { LIST_CSS, ListHeader, FilterTabs, Sheet, EmptyRow, LoadingRows, LoadErrorRow, RowMenu, RegisterRow, ChevronIcon } from "./ui/Register.jsx";
 
 function clientName(c) {
   return c?.raison_sociale || `${c?.prenom || ""} ${c?.nom || ""}`.trim() || "Sans client";
@@ -81,7 +81,9 @@ function DossierRows({ versions, cl, goDevis, last, ctx }) {
   );
 }
 
-export default function DevisList({ devis, clients, goDevis, setTab, onDelete, onDuplicate }) {
+// loaded / loadError / onRetry : état du chargement de la liste (useDevis).
+// L'état vide n'est affiché qu'une fois le chargement réussi.
+export default function DevisList({ devis, clients, goDevis, setTab, onDelete, onDuplicate, loaded = true, loadError = null, onRetry }) {
   const [filtre, setFiltre] = useState("tous");
   // Devis en cours de duplication : empêche un double appui de créer deux copies.
   const [duplicatingIds, setDuplicatingIds] = useState(() => new Set());
@@ -122,7 +124,7 @@ export default function DevisList({ devis, clients, goDevis, setTab, onDelete, o
   return (
     <div className="zb-list" style={{ maxWidth: 960, margin: "0 auto", padding: "16px 12px 24px", fontFamily: ZB.font, color: ZB.ink }}>
       <style>{LIST_CSS}</style>
-      <ListHeader count={`${items.length} devis`}/>
+      <ListHeader count={loaded ? `${items.length} devis` : ""}/>
 
       {negociationCount > 0 && filtre !== "en_negociation" && (
         <button type="button" onClick={() => setFiltre("en_negociation")}
@@ -138,14 +140,17 @@ export default function DevisList({ devis, clients, goDevis, setTab, onDelete, o
       <FilterTabs label="Filtrer par statut" options={options} value={filtre} onChange={setFiltre}/>
 
       <Sheet>
-        {filtered.length === 0 && (
+        {!loaded && (loadError
+          ? <LoadErrorRow message="Impossible de charger tes devis." onRetry={onRetry}/>
+          : <LoadingRows label="Chargement de tes devis…"/>)}
+        {loaded && filtered.length === 0 && (
           <EmptyRow>
             {items.length === 0
               ? "Aucun devis pour l'instant. Dicte ton premier devis avec le bouton Agent IA."
               : "Aucun devis avec ce statut."}
           </EmptyRow>
         )}
-        {filtered.map((item, i) => {
+        {loaded && filtered.map((item, i) => {
           const last = i === filtered.length - 1;
           if (item.type === "group") {
             const cl = clients.find(c => c.id === item.versions.find(v => v.client_id)?.client_id);

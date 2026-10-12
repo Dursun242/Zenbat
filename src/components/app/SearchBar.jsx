@@ -105,7 +105,7 @@ export default function SearchBar({ devis = [], clients = [], invoices = [], goD
             width: "100%", boxSizing: "border-box", minHeight: 44,
             paddingLeft: 38, paddingRight: q ? 48 : 12, paddingTop: 10, paddingBottom: 10,
             fontSize: 16, borderRadius: 8,
-            border: `1px solid ${ZB.rule}`, background: ZB.sheet,
+            border: `1px solid ${ZB.field}`, background: ZB.sheet,
             outline: "none", color: ZB.ink, fontFamily: "inherit",
           }}
         />

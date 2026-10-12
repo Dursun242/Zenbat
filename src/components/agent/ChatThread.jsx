@@ -7,7 +7,7 @@
 const REASON_TAGS = ["Trop de questions", "Mauvais métier", "Prix incorrects", "Trop générique", "Hors sujet"];
 
 const C = {
-  ink: "#1A1612", ink2: "#5C544B", rule: "#D9D2C5", ruleSoft: "#ECE7DE",
+  ink: "#1A1612", ink2: "#5C544B", rule: "#D9D2C5", ruleSoft: "#ECE7DE", field: "#8F857A",
   accent: "#A4461F", accentSoft: "#F6E7DF", stamp: "#1E7B3C", danger: "#B42318", sheet: "#FFFFFF",
 };
 
@@ -47,7 +47,7 @@ function ReasonPicker({ idx, fb, setFeedback, saveFeedback }) {
       <label htmlFor={`fb-${idx}`} className="zb-sr">Autre raison</label>
       <input id={`fb-${idx}`} placeholder="Autre raison (facultatif)" value={fb.customReason || ""}
         onChange={e => setFeedback(prev => ({ ...prev, [idx]: { ...prev[idx], customReason: e.target.value } }))}
-        style={{ minHeight: 44, padding: "0 12px", borderRadius: 8, border: `1px solid ${C.rule}`, fontFamily: "inherit", fontSize: 16, color: C.ink }}/>
+        style={{ minHeight: 44, padding: "0 12px", borderRadius: 8, border: `1px solid ${C.field}`, fontFamily: "inherit", fontSize: 16, color: C.ink }}/>
       <button type="button" onClick={() => saveFeedback(idx, -1, fb.customReason || fb.reason || null)}
         style={{ justifySelf: "start", minHeight: 44, padding: "0 18px", borderRadius: 8, border: "none", background: C.ink, color: "#FBFAF7",
           fontFamily: "inherit", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>

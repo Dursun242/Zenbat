@@ -190,7 +190,7 @@ export function NegotiationPanel({ devis, suivi, onCreateIndice }) {
         Message au client (facultatif, envoyé par mail si tu refuses)
       </label>
       <textarea id="neg-msg" value={artMsg} onChange={e => setArtMsg(e.target.value)} rows={2}
-        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 8, border: `1px solid ${ZB.rule}`, fontFamily: 'inherit', fontSize: 16, resize: 'vertical', marginBottom: 12 }}/>
+        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 8, border: `1px solid ${ZB.field}`, fontFamily: 'inherit', fontSize: 16, resize: 'vertical', marginBottom: 12 }}/>
 
       {respErr && <div role="alert" style={{ color: ZB.danger, fontSize: 14, marginBottom: 8 }}>{respErr}</div>}
 

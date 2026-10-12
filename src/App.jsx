@@ -32,6 +32,7 @@ import InvoicesList  from "./components/InvoicesList.jsx";
 import SupportChat   from "./components/SupportChat.jsx";
 import SendToComptableModal from "./components/app/SendToComptableModal.jsx";
 import AuthScreen    from "./pages/AuthScreen.jsx";
+import EmailVerificationBanner from "./components/app/EmailVerificationBanner.jsx";
 
 // Écrans principaux — imports synchrones (pas de lazy/import dynamique).
 // Historique : ces 9 écrans étaient lazy-loadés pour réduire le bundle
@@ -89,7 +90,8 @@ function initialTabFromUrl() {
   return "dashboard";
 }
 
-export default function App() {
+// emailVerification : { blocking } quand l'email n'est pas encore confirmé (Root).
+export default function App({ emailVerification = null } = {}) {
   const [screen, setScreen] = useState("app");
   const [tab,    setTab]    = useState(initialTabFromUrl);
   // Diagnostic d'affichage : 5 appuis rapides sur le logo de l'en-tête.
@@ -178,15 +180,28 @@ export default function App() {
   const onQuotaReached = () => setScreen("paywall");
 
   const { brand, setBrand }                             = useBrand(user, setScreen);
-  const { clients, setClients, onSaveClient, onDeleteClient, onRestoreClient } = useClients(user, saveCallbacks);
+  const {
+    clients, setClients, onSaveClient, onDeleteClient, onRestoreClient,
+    loaded: clientsLoaded, loadError: clientsLoadError, reload: reloadClients,
+  } = useClients(user, saveCallbacks);
   const {
     devis, setDevis, selD, setSelD, loadingDevis, autoOpenPDF, setAutoOpenPDF,
+    loaded: devisLoaded, loadError: devisLoadError, reload: reloadDevis,
     onSaveDevis, onCreateDevis, onDuplicateDevis, onCreateIndice, onDeleteDevis, goDevis,
   } = useDevis(user, { ...saveCallbacks, setTab, effectivePlan, weekCount, stickyDevisThisWeek, onDevisCreated, onQuotaReached, isAdmin });
   const {
-    invoices, selI, flushInvoiceSave, onSaveInvoice, onCreateInvoiceFromDevis, onCreateEmptyInvoice,
+    invoices, selI, flushInvoiceSave, onSaveInvoice,
+    loaded: invoicesLoaded, loadError: invoicesLoadError, reload: reloadInvoices, onCreateInvoiceFromDevis, onCreateEmptyInvoice,
     onCreateAcompte, onCreateSolde, onCreateAvoir, onDeleteInvoice, goInvoice,
   } = useInvoices(user, devis, brand, { ...saveCallbacks, setTab, clients });
+  // Accueil : prêt quand devis ET factures sont chargés ; « Réessayer »
+  // relance seulement ce qui a échoué.
+  const dashboardLoaded = devisLoaded && invoicesLoaded;
+  const dashboardLoadError = (!devisLoaded && devisLoadError) || (!invoicesLoaded && invoicesLoadError) || null;
+  const reloadDashboard = () => {
+    if (!devisLoaded && devisLoadError) reloadDevis();
+    if (!invoicesLoaded && invoicesLoadError) reloadInvoices();
+  };
 
   useEffect(() => {
     const handler = e => { e.preventDefault(); deferredPrompt.current = e; };
@@ -561,6 +576,9 @@ export default function App() {
         </button>
       )}
 
+      {/* Email pas encore confirmé : bandeau dans la colonne (ne rogne pas l'app) */}
+      {emailVerification && <EmailVerificationBanner blocking={!!emailVerification.blocking}/>}
+
       {/* Body */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
 
@@ -592,9 +610,11 @@ export default function App() {
         {/* Contenu principal */}
         <div ref={contentRef} className="app-content" style={{ flex: 1, overflowY: "auto", paddingBottom: keyboardOpen ? 0 : NAV_RESERVED_CSS }}>
           {tab === "dashboard"     && <Dashboard devis={devis} invoices={invoices} clients={clients} goDevis={goDevis} goInvoice={goInvoice} setTab={setTab} brand={brand}
+                                         loaded={dashboardLoaded} loadError={dashboardLoadError} onRetry={reloadDashboard}
                                          onOpenProfile={() => setScreen("onboarding")}
                                          onOpenPWAInstall={() => setScreen("pwa_install")}/>}
-          {tab === "clients"       && <ClientsList clients={clients} onSave={onSaveClient} onDelete={onDeleteClient} onRestore={onRestoreClient} goClient={id => { setSelC(id); setTab("client_detail"); }} showUndo={showUndo}/>}
+          {tab === "clients"       && <ClientsList clients={clients} onSave={onSaveClient} onDelete={onDeleteClient} onRestore={onRestoreClient} goClient={id => { setSelC(id); setTab("client_detail"); }} showUndo={showUndo}
+                                         loaded={clientsLoaded} loadError={clientsLoadError} onRetry={reloadClients}/>}
           {tab === "client_detail" && selC && (
             <ClientDetail
               c={clients.find(x => x.id === selC)}
@@ -605,7 +625,8 @@ export default function App() {
               onDelete={async () => { await onDeleteClient(selC); setTab("clients"); }}
               onNewDevis={() => setTab("agent")}/>
           )}
-          {tab === "devis"         && <DevisList devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} onDelete={onDeleteDevis} onDuplicate={onDuplicateDevis}/>}
+          {tab === "devis"         && <DevisList devis={devis} clients={clients} goDevis={goDevis} setTab={setTab} onDelete={onDeleteDevis} onDuplicate={onDuplicateDevis}
+                                         loaded={devisLoaded} loadError={devisLoadError} onRetry={reloadDevis}/>}
           {tab === "devis_detail"  && selD && (() => {
             const cur = devis.find(x => x.id === selD);
             // Devis introuvable dans le state (ex. création bloquée par le quota freemium)
@@ -650,7 +671,8 @@ export default function App() {
               </Suspense>
             );
           })()}
-          {tab === "factures"        && <InvoicesList invoices={invoices} clients={clients} goInvoice={goInvoice} onCreateEmpty={onCreateEmptyInvoice} onDelete={onDeleteInvoice} isFreemium={isFreemium} onPaywall={() => setScreen("paywall")}/>}
+          {tab === "factures"        && <InvoicesList invoices={invoices} clients={clients} goInvoice={goInvoice} onCreateEmpty={onCreateEmptyInvoice} onDelete={onDeleteInvoice} isFreemium={isFreemium} onPaywall={() => setScreen("paywall")}
+                                           loaded={invoicesLoaded} loadError={invoicesLoadError} onRetry={reloadInvoices}/>}
           {tab === "factures_detail" && selI && (() => {
             const inv = invoices.find(x => x.id === selI);
             if (!inv) return null;
