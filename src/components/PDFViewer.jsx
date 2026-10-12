@@ -283,7 +283,13 @@ export default function PDFViewer({ d, cl, brand, onClose, hidden=false, onPageR
               <div style={{fontSize:9,color:isSigned?"#15803d":"#6b7280",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>
                 SIGNATURE CLIENT · Bon pour accord
               </div>
-              {isSigned ? (
+              {isSigned && !d.client_accepted_at ? (
+                // Marqué signé à la main : pas de tracé manuscrit ni de mention électronique.
+                <div style={{height:40,display:"flex",flexDirection:"column",justifyContent:"center",borderBottom:"1px solid #16a34a"}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#15803d"}}>Accord du client enregistré par l'entreprise</div>
+                  {d.signed_by && <div style={{fontSize:10,color:"#15803d",marginTop:2}}>{d.signed_by}</div>}
+                </div>
+              ) : isSigned ? (
                 <div style={{height:40,display:"flex",flexDirection:"column",justifyContent:"center",borderBottom:"1px solid #16a34a"}}>
                   <div style={{
                     fontSize: 22,
