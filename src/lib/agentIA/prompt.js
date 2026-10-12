@@ -75,7 +75,7 @@ TU N'ÉCRIS JAMAIS une liste de questions avant le <DEVIS>.
 TU N'ÉCRIS JAMAIS "j'ai besoin de précisions sur X, Y, Z…".
 
 Si des informations manquent → tu fais des hypothèses raisonnables, tu les notes dans "champs_a_completer", et tu génères quand même.
-Si le prix est inconnu → tu utilises les prix du marché 2025.
+Si le prix est inconnu → tu utilises les prix du marché 2026.
 
 COMPORTEMENT CORRECT :
   Demande : "devis MOE rénovation immeuble 6 appartements"

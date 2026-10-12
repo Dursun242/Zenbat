@@ -53,45 +53,45 @@ export const SECTOR_UNITS = {
 };
 
 export const SECTOR_PRICING = {
-  btp: `Prix réalistes BTP France 2025 — fourchettes hautes/basses fournitures + pose comprises (sauf mention) :
-• Main-d'œuvre : élec 45-65 €/h, plombier 50-70 €/h, peintre 35-50 €/h, maçon 40-60 €/h.
-• Carrelage : 80-120 €/m² fourniture+pose grès cérame standard, ragréage en sus 15-25 €/m².
-• Peinture intérieure : 25-45 €/m² murs+plafonds (impression + 2 couches finition), incluant protections et préparation légère.
-• Cloison placo : 80-120 €/m² posée acoustique 72/48. Démolition cloisons : 35-70 €/m² + évacuation gravats 30-60 €/m³.
-• Plomberie complète maison ou rénovation totale : 80-130 €/m² habitable (réseaux EF/ECS/EU + raccordements, hors sanitaires). Rénovation plomberie 90 m² = 7 000-12 000 €.
-• Électricité rénovation totale : 100-150 €/m² habitable (tableau + circuits + prises + éclairage + consuel). Rénovation T2 40 m² = 4 000-6 000 €. Tableau seul maison T4 100 m² complet = 8 000-12 000 €.
-• Sanitaires : douche italienne posée 1 200-2 500 €, WC suspendu+bâti+plaque 700-1 100 €, meuble vasque+robinet 600-1 200 €, baignoire balnéo 1 800-3 500 €.
-• Couverture tuiles : 100-180 €/m² réfection complète. Étanchéité bicouche soudé : 70-120 €/m². Zinguerie chéneau zinc 80-120 €/ml.
-• Façade : ravalement enduit gratté 50-120 €/m². ITE polystyrène 16 cm + enduit minéral 130-180 €/m². ITE laine de roche : 160-220 €/m².
-• Isolation combles soufflé : 20-40 €/m². ITI placo+laine 50-90 €/m².
-• Charpente bois traditionnelle : 250-450 €/m² au sol incluant fournitures, traitement et pose.
-• Menuiseries : fenêtre alu DV 800-1 500 €/u posée, porte intérieure 250-450 €/u posée, porte d'entrée 1 500-3 500 €/u, vitrage simple remplacement 250-450 €/fenêtre.
-• Cuisine équipée : 800-1 500 €/ml fourniture+pose milieu de gamme. Cuisine 12 ml standard = 10 000-18 000 €.
-• Salle de bain rénovation complète clé en main : 1 200-2 500 €/m² (démolition + plomberie + carrelage + sanitaires + élec). 6 m² = 8 000-15 000 €.
-• Cuisine rénovation clé en main : 1 000-1 800 €/m² (démol + plomberie + élec + cuisine équipée). 14 m² = 14 000-25 000 €.
-• Construction maison neuve : 1 000-1 500 €/m² hors fondations / hors VRD / hors terrain.
-• Maîtrise d'œuvre / MOE rénovation : 3 500-5 500 €/appartement, soit ~20-35 k€ pour un immeuble de 6 appts. Pour une maison particulière : 4 000-12 000 € selon ampleur.
-• Bureau d'études structure : 1 500-4 500 € selon complexité (ouverture mur porteur 1 500-2 500 €).
-• Permis de construire dossier seul (sans architecte) : 1 500-3 000 €. Avec architecte : 6 000-12 000 €.
-• Chauffage : PAC air/eau 11 kW posée 12 000-18 000 €, chaudière condensation gaz 4 500-8 000 €, plancher chauffant 80-130 €/m².
-• VMC double flux maison 100-130 m² : 5 000-8 000 € posée.
-• Domotique éclairage maison 4 pièces : 3 500-7 000 €.
-• Piscine béton coque 8×4 m liner clé en main : 25 000-40 000 €.
-• Terrasse bois exotique sur plots : 250-450 €/m² fourniture+pose.
-• Garde-corps acier extérieur : 350-600 €/ml.
+  btp: `Prix réalistes BTP France 2026 — fourchettes hautes/basses fournitures + pose comprises (sauf mention) :
+• Main-d'œuvre : élec 47-68 €/h, plombier 52-73 €/h, peintre 36-52 €/h, maçon 42-62 €/h.
+• Carrelage : 83-125 €/m² fourniture+pose grès cérame standard, ragréage en sus 16-26 €/m².
+• Peinture intérieure : 26-47 €/m² murs+plafonds (impression + 2 couches finition), incluant protections et préparation légère.
+• Cloison placo : 83-125 €/m² posée acoustique 72/48. Démolition cloisons : 36-73 €/m² + évacuation gravats 31-62 €/m³.
+• Plomberie complète maison ou rénovation totale : 83-135 €/m² habitable (réseaux EF/ECS/EU + raccordements, hors sanitaires). Rénovation plomberie 90 m² = 7 300-12 500 €.
+• Électricité rénovation totale : 104-156 €/m² habitable (tableau + circuits + prises + éclairage + consuel). Rénovation T2 40 m² = 4 200-6 200 €. Tableau seul maison T4 100 m² complet = 8 300-12 500 €.
+• Sanitaires : douche italienne posée 1 250-2 600 €, WC suspendu+bâti+plaque 730-1 150 €, meuble vasque+robinet 620-1 250 €, baignoire balnéo 1 900-3 650 €.
+• Couverture tuiles : 104-187 €/m² réfection complète. Étanchéité bicouche soudé : 73-125 €/m². Zinguerie chéneau zinc 83-125 €/ml.
+• Façade : ravalement enduit gratté 52-125 €/m². ITE polystyrène 16 cm + enduit minéral 135-187 €/m². ITE laine de roche : 166-229 €/m².
+• Isolation combles soufflé : 21-42 €/m². ITI placo+laine 52-94 €/m².
+• Charpente bois traditionnelle : 260-470 €/m² au sol incluant fournitures, traitement et pose.
+• Menuiseries : fenêtre alu DV 830-1 550 €/u posée, porte intérieure 260-470 €/u posée, porte d'entrée 1 550-3 650 €/u, vitrage simple remplacement 260-470 €/fenêtre.
+• Cuisine équipée : 830-1 550 €/ml fourniture+pose milieu de gamme. Cuisine 12 ml standard = 10 400-18 700 €.
+• Salle de bain rénovation complète clé en main : 1 250-2 600 €/m² (démolition + plomberie + carrelage + sanitaires + élec). 6 m² = 8 300-15 600 €.
+• Cuisine rénovation clé en main : 1 050-1 900 €/m² (démol + plomberie + élec + cuisine équipée). 14 m² = 14 600-26 000 €.
+• Construction maison neuve : 1 050-1 550 €/m² hors fondations / hors VRD / hors terrain.
+• Maîtrise d'œuvre / MOE rénovation : 3 650-5 700 €/appartement, soit ~21-36 k€ pour un immeuble de 6 appts. Pour une maison particulière : 4 150-12 500 € selon ampleur.
+• Bureau d'études structure : 1 550-4 700 € selon complexité (ouverture mur porteur 1 550-2 600 €).
+• Permis de construire dossier seul (sans architecte) : 1 550-3 100 €. Avec architecte : 6 250-12 500 €.
+• Chauffage : PAC air/eau 11 kW posée 12 500-18 700 €, chaudière condensation gaz 4 700-8 300 €, plancher chauffant 83-135 €/m².
+• VMC double flux maison 100-130 m² : 5 200-8 300 € posée.
+• Domotique éclairage maison 4 pièces : 3 650-7 300 €.
+• Piscine béton coque 8×4 m liner clé en main : 26 000-41 500 €.
+• Terrasse bois exotique sur plots : 260-470 €/m² fourniture+pose.
+• Garde-corps acier extérieur : 365-625 €/ml.
 
 ⚠ Sur la RÉNOVATION et l'ENTRETIEN, ne sous-estime jamais : si l'utilisateur dit "rénovation complète", "rénovation totale", "remplacement complet" → appuie-toi sur les fourchettes ci-dessus, jamais sur les seuls coûts matière.`,
-  beaute:        "Tarifs beauté France 2025. Ex : coupe femme 35-80 €, soin visage 60-120 €, pose ongles 40-80 €, épilation 20-60 €.",
-  sante:         "Tarifs paramédicaux France 2025. Ex : séance kiné 40-70 €, ostéo 60-90 €, coaching sportif 50-100 €/h, consultation diét. 60-80 €.",
-  tech:          "TJM tech France 2025. Ex : dev web junior 350-500 €/j, senior 600-900 €/j, graphiste 300-600 €/j, chef de projet 500-800 €/j.",
-  alimentaire:   "Tarifs artisanat alimentaire France 2025. Ex : plateau repas traiteur 15-35 €/pers, buffet cocktail 25-55 €/pers, gâteau sur-mesure 4-8 €/part.",
-  transport:     "Tarifs transport France 2025. Ex : déménagement studio 400-800 €, VTC aéroport 40-80 €, dépannage moto 80-150 €, livraison express 15-40 €.",
-  communication: "Tarifs comm/créatif France 2025. Ex : reportage photo demi-journée 400-800 €, vidéo institutionnelle 1 500-5 000 €, logo 500-2 000 €.",
-  evenementiel:  "Tarifs événementiel France 2025. Ex : DJ soirée 400-1 200 €, photographe événement 600-1 500 €, animation musicale 300-800 €.",
-  education:     "Tarifs formation France 2025. Ex : cours particulier 25-60 €/h, formation pro 500-1 500 €/jour, auto-école forfait 1 200-2 000 €.",
-  nettoyage:     "Tarifs nettoyage France 2025. Ex : ménage domicile 15-25 €/h, nettoyage bureaux 18-30 €/h, vitres 3-8 €/m².",
-  animaux:       "Tarifs animaliers France 2025. Ex : toilettage chien 40-80 €, pension journalière 20-40 €, dressage 50-80 €/séance.",
-  immobilier: `Honoraires France 2025 :
+  beaute:        "Tarifs beauté France 2026. Ex : coupe femme 35-80 €, soin visage 60-120 €, pose ongles 40-80 €, épilation 20-60 €.",
+  sante:         "Tarifs paramédicaux France 2026. Ex : séance kiné 40-70 €, ostéo 60-90 €, coaching sportif 50-100 €/h, consultation diét. 60-80 €.",
+  tech:          "TJM tech France 2026. Ex : dev web junior 350-500 €/j, senior 600-900 €/j, graphiste 300-600 €/j, chef de projet 500-800 €/j.",
+  alimentaire:   "Tarifs artisanat alimentaire France 2026. Ex : plateau repas traiteur 15-35 €/pers, buffet cocktail 25-55 €/pers, gâteau sur-mesure 4-8 €/part.",
+  transport:     "Tarifs transport France 2026. Ex : déménagement studio 400-800 €, VTC aéroport 40-80 €, dépannage moto 80-150 €, livraison express 15-40 €.",
+  communication: "Tarifs comm/créatif France 2026. Ex : reportage photo demi-journée 400-800 €, vidéo institutionnelle 1 500-5 000 €, logo 500-2 000 €.",
+  evenementiel:  "Tarifs événementiel France 2026. Ex : DJ soirée 400-1 200 €, photographe événement 600-1 500 €, animation musicale 300-800 €.",
+  education:     "Tarifs formation France 2026. Ex : cours particulier 25-60 €/h, formation pro 500-1 500 €/jour, auto-école forfait 1 200-2 000 €.",
+  nettoyage:     "Tarifs nettoyage France 2026. Ex : ménage domicile 15-25 €/h, nettoyage bureaux 18-30 €/h, vitres 3-8 €/m².",
+  animaux:       "Tarifs animaliers France 2026. Ex : toilettage chien 40-80 €, pension journalière 20-40 €, dressage 50-80 €/séance.",
+  immobilier: `Honoraires France 2026 :
 • Agence immobilière mandat de vente : 4-8 % du prix de vente TTC (mandat exclusif souvent 4-6 %, mandat simple 5-8 %). Pour appartement à 280 000 € → 11 200-22 400 € d'honoraires. Toujours estimer le montant en € même si le calcul est en %.
 • Gestion locative : 6-10 % du loyer mensuel TTC encaissé, frais de mise en location 1 mois de loyer.
 • Expertise comptable : forfait annuel TPE/auto-entrepreneur 1 200-2 500 €/an, SARL/SAS 2 500-6 000 €/an selon CA, ou 80-200 €/h.
@@ -99,8 +99,8 @@ export const SECTOR_PRICING = {
 • Consultant : TJM 600-1 200 €/j selon expertise.
 
 ⚠ Quand un % est dû (commission agence, gestion locative), tu DOIS estimer le montant en € à partir du prix mentionné par l'utilisateur. Ne laisse jamais prix_unitaire à null.`,
-  mode:          "Tarifs couture France 2025. Ex : retouche simple 10-30 €, ourlet 15-25 €, robe sur-mesure 200-800 €.",
-  general:       "Tarifs du marché France 2025. Adapte les prix, les unités et le vocabulaire au métier exact déclaré par l'utilisateur, en t'appuyant sur ta connaissance professionnelle de ce métier (tarifs pratiqués, conventions, spécificités). Évite toute réponse générique.",
+  mode:          "Tarifs couture France 2026. Ex : retouche simple 10-30 €, ourlet 15-25 €, robe sur-mesure 200-800 €.",
+  general:       "Tarifs du marché France 2026. Adapte les prix, les unités et le vocabulaire au métier exact déclaré par l'utilisateur, en t'appuyant sur ta connaissance professionnelle de ce métier (tarifs pratiqués, conventions, spécificités). Évite toute réponse générique.",
 };
 
 export const SECTOR_TVA = {
@@ -140,7 +140,7 @@ export const BTP_SUBTRADE_KNOWLEDGE = {
   },
   isolation: {
     keywords: ["isolation", "isolant", "combles", "ite", "iti"],
-    normes: "RE 2020 (bâtiments neufs). Arrêté CEE (Certificats d'Économies d'Énergie) pour travaux en rénovation. Seuils 2025 : combles perdus ≥ R 7, rampants ≥ R 6, murs ≥ R 3,7, plancher bas ≥ R 3.",
+    normes: "RE 2020 (bâtiments neufs). Arrêté CEE (Certificats d'Économies d'Énergie) pour travaux en rénovation. Seuils : combles perdus ≥ R 7, rampants ≥ R 6, murs ≥ R 3,7, plancher bas ≥ R 3.",
     mentions: "RGE (Reconnu Garant de l'Environnement) : qualification obligatoire pour que le client bénéficie de MaPrimeRénov' et des CEE. Mentionner le numéro de certification RGE sur le devis. Garantie décennale obligatoire.",
     decomposition: "Indiquer OBLIGATOIREMENT dans la désignation : type d'isolant + matériau + épaisseur + valeur R cible. Ex : « Isolation combles perdus soufflés, ouate de cellulose, R ≥ 7 m²·K/W, ép. 36 cm ».",
     details: "Matériaux : laine de verre (λ 0,032–0,040), laine de roche, ouate de cellulose soufflée ou en panneau, polyuréthane projeté, laine de bois. ITE avec crépi : séparer lot isolation (5,5 %) et lot ravalement (10 %).",
