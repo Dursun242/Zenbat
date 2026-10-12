@@ -664,7 +664,7 @@ export default function App() {
                   onBack={() => setTab("factures")}
                   onChange={onSaveInvoice}
                   onCreateAvoir={onCreateAvoir}
-                  onDelete={() => { if (confirm("Supprimer cette facture ?")) onDeleteInvoice(inv.id); }}/>
+                  onDelete={() => onDeleteInvoice(inv.id)}/>
               </Suspense>
             );
           })()}

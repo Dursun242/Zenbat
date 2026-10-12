@@ -648,12 +648,12 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
                   onChange={v => onChange({ ...d, objet: v })}
                   style={{ display: "block", width: "100%", margin: "14px 0 0", padding: "4px 0", border: "none", resize: "none", overflow: "hidden",
                     background: "none", fontFamily: "inherit", fontSize: 21, fontWeight: 700, lineHeight: 1.25, color: ZB.ink, outline: "none" }}/>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+                {(!readOnly || d.ville_chantier) && <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
                   <label htmlFor="dv-lieu" style={{ fontSize: 13, color: ZB.ink2, flexShrink: 0 }}>Lieu du chantier</label>
                   <input id="dv-lieu" value={d.ville_chantier || ""} readOnly={readOnly} placeholder="À préciser"
                     onChange={e => !readOnly && onChange({ ...d, ville_chantier: e.target.value })}
                     style={{ flex: 1, minWidth: 0, minHeight: 36, padding: "4px 0", border: "none", borderBottom: `1px dotted ${ZB.rule}`, background: "none", fontFamily: "inherit", fontSize: 16, color: ZB.ink, outline: "none" }}/>
-                </div>
+                </div>}
 
                 {/* Colonnes */}
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: 18, paddingBottom: 8, borderBottom: `2px solid ${ZB.ink}`, fontSize: 13, fontWeight: 600, color: ZB.ink2 }}>
