@@ -16,7 +16,14 @@
  * Fichier pur (pas de React, pas de navigateur) : importable par l'API.
  */
 
-export const round2 = (n) => Math.round((Number(n) || 0) * 100 + Number.EPSILON) / 100;
+// Arrondi commercial au centime (demi-centime vers le haut, en valeur
+// absolue). toFixed(8) efface l'erreur binaire du ×100 : 1,265 × 100 vaut
+// 126,49999999999999 en flottant et donnait 1,26 au lieu de 1,27.
+export const round2 = (n) => {
+  const x = Number(n) || 0;
+  const sign = x < 0 ? -1 : 1;
+  return sign * Math.round(Number((Math.abs(x) * 100).toFixed(8))) / 100 + 0;
+};
 
 const ouvragesOf = (lignes) => (lignes || []).filter(l => l?.type_ligne === "ouvrage");
 

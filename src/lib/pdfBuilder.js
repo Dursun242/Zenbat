@@ -1,7 +1,8 @@
 import { jsPDF } from "jspdf";
 import { fmt, fmtD } from "./utils.js";
-import { computeTotals, isNoTva, lineRate } from "./invoiceCalc.js";
+import { computeTotals, isNoTva, lineRate, lineTotal } from "./invoiceCalc.js";
 import { notifyAdminPdf } from "./telegramNotify.js";
+import { paymentPenaltiesText } from "./constants.js";
 
 // Polices embarquées dans jsPDF — indispensable pour la conformité PDF/A-3 du
 // Factur-X. Les fonts standard PDF "Helvetica" ne sont pas embarquées (ISO
@@ -278,6 +279,9 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
     [cl?.code_postal, cl?.ville].filter(Boolean).join(" "),
     cl?.email,
     cl?.telephone && `Tél : ${cl.telephone}`,
+    // Client professionnel : SIREN / SIRET et n° de TVA (mentions de facture).
+    cl?.siret && `SIRET : ${cl.siret}`,
+    cl?.tva_intra && `TVA : ${cl.tva_intra}`,
   ].filter(Boolean);
   const companyLines = [
     brand.address,
@@ -287,9 +291,14 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
     brand.siret && `SIRET : ${brand.siret}`,
   ].filter(Boolean);
 
+  // Validité du devis : la date enregistrée sur le devis si elle existe,
+  // sinon émission + délai de validité de l'entreprise.
   const baseDate  = d.date_emission ? new Date(d.date_emission) : new Date();
-  const validDate = isNaN(baseDate.getTime()) ? new Date() : new Date(baseDate);
-  validDate.setDate(validDate.getDate() + (brand.validityDays || 30));
+  const savedValid = d.date_validite ? new Date(d.date_validite) : null;
+  const validDate = savedValid && !isNaN(savedValid.getTime())
+    ? savedValid
+    : (isNaN(baseDate.getTime()) ? new Date() : new Date(baseDate));
+  if (!(savedValid && !isNaN(savedValid.getTime()))) validDate.setDate(validDate.getDate() + (brand.validityDays || 30));
 
   const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
   const fonts = await loadFonts();
@@ -416,7 +425,8 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
       pdf.setFont(FONT, "normal"); setTxt(pdf, DARK);
       pdf.text(descLines, X + 3, ty);
 
-      const total   = (l.quantite || 0) * (l.prix_unitaire || 0);
+      // Arrondi au centime, comme les totaux (invoiceCalc).
+      const total   = lineTotal(l);
       const tvaDisp = `${rateOf(l)}%`.replace(".", ",");
       txt(pdf, l.unite || "—",            X + CD + CU / 2,                  ty, { size: 8.5, color: MUTED,  align: "center" });
       txt(pdf, String(l.quantite ?? ""),  X + CD + CU + CQ / 2,             ty, { size: 8.5,                align: "center" });
@@ -590,6 +600,10 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
     footParts.push("TVA non applicable, art. 293 B du CGI");
   if (d?.auto_liquidation_btp)
     footParts.push("Autoliquidation — TVA due par le preneur, art. 283-2 nonies du CGI");
+  // Taux réduit des travaux dans un logement (5,5 / 10 %) : depuis 2025, une
+  // mention du client sur le devis ou la facture remplace l'attestation.
+  if (!noTva && tvaRows.some(r => r.rate === 5.5 || r.rate === 10))
+    footParts.push("Taux réduit de TVA : le client certifie que les travaux portent sur des locaux à usage d'habitation achevés depuis plus de deux ans (art. 278-0 bis A et 279-0 bis du CGI).");
   if (brand.mentionsLegales) footParts.push(brand.mentionsLegales);
   const legalId = [
     brand.companyName && brand.legalForm ? `${brand.companyName} — ${brand.legalForm}` : brand.legalForm || "",
@@ -599,7 +613,7 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
     brand.tva && brand.vatRegime !== "franchise" ? `TVA ${brand.tva}` : "",
   ].filter(Boolean).join(" · ");
   if (legalId) footParts.push(legalId);
-  if (kind === "facture" && brand.paymentPenalties) footParts.push(brand.paymentPenalties);
+  if (kind === "facture" && paymentPenaltiesText(brand)) footParts.push(paymentPenaltiesText(brand));
   if (kind === "facture" && brand.escompte)         footParts.push(brand.escompte);
 
   if (footParts.length) {

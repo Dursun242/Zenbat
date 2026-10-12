@@ -64,6 +64,9 @@ export const STATUT_FACTURE = {
 };
 
 // ── Marque par défaut ─────────────────────────────────────
+// Art. L441-10 et D441-5 du code de commerce (ventes entre professionnels).
+export const PAYMENT_PENALTIES_TEXT = "Pénalités de retard : taux de refinancement de la BCE majoré de 10 points (art. L441-10 du code de commerce). Indemnité forfaitaire pour frais de recouvrement : 40 € (art. D441-5).";
+
 export const DEFAULT_BRAND = {
   companyName: "", logo: null, siret: "", tva: "",
   firstName: "", lastName: "",
@@ -84,11 +87,20 @@ export const DEFAULT_BRAND = {
   legalForm:         "",       // forme juridique (SAS, SARL, EI, auto-entrepreneur, etc.)
   rcs:               "",       // "RCS Le Havre 123 456 789"
   capital:           "",       // capital social (libellé libre, ex : "10 000 €")
-  paymentPenalties:  "Pénalités de retard : taux d'intérêt légal majoré de 10 points. Indemnité forfaitaire pour frais de recouvrement : 40 € (art. L441-10 code de commerce).",
+  paymentPenalties:  PAYMENT_PENALTIES_TEXT,
   escompte:          "Aucun escompte consenti pour paiement anticipé.",
 };
 
 export const FRANCHISE_MENTION = "TVA non applicable, art. 293 B du CGI";
+
+// Texte d'avant octobre 2026, resté enregistré chez les artisans qui ne l'ont
+// pas modifié : le taux cité était faux (L441-10 : taux BCE + 10 points).
+const LEGACY_PAYMENT_PENALTIES = "Pénalités de retard : taux d'intérêt légal majoré de 10 points. Indemnité forfaitaire pour frais de recouvrement : 40 € (art. L441-10 code de commerce).";
+
+// Mention des pénalités à imprimer : le texte de l'artisan, sauf l'ancien
+// texte par défaut, remplacé par la version correcte.
+export const paymentPenaltiesText = (brand) =>
+  brand?.paymentPenalties === LEGACY_PAYMENT_PENALTIES ? PAYMENT_PENALTIES_TEXT : brand?.paymentPenalties || "";
 
 export const DEFAULT_DEMO_BRAND = {
   ...DEFAULT_BRAND,
