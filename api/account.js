@@ -7,6 +7,7 @@ import { cors } from "./_cors.js"
 import { authenticate, notifyTelegram } from "./_withAuth.js"
 import { sendEmail, escapeHtml } from "./_email.js"
 import { consumeDailyQuota, refundDailyQuota, EMAIL_DAILY_LIMIT } from "./_quota.js"
+import { logServerError } from "./_serverLog.js"
 
 // Regex RFC 5322 simplifiée, alignée sur contact.js / newsletter.js
 const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/
@@ -266,18 +267,27 @@ async function handleSendComptable({ req, res, user, admin }) {
     if (dFrom) invoicesQ = invoicesQ.gte('date_emission', dFrom.toISOString().slice(0, 10))
     if (dTo)   invoicesQ = invoicesQ.lte('date_emission', dTo.toISOString().slice(0, 10))
 
-    const [{ data: invoices = [] }, { data: clients = [] }] = await Promise.all([
+    const [{ data: invoicesData, error: invErr }, { data: clientsData }] = await Promise.all([
       invoicesQ.order('date_emission', { ascending: true }),
       admin.from('clients').select('id, raison_sociale, siret, tva_intra, email').eq('owner_id', user.id),
     ])
+    // supabase-js renvoie data: null en cas d'erreur (la valeur par défaut
+    // d'une déstructuration ne s'applique pas à null).
+    if (invErr) {
+      await logServerError('account/send-comptable-invoices', invErr, { user_id: user.id })
+      return res.status(500).json({ error: 'Lecture des factures impossible, réessaie dans un instant.' })
+    }
+    const invoices = invoicesData || []
+    const clients  = clientsData || []
 
     if (!invoices.length) {
       return res.status(400).json({ error: `Aucune facture trouvée sur la période (${periodLabel(period, from, to)}).` })
     }
 
     const invoiceIds = invoices.map(i => i.id)
-    const { data: lignes = [] } = await admin.from('lignes_invoices')
+    const { data: lignesData } = await admin.from('lignes_invoices')
       .select('*').in('invoice_id', invoiceIds).is('deleted_at', null)
+    const lignes = lignesData || []
 
     // Index clients pour join lisible
     const clientById = new Map(clients.map(c => [c.id, c]))

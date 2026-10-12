@@ -239,6 +239,15 @@ describe('webhook — checkout.session.completed', () => {
     expect(notifyTelegram).toHaveBeenCalledWith('payment_success', { email: 'client@test.fr', plan: 'monthly', amount: 19 })
   })
 
+  it("abonnement 6 mois : échec de l'annulation chez Stripe → 500, profil inchangé, nouvel essai possible", async () => {
+    stripeApi.subscriptions.update = vi.fn(async () => { throw new Error('Stripe indisponible') })
+    const r = makeRes()
+    await handler(signedReq(evt('checkout.session.completed', session({ metadata: { plan: 'biannual' }, amount_total: 5700 }))), r)
+    expect(r.statusCode).toBe(500)
+    expect(profileUpdates()).toHaveLength(0)
+    expect(processed.has('evt_1')).toBe(false)
+  })
+
   it('abonnement 6 mois → billing_cycle biannual + annulation en fin de période', async () => {
     const r = makeRes()
     await handler(signedReq(evt('checkout.session.completed', session({ metadata: { plan: 'biannual' }, amount_total: 5700 }))), r)
@@ -341,14 +350,25 @@ describe('webhook — cycle de vie de l’abonnement', () => {
     expect(profileUpdates()).toHaveLength(0)
   })
 
-  // Comportement actuel : l'événement n'est pas traité. Un abonnement passé en
-  // past_due / unpaid garde le plan pro tant que Stripe n'envoie pas
-  // customer.subscription.deleted (cf. réglages de relance du Dashboard Stripe).
-  it('customer.subscription.updated → accusé de réception, plan inchangé (non géré)', async () => {
+  it('customer.subscription.updated unpaid → plan free', async () => {
+    profilesByCustomer.cus_1 = { id: 'user-1', stripe_subscription_id: 'sub_1' }
     const r = makeRes()
-    await handler(signedReq(evt('customer.subscription.updated', { customer: 'cus_1', status: 'unpaid' })), r)
+    await handler(signedReq(evt('customer.subscription.updated', { id: 'sub_1', customer: 'cus_1', status: 'unpaid' })), r)
     expect(r.statusCode).toBe(200)
-    expect(r.body).toEqual({ received: true })
+    expect(opArgs(profileUpdates()[0], 'update')[0]).toMatchObject({ plan: 'free', stripe_subscription_id: null })
+  })
+
+  it('customer.subscription.updated past_due → Pro gardé pendant les relances', async () => {
+    const r = makeRes()
+    await handler(signedReq(evt('customer.subscription.updated', { id: 'sub_1', customer: 'cus_1', status: 'past_due' })), r)
+    expect(r.statusCode).toBe(200)
+    expect(profileUpdates()).toHaveLength(0)
+  })
+
+  it("customer.subscription.updated d'un ancien abonnement → profil intact", async () => {
+    profilesByCustomer.cus_1 = { id: 'user-1', stripe_subscription_id: 'sub_nouveau' }
+    const r = makeRes()
+    await handler(signedReq(evt('customer.subscription.updated', { id: 'sub_ancien', customer: 'cus_1', status: 'canceled' })), r)
     expect(profileUpdates()).toHaveLength(0)
   })
 })
