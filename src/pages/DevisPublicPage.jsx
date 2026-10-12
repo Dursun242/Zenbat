@@ -1,94 +1,106 @@
+// Page publique du devis, côté client (lien personnel envoyé par l'artisan).
+// Système « Bordereau », mais à l'identité de l'artisan : son logo, son nom,
+// sa couleur (rendue lisible par readableAccent) ; vouvoiement.
+// Le devis se lit ligne par ligne comme sur le PDF ; une seule action
+// principale, « Signer le devis », dans une barre collée en bas. La
+// vérification par code n'intervient qu'au moment d'une action engageante.
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { ZB, NUM } from '../lib/theme.js'
+import { computeTotals, isNoTva } from '../lib/invoiceCalc.js'
+import { readableAccent } from '../lib/color.js'
+import { sectionsOf, Line, LotHeading, Totals } from '../components/bordereau/parts.jsx'
 
 const fmtEur = n => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(n || 0)
-const fmtD   = d => d ? new Date(d).toLocaleDateString('fr-FR') : '—'
-const fmtDT  = d => d ? new Date(d).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'
+const fmtD   = d => d ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'
+const fmtDT  = d => d ? new Date(d).toLocaleString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : '—'
 
 const CAT_LABELS = {
   assurance_decennale: 'Assurance décennale',
-  attestation_tva_10:  'Attestation TVA 10%',
-  attestation_tva_55:  'Attestation TVA 5.5%',
+  attestation_tva_10:  'Attestation TVA 10 %',
+  attestation_tva_55:  'Attestation TVA 5,5 %',
   plaquette:           'Plaquette commerciale',
   fiche_technique:     'Fiche technique',
   autre:               'Document annexe',
 }
 
 const AUDIT_LABELS = {
-  sent:             { label: 'Devis envoyé' },
-  opened:           { label: 'Consulté' },
-  accepted:         { label: 'Accepté' },
-  refused:          { label: 'Refusé' },
-  negotiation_sent: { label: 'Proposition envoyée' },
-  artisan_responded:{ label: "Réponse de l'artisan" },
+  sent:              'Devis envoyé',
+  opened:            'Devis consulté',
+  accepted:          'Devis signé',
+  refused:           'Devis refusé',
+  negotiation_sent:  'Demande de modification envoyée',
+  artisan_responded: "Réponse de l'artisan",
 }
+
+const PAGE_CSS = `
+  .dp * { box-sizing: border-box }
+  .dp input, .dp textarea, .dp button { font-family: inherit }
+  .dp button:focus-visible, .dp a:focus-visible, .dp input:focus-visible, .dp textarea:focus-visible { outline: 2px solid var(--dp-accent); outline-offset: 2px }
+  .dp input:focus, .dp textarea:focus { border-color: var(--dp-accent) !important }
+  .dp input::placeholder, .dp textarea::placeholder { color: ${ZB.ink3}; opacity: 1 }
+  @keyframes dp-spin { to { transform: rotate(360deg) } }
+  @keyframes dp-stamp { from { opacity: 0; transform: rotate(-3deg) scale(1.6) } to { opacity: 1; transform: rotate(-3deg) scale(1) } }
+  .dp-stamp-in { animation: dp-stamp .35s cubic-bezier(.2,.7,.2,1) both }
+  @media (prefers-reduced-motion: reduce) { .dp-stamp-in, .dp-spin { animation: none !important } }
+`
+
+const field = { width: '100%', minHeight: 48, padding: '10px 12px', border: `1px solid ${ZB.rule}`, borderRadius: 8, background: ZB.sheet, fontSize: 16, color: ZB.ink, outline: 'none' }
+const label = { display: 'block', fontSize: 14, fontWeight: 600, color: ZB.ink2, marginBottom: 6 }
+const btnMain = accent => ({ minHeight: 52, padding: '0 20px', borderRadius: 10, border: 'none', background: accent, color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer' })
+const btnSecond = { minHeight: 48, padding: '0 16px', borderRadius: 10, border: `1px solid ${ZB.rule}`, background: ZB.sheet, color: ZB.ink, fontSize: 15, fontWeight: 600, cursor: 'pointer' }
+const btnText = accent => ({ minHeight: 44, padding: '0 4px', background: 'none', border: 'none', color: accent, fontSize: 15, fontWeight: 600, cursor: 'pointer' })
 
 function ErrBox({ msg }) {
   if (!msg) return null
-  return <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', color: '#991b1b', fontSize: 13, marginTop: 12 }}>{msg}</div>
+  return <p role="alert" style={{ margin: '12px 0 0', padding: '10px 12px', borderRadius: 8, background: ZB.dangerSoft, color: ZB.danger, fontSize: 15, lineHeight: 1.45 }}>{msg}</p>
 }
 
-// ── Header ─────────────────────────────────────────────────────────────────
-
-function Header({ artisan }) {
-  const accent  = artisan?.color || '#111111'
-  const logo    = artisan?.logo
+// Cadre de la page : bande à la couleur de l'artisan, en-tête à son nom.
+function Shell({ artisan, accent, children, wide = false }) {
   const company = artisan?.company
-
-  // En-tête « espace client » : bandeau à la couleur de l'artisan, logo dans une
-  // pastille blanche (lisible même si le logo a un fond transparent/clair) +
-  // libellé « ESPACE CLIENT » et nom de l'entreprise.
+  const contact = [artisan?.phone, artisan?.email].filter(Boolean)
   return (
-    <div style={{ background: accent, padding: '18px 20px 20px' }}>
-      <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 14 }}>
-        {logo && (
-          <div style={{ background: '#fff', borderRadius: 12, padding: 8, flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,.15)', lineHeight: 0 }}>
-            <img src={logo} alt={company || ''} style={{ height: 40, maxWidth: 120, objectFit: 'contain', display: 'block' }} />
+    <div className="dp" style={{ '--dp-accent': accent, minHeight: '100dvh', background: ZB.paper, color: ZB.ink, fontFamily: ZB.font, borderTop: `4px solid ${accent}` }}>
+      <style>{PAGE_CSS}</style>
+      <header style={{ borderBottom: `1px solid ${ZB.rule}`, background: ZB.paper }}>
+        <div style={{ maxWidth: wide ? 1100 : 760, margin: '0 auto', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
+          {artisan?.logo && <img src={artisan.logo} alt={company || 'Logo'} style={{ height: 40, maxWidth: 140, objectFit: 'contain', flexShrink: 0 }}/>}
+          <div style={{ minWidth: 0 }}>
+            {company && <div style={{ fontSize: 17, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company}</div>}
+            {contact.length > 0 && (
+              <div style={{ fontSize: 13, color: ZB.ink2, marginTop: 2, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {artisan.phone && <a href={`tel:${String(artisan.phone).replace(/[^\d+]/g, '')}`} style={{ color: ZB.ink2 }}>{artisan.phone}</a>}
+                {artisan.email && <a href={`mailto:${artisan.email}`} style={{ color: ZB.ink2 }}>{artisan.email}</a>}
+              </div>
+            )}
           </div>
-        )}
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '1.5px', color: 'rgba(255,255,255,.85)', textTransform: 'uppercase' }}>
-            Espace client
-          </div>
-          {company && (
-            <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', letterSpacing: '-0.3px', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {company}
-            </div>
-          )}
         </div>
-      </div>
+      </header>
+      {children}
     </div>
   )
 }
 
-// Bloc « Comment ça marche ? » — rassure le client sur les 3 étapes de la
-// signature en ligne, à la manière d'un espace client.
-function HowItWorks() {
-  const steps = [
-    { n: '1', t: 'Consultez', d: 'Parcourez le devis et son PDF.' },
-    { n: '2', t: 'Signez en ligne', d: 'Acceptez en un clic, ou demandez une modification.' },
-    { n: '3', t: "C'est validé", d: "L'artisan est notifié aussitôt." },
-  ]
+function Card({ children, style }) {
+  return <div style={{ background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 8, padding: '22px 20px', ...style }}>{children}</div>
+}
+
+function Centered({ children }) {
+  return <main style={{ maxWidth: 480, margin: '0 auto', padding: '32px 16px 48px' }}>{children}</main>
+}
+
+function Stamp({ color, children }) {
   return (
-    <div style={{ background: 'white', borderRadius: 12, padding: '16px 20px', marginBottom: 12, border: '1px solid #e5e5e5' }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>Comment ça marche ?</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {steps.map(s => (
-          <div key={s.n} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-            <div style={{ flexShrink: 0, width: 22, height: 22, borderRadius: '50%', background: '#f0f0f0', color: '#666', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{s.n}</div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#111' }}>{s.t}</div>
-              <div style={{ fontSize: 12, color: '#888', marginTop: 1 }}>{s.d}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+    <span className="dp-stamp-in" style={{ display: 'inline-block', padding: '8px 16px', border: `5px double ${color}`, borderRadius: 4, color,
+      fontSize: 20, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', transform: 'rotate(-3deg)' }}>
+      {children}
+    </span>
   )
 }
 
-// ── Phase OTP ──────────────────────────────────────────────────────────────
+// ── Phase code de vérification ────────────────────────────────────────────
 
-function PhaseEmail({ data, onVerified, onCancel }) {
+function PhaseEmail({ data, accent, onVerified, onCancel }) {
   // L'email du client est déjà connu côté serveur (data.emailHint) — c'est
   // celui à qui l'artisan a envoyé le devis. On déclenche donc l'envoi de
   // l'OTP automatiquement au chargement et on amène directement le client
@@ -102,11 +114,10 @@ function PhaseEmail({ data, onVerified, onCancel }) {
   const [err,    setErr]    = useState(null)
   const autoSentRef = useRef(false)
 
-  const accent = data?.artisan?.color || '#111111'
   const clientEmail = data?.emailHint || ''
 
   const requestOtp = useCallback(async () => {
-    if (!clientEmail) { setErr("Aucun email enregistré pour ce devis. Contactez l'artisan."); return }
+    if (!clientEmail) { setErr("Aucune adresse email n'est enregistrée pour ce devis. Contactez l'artisan."); return }
     setBusy(true); setErr(null)
     try {
       // On n'envoie plus l'email au serveur : data.emailHint est masqué
@@ -118,7 +129,7 @@ function PhaseEmail({ data, onVerified, onCancel }) {
       if (!res.ok) { setErr(json.error); return }
       setSessId(json.session_id); setSent(true)
       writePendingOtp(data._token, json.session_id, clientEmail)
-    } catch { setErr('Erreur réseau') } finally { setBusy(false) }
+    } catch { setErr('Pas de connexion. Réessayez.') } finally { setBusy(false) }
   }, [clientEmail, data?._token])
 
   // Auto-déclenchement au mount : un seul tir, sauf session déjà ouverte.
@@ -137,77 +148,60 @@ function PhaseEmail({ data, onVerified, onCancel }) {
       if (!res.ok) { setErr(json.error); return }
       clearPendingOtp(data._token)
       onVerified(sessId)
-    } catch { setErr('Erreur réseau') } finally { setBusy(false) }
+    } catch { setErr('Pas de connexion. Réessayez.') } finally { setBusy(false) }
   }
 
   return (
-    <div style={{ maxWidth: 420, margin: '48px auto', padding: '0 20px' }}>
-      <div style={{ background: 'white', borderRadius: 12, padding: '32px 28px', border: '1px solid #e5e5e5' }}>
-
-        <div style={{ marginBottom: 28 }}>
-          <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 600, color: '#999', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            {data.artisan?.company || 'Devis'}
-          </p>
-          <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 700, color: '#111', lineHeight: 1.3 }}>
-            Confirmez votre identité
-          </h2>
-          {data.objet && (
-            <p style={{ margin: '0 0 8px', fontSize: 14, color: '#555', lineHeight: 1.5 }}>{data.objet}</p>
-          )}
-          {data.montant_ht > 0 && (
-            <p style={{ margin: 0, fontSize: 24, fontWeight: 800, color: '#111', letterSpacing: '-0.5px' }}>
-              {fmtEur(data.montant_ht)} <span style={{ fontSize: 13, fontWeight: 500, color: '#999' }}>HT</span>
-            </p>
-          )}
-        </div>
-
-        <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 24 }}>
+    <Centered>
+      <Card>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, lineHeight: 1.3 }}>Confirmez qu'il s'agit bien de vous</h1>
+        <p style={{ margin: '8px 0 0', fontSize: 15, color: ZB.ink2, lineHeight: 1.5 }}>
+          Devis {data.numero}{data.objet ? ` · ${data.objet}` : ''}
+        </p>
+        <div style={{ borderTop: `1px solid ${ZB.rule}`, marginTop: 18, paddingTop: 18 }}>
           {!clientEmail ? (
-            <p style={{ fontSize: 13, color: '#b45309', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', margin: 0 }}>
-              ⚠ Aucun email n'est enregistré pour ce devis. Contactez l'artisan pour obtenir l'accès.
+            <p style={{ margin: 0, fontSize: 15, color: ZB.ink, background: ZB.warnSoft, borderRadius: 8, padding: '10px 12px', lineHeight: 1.45 }}>
+              Aucune adresse email n'est enregistrée pour ce devis. Contactez l'artisan pour obtenir l'accès.
             </p>
           ) : !sent ? (
-            <p style={{ fontSize: 13, color: '#555', margin: 0, textAlign: 'center' }}>
-              {busy ? 'Envoi du code en cours…' : 'Préparation de l\'accès…'}
-            </p>
+            <p role="status" style={{ margin: 0, fontSize: 15, color: ZB.ink2 }}>{busy ? 'Envoi du code…' : "Préparation de l'accès…"}</p>
           ) : (
             <>
-              <p style={{ fontSize: 13, color: '#555', marginBottom: 16 }}>
-                Pour signer en ligne en toute sécurité, saisissez le code à 8 chiffres envoyé à <strong>{clientEmail}</strong>.
+              <p style={{ margin: '0 0 14px', fontSize: 15, lineHeight: 1.5 }}>
+                Pour signer en ligne, saisissez le code à 8 chiffres envoyé à <strong>{clientEmail}</strong>.
               </p>
-              <input
-                type="text" inputMode="numeric" value={code}
+              <label htmlFor="dp-code" className="zb-sr">Code à 8 chiffres</label>
+              <input id="dp-code" type="text" inputMode="numeric" autoComplete="one-time-code" value={code}
                 onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
                 onKeyDown={e => e.key === 'Enter' && code.length === 8 && verifyOtp()}
-                placeholder="_ _ _ _ _ _ _ _" autoFocus maxLength={8}
-                style={{ width: '100%', padding: '14px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 28, fontWeight: 800, letterSpacing: 6, textAlign: 'center', outline: 'none', boxSizing: 'border-box', marginBottom: 12 }}
-              />
-              <button onClick={verifyOtp} disabled={code.length !== 8 || busy}
-                style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: accent, color: 'white', fontWeight: 700, fontSize: 14, cursor: code.length !== 8 || busy ? 'default' : 'pointer', opacity: code.length !== 8 || busy ? 0.6 : 1 }}>
-                {busy ? 'Vérification…' : 'Vérifier et continuer'}
+                placeholder="········" autoFocus maxLength={8}
+                style={{ ...field, minHeight: 60, fontSize: 28, fontWeight: 700, letterSpacing: 8, textAlign: 'center', marginBottom: 12, ...NUM }}/>
+              <button type="button" onClick={verifyOtp} disabled={code.length !== 8 || busy}
+                style={{ ...btnMain(accent), width: '100%', opacity: code.length !== 8 || busy ? 0.5 : 1, cursor: code.length !== 8 || busy ? 'default' : 'pointer' }}>
+                {busy ? 'Vérification…' : 'Continuer'}
               </button>
-              <button onClick={() => { setCode(''); setErr(null); requestOtp() }} disabled={busy}
-                style={{ display: 'block', width: '100%', marginTop: 10, background: 'none', border: 'none', color: '#999', fontSize: 13, cursor: busy ? 'default' : 'pointer' }}>
-                Renvoyer un code
+              <button type="button" onClick={() => { setCode(''); setErr(null); requestOtp() }} disabled={busy}
+                style={{ ...btnText(accent), display: 'block', margin: '8px auto 0' }}>
+                Recevoir un nouveau code
               </button>
             </>
           )}
-          <ErrBox msg={err} />
+          <ErrBox msg={err}/>
           {onCancel && (
-            <button onClick={onCancel} disabled={busy}
-              style={{ display: 'block', width: '100%', marginTop: 16, background: 'none', border: 'none', color: '#bbb', fontSize: 13, cursor: busy ? 'default' : 'pointer' }}>
-              ← Revenir au devis
+            <button type="button" onClick={onCancel} disabled={busy}
+              style={{ ...btnText(ZB.ink2), display: 'block', margin: '12px auto 0' }}>
+              Revenir au devis
             </button>
           )}
         </div>
-      </div>
-    </div>
+      </Card>
+    </Centered>
   )
 }
 
-// ── Mode négociation ───────────────────────────────────────────────────────
+// ── Demande de modifications ──────────────────────────────────────────────
 
-function NegotiateMode({ lignes, token, sessionId, accent, onDone, onCancel }) {
+function NegotiateMode({ lignes, token, sessionId, accent, company, onDone, onCancel }) {
   const [actions,  setActions]  = useState({})
   const [qtys,     setQtys]     = useState({})
   const [comments, setComments] = useState({})
@@ -246,88 +240,92 @@ function NegotiateMode({ lignes, token, sessionId, accent, onDone, onCancel }) {
       const json = await res.json()
       if (!res.ok) { setErr(json.error); return }
       onDone(json.newTotal)
-    } catch { setErr('Erreur réseau') } finally { setBusy(false) }
+    } catch { setErr('Pas de connexion. Réessayez.') } finally { setBusy(false) }
   }
 
   const origTotal = ouvrages.reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0), 0)
   const diff = newTotal - origTotal
 
   return (
-    <div style={{ background: 'white', borderRadius: 12, padding: 24, marginBottom: 12, border: '1px solid #e5e5e5' }}>
-      <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: '#111' }}>Proposer des modifications</h3>
-      <p style={{ fontSize: 13, color: '#777', margin: '0 0 20px', lineHeight: 1.5 }}>
-        Retirez ou ajustez des prestations. L'artisan recevra votre proposition et pourra l'accepter ou vous recontacter.
+    <section aria-labelledby="dp-neg" style={{ background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 8, padding: '20px 18px' }}>
+      <h2 id="dp-neg" style={{ margin: 0, fontSize: 19, fontWeight: 700 }}>Demander des modifications</h2>
+      <p style={{ margin: '6px 0 16px', fontSize: 15, color: ZB.ink2, lineHeight: 1.5 }}>
+        Retirez ou ajustez des prestations. {company || "L'artisan"} reçoit votre demande et vous répond.
       </p>
 
-      {ouvrages.map(l => {
-        const removed = actions[l.id] === 'remove'
-        const qty     = qtys[l.id] !== undefined ? qtys[l.id] : l.quantite
-        return (
-          <div key={l.id} style={{ padding: '12px 14px', borderRadius: 8, marginBottom: 8, background: removed ? '#fef2f2' : '#fafafa', border: `1px solid ${removed ? '#fecaca' : '#ebebeb'}` }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-              <div style={{ display: 'flex', gap: 4, flexShrink: 0, marginTop: 2 }}>
-                <button onClick={() => setActions(a => ({ ...a, [l.id]: undefined }))}
-                  style={{ width: 24, height: 24, borderRadius: 6, border: `1.5px solid ${!removed ? accent : '#ddd'}`, background: !removed ? accent : 'white', color: !removed ? 'white' : '#aaa', fontSize: 11, cursor: 'pointer', fontWeight: 700 }}>✓</button>
-                <button onClick={() => setActions(a => ({ ...a, [l.id]: 'remove' }))}
-                  style={{ width: 24, height: 24, borderRadius: 6, border: `1.5px solid ${removed ? '#ef4444' : '#ddd'}`, background: removed ? '#ef4444' : 'white', color: removed ? 'white' : '#aaa', fontSize: 11, cursor: 'pointer', fontWeight: 700 }}>✕</button>
+      <div style={{ borderTop: `2px solid ${ZB.ink}` }}>
+        {ouvrages.map(l => {
+          const removed = actions[l.id] === 'remove'
+          const qty     = qtys[l.id] !== undefined ? qtys[l.id] : l.quantite
+          return (
+            <div key={l.id} style={{ padding: '12px 0', borderBottom: `1px solid ${ZB.ruleSoft}` }}>
+              <div style={{ fontSize: 15, fontWeight: 600, textDecoration: removed ? 'line-through' : 'none', color: removed ? ZB.ink3 : ZB.ink }}>{l.designation}</div>
+              {l.lot && <div style={{ fontSize: 13, color: ZB.ink2, marginTop: 2 }}>{l.lot}</div>}
+              <div role="radiogroup" aria-label={`Que faire de « ${l.designation} » ?`} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 10 }}>
+                {[['keep', 'Garder'], ['remove', 'Retirer']].map(([k, lbl]) => {
+                  const on = k === 'remove' ? removed : !removed
+                  const col = k === 'remove' ? ZB.danger : accent
+                  return (
+                    <button key={k} type="button" role="radio" aria-checked={on}
+                      onClick={() => setActions(a => ({ ...a, [l.id]: k === 'remove' ? 'remove' : undefined }))}
+                      style={{ minHeight: 44, borderRadius: 8, border: `1px solid ${on ? col : ZB.rule}`, background: on ? (k === 'remove' ? ZB.dangerSoft : ZB.paper2) : ZB.sheet,
+                        color: on ? col : ZB.ink, fontSize: 15, fontWeight: on ? 700 : 500, cursor: 'pointer' }}>
+                      {lbl}
+                    </button>
+                  )
+                })}
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, textDecoration: removed ? 'line-through' : 'none', color: removed ? '#aaa' : '#111' }}>{l.designation}</div>
-                {l.lot && <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{l.lot}</div>}
-                {!removed && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-                    <span style={{ fontSize: 12, color: '#777' }}>Qté</span>
-                    <input type="number" min={0.1} step={0.1} value={qty}
-                      onChange={e => setQtys(q => ({ ...q, [l.id]: e.target.value }))}
-                      style={{ width: 72, padding: '4px 8px', borderRadius: 6, border: '1px solid #ddd', fontSize: 16, textAlign: 'right' }} />
-                    <span style={{ fontSize: 12, color: '#aaa' }}>{l.unite}</span>
-                    <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 700, color: '#111' }}>
-                      {fmtEur(Number(qty) * (l.prix_unitaire || 0))}
-                    </span>
-                  </div>
-                )}
+              {!removed && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+                  <label htmlFor={`q-${l.id}`} style={{ fontSize: 14, color: ZB.ink2 }}>Quantité</label>
+                  <input id={`q-${l.id}`} type="number" inputMode="decimal" min={0} step="any" value={qty}
+                    onChange={e => setQtys(q => ({ ...q, [l.id]: e.target.value }))}
+                    style={{ ...field, width: 96, minHeight: 44, textAlign: 'right', ...NUM }}/>
+                  <span style={{ fontSize: 14, color: ZB.ink2 }}>{l.unite}</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 15, fontWeight: 700, ...NUM }}>{fmtEur(Number(qty) * (l.prix_unitaire || 0))}</span>
+                </div>
+              )}
+              <label style={{ display: 'block', marginTop: 10 }}>
+                <span className="zb-sr">Commentaire sur cette ligne</span>
                 <input value={comments[l.id] || ''} onChange={e => setComments(c => ({ ...c, [l.id]: e.target.value }))}
-                  placeholder={removed ? 'Précisez pourquoi (optionnel)' : 'Commentaire (optionnel)'}
-                  style={{ width: '100%', marginTop: 8, padding: '7px 10px', borderRadius: 6, border: '1px solid #ddd', fontSize: 16, boxSizing: 'border-box' }} />
-              </div>
+                  placeholder={removed ? 'Pourquoi la retirer ? (facultatif)' : 'Commentaire (facultatif)'}
+                  style={{ ...field, minHeight: 44 }}/>
+              </label>
             </div>
-          </div>
-        )
-      })}
-
-      <div style={{ borderRadius: 8, border: '1px solid #ddd', padding: '12px 14px', marginTop: 16, marginBottom: 12 }}>
-        <label style={{ fontSize: 12, fontWeight: 600, color: '#555', display: 'block', marginBottom: 8 }}>Budget cible <span style={{ fontWeight: 400, color: '#aaa' }}>(optionnel)</span></label>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input type="number" value={budget} onChange={e => setBudget(e.target.value)} placeholder="Ex : 7 000"
-            style={{ flex: 1, padding: '9px 12px', borderRadius: 6, border: '1px solid #ddd', fontSize: 16, outline: 'none' }} />
-          <span style={{ fontSize: 13, color: '#777' }}>€ HT</span>
-        </div>
+          )
+        })}
       </div>
 
-      <textarea value={message} onChange={e => setMessage(e.target.value)} rows={3}
-        placeholder="Message pour l'artisan…"
-        style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 16, resize: 'vertical', boxSizing: 'border-box', marginBottom: 14, fontFamily: 'inherit' }} />
+      <label style={{ display: 'block', marginTop: 16 }}>
+        <span style={label}>Budget visé (facultatif)</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input type="number" inputMode="decimal" value={budget} onChange={e => setBudget(e.target.value)} placeholder="Ex : 7 000"
+            style={{ ...field, flex: 1, ...NUM }}/>
+          <span style={{ fontSize: 15, color: ZB.ink2 }}>€ HT</span>
+        </span>
+      </label>
 
-      <div style={{ background: '#fafafa', borderRadius: 8, padding: '12px 14px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 13, color: '#555' }}>Nouveau total estimé</span>
-        <div style={{ textAlign: 'right' }}>
-          <span style={{ fontSize: 20, fontWeight: 800, color: '#111' }}>{fmtEur(newTotal)}</span>
-          {diff < 0 && <div style={{ fontSize: 12, color: '#16a34a', marginTop: 2 }}>Économie de {fmtEur(Math.abs(diff))}</div>}
-        </div>
+      <label style={{ display: 'block', marginTop: 14 }}>
+        <span style={label}>Message pour l'artisan</span>
+        <textarea value={message} onChange={e => setMessage(e.target.value)} rows={3} style={{ ...field, resize: 'vertical' }}/>
+      </label>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 16, padding: '10px 0', borderTop: `2px solid ${ZB.ink}`, borderBottom: `3px double ${ZB.ink}`, ...NUM }}>
+        <span style={{ fontSize: 15, fontWeight: 600 }}>Nouveau total estimé</span>
+        <span style={{ textAlign: 'right' }}>
+          <span style={{ fontSize: 20, fontWeight: 700 }}>{fmtEur(newTotal)} <span style={{ fontSize: 13, color: ZB.ink2 }}>HT</span></span>
+          {diff < 0 && <span style={{ display: 'block', fontSize: 14, color: ZB.ink2 }}>soit {fmtEur(Math.abs(diff))} de moins</span>}
+        </span>
       </div>
 
-      <ErrBox msg={err} />
-      <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-        <button onClick={onCancel}
-          style={{ flex: 1, padding: '11px', borderRadius: 8, border: '1px solid #ddd', background: 'white', color: '#555', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
-          Annuler
-        </button>
-        <button onClick={submit} disabled={busy}
-          style={{ flex: 2, padding: '11px', borderRadius: 8, border: 'none', background: accent, color: 'white', fontWeight: 700, fontSize: 14, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>
-          {busy ? 'Envoi…' : 'Envoyer ma proposition'}
+      <ErrBox msg={err}/>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8, marginTop: 16 }}>
+        <button type="button" onClick={onCancel} style={btnSecond}>Annuler</button>
+        <button type="button" onClick={submit} disabled={busy} style={{ ...btnMain(accent), opacity: busy ? 0.6 : 1 }}>
+          {busy ? 'Envoi…' : 'Envoyer ma demande'}
         </button>
       </div>
-    </div>
+    </section>
   )
 }
 
@@ -409,7 +407,8 @@ export default function DevisPublicPage({ token }) {
   const [verified,     setVerified]     = useState(false)
   const [pendingAction, setPendingAction] = useState(null)
 
-  const accent = data?.artisan?.color || '#111111'
+  // Couleur de l'artisan, assombrie si besoin pour rester lisible sous un texte blanc.
+  const accent = readableAccent(data?.artisan?.color)
   // URL blob du PDF affiché en aperçu inline (généré au chargement de la vue).
   const [pdfUrl, setPdfUrl] = useState(null)
 
@@ -490,7 +489,7 @@ export default function DevisPublicPage({ token }) {
       const json = await res.json()
       if (!res.ok) { setErr(json.error); return false }
       return json
-    } catch { setErr('Erreur réseau'); return false } finally { setBusy(false) }
+    } catch { setErr('Pas de connexion. Réessayez.'); return false } finally { setBusy(false) }
   }
 
   // Génère le PDF signé côté navigateur et le POST à l'API qui l'envoie
@@ -545,7 +544,7 @@ export default function DevisPublicPage({ token }) {
     // si la phase finale est atteinte, on ne relance pas (sinon double
     // signature, double email, audit log dupliqué).
     if (busy || phase === 'signing' || phase === 'accepted') return
-    if (!clientName.trim()) { setErr('Votre nom est requis'); return }
+    if (!clientName.trim()) { setErr('Indiquez votre nom pour signer.'); return }
     const ok = await post({ action: 'accept', client_name: clientName })
     if (!ok) return
     setPhase('signing')
@@ -560,345 +559,282 @@ export default function DevisPublicPage({ token }) {
 
   const handleRefuse = async () => {
     if (busy || phase === 'refused') return
-    if (!refuseReason.trim()) { setErr('La raison du refus est requise'); return }
+    if (!refuseReason.trim()) { setErr('Indiquez la raison du refus.'); return }
     const ok = await post({ action: 'refuse', reason: refuseReason })
     if (ok) setPhase('refused')
   }
 
+  // Un seul calcul des montants (src/lib/invoiceCalc.js) : le TTC affiché est
+  // celui du PDF et celui que le client signe.
+  const lignes   = data?.lignes || []
+  const ouvrages = lignes.filter(l => l.type_ligne === 'ouvrage')
+  const brandVat = data?.artisan?.brand?.vatRegime
+  const franchise = brandVat === 'franchise'
+  const autoLiq  = !!data?.auto_liquidation_btp
+  const totals   = computeTotals(lignes, { noTva: isNoTva(brandVat, autoLiq), docRate: data?.tva_rate })
+
   if (phase === 'loading') {
-    return <div style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', background: '#f5f5f5', color: '#aaa', fontSize: 14 }}>Chargement…</div>
+    return (
+      <div className="dp" style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', background: ZB.paper, color: ZB.ink2, fontFamily: ZB.font, fontSize: 15 }}>
+        <p role="status">Chargement du devis…</p>
+      </div>
+    )
   }
 
   if (phase === 'error') {
     return (
-      <div style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', background: '#f5f5f5', padding: 20 }}>
-        <div style={{ textAlign: 'center', color: '#555' }}>
-          <div style={{ fontSize: 40, marginBottom: 16 }}>—</div>
-          <h2 style={{ margin: '0 0 8px', color: '#111' }}>Lien introuvable</h2>
-          <p style={{ margin: 0, fontSize: 14 }}>Ce lien est invalide ou a expiré.</p>
-        </div>
-      </div>
+      <Shell artisan={null} accent={ZB.ink}>
+        <Centered>
+          <Card>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Ce lien ne fonctionne plus</h1>
+            <p style={{ margin: '8px 0 0', fontSize: 15, color: ZB.ink2, lineHeight: 1.5 }}>
+              Il est incomplet ou le devis a été remplacé. Demandez à l'artisan de vous renvoyer le lien, ou ouvrez le dernier email reçu.
+            </p>
+          </Card>
+        </Centered>
+      </Shell>
     )
   }
 
   if (phase === 'verify') {
     return (
-      <div style={{ minHeight: '100dvh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
-        <Header artisan={data?.artisan} />
+      <Shell artisan={data?.artisan} accent={accent}>
         <PhaseEmail
           data={data}
+          accent={accent}
           onCancel={() => { setPendingAction(null); setErr(null); setPhase('view') }}
           onVerified={async id => {
             setSessionId(id); writePersistedSessionId(token, id)
             setVerified(true)
             await load(id)
             if (pendingAction) { setMode(pendingAction); setPendingAction(null) }
-          }} />
-      </div>
+          }}/>
+      </Shell>
     )
   }
 
   if (phase === 'signing') {
     return (
-      <div style={{ minHeight: '100dvh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
-        <style>{`@keyframes dp-spin { to { transform: rotate(360deg) } }`}</style>
-        <Header artisan={data?.artisan} />
-        <div style={{ maxWidth: 480, margin: '48px auto', padding: '0 20px', textAlign: 'center' }}>
-          <div style={{ background: 'white', borderRadius: 12, padding: '48px 32px', border: '1px solid #e5e5e5' }}>
-            <div style={{
-              width: 48, height: 48, margin: '0 auto 24px',
-              border: `3px solid #e5e5e5`,
-              borderTopColor: accent,
-              borderRadius: '50%',
-              animation: 'dp-spin 0.9s linear infinite',
-            }} />
-            <h2 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 700, color: '#111' }}>Signature en cours…</h2>
-            <p style={{ color: '#777', fontSize: 14, lineHeight: 1.6, margin: 0 }}>
-              Nous préparons votre devis signé et l'envoyons par email.
-              Cela peut prendre quelques secondes — merci de ne pas fermer cette page.
+      <Shell artisan={data?.artisan} accent={accent}>
+        <Centered>
+          <Card style={{ textAlign: 'center' }}>
+            <div className="dp-spin" aria-hidden="true" style={{ width: 44, height: 44, margin: '8px auto 20px', border: `3px solid ${ZB.rule}`, borderTopColor: accent, borderRadius: '50%', animation: 'dp-spin .9s linear infinite' }}/>
+            <h1 role="status" style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Signature en cours…</h1>
+            <p style={{ margin: '8px 0 0', fontSize: 15, color: ZB.ink2, lineHeight: 1.5 }}>
+              Nous préparons votre devis signé et vous l'envoyons par email. Merci de garder cette page ouverte quelques secondes.
             </p>
-          </div>
-        </div>
-      </div>
+          </Card>
+        </Centered>
+      </Shell>
     )
   }
 
   if (phase === 'accepted') {
     return (
-      <div style={{ minHeight: '100dvh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
-        <Header artisan={data?.artisan} />
-        <div style={{ maxWidth: 480, margin: '48px auto', padding: '0 20px', textAlign: 'center' }}>
-          <div style={{ background: 'white', borderRadius: 12, padding: '40px 32px', border: '1px solid #e5e5e5' }}>
-            <div style={{ width: 48, height: 48, background: '#f0fdf4', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', fontSize: 22 }}>✓</div>
-            <h2 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 700, color: '#111' }}>Devis accepté</h2>
-            <p style={{ color: '#777', fontSize: 14, lineHeight: 1.6, margin: '0 0 16px' }}>
-              Votre accord pour le devis <strong style={{ color: '#111' }}>{data.numero}</strong> a bien été enregistré
-              {data.client_accepted_at ? ` le ${fmtD(data.client_accepted_at)}` : ''}.
+      <Shell artisan={data?.artisan} accent={accent}>
+        <Centered>
+          <Card style={{ textAlign: 'center' }}>
+            <div style={{ margin: '6px 0 18px' }}><Stamp color={ZB.stamp}>Signé</Stamp></div>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Merci, votre accord est enregistré</h1>
+            <p style={{ margin: '8px 0 0', fontSize: 15, color: ZB.ink2, lineHeight: 1.5 }}>
+              Devis <strong style={{ color: ZB.ink }}>{data.numero}</strong>{data.client_accepted_at ? `, signé le ${fmtD(data.client_accepted_at)}` : ''}
+              {ouvrages.length > 0 && <>, pour <strong style={{ color: ZB.ink, whiteSpace: 'nowrap', ...NUM }}>{fmtEur(totals.ttc)} TTC</strong></>}.
             </p>
+            {ouvrages.length > 0 && (
+              <button type="button" onClick={openPdf} disabled={pdfLoading} style={{ ...btnSecond, marginTop: 16 }}>
+                {pdfLoading ? 'Préparation…' : 'Voir le devis signé'}
+              </button>
+            )}
             {emailSent?.client && (
-              <p style={{ color: '#15803d', fontSize: 13, lineHeight: 1.6, margin: '0 0 16px', background: '#f0fdf4', borderRadius: 8, padding: '10px 14px' }}>
-                ✓ Le devis signé vous a été envoyé par email.
+              <p style={{ margin: '16px 0 0', fontSize: 15, background: ZB.stampSoft, borderRadius: 8, padding: '10px 12px', lineHeight: 1.45 }}>
+                Le devis signé vous a été envoyé par email.
               </p>
             )}
             {emailSent && !emailSent.client && (
-              <p style={{ color: '#92400e', fontSize: 13, lineHeight: 1.6, margin: '0 0 16px', background: '#fef9c3', borderRadius: 8, padding: '10px 14px' }}>
-                Votre signature est enregistrée, mais l'envoi du PDF par email a échoué. L'artisan vous le transmettra.
+              <p style={{ margin: '16px 0 0', fontSize: 15, background: ZB.warnSoft, borderRadius: 8, padding: '10px 12px', lineHeight: 1.45 }}>
+                Votre signature est bien enregistrée, mais l'email avec le PDF n'est pas parti. L'artisan vous le transmettra.
               </p>
             )}
             {data.artisan?.company && (
-              <p style={{ color: '#555', fontSize: 14, margin: 0 }}>
-                L'équipe de <strong>{data.artisan.company}</strong> vous contactera prochainement.
+              <p style={{ margin: '16px 0 0', fontSize: 15, lineHeight: 1.5 }}>
+                {data.artisan.company} vous recontacte pour organiser les travaux.
               </p>
             )}
-            {data.artisan?.phone && (
-              <p style={{ color: '#999', fontSize: 13, marginTop: 12 }}>{data.artisan.phone}</p>
-            )}
-          </div>
-        </div>
-      </div>
+          </Card>
+        </Centered>
+      </Shell>
     )
   }
 
   if (phase === 'refused') {
     return (
-      <div style={{ minHeight: '100dvh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
-        <Header artisan={data?.artisan} />
-        <div style={{ maxWidth: 480, margin: '48px auto', padding: '0 20px', textAlign: 'center' }}>
-          <div style={{ background: 'white', borderRadius: 12, padding: '40px 32px', border: '1px solid #e5e5e5' }}>
-            <h2 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 700, color: '#111' }}>Devis refusé</h2>
-            <p style={{ color: '#777', fontSize: 14, lineHeight: 1.6, margin: 0 }}>
-              Contactez l'artisan si vous souhaitez discuter d'une nouvelle proposition.
+      <Shell artisan={data?.artisan} accent={accent}>
+        <Centered>
+          <Card style={{ textAlign: 'center' }}>
+            <div style={{ margin: '6px 0 18px' }}><Stamp color={ZB.ink2}>Refusé</Stamp></div>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Votre réponse est enregistrée</h1>
+            <p style={{ margin: '8px 0 0', fontSize: 15, color: ZB.ink2, lineHeight: 1.5 }}>
+              Si vous souhaitez une nouvelle proposition, contactez directement l'artisan.
             </p>
-            {data.artisan?.email && (
-              <p style={{ color: '#999', fontSize: 13, marginTop: 12 }}>{data.artisan.email}</p>
-            )}
+          </Card>
+        </Centered>
+      </Shell>
+    )
+  }
+
+  // ── Vue principale ─────────────────────────────────────────────────────
+  const sections = sectionsOf(lignes)
+  const cloture  = ['accepte', 'refuse', 'remplace'].includes(data?.statut)
+  const enNeg    = data?.statut === 'en_negociation'
+  const clientFirst = data?.client?.name
+
+  let bar = null
+  if (!cloture && mode === 'accept') {
+    bar = (
+      <div role="group" aria-label="Signer le devis" style={{ display: 'grid', gap: 10 }}>
+        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.45 }}>
+          En signant, vous donnez votre accord pour le devis <strong>{data.numero}</strong>, soit <strong style={NUM}>{fmtEur(totals.ttc)} TTC</strong>.
+        </p>
+        <label>
+          <span style={label}>Votre nom et prénom</span>
+          <input value={clientName} onChange={e => setClientName(e.target.value)} autoComplete="name" placeholder="Ex : Claire Durand" style={field}/>
+        </label>
+        <ErrBox msg={err}/>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+          <button type="button" onClick={() => { setMode(null); setErr(null) }} style={btnSecond}>Annuler</button>
+          <button type="button" onClick={handleAccept} disabled={!clientName.trim() || busy}
+            style={{ ...btnMain(accent), opacity: !clientName.trim() || busy ? 0.5 : 1, cursor: !clientName.trim() || busy ? 'default' : 'pointer' }}>
+            {busy ? 'Signature…' : 'Bon pour accord, je signe'}
+          </button>
+        </div>
+      </div>
+    )
+  } else if (!cloture && mode === 'refuse') {
+    bar = (
+      <div role="group" aria-label="Refuser le devis" style={{ display: 'grid', gap: 10 }}>
+        <label>
+          <span style={label}>Pourquoi refusez-vous ce devis ?</span>
+          <textarea value={refuseReason} onChange={e => setRefuseReason(e.target.value)} rows={2}
+            placeholder="Ex : budget trop élevé, autre proposition…" style={{ ...field, resize: 'vertical' }}/>
+        </label>
+        <ErrBox msg={err}/>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+          <button type="button" onClick={() => { setMode(null); setErr(null) }} style={btnSecond}>Annuler</button>
+          <button type="button" onClick={handleRefuse} disabled={!refuseReason.trim() || busy}
+            style={{ ...btnSecond, color: ZB.danger, borderColor: ZB.danger, opacity: !refuseReason.trim() || busy ? 0.5 : 1 }}>
+            {busy ? 'Envoi…' : 'Refuser le devis'}
+          </button>
+        </div>
+      </div>
+    )
+  } else if (!cloture && mode === null) {
+    bar = enNeg ? (
+      <p style={{ margin: 0, fontSize: 15, color: ZB.ink2, lineHeight: 1.45 }}>
+        Votre demande de modification est entre les mains de l'artisan : il vous répond par email.
+      </p>
+    ) : (
+      <div style={{ display: 'grid', gap: 6 }}>
+        {ouvrages.length > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '0 2px 4px', ...NUM }}>
+            <span style={{ fontSize: 15 }}>Total du devis</span>
+            <span style={{ fontSize: 19, fontWeight: 700 }}>{fmtEur(totals.ttc)} <span style={{ fontSize: 13, fontWeight: 600, color: ZB.ink2 }}>TTC</span></span>
           </div>
+        )}
+        <button type="button" onClick={() => startAction('accept')} style={{ ...btnMain(accent), width: '100%' }}>Signer le devis</button>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 20, flexWrap: 'wrap' }}>
+          <button type="button" onClick={() => startAction('negotiate')} style={btnText(accent)}>Demander des modifications</button>
+          <button type="button" onClick={() => startAction('refuse')} style={btnText(ZB.ink2)}>Refuser</button>
         </div>
       </div>
     )
   }
 
-  // ── Vue principale ─────────────────────────────────────────────────────
-  const lignes   = data?.lignes || []
-  const ouvrages = lignes.filter(l => l.type_ligne === 'ouvrage')
-  const totalHT  = ouvrages.reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0), 0)
-  // TVA calculée ligne par ligne : un devis peut mélanger plusieurs taux
-  // (ex. BTP 5,5 % rénovation + 10 % entretien). Appliquer le taux de la
-  // 1ère ligne à tout le HT fausserait le TTC — or il vaut engagement signé.
-  const totalTVA = ouvrages.reduce((s, l) => s + (l.quantite || 0) * (l.prix_unitaire || 0) * ((l.tva_rate ?? 20) / 100), 0)
-  const totalTTC = totalHT + totalTVA
-  const tauxTva  = [...new Set(ouvrages.map(l => l.tva_rate ?? 20))]
-  const tvaLabel = tauxTva.length <= 1 ? `TVA ${tauxTva[0] ?? 20}%` : 'TVA multitaux'
-  const cloture  = ['accepte', 'refuse', 'remplace'].includes(data?.statut)
-  const enNeg    = data?.statut === 'en_negociation'
-
   return (
-    <div style={{ minHeight: '100dvh', background: '#f5f5f5', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', paddingBottom: 60 }}>
-      <style>{`
-        * { box-sizing: border-box } input, textarea, button { font-family: inherit }
-        /* Mobile : une seule colonne, ordre DOM = carte → PDF → actions. */
-        .ec-grid { max-width: 600px; margin: 0 auto; padding: 20px 16px 0; display: grid; grid-template-columns: 1fr; gap: 12px; }
-        .ec-footer { max-width: 600px; margin: 40px auto 0; }
-        /* Mobile : détail HTML responsive (l'iframe PDF déborde sur iOS). */
-        .ec-pdf-desktop { display: none; }
-        .ec-pdf-mobile  { display: block; }
-        /* Desktop : deux colonnes — PDF large à gauche, résumé + actions à
-           droite. Les zones nommées repositionnent sans toucher l'ordre DOM. */
-        @media (min-width: 900px) {
-          .ec-grid {
-            max-width: 1320px; gap: 16px; align-items: start;
-            grid-template-columns: minmax(0, 1.7fr) minmax(320px, 1fr);
-            grid-template-areas: "pdf card" "pdf actions";
-          }
-          .ec-card    { grid-area: card; }
-          .ec-pdf     { grid-area: pdf; }
-          .ec-actions { grid-area: actions; }
-          .ec-footer  { max-width: 1320px; }
-          /* Desktop : on affiche l'iframe PDF, on masque le détail HTML. */
-          .ec-pdf-desktop { display: block; }
-          .ec-pdf-mobile  { display: none; }
-        }
-      `}</style>
-      <Header artisan={data?.artisan} />
+    <Shell artisan={data?.artisan} accent={accent}>
+      <main style={{ maxWidth: 760, margin: '0 auto', padding: '18px 12px 24px' }}>
+        <p style={{ margin: '0 4px 14px', fontSize: 15, color: ZB.ink2, lineHeight: 1.5 }}>
+          {clientFirst ? `Bonjour ${clientFirst}, voici` : 'Voici'} votre devis{data.artisan?.company ? ` de ${data.artisan.company}` : ''}.
+          {!cloture && !enNeg && ' Vous pouvez le signer en ligne.'}
+        </p>
 
-      <div className="ec-grid">
-
-        {/* Carte devis */}
-        <div className="ec-card" style={{ background: 'white', borderRadius: 12, padding: '24px', border: '1px solid #e5e5e5' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#aaa', letterSpacing: '0.5px', marginBottom: 8 }}>{data.numero}</div>
-          {data.objet && (
-            <h2 style={{ margin: '0 0 12px', fontSize: 17, fontWeight: 700, color: '#111', lineHeight: 1.4 }}>{data.objet}</h2>
-          )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 8 }}>
-            <div style={{ fontSize: 12, color: '#aaa' }}>
-              Émis le {fmtD(data.date_emission)}
-              {data.date_validite && <> · Valable jusqu'au {fmtD(data.date_validite)}</>}
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 28, fontWeight: 800, color: '#111', letterSpacing: '-0.5px', lineHeight: 1 }}>{fmtEur(totalHT)}</div>
-              <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>HT · {tvaLabel}</div>
-            </div>
-          </div>
-
-          {enNeg && (
-            <div style={{ marginTop: 16, borderTop: '1px solid #f0f0f0', paddingTop: 14, fontSize: 13, color: '#777' }}>
-              Votre proposition est en cours d'examen.
-            </div>
-          )}
-        </div>
-
-        {/* Aperçu du devis — colonne gauche sur desktop */}
-        <div className="ec-pdf" style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e5e5', overflow: 'hidden' }}>
-
-          {/* Desktop : aperçu PDF intégré (iframe). #view=FitH&zoom=page-width
-              ajuste la page à la largeur sur Chrome/Firefox desktop. */}
-          <div className="ec-pdf-desktop">
-            {pdfUrl ? (
-              <iframe title={`Devis ${data.numero}`} src={`${pdfUrl}#view=FitH&zoom=page-width&navpanes=0`}
-                style={{ width: '100%', height: '82vh', minHeight: 520, border: 'none', display: 'block', background: '#f5f5f5' }} />
-            ) : (
-              <div style={{ padding: '40px 20px', textAlign: 'center', color: '#aaa', fontSize: 13 }}>
-                Préparation de l'aperçu du devis…
+        <article aria-label={`Devis ${data.numero}`} style={{ background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 8, padding: '18px 18px 20px' }}>
+          <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, ...NUM }}>Devis {data.numero}</div>
+              <div style={{ fontSize: 13, color: ZB.ink2, marginTop: 4 }}>
+                Émis le {fmtD(data.date_emission)}{data.date_validite && <> · <span style={{ whiteSpace: 'nowrap' }}>valable jusqu'au {fmtD(data.date_validite)}</span></>}
               </div>
-            )}
-          </div>
-
-          {/* Mobile : pas d'aperçu inline (l'iframe PDF déborde sur iOS) — on
-              invite directement à ouvrir le PDF en plein écran. */}
-          <div className="ec-pdf-mobile" style={{ padding: '28px 20px 8px', textAlign: 'center' }}>
-            <div style={{ fontSize: 40, marginBottom: 10 }}>📄</div>
-            <div style={{ fontSize: 15, color: '#111', fontWeight: 600 }}>Votre devis {data.numero}</div>
-            <div style={{ fontSize: 13, color: '#999', marginTop: 4 }}>Appuyez ci-dessous pour l'ouvrir en PDF.</div>
-          </div>
-
-          <button onClick={openPdf} disabled={pdfLoading}
-            style={{ width: '100%', background: accent, color: 'white', border: 'none', padding: '14px 20px', fontSize: 15, fontWeight: 700, cursor: pdfLoading ? 'default' : 'pointer', opacity: pdfLoading ? 0.7 : 1 }}>
-            {pdfLoading ? 'Génération…' : '⤢ Ouvrir le PDF'}
-          </button>
-        </div>
-
-        {/* Colonne droite sur desktop : résumé secondaire + actions */}
-        <div className="ec-actions">
-
-        {/* Documents joints */}
-        {data.docs?.length > 0 && (
-          <div style={{ background: 'white', borderRadius: 12, padding: '16px 20px', marginBottom: 12, border: '1px solid #e5e5e5' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>Documents joints</div>
-            {data.docs.map(doc => (
-              <a key={doc.id} href={`/api/devis-public?token=${token}&session_id=${sessionId}&doc_id=${doc.id}`}
-                target="_blank" rel="noopener noreferrer"
-                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid #f5f5f5', textDecoration: 'none', color: '#111' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{doc.name}</div>
-                  <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{CAT_LABELS[doc.category] || 'Document'}</div>
-                </div>
-                <span style={{ fontSize: 12, color: accent, fontWeight: 600 }}>Télécharger</span>
-              </a>
-            ))}
-          </div>
-        )}
-
-        {/* Historique */}
-        {data.auditLog?.length > 0 && (
-          <div style={{ background: 'white', borderRadius: 12, padding: '16px 20px', marginBottom: 16, border: '1px solid #e5e5e5' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12 }}>Historique</div>
-            {data.auditLog.map((e, i) => {
-              const info = AUDIT_LABELS[e.event] || { label: e.event }
-              return (
-                <div key={i} style={{ display: 'flex', gap: 12, padding: '5px 0', fontSize: 13, borderBottom: i < data.auditLog.length - 1 ? '1px solid #f5f5f5' : 'none' }}>
-                  <span style={{ color: '#ccc', fontSize: 12, minWidth: 72, paddingTop: 1 }}>{fmtDT(e.created_at)}</span>
-                  <span style={{ color: '#555' }}>{info.label}{e.meta?.client_name ? ` — ${e.meta.client_name}` : ''}</span>
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {/* Mode négociation */}
-        {mode === 'negotiate' && !cloture && !enNeg && (
-          <NegotiateMode lignes={lignes} token={token} sessionId={sessionId} accent={accent}
-            onDone={() => { setMode(null); load(sessionId) }}
-            onCancel={() => setMode(null)} />
-        )}
-
-        {/* Mode accepter */}
-        {mode === 'accept' && (
-          <div style={{ background: 'white', borderRadius: 12, padding: 24, marginBottom: 12, border: '1px solid #e5e5e5' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 700, color: '#111' }}>Confirmer votre accord</h3>
-            <p style={{ fontSize: 13, color: '#777', marginTop: 0, marginBottom: 20, lineHeight: 1.5 }}>
-              En acceptant, vous confirmez votre accord pour un montant de <strong style={{ color: '#111' }}>{fmtEur(totalHT)} HT</strong> ({fmtEur(totalTTC)} TTC).
-            </p>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 8 }}>Votre nom complet</label>
-            <input value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Jean Dupont"
-              style={{ width: '100%', padding: '11px 14px', borderRadius: 8, border: '1.5px solid #ddd', fontSize: 16, marginBottom: 16, outline: 'none' }} />
-            <ErrBox msg={err} />
-            <div style={{ display: 'flex', gap: 10, marginTop: err ? 12 : 0 }}>
-              <button onClick={() => { setMode(null); setErr(null) }}
-                style={{ flex: 1, padding: '11px', borderRadius: 8, border: '1px solid #ddd', background: 'white', color: '#555', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
-                Annuler
-              </button>
-              <button onClick={handleAccept} disabled={!clientName.trim() || busy}
-                style={{ flex: 2, padding: '11px', borderRadius: 8, border: 'none', background: accent, color: 'white', fontWeight: 700, fontSize: 14, cursor: !clientName.trim() || busy ? 'default' : 'pointer', opacity: !clientName.trim() || busy ? 0.6 : 1 }}>
-                {busy ? 'Confirmation…' : 'Accepter ce devis'}
-              </button>
             </div>
-          </div>
-        )}
-
-        {/* Mode refuser */}
-        {mode === 'refuse' && (
-          <div style={{ background: 'white', borderRadius: 12, padding: 24, marginBottom: 12, border: '1px solid #e5e5e5' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 700, color: '#111' }}>Refuser ce devis</h3>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 8 }}>Raison du refus</label>
-            <textarea value={refuseReason} onChange={e => setRefuseReason(e.target.value)} rows={3}
-              placeholder="Ex : Tarif trop élevé, j'ai eu une autre proposition…"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 16, resize: 'vertical', marginBottom: 16, outline: 'none' }} />
-            <ErrBox msg={err} />
-            <div style={{ display: 'flex', gap: 10, marginTop: err ? 12 : 0 }}>
-              <button onClick={() => { setMode(null); setErr(null) }}
-                style={{ flex: 1, padding: '11px', borderRadius: 8, border: '1px solid #ddd', background: 'white', color: '#555', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
-                Annuler
-              </button>
-              <button onClick={handleRefuse} disabled={!refuseReason.trim() || busy}
-                style={{ flex: 2, padding: '11px', borderRadius: 8, border: '1px solid #ddd', background: 'white', color: '#ef4444', fontWeight: 600, fontSize: 14, cursor: !refuseReason.trim() || busy ? 'default' : 'pointer', opacity: !refuseReason.trim() || busy ? 0.5 : 1 }}>
-                {busy ? 'Envoi…' : 'Confirmer le refus'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Comment ça marche ? — affiché tant que le client peut agir */}
-        {!cloture && mode === null && <HowItWorks />}
-
-        {/* Boutons d'action */}
-        {!cloture && mode === null && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {!enNeg && (
-              <button onClick={() => startAction('accept')}
-                style={{ width: '100%', padding: '14px', borderRadius: 10, border: 'none', background: accent, color: 'white', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
-                ✍️ Signer en ligne
-              </button>
-            )}
-            {!enNeg && (
-              <button onClick={() => startAction('negotiate')}
-                style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1px solid #ddd', background: 'white', color: '#555', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
-                Demander des modifications
-              </button>
-            )}
-            <button onClick={() => startAction('refuse')}
-              style={{ width: '100%', padding: '11px', borderRadius: 10, border: 'none', background: 'transparent', color: '#bbb', fontWeight: 500, fontSize: 13, cursor: 'pointer' }}>
-              Refuser
+            <button type="button" onClick={openPdf} disabled={pdfLoading}
+              style={{ ...btnText(accent), display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0, marginTop: -10 }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
+              {pdfLoading ? 'Préparation…' : 'Voir le PDF'}
             </button>
+          </header>
+          {data.objet && <h1 style={{ margin: '14px 0 0', fontSize: 21, fontWeight: 700, lineHeight: 1.25 }}>{data.objet}</h1>}
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 18, paddingBottom: 8, borderBottom: `2px solid ${ZB.ink}`, fontSize: 13, fontWeight: 600, color: ZB.ink2 }}>
+            <span>Désignation</span><span>Montant HT</span>
+          </div>
+          {sections.map((sec, si) => (
+            <section key={sec.lot?.id || `s${si}`} aria-label={sec.lot?.designation || 'Prestations'}>
+              {sec.lot && <LotHeading lot={sec.lot} subtotal={sec.subtotal}/>}
+              {sec.rows.map(({ l, idx }) => <Line key={l.id || idx} l={l} idx={idx} franchise={isNoTva(brandVat, autoLiq)}/>)}
+            </section>
+          ))}
+          {ouvrages.length > 0 && <Totals ht={totals.ht} tvaRows={totals.tvaRows} ttc={totals.ttc} franchise={franchise} autoLiquidation={autoLiq && !franchise}/>}
+        </article>
+
+        {mode === 'negotiate' && !cloture && !enNeg && (
+          <div style={{ marginTop: 16 }}>
+            <NegotiateMode lignes={lignes} token={token} sessionId={sessionId} accent={accent} company={data.artisan?.company}
+              onDone={() => { setMode(null); load(sessionId) }}
+              onCancel={() => setMode(null)}/>
           </div>
         )}
 
-        </div>{/* end ec-actions */}
-      </div>{/* end ec-grid */}
+        {data.docs?.length > 0 && (
+          <section style={{ marginTop: 20 }}>
+            <h2 style={{ margin: '0 4px 8px', fontSize: 17, fontWeight: 700 }}>Documents joints</h2>
+            <div style={{ background: ZB.sheet, border: `1px solid ${ZB.rule}`, borderRadius: 8 }}>
+              {data.docs.map((doc, i) => (
+                <a key={doc.id} href={`/api/devis-public?token=${token}&session_id=${sessionId}&doc_id=${doc.id}`} target="_blank" rel="noopener noreferrer"
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 60, padding: '10px 16px', borderBottom: i < data.docs.length - 1 ? `1px solid ${ZB.ruleSoft}` : 'none', textDecoration: 'none', color: ZB.ink }}>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 15, fontWeight: 600 }}>{doc.name}</span>
+                    <span style={{ display: 'block', fontSize: 13, color: ZB.ink2 }}>{CAT_LABELS[doc.category] || 'Document'}</span>
+                  </span>
+                  <span style={{ fontSize: 15, fontWeight: 600, color: accent }}>Télécharger</span>
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
 
-      {/* Footer */}
-      <div className="ec-footer" style={{ textAlign: 'center', fontSize: 11, color: '#ccc' }}>
-        Propulsé par Zenbat · Lien personnel confidentiel
-      </div>
-    </div>
+        {data.auditLog?.length > 0 && (
+          <section style={{ marginTop: 20 }}>
+            <h2 style={{ margin: '0 4px 8px', fontSize: 17, fontWeight: 700 }}>Suivi</h2>
+            <ol style={{ listStyle: 'none', margin: 0, padding: 0, borderTop: `1px solid ${ZB.rule}` }}>
+              {data.auditLog.map((e, i) => (
+                <li key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '10px 4px', borderBottom: `1px solid ${ZB.ruleSoft}`, fontSize: 14 }}>
+                  <span>{AUDIT_LABELS[e.event] || e.event}{e.meta?.client_name ? ` : ${e.meta.client_name}` : ''}</span>
+                  <span style={{ color: ZB.ink2, whiteSpace: 'nowrap' }}>{fmtDT(e.created_at)}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+
+        <p style={{ margin: '28px 0 0', textAlign: 'center', fontSize: 13, color: ZB.ink3 }}>
+          Lien personnel et confidentiel · signature en ligne par Zenbat
+        </p>
+      </main>
+
+      {bar && mode !== 'negotiate' && (
+        <div style={{ position: 'sticky', bottom: 0, zIndex: 2, background: ZB.paper, borderTop: `1px solid ${ZB.rule}`, padding: '12px 12px calc(14px + env(safe-area-inset-bottom))' }}>
+          <div style={{ maxWidth: 760, margin: '0 auto' }}>{bar}</div>
+        </div>
+      )}
+    </Shell>
   )
 }
