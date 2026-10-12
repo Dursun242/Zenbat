@@ -309,7 +309,7 @@ export default function UserDetailDrawer({
                   return (
                   <div key={inv.id} style={{ background: "white", borderRadius: 10, padding: 12, boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-                      <div style={{ fontFamily: "monospace", fontSize: 11, color: "#6B6358" }}>{inv.numero}{inv.avoir_of_invoice_id ? " · avoir" : ""}</div>
+                      <div style={{ fontFamily: "monospace", fontSize: 11, color: "#6B6358" }}>{inv.numero || "brouillon"}{inv.avoir_of_invoice_id ? " · avoir" : ""}</div>
                       <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                         {inv.locked && <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 20, background: "#fef3c7", color: "#92400e", fontWeight: 700 }}>🔒</span>}
                         <span style={{ fontSize: 9, padding: "1px 7px", borderRadius: 20, background: "#F0EBE3", color: "#6B6358", fontWeight: 700 }}>{inv.statut}</span>

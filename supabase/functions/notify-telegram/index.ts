@@ -152,7 +152,7 @@ async function formatEvent(kind: EventKind, payload: Record<string, unknown>): P
           (devisTtc > 0 ? ` (${fmtAmount(devisTtc)})` : "") + oLine;
       }
       if (t === "invoices" && action === "insert") {
-        return `🧾 Nouvelle facture <b>${escapeHtml(nd.numero)}</b>` +
+        return `🧾 Nouvelle facture <b>${escapeHtml(nd.numero || "brouillon")}</b>` +
           (invoiceTtc > 0 ? ` — ${fmtAmount(invoiceTtc)}` : "") + oLine;
       }
       if (t === "invoices" && action === "update" && nd.statut !== od.statut) {

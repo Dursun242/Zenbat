@@ -318,7 +318,8 @@ export async function buildPdf(d, cl, brand, kind = "devis", { filename = "docum
   // Doc info (right-aligned)
   const rx = X + CW;
   txt(pdf, docLabel, rx, y + 4,  { size: 7.5, bold: true, color: MUTED, align: "right" });
-  txt(pdf, s(d.numero), rx, y + 10, { size: 14, bold: true, color: accent, align: "right" });
+  // Facture brouillon : pas encore de numéro (attribué à l'émission).
+  txt(pdf, s(d.numero || (kind === "facture" && !isProforma ? "Brouillon" : "")), rx, y + 10, { size: 14, bold: true, color: accent, align: "right" });
   txt(pdf, `Émis le ${fmtD(d.date_emission)}`, rx, y + 16, { size: 7.5, color: LIGHT, align: "right" });
   if (kind === "facture") {
     if (d.date_echeance)

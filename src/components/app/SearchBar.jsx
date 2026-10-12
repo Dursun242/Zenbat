@@ -75,7 +75,7 @@ export default function SearchBar({ devis = [], clients = [], invoices = [], goD
       ...invoices
         .filter(inv => (inv.numero || "").toLowerCase().includes(query) || (inv.objet || "").toLowerCase().includes(query))
         .slice(0, 3)
-        .map(inv => ({ type: "facture", id: inv.id, label: inv.numero, sub: inv.objet || "" })),
+        .map(inv => ({ type: "facture", id: inv.id, label: inv.numero || "Facture brouillon", sub: inv.objet || "" })),
     ];
   }, [query, clients, devis, invoices]);
 

@@ -260,7 +260,9 @@ async function handleSendComptable({ req, res, user, admin }) {
     const { from: dFrom, to: dTo } = periodRange(period, from, to)
 
     // Factures + clients + lignes en parallèle
-    let invoicesQ = admin.from('invoices').select('*').eq('owner_id', user.id)
+    // Factures émises seulement : un brouillon n'est pas une facture (pas de
+    // numéro avant l'émission, migration 0060).
+    let invoicesQ = admin.from('invoices').select('*').eq('owner_id', user.id).eq('locked', true)
     if (dFrom) invoicesQ = invoicesQ.gte('date_emission', dFrom.toISOString().slice(0, 10))
     if (dTo)   invoicesQ = invoicesQ.lte('date_emission', dTo.toISOString().slice(0, 10))
 

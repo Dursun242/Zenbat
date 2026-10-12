@@ -59,7 +59,7 @@ const fmtDate = d => {
   return `${x.getFullYear()}${String(x.getMonth()+1).padStart(2,"0")}${String(x.getDate()).padStart(2,"0")}`;
 };
 
-// montant_ht / montant_tva / montant_ttc calculés depuis les lignes reçues.
+// montant_ht / montant_tva / montant_ttc calculés depuis les lignes en base.
 function emittedAmounts(invoice, brand) {
   const t = computeTotals(invoice.lignes, { noTva: isNoTva(brand?.vatRegime, invoice.auto_liquidation_btp) });
   return { montant_ht: t.ht, montant_tva: t.tva, montant_ttc: t.ttc };
@@ -373,38 +373,62 @@ export default async function handler(req, res) {
   if (!auth) return;
   const { user, admin } = auth;
 
-  // Routage par action : 'send' = email du Factur-X au client (depuis Storage),
-  // 'set_status' = change le statut de paiement d'une facture émise (verrouillée),
-  // sinon flux historique = génère + assemble + uploade le Factur-X.
+  // Routage par action : 'emit' = émission (numéro + date + verrou, migration
+  // 0060), 'send' = email du Factur-X au client (depuis Storage), 'set_status' =
+  // statut de paiement d'une facture émise, 'hide' = masquage, sinon génère +
+  // assemble + archive le Factur-X d'une facture déjà émise.
   if (req.body?.action === "send")       return handleSend(req, res, { user, admin });
   if (req.body?.action === "set_status") return handleSetStatus(req, res, { user, admin });
   if (req.body?.action === "hide")       return handleHide(req, res, { user, admin });
+  if (req.body?.action === "emit")       return handleEmit(req, res, { user, admin });
 
   const { pdf_base64, invoice, client, brand, sourceInvoice } = req.body || {};
   if (!pdf_base64 || !invoice?.id) {
     return res.status(400).json({ error: "pdf_base64 et invoice.id requis" });
   }
 
-  // Vérification propriété : on exige toujours une facture persistée
-  // et appartenant à l'utilisateur. Sans ce check, l'endpoint deviendrait
-  // un proxy Factur-X non authentifié pour n'importe quel PDF.
-  const { data: row } = await admin
+  // La facture fait foi en base : numéro, dates, montants et lignes sont
+  // relus ici, jamais pris du navigateur (le chemin d'archive dépend du
+  // numéro). Seules les mentions d'affichage (client, marque) viennent du body.
+  const { data: row, error: rowErr } = await admin
     .from("invoices")
-    .select("id, locked")
+    .select("*")
     .eq("id", invoice.id)
     .eq("owner_id", user.id)
     .maybeSingle();
+  if (rowErr) {
+    await logServerError("facturx/generate-read", rowErr, { invoice_id: invoice.id });
+    return res.status(500).json({ error: "Lecture de la facture impossible, réessaie." });
+  }
   if (!row) return res.status(403).json({ error: "Accès refusé à cette facture" });
-  // Facture déjà émise : le Factur-X archivé fait foi (CGI art. 289), on ne
-  // l'écrase pas. Le PDF régénéré est seulement renvoyé au navigateur.
-  const wasLocked = !!row.locked;
+  // Un brouillon n'a pas encore de numéro : l'émission (action « emit »)
+  // passe d'abord. Une ancienne version de l'application arrive ici avec un
+  // brouillon : on lui demande de se mettre à jour.
+  if (!row.locked || !row.numero) {
+    return res.status(409).json({
+      error: "Une nouvelle version de Zenbat est disponible : recharge la page, puis émets la facture à nouveau.",
+      code: "emit_first",
+    });
+  }
+
+  const { data: dbLignes, error: lignesErr } = await admin
+    .from("lignes_invoices")
+    .select("*")
+    .eq("invoice_id", row.id)
+    .is("deleted_at", null)
+    .order("position", { ascending: true });
+  if (lignesErr) {
+    await logServerError("facturx/generate-lignes", lignesErr, { invoice_id: row.id });
+    return res.status(500).json({ error: "Lecture des lignes impossible, réessaie." });
+  }
+  const emitted = { ...row, lignes: dbLignes || [] };
 
   try {
     const pdfBytes = Uint8Array.from(Buffer.from(pdf_base64, "base64"));
     const pdfDoc   = await PDFDocument.load(pdfBytes);
 
     // 1. Attache l'XML Factur-X
-    const xml      = buildXML({ invoice, client, brand, sourceInvoice });
+    const xml      = buildXML({ invoice: emitted, client, brand, sourceInvoice });
     const xmlBytes = new TextEncoder().encode(xml);
     await pdfDoc.attach(xmlBytes, XML_FILENAME, {
       mimeType:         "text/xml",
@@ -419,15 +443,15 @@ export default async function handler(req, res) {
     addSRGBOutputIntent(pdfDoc, icc);
 
     // 3. Métadonnées classiques
-    const docKind = invoice.avoir_of_invoice_id ? "Avoir" : "Facture";
-    pdfDoc.setTitle(`${docKind} ${invoice.numero || ""}`.trim());
+    const docKind = emitted.avoir_of_invoice_id ? "Avoir" : "Facture";
+    pdfDoc.setTitle(`${docKind} ${emitted.numero}`.trim());
     pdfDoc.setProducer("Zenbat Factur-X");
     pdfDoc.setCreator("Zenbat");
     pdfDoc.setCreationDate(new Date());
     pdfDoc.setModificationDate(new Date());
 
     // 4. Bloc XMP Factur-X
-    const xmpBytes = new TextEncoder().encode(buildXMP({ invoice }));
+    const xmpBytes = new TextEncoder().encode(buildXMP({ invoice: emitted }));
     const metaDict = pdfDoc.context.obj({
       Type:    PDFName.of("Metadata"),
       Subtype: PDFName.of("XML"),
@@ -438,99 +462,114 @@ export default async function handler(req, res) {
 
     const out = await pdfDoc.save({ useObjectStreams: false });
 
-    // Persiste le Factur-X final dans Storage pour l'export comptable.
-    // Path identique à celui utilisé par notify-telegram (qui uploade le
-    // brouillon en best-effort) : on écrase via upsert pour que le comptable
-    // reçoive la version légale (XML CII embarqué) et pas le brouillon.
-    if (invoice.numero) {
-      const safeNumero = String(invoice.numero).replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
-      const path = `${user.id}/invoices/${safeNumero}.pdf`;
-      const { error: upErr } = await admin.storage
-        .from("devis-pdfs")
-        .upload(path, Buffer.from(out), { contentType: "application/pdf", upsert: !wasLocked });
-      if (upErr && !wasLocked) console.warn("[facturx] storage upload:", upErr.message);
-    }
-
-    // Émission : transition brouillon → envoyee + locked=true, faite
-    // server-side via admin (service_role) pour bypasser la RLS. Certaines
-    // installations ont conservé la policy 0022 (with check ... and not locked)
-    // sans le fix 0035, ce qui faisait silencieusement échouer le UPDATE
-    // côté client → toast "Impossible de sauvegarder la facture", facture
-    // qui repassait en brouillon à la session suivante (cf section "Bugs
-    // connus" de CLAUDE.md). Désormais la transition est garantie côté
-    // serveur. Le .eq('statut','brouillon') rend l'opération idempotente.
-    let lockedNow   = !!invoice.locked;
-    let statutNow   = invoice.statut || null;
-    let lockWarn    = null;
-    if (invoice.id) {
-      const { data: stateRow, error: stateErr } = await admin
-        .from("invoices")
-        .select("statut, locked")
-        .eq("id", invoice.id)
-        .eq("owner_id", user.id)
-        .maybeSingle();
-      if (stateErr) {
-        console.error("[facturx/lock-select]", stateErr);
-        lockWarn = `Lecture état facture impossible : ${stateErr.message}`;
-      } else if (stateRow) {
-        statutNow = stateRow.statut;
-        lockedNow = !!stateRow.locked;
-        if (stateRow.statut === "brouillon" && !stateRow.locked) {
-          // .select() pour récupérer les lignes affectées : si l'UPDATE
-          // ne matche aucune ligne (RLS, trigger, race), supabase-js ne
-          // renvoie PAS d'erreur — on prétendrait à tort l'émission OK
-          // alors que la DB reste en brouillon. Le tableau retourné permet
-          // de détecter ce cas et de remonter l'échec au client.
-          const { data: updated, error: lockErr } = await admin
-            .from("invoices")
-            // Montants figés à l'émission, recalculés depuis les lignes
-            // émises (mêmes chiffres que le PDF et le XML).
-            .update({ statut: "envoyee", locked: true, ...emittedAmounts(invoice, brand) })
-            .eq("id", invoice.id)
-            .eq("owner_id", user.id)
-            .eq("statut", "brouillon")
-            .select("statut, locked");
-          if (lockErr) {
-            console.error("[facturx/lock-update]", lockErr);
-            lockWarn = `Verrouillage facture échoué : ${lockErr.message}`;
-          } else if (!updated?.length) {
-            // Aucune ligne modifiée : course concurrente ou contrainte
-            // implicite. On relit pour refléter l'état réel.
-            const { data: after } = await admin
-              .from("invoices")
-              .select("statut, locked")
-              .eq("id", invoice.id)
-              .eq("owner_id", user.id)
-              .maybeSingle();
-            statutNow = after?.statut ?? statutNow;
-            lockedNow = !!after?.locked;
-            if (statutNow === "brouillon" && !lockedNow) {
-              console.error("[facturx/lock-update] 0 rows updated, statut reste brouillon", { invoice_id: invoice.id });
-              lockWarn = "L'émission n'a pas pu être persistée (0 lignes modifiées) — la facture reste en brouillon.";
-            }
-          } else {
-            statutNow = updated[0].statut;
-            lockedNow = !!updated[0].locked;
-          }
-        }
+    // Archive légale dans Storage (export comptable, envoi au client). Le
+    // premier Factur-X remplace le PDF de travail que notify-telegram a pu
+    // déposer au même chemin ; ensuite (facturx_archived_at posé) l'archive
+    // n'est plus jamais écrasée (CGI art. 289) : le PDF régénéré est
+    // seulement renvoyé au navigateur.
+    const firstArchive = !row.facturx_archived_at;
+    let archiveWarn = null;
+    const safeNumero = String(emitted.numero).replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
+    const path = `${user.id}/invoices/${safeNumero}.pdf`;
+    const { error: upErr } = await admin.storage
+      .from("devis-pdfs")
+      .upload(path, Buffer.from(out), { contentType: "application/pdf", upsert: firstArchive });
+    if (firstArchive) {
+      if (upErr) {
+        console.warn("[facturx] storage upload:", upErr.message);
+        archiveWarn = "Le PDF est téléchargé, mais son archivage a échoué : télécharge-le à nouveau depuis la facture pour réessayer.";
+      } else {
+        const { error: markErr } = await admin
+          .from("invoices")
+          .update({ facturx_archived_at: new Date().toISOString() })
+          .eq("id", row.id)
+          .is("facturx_archived_at", null);
+        if (markErr) console.warn("[facturx] facturx_archived_at:", markErr.message);
       }
     }
 
     return res.status(200).json({
       pdf_base64:  Buffer.from(out).toString("base64"),
       icc_applied: !!icc,
-      locked:      lockedNow,
-      statut:      statutNow,
-      ...(lockWarn ? { lock_warning: lockWarn } : {}),
+      locked:      true,
+      statut:      row.statut,
+      numero:      row.numero,
+      ...(archiveWarn ? { archive_warning: archiveWarn } : {}),
     });
   } catch (err) {
     console.error("[facturx]", err);
-    await logServerError("facturx/generate", err, { invoice_id: invoice?.id, action: req.body?.action || "generate" });
+    await logServerError("facturx/generate", err, { invoice_id: row.id, action: "generate" });
     return res.status(500).json({ error: err.message || "Erreur génération Factur-X" });
   }
 }
 
-// ── Action 'set_status' : change le statut de paiement d'une facture émise ──
+// Émission d'une facture (ou d'un avoir) : numéro définitif, date du jour,
+// montants figés et verrou posés en une transaction par emit_invoice()
+// (migration 0060), sous verrou par artisan : pas de trou, pas de doublon,
+// numéros dans l'ordre des dates. Les montants sont recalculés ici depuis
+// les lignes en base (invoiceCalc), pas pris du navigateur. Idempotente.
+async function handleEmit(req, res, { user, admin }) {
+  const id = req.body?.invoice_id;
+  if (!id || typeof id !== "string") return res.status(400).json({ error: "invoice_id requis" });
+
+  const { data: row, error: rowErr } = await admin
+    .from("invoices")
+    .select("id, statut, locked, deleted_at, auto_liquidation_btp")
+    .eq("id", id)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (rowErr) {
+    await logServerError("facturx/emit-read", rowErr, { invoice_id: id });
+    return res.status(500).json({ error: "Lecture de la facture impossible, réessaie." });
+  }
+  if (!row) return res.status(403).json({ error: "Accès refusé à cette facture" });
+  if (row.deleted_at) return res.status(409).json({ error: "Cette facture a été supprimée." });
+
+  let amounts = { montant_ht: 0, montant_tva: 0, montant_ttc: 0 };
+  if (!row.locked) {
+    const [{ data: lignes, error: lignesErr }, { data: profile }] = await Promise.all([
+      admin.from("lignes_invoices").select("type_ligne, quantite, prix_unitaire, tva_rate")
+        .eq("invoice_id", id).is("deleted_at", null),
+      admin.from("profiles").select("brand_data").eq("id", user.id).maybeSingle(),
+    ]);
+    if (lignesErr) {
+      await logServerError("facturx/emit-lignes", lignesErr, { invoice_id: id });
+      return res.status(500).json({ error: "Lecture des lignes impossible, réessaie." });
+    }
+    if (!(lignes || []).some(l => (l.type_ligne || "ouvrage") === "ouvrage")) {
+      return res.status(400).json({ error: "Ajoute au moins une ligne avant d'émettre." });
+    }
+    const brand = parseBrand(profile?.brand_data);
+    amounts = emittedAmounts({ lignes, auto_liquidation_btp: row.auto_liquidation_btp }, brand);
+  }
+
+  const { data, error } = await admin.rpc("emit_invoice", {
+    p_invoice_id: id,
+    p_owner_id:   user.id,
+    p_ht:         amounts.montant_ht,
+    p_tva:        amounts.montant_tva,
+    p_ttc:        amounts.montant_ttc,
+  });
+  if (error) {
+    await logServerError("facturx/emit", error, { invoice_id: id, code: error.code });
+    // 42883 / PGRST202 : fonction absente, migration 0060 pas encore appliquée.
+    if (error.code === "42883" || error.code === "PGRST202") {
+      return res.status(503).json({ error: "L'émission est momentanément indisponible (mise à jour de la base en attente). Réessaie plus tard." });
+    }
+    return res.status(500).json({ error: error.message || "Émission impossible, réessaie." });
+  }
+  if (!data?.numero) {
+    return res.status(500).json({ error: "Émission impossible : numéro non attribué, réessaie." });
+  }
+  return res.status(200).json({ ...data, ...(row.locked ? {} : amounts) });
+}
+
+function parseBrand(raw) {
+  if (!raw) return {};
+  if (typeof raw === "string") { try { return JSON.parse(raw); } catch { return {}; } }
+  return raw;
+}
+
 // Une facture émise est verrouillée (locked=true) : son CONTENU est immuable
 // (CGI art. 289) et la RLS `invoices_update_own` (USING not locked) rejette
 // tout UPDATE côté client. Mais le statut de PAIEMENT (payée, rejetée…) est un
