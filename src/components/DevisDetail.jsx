@@ -254,6 +254,22 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
     }
   };
 
+  // Facture finale : le solde s'il y a des acomptes, sinon la facture du
+  // devis entier. Masquée dès qu'une facture finale (solde ou complète) existe.
+  const hasFinalInvoice = devisHasSolde || invoices.some(inv =>
+    inv.devis_id === d.id && inv.statut !== "annulee" && !inv.avoir_of_invoice_id
+    && (inv.invoice_type || "normale") === "normale"
+  );
+  const finalBusy = actionBusy || soldeLoading;
+  const handleFinal = () => {
+    if (isFreemium) { onPaywall(); return; }
+    if (devisAcomptes.length > 0) return handleSolde();
+    return runAction(() => onConvertToInvoice());
+  };
+  const canFinal = !isRemplace && ht > 0 && !hasFinalInvoice
+    && ["envoye", "en_signature", "accepte"].includes(d.statut)
+    && (devisAcomptes.length > 0 ? !!onCreateSolde && remainingHT > 0 : !!onConvertToInvoice);
+
   const markSigned = () => {
     setStatutBusy(true); setConfirmStatus(null);
     onChange({ ...d, statut: "accepte", signed_at: new Date().toISOString(), signed_by: clientName(cl) || "" });
@@ -339,9 +355,9 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
               Facturer <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".06em", padding: "2px 6px", borderRadius: 4, border: "1px solid rgba(255,255,255,.7)" }}>PRO</span>
             </button>
           ) : (
-            <button type="button" className="zb-primary" style={{ ...btnPrimary, width: "100%", opacity: actionBusy ? 0.7 : 1 }} disabled={actionBusy}
-              onClick={() => runAction(() => onConvertToInvoice())}>
-              {actionBusy ? "Création de la facture…" : "Facturer"}
+            <button type="button" className="zb-primary" style={{ ...btnPrimary, width: "100%", opacity: finalBusy ? 0.7 : 1 }} disabled={finalBusy}
+              onClick={handleFinal}>
+              {finalBusy ? "Création de la facture…" : "Facturer"}
             </button>
           )
         )}
@@ -400,6 +416,7 @@ export default function DevisDetail({ d, cl, clients = [], onBack, brand, onChan
     d.statut === "brouillon" && !isRemplace && { key: "sent", label: "Marquer comme envoyé (envoyé hors Zenbat)", onClick: () => setConfirmStatus("envoye") },
     d.statut === "brouillon" && !isRemplace && { key: "sig", label: "Marquer comme à signer", onClick: () => setConfirmStatus("en_signature") },
     canAcompte && { key: "aco", label: "Créer une facture d'acompte", onClick: () => setAcompteModal(true) },
+    canFinal && { key: "fin", label: finalBusy ? "Création de la facture…" : "Créer la facture finale", onClick: () => { if (!finalBusy) handleFinal(); } },
     ["envoye", "en_signature"].includes(d.statut) && !isRemplace && { key: "ok", label: "Marquer comme signé (signé en direct)", onClick: () => setConfirmStatus("accepte") },
     ["envoye", "en_signature"].includes(d.statut) && !isRemplace && { key: "ko", label: "Marquer comme refusé", onClick: () => setConfirmStatus("refuse"), danger: true },
   ].filter(Boolean);
