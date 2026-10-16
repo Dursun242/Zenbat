@@ -73,4 +73,29 @@ describe("Fiche devis", () => {
     fireEvent.click(screen.getByRole("button", { name: "Oui, à signer" }));
     expect(onChange.mock.calls.at(-1)[0].statut).toBe("en_signature");
   });
+  it("envoyé : « Créer la facture finale » dans le menu facture le devis entier", () => {
+    const onConvertToInvoice = vi.fn();
+    renderDevis("envoye", { onConvertToInvoice, onCreateSolde: vi.fn() });
+    fireEvent.click(screen.getByRole("button", { name: "Plus d'actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Créer la facture finale" }));
+    expect(onConvertToInvoice).toHaveBeenCalledTimes(1);
+  });
+
+  it("avec acomptes : la facture finale est le solde, et disparaît une fois créée", () => {
+    const onConvertToInvoice = vi.fn();
+    const onCreateSolde = vi.fn(async () => {});
+    const acompte = { id: "a1", devis_id: "d1", invoice_type: "acompte", statut: "envoyee", montant_ht: 207 };
+    renderDevis("accepte", { onConvertToInvoice, onCreateSolde, invoices: [acompte] });
+    fireEvent.click(screen.getByRole("button", { name: "Plus d'actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Créer la facture finale" }));
+    expect(onCreateSolde).toHaveBeenCalledWith("d1", [acompte]);
+    expect(onConvertToInvoice).not.toHaveBeenCalled();
+  });
+
+  it("facture finale déjà créée : plus proposée dans le menu", () => {
+    const solde = { id: "s1", devis_id: "d1", invoice_type: "solde", statut: "brouillon", montant_ht: 690 };
+    renderDevis("envoye", { onConvertToInvoice: vi.fn(), onCreateSolde: vi.fn(), invoices: [solde] });
+    fireEvent.click(screen.getByRole("button", { name: "Plus d'actions" }));
+    expect(screen.queryByRole("menuitem", { name: "Créer la facture finale" })).toBeNull();
+  });
 });
