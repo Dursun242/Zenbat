@@ -279,6 +279,13 @@ Skills de design (`.claude/skills/`, repris du dépôt `idm`) :
 - **awesome-design-md** : 74 systèmes de design de sites réels (DESIGN.md) pour un rendu « dans le style de ».
 - **design-taste-frontend** : règles anti-« slop » pour landing pages et refontes (pas pour les écrans métier).
 
+Skills d'Emil Kowalski (`.claude/skills/`, repris de `emilkowalski/skills` @ `2d22863`, licence MIT copiée dans chaque dossier ; `write-swift`, `animate-expo` et `ask-sonner` non repris : pas de Swift, de React Native ni de Sonner ici) :
+- **emil-design-eng** : philosophie de finition d'interface (animations surtout, détails visuels).
+- **animate** (construire une animation), **review-animations** (revue stricte, sur demande seulement), **improve-animations** (audit + plans), **find-animation-opportunities**, **animation-performance** (images perdues), **animation-vocabulary** (nommer un effet).
+- **apple-design** (mouvement physique, gestes, feuilles), **mobile-native** (PWA qui fait « app » sur téléphone), **break-ui** (données pires cas sur un écran).
+- **pick-ui-library** et **prototype** : sur demande explicite seulement (`/pick-ui-library`, `/prototype`).
+- En cas de conflit, ce fichier et `DESIGN.md` font foi : animations via `framer-motion` déjà en place (pas de nouvelle librairie sans accord), règle `position:fixed` / `transform` ci-dessus, `safe-area-inset-top` sur le padding-top seulement.
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
