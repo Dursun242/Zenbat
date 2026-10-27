@@ -1,18 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { buildMistralBody, promptCacheKey, mistralToAnthropic, pipeMistralStream } from "./_ai.js";
+import { buildMistralBody, mistralToAnthropic, pipeMistralStream } from "./_ai.js";
 
 describe("_ai — cache de prompt Mistral", () => {
-  it("même début de prompt système → même prompt_cache_key, quelle que soit la fin", () => {
-    const head = "RÈGLES COMMUNES ".repeat(400); // > 4000 caractères
-    const a = buildMistralBody({ system: head + "Métiers : Maçonnerie", messages: [], max_tokens: 10 });
-    const b = buildMistralBody({ system: head + "Métiers : Coiffure",   messages: [], max_tokens: 10 });
-    expect(a.prompt_cache_key).toMatch(/^zenbat-[0-9a-f]+$/);
-    expect(a.prompt_cache_key).toBe(b.prompt_cache_key);
-  });
-
-  it("prompts différents dès le début → clés différentes, pas de clé sans system", () => {
-    expect(promptCacheKey("Agent devis")).not.toBe(promptCacheKey("Support"));
-    expect(buildMistralBody({ messages: [], max_tokens: 10 }).prompt_cache_key).toBeUndefined();
+  it("n'envoie pas de prompt_cache_key (rejeté en prod le 2026-10-27)", () => {
+    const body = buildMistralBody({ system: "Agent devis", messages: [], max_tokens: 10 });
+    expect(body.prompt_cache_key).toBeUndefined();
   });
 
   it("remonte les tokens servis depuis le cache (réponse non-streamée)", () => {

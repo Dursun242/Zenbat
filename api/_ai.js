@@ -72,8 +72,9 @@ export function buildMistralBody({ model, system, messages, max_tokens, temperat
   if (typeof temperature === "number") body.temperature = temperature;
   if (typeof top_p === "number")       body.top_p = top_p;
   if (stream === true)                 body.stream = true;
-  const cacheKey = promptCacheKey(system);
-  if (cacheKey)                        body.prompt_cache_key = cacheKey;
+  // Pas de prompt_cache_key : son envoi a fait échouer les appels en prod
+  // (2026-10-27). Le cache de préfixe Mistral est automatique sans lui ; le
+  // gain vient de l'ordre du prompt (cf src/lib/agentIA/prompt.js).
   return body;
 }
 

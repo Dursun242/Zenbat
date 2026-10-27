@@ -574,7 +574,7 @@ describe("claude endpoint — fournisseur Mistral", () => {
       { role: "user", content: "x" },
     ]);
     expect(sent.temperature).toBe(0.2);
-    expect(sent.prompt_cache_key).toMatch(/^zenbat-[0-9a-f]+$/);
+    expect(sent.prompt_cache_key).toBeUndefined();
 
     expect(res.statusCode).toBe(200);
     expect(res.body.content[0].text).toBe("bonjour");
