@@ -40,6 +40,28 @@ function flattenContent(content) {
   return String(content ?? "");
 }
 
+// Clé de cache Mistral (`prompt_cache_key`) : même valeur pour les requêtes qui
+// partagent le même début de prompt → plus de chances de toucher le cache
+// (tokens facturés 10 %). Dérivée du début du prompt système, qui est commun à
+// tous les artisans (cf src/lib/agentIA/prompt.js) : l'agent devis, le support
+// et le scraper ont chacun leur clé, sans aucune donnée utilisateur dedans.
+const CACHE_KEY_HEAD_CHARS = 4000;
+export function promptCacheKey(system) {
+  const head = flattenContent(system).slice(0, CACHE_KEY_HEAD_CHARS);
+  if (!head) return null;
+  let h = 0x811c9dc5; // FNV-1a 32 bits : stable, sans dépendance
+  for (let i = 0; i < head.length; i++) {
+    h ^= head.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return `zenbat-${(h >>> 0).toString(16)}`;
+}
+
+// Tokens d'entrée servis depuis le cache (facturés 10 %), 0 si absent.
+function cachedTokens(usage) {
+  return usage?.prompt_tokens_details?.cached_tokens || 0;
+}
+
 export function buildMistralBody({ model, system, messages, max_tokens, temperature, top_p, stream }) {
   const out = [];
   if (system) out.push({ role: "system", content: flattenContent(system) });
@@ -50,6 +72,8 @@ export function buildMistralBody({ model, system, messages, max_tokens, temperat
   if (typeof temperature === "number") body.temperature = temperature;
   if (typeof top_p === "number")       body.top_p = top_p;
   if (stream === true)                 body.stream = true;
+  const cacheKey = promptCacheKey(system);
+  if (cacheKey)                        body.prompt_cache_key = cacheKey;
   return body;
 }
 
@@ -78,8 +102,11 @@ export function mistralToAnthropic(data) {
     content:       [{ type: "text", text: flattenContent(choice.message?.content) }],
     stop_reason:   STOP_REASONS[choice.finish_reason] || choice.finish_reason || null,
     usage: {
-      input_tokens:  data?.usage?.prompt_tokens     || 0,
-      output_tokens: data?.usage?.completion_tokens || 0,
+      input_tokens:            data?.usage?.prompt_tokens     || 0,
+      output_tokens:           data?.usage?.completion_tokens || 0,
+      // Nom Anthropic : inclus dans input_tokens chez Mistral (prompt_tokens
+      // compte tout), contrairement à Anthropic où il s'ajoute.
+      cache_read_input_tokens: cachedTokens(data?.usage),
     },
   };
 }
@@ -111,6 +138,7 @@ export async function pipeMistralStream(upstream, res) {
   let buffer = "";
   let inputTokens = 0;
   let outputTokens = 0;
+  let cachedInputTokens = 0;
   let finished = false;
   let stopReason = null;
 
@@ -142,6 +170,7 @@ export async function pipeMistralStream(upstream, res) {
     if (evt?.usage) {
       inputTokens  = evt.usage.prompt_tokens     || inputTokens;
       outputTokens = evt.usage.completion_tokens || outputTokens;
+      cachedInputTokens = cachedTokens(evt.usage) || cachedInputTokens;
     }
   };
 
@@ -162,7 +191,7 @@ export async function pipeMistralStream(upstream, res) {
     res.write(sse({ type: "message_stop" }));
     res.flush?.();
   }
-  return { inputTokens, outputTokens };
+  return { inputTokens, outputTokens, cachedInputTokens };
 }
 
 // Appel simple non-streamé (system + un message user) → { text, usage, model }.

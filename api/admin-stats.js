@@ -33,6 +33,20 @@ const MODEL_PRICING = {
 import { cors } from "./_cors.js"
 import { authenticate } from "./_withAuth.js"
 
+// Logs IA avec la colonne cached_input_tokens (migration 0063) ; sur une base
+// où elle manque encore, relit sans elle (coût calculé sans remise cache).
+const AI_LOG_COLS = 'model, input_tokens, output_tokens, created_at, user_id'
+async function selectAiLogs(admin, since = null) {
+  const run = (cols) => {
+    let q = admin.from('claude_api_logs').select(cols).eq('status_code', 200)
+    if (since) q = q.gte('created_at', since)
+    return q
+  }
+  const res = await run(`${AI_LOG_COLS}, cached_input_tokens`)
+  if (res.error && (res.error.code === '42703' || res.error.code === 'PGRST204')) return run(AI_LOG_COLS)
+  return res
+}
+
 export default async function handler(req, res) {
   cors(req, res, { methods: "GET, POST, OPTIONS" })
   if (req.method === 'OPTIONS') return res.status(204).end()
@@ -209,16 +223,21 @@ export default async function handler(req, res) {
       { data: profiles,   error: pro },
       { data: authUsers,  error: ae },
     ] = await Promise.all([
-      admin.from('claude_api_logs').select('model, input_tokens, output_tokens, created_at, user_id').eq('status_code', 200),
-      admin.from('claude_api_logs').select('model, input_tokens, output_tokens, created_at, user_id').eq('status_code', 200).gte('created_at', thirtyDaysAgo),
+      selectAiLogs(admin),
+      selectAiLogs(admin, thirtyDaysAgo),
       admin.from('profiles').select('id, company_name, full_name'),
       admin.auth.admin.listUsers({ perPage: 1000 }).then(r => ({ data: r.data?.users || [], error: r.error })),
     ])
     if (le) return res.status(500).json({ error: le.message })
 
-    const calcCost = (model, inputTk, outputTk) => {
+    // cachedTk : part de inputTk servie depuis le cache Mistral (migration
+    // 0063), facturée 10 % du prix d'entrée.
+    const calcCost = (model, inputTk, outputTk, cachedTk = 0) => {
       const p = MODEL_PRICING[model] || { input: 3.00, output: 15.00 }
-      return (inputTk / 1_000_000) * p.input + (outputTk / 1_000_000) * p.output
+      const cached = Math.min(cachedTk || 0, inputTk)
+      return ((inputTk - cached) / 1_000_000) * p.input
+        + (cached / 1_000_000) * p.input * 0.1
+        + (outputTk / 1_000_000) * p.output
     }
 
     // ── Totaux globaux ──────────────────────────────────────────────────
@@ -228,7 +247,7 @@ export default async function handler(req, res) {
     for (const r of allLogs || []) {
       const inp = r.input_tokens  || 0
       const out = r.output_tokens || 0
-      const cost = calcCost(r.model, inp, out)
+      const cost = calcCost(r.model, inp, out, r.cached_input_tokens)
       totalInput  += inp; totalOutput += out; totalCost += cost
       const m = r.model || 'unknown'
       if (!byModel[m]) byModel[m] = { input: 0, output: 0, cost: 0, calls: 0 }
@@ -241,7 +260,7 @@ export default async function handler(req, res) {
       if (r.created_at >= startMonth) {
         monthInput  += r.input_tokens  || 0
         monthOutput += r.output_tokens || 0
-        monthCost   += calcCost(r.model, r.input_tokens || 0, r.output_tokens || 0)
+        monthCost   += calcCost(r.model, r.input_tokens || 0, r.output_tokens || 0, r.cached_input_tokens)
       }
     }
 
@@ -253,7 +272,7 @@ export default async function handler(req, res) {
     for (const r of recent || []) {
       const inp  = r.input_tokens  || 0
       const out  = r.output_tokens || 0
-      const cost = calcCost(r.model, inp, out)
+      const cost = calcCost(r.model, inp, out, r.cached_input_tokens)
       if (r.created_at >= sevenDaysAgo) {
         weekInput += inp; weekOutput += out; weekCost += cost; weekCalls++
       }
@@ -271,7 +290,7 @@ export default async function handler(req, res) {
       const out = r.output_tokens || 0
       daily[day].input  += inp
       daily[day].output += out
-      daily[day].cost   += calcCost(r.model, inp, out)
+      daily[day].cost   += calcCost(r.model, inp, out, r.cached_input_tokens)
       daily[day].calls  += 1
     }
     const dailyTrend = Object.entries(daily)
@@ -286,7 +305,7 @@ export default async function handler(req, res) {
       if (!r.user_id) continue
       const inp  = r.input_tokens  || 0
       const out  = r.output_tokens || 0
-      const cost = calcCost(r.model, inp, out)
+      const cost = calcCost(r.model, inp, out, r.cached_input_tokens)
       if (!perUser[r.user_id]) perUser[r.user_id] = { input: 0, output: 0, cost: 0, calls: 0 }
       perUser[r.user_id].input  += inp
       perUser[r.user_id].output += out

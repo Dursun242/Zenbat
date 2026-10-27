@@ -574,11 +574,12 @@ describe("claude endpoint — fournisseur Mistral", () => {
       { role: "user", content: "x" },
     ]);
     expect(sent.temperature).toBe(0.2);
+    expect(sent.prompt_cache_key).toMatch(/^zenbat-[0-9a-f]+$/);
 
     expect(res.statusCode).toBe(200);
     expect(res.body.content[0].text).toBe("bonjour");
     expect(res.body.stop_reason).toBe("end_turn");
-    expect(res.body.usage).toEqual({ input_tokens: 12, output_tokens: 3 });
+    expect(res.body.usage).toEqual({ input_tokens: 12, output_tokens: 3, cache_read_input_tokens: 0 });
     expect(res.headers["X-AI-Provider"]).toBe("mistral");
     expect(res.headers["X-AI-Model"]).toBe("mistral-small-latest");
   });
