@@ -1,4 +1,4 @@
-import { fmtDT, relTime, fmtEur } from "../../lib/admin/format.js"
+import { fmtDT, relTime, fmtEur, SUB_PLAN, SUB_STATUS, daysUntil, inDays } from "../../lib/admin/format.js"
 
 // Vue santé revenue Stripe — données live depuis l'API Stripe (pas du
 // cache DB). Trois cas qui méritent attention immédiate :
@@ -7,7 +7,7 @@ import { fmtDT, relTime, fmtEur } from "../../lib/admin/format.js"
 //   - cancelingActive : a cliqué "annuler", encore actif jusqu'à la fin
 //     de la période. Cible de winback avant désactivation.
 //   - recentlyCanceled : déjà parti depuis ≤ 90j. Diag des causes.
-export default function AdminStripeHealth({ data, loading, onRefresh, embedded = false }) {
+export default function AdminStripeHealth({ data, loading, onRefresh, onOpenUser, embedded = false }) {
   const Container = embedded ? "div" : "section"
   return (
     <Container style={{ background: embedded ? "transparent" : "white", borderRadius: 14, padding: embedded ? 0 : "14px 16px" }}>
@@ -29,6 +29,7 @@ export default function AdminStripeHealth({ data, loading, onRefresh, embedded =
               { l: "Abonnements actifs",  v: data.summary.activeCount,                  c: "#0ea5e9" },
               { l: "Past due",            v: data.summary.pastDueCount,                 c: data.summary.pastDueCount ? "#ef4444" : "#9A8E82" },
               { l: "À churner",           v: data.summary.cancelingCount,               c: data.summary.cancelingCount ? "#f59e0b" : "#9A8E82" },
+              { l: "6 mois finis ≤ 30 j", v: data.summary.biannualEnding30d ?? 0,       c: data.summary.biannualEnding30d ? "#f59e0b" : "#9A8E82" },
               { l: "Churn ce mois",       v: data.summary.churnThisMonth,               c: "#7c3aed" },
               { l: "Churn 90j",           v: data.summary.recentlyCanceled90d,          c: "#6B6358" },
             ].map(k => (
@@ -39,6 +40,7 @@ export default function AdminStripeHealth({ data, loading, onRefresh, embedded =
             ))}
           </div>
 
+          <Subscribers subs={data.subscribers} onOpenUser={onOpenUser} />
           <Bucket title="Paiements échoués (past_due)" subtitle="Carte refusée — relancer pour éviter le churn" tone="danger" subs={data.pastDue} />
           <Bucket title="À churner — annulation programmée" subtitle="Encore actifs jusqu'à expiration de la période" tone="warn" subs={data.cancelingActive} />
           <Bucket title="Churns récents (90 derniers jours)" subtitle="Diagnostic des causes" tone="neutral" subs={data.recentlyCanceled} />
@@ -91,6 +93,55 @@ function Bucket({ title, subtitle, tone, subs }) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Tous les abonnés en cours, échéance la plus proche d'abord : fin d'accès
+// pour un Pro 6 mois (sans renouvellement), prochain prélèvement sinon.
+// Un clic ouvre la fiche (onglet Abonnement : détail + factures Stripe).
+function Subscribers({ subs, onOpenUser }) {
+  if (!subs) return null
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 6 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#0ea5e9", letterSpacing: "0.5px", textTransform: "uppercase" }}>
+          Abonnés Pro ({subs.length})
+        </div>
+        <div style={{ fontSize: 10, color: "#9A8E82" }}>Échéance la plus proche en premier</div>
+      </div>
+      {subs.length === 0 ? (
+        <div style={{ fontSize: 11, color: "#9A8E82", padding: 8, textAlign: "center" }}>Aucun.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {subs.map(s => {
+            const due   = s.ends_at || s.renews_at
+            const soon  = s.ends_at && daysUntil(s.ends_at) <= 30
+            const click = onOpenUser && s.profile_id
+            return (
+              <button key={s.id} type="button" disabled={!click} onClick={() => click && onOpenUser(s)}
+                style={{ background: "white", border: "none", borderRadius: 8, padding: "7px 10px", boxShadow: "0 1px 2px rgba(0,0,0,.03)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, textAlign: "left", cursor: click ? "pointer" : "default", font: "inherit", width: "100%" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1612", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</div>
+                  <div style={{ fontSize: 10, color: "#9A8E82", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {SUB_PLAN[s.plan] || "Pro"}
+                    {s.amount_eur != null && <> · {fmtEur(s.amount_eur)}</>}
+                    {s.status !== "active" && <> · <span style={{ color: "#ef4444", fontWeight: 700 }}>{SUB_STATUS[s.status] || s.status}</span></>}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0, fontSize: 10, color: "#9A8E82" }}>
+                  {due && (
+                    <div style={{ color: soon ? "#f59e0b" : "#6B6358", fontWeight: 700 }}>
+                      {s.ends_at ? "Fin" : "Renouv."} {fmtDT(due)}
+                    </div>
+                  )}
+                  {due && <div>{inDays(due)}</div>}
+                </div>
+              </button>
+            )
+          })}
         </div>
       )}
     </div>

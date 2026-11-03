@@ -32,6 +32,7 @@ const MODEL_PRICING = {
 
 import { cors } from "./_cors.js"
 import { authenticate } from "./_withAuth.js"
+import { subSummary } from "./_stripeBilling.js"
 
 // Logs IA avec la colonne cached_input_tokens (migration 0063) ; sur une base
 // où elle manque encore, relit sans elle (coût calculé sans remise cache).
@@ -587,15 +588,10 @@ export default async function handler(req, res) {
       const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id
       const p = profByCustomer.get(customerId)
       const a = p ? authById.get(p.id) : null
-      const amount = sub.items?.data?.[0]?.price?.unit_amount
+      const sum = subSummary(sub)
       return {
-        id:                sub.id,
-        status:            sub.status,
-        cancel_at_period_end: !!sub.cancel_at_period_end,
-        current_period_end:sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
-        canceled_at:       sub.canceled_at        ? new Date(sub.canceled_at * 1000).toISOString()        : null,
-        amount_monthly:    typeof amount === 'number' ? amount / 100 : null,
-        interval:          sub.items?.data?.[0]?.price?.recurring?.interval || null,
+        ...sum,
+        amount_monthly:    sum.monthly_eur,
         profile_id:        p?.id || null,
         name:              p?.company_name || p?.full_name || a?.email || '—',
         email:             a?.email || sub.customer_email || null,
@@ -603,8 +599,15 @@ export default async function handler(req, res) {
       }
     }
 
-    // Bucket "à churner bientôt" = actifs avec cancel_at_period_end
-    const cancelingActive = allActive.filter(s => s.cancel_at_period_end).map(enrich)
+    // Tous les abonnés en cours, la fin d'accès / l'échéance la plus proche
+    // d'abord (les Pro 6 mois arrivent en tête quand leur période se termine).
+    const subscribers = [...allActive, ...allPastDue].map(enrich)
+      .sort((a, b) => (a.ends_at || a.renews_at || '9').localeCompare(b.ends_at || b.renews_at || '9'))
+
+    // Bucket "à churner bientôt" = actifs avec cancel_at_period_end. Les Pro
+    // 6 mois en sont exclus : leur fin est programmée dès la souscription
+    // (sans renouvellement automatique), ce n'est pas une résiliation.
+    const cancelingActive = subscribers.filter(s => s.status === 'active' && s.ends_at && s.plan !== 'biannual')
     const pastDue         = allPastDue.map(enrich)
     const ninetyDaysAgo   = Date.now() - 90 * 86400000
     const recentlyCanceled = allCanceled
@@ -615,12 +618,8 @@ export default async function handler(req, res) {
     // MRR live = sum des subs 'active' (hors past_due hors canceled).
     // Plus précis que `pro × 19€` de admin-stats global (qui ne distingue
     // pas les Pro temporairement en past_due).
-    const mrrCents = allActive.reduce((s, sub) => {
-      const amount = sub.items?.data?.[0]?.price?.unit_amount || 0
-      const interval = sub.items?.data?.[0]?.price?.recurring?.interval
-      // Ramène biannual à mensuel
-      return s + (interval === 'year' ? amount / 12 : amount)
-    }, 0)
+    // Ramené au mois : 57 € / 6 mois compte 9,50 €.
+    const mrrCents = allActive.reduce((s, sub) => s + Math.round((subSummary(sub).monthly_eur || 0) * 100), 0)
 
     // Churn ce mois = subs canceled dont canceled_at >= début du mois courant.
     const nowDate = new Date()
@@ -632,12 +631,15 @@ export default async function handler(req, res) {
         activeCount:        allActive.length,
         pastDueCount:       pastDue.length,
         cancelingCount:     cancelingActive.length,
+        biannualEnding30d:  subscribers.filter(s => s.plan === 'biannual' && s.ends_at
+                              && new Date(s.ends_at).getTime() - Date.now() < 30 * 86400000).length,
         recentlyCanceled90d:recentlyCanceled.length,
         churnThisMonth,
         mrrEur:             Math.round(mrrCents / 100),
       },
       pastDue,
       cancelingActive,
+      subscribers,
       recentlyCanceled,
       generatedAt: new Date().toISOString(),
     })

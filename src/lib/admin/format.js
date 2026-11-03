@@ -33,3 +33,21 @@ export const SORT_OPTS = [
   { v: "ai_used",      l: "Usage IA" },
   { v: "name",         l: "Nom A→Z" },
 ];
+
+// Abonnements Stripe (cf. api/_stripeBilling.js)
+export const SUB_PLAN = { biannual: "Pro 6 mois", monthly: "Pro mensuel" };
+export const SUB_STATUS = {
+  active: "Actif", trialing: "Essai", past_due: "Paiement échoué", unpaid: "Impayé",
+  incomplete: "Incomplet", incomplete_expired: "Expiré", canceled: "Terminé", paused: "En pause",
+};
+
+// Jours restants avant une date (négatif si passée), arrondi au jour.
+export const daysUntil = d => d ? Math.ceil((new Date(d) - Date.now()) / 86400000) : null;
+
+export const inDays = d => {
+  const n = daysUntil(d);
+  if (n === null) return "";
+  if (n < 0)  return `il y a ${-n} j`;
+  if (n === 0) return "aujourd'hui";
+  return `dans ${n} j`;
+};

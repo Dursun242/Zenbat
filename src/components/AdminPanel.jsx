@@ -264,9 +264,9 @@ export default function AdminPanel({ onBack }) {
   const openDelete = (u) => { setDeleteMode("delete"); setDeleteTarget(u); setConfirmInput(""); setDeleteError(null) }
   const openReset  = (u) => { setDeleteMode("reset_data"); setDeleteTarget(u); setConfirmInput(""); setDeleteError(null) }
 
-  const openDetail = async (u) => {
+  const openDetail = async (u, tab = "overview") => {
     setDetailUser(u); setDetailData(null); setDetailError(null)
-    setDetailTab("overview"); setDetailLoading(true)
+    setDetailTab(tab); setDetailLoading(true)
     try {
       const token = await getToken()
       const res  = await fetch(`/api/admin-user-detail?userId=${encodeURIComponent(u.id)}`, { headers: { Authorization: `Bearer ${token}` } })
@@ -517,12 +517,13 @@ export default function AdminPanel({ onBack }) {
             <AdminOnboardingTargets data={onboardingTargets} loading={onboardingTargetsLoading} onRefresh={loadOnboardingTargets} embedded />
           </Collapsible>
 
-          <Collapsible title="Santé revenue Stripe" subtitle="Past due, churns à venir, MRR live"
+          <Collapsible title="Santé revenue Stripe" subtitle="Abonnés Pro et échéances, past due, churns, MRR live"
             count={(stripeHealth?.summary?.pastDueCount || 0) + (stripeHealth?.summary?.cancelingCount || 0)}
             loaded={stripeHealth !== null} onExpand={loadStripeHealth}>
             {stripeHealth?.error
               ? <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: 12, color: "#b91c1c", fontSize: 12 }}>❌ {stripeHealth.error}</div>
-              : <AdminStripeHealth data={stripeHealth} loading={stripeHealthLoading} onRefresh={loadStripeHealth} embedded />}
+              : <AdminStripeHealth data={stripeHealth} loading={stripeHealthLoading} onRefresh={loadStripeHealth} embedded
+                  onOpenUser={s => openDetail({ id: s.profile_id, name: s.name, fullName: s.name, email: s.email, plan: "pro" }, "billing")} />}
           </Collapsible>
 
           <Collapsible title="Coût Claude API" subtitle="Tokens consommés, coût mensuel par modèle"
