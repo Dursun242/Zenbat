@@ -74,15 +74,22 @@ export function useDevis(user, { markSaving, markSaved, setSaveState, showErr, s
   // (ex. statut basculé en 'en_negociation' par /api/devis-public quand
   // le client envoie une demande de modification). Sans ce hook, le
   // statut + le badge nav restaient à la valeur du dernier load.
+  // Au plus un rechargement toutes les 30 s : visibilitychange et focus
+  // arrivent ensemble au retour sur l'onglet, et chaque rechargement relit
+  // tous les devis et toutes les lignes (budget d'E/S disque Supabase).
+  const lastRefresh = useRef(0);
   useEffect(() => {
     if (!user) return;
+    lastRefresh.current = Date.now(); // le chargement initial vient de partir
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastRefresh.current < 30_000) return;
       // Garde-fou : si un save est en attente (debounce 800 ms pas encore
       // flushé après une frappe utilisateur), un refetch écraserait la
       // valeur locale avec l'ancienne version DB → frappe perdue. On
       // diffère jusqu'au prochain focus quand la file est vide.
       if (Object.keys(saveTimers.current).length > 0) return;
+      lastRefresh.current = Date.now();
       listDevisWithLignes()
         .then(ds => { if (ds) { setDevis(ds.length ? ds : []); setLoaded(true); setLoadError(null); } })
         .catch(err => {

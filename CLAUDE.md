@@ -40,7 +40,8 @@ L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - **En attente : `0061_parent_ownership.sql`** (audit du 2026-10-12) : depuis le navigateur, une ligne, un document, un client ou une facture liés ne peuvent pointer que vers des données du même compte (trigger générique `check_parent_owner`, fermait l'ajout d'une ligne dans le devis d'un autre artisan) ; insertions publiques fermées sur `claude_api_logs` et `newsletter_subscribers` (serveur seul), `coherence_validations` réservé aux comptes connectés (`app_logs` reste ouvert pour le journal d'erreurs du navigateur) ; `client_accepted_at` / `client_refused_at` / `client_refusal_reason` posés par le serveur seulement (trigger `protect_client_signature_fields`).
 - **En attente : `0062_signed_devis_lock.sql`** (audit du 2026-10-12) : depuis le navigateur, les lignes d'un devis accepté ou signé en ligne ne sont plus modifiables (trigger `protect_signed_devis_lines`) ; un devis signé en ligne par le client (`client_accepted_at`) ne quitte plus « accepté » sauf vers « remplacé », et son objet / montant / TVA sont figés (`protect_esigned_devis`) ; dossier Storage `{user}/devis-signes/` (PDF signés archivés par `/api/devis-public`) réservé au serveur.
 - **En attente : `0063_ai_cached_tokens.sql`** (optimisation coût IA du 2026-10-27) : colonne `claude_api_logs.cached_input_tokens` (part de `input_tokens` servie depuis le cache Mistral, facturée 10 %). Sans elle, `api/claude.js` journalise sans la colonne et `api/admin-stats.js` relit sans elle (fallback 42703 / PGRST204). Requête de suivi du taux de cache dans l'en-tête de la migration.
-- Prochaine migration à créer : préfixer avec `0064_`.
+- **En attente : `0064_disk_io.sql`** (alerte Supabase « Disk IO Budget » du 2026-11-03) : index `owner_id` sur `lignes_devis` et `lignes_invoices` (la RLS faisait parcourir les lignes de tous les artisans à chaque chargement), `log_activity()` ne journalise plus les UPDATE sans changement (hors `updated_at`), `admin_last_activity_per_owner()` passe par l'index au lieu d'un parcours complet d'`activity_log`. Requêtes de diagnostic (`pg_stat_statements`, tailles des tables) en fin de fichier.
+- Prochaine migration à créer : préfixer avec `0065_`.
 
 **Tracking depuis 0043** : la table `public.schema_migrations(version, label, applied_at)` est créée par la migration `0043`. À partir de là, chaque nouvelle migration **doit** se terminer par un INSERT idempotent qui s'auto-enregistre :
 ```sql
@@ -281,6 +282,13 @@ Skills de design (`.claude/skills/`, repris du dépôt `idm`) :
 - **impeccable** : conception, critique et finition d'interface (`/impeccable audit|critique|polish|…`). Son moteur se télécharge au premier lancement dans `~/.impeccable` (hors dépôt). `PRODUCT.md` et `DESIGN.md` existent (cf. section « Système de design »).
 - **awesome-design-md** : 74 systèmes de design de sites réels (DESIGN.md) pour un rendu « dans le style de ».
 - **design-taste-frontend** : règles anti-« slop » pour landing pages et refontes (pas pour les écrans métier).
+
+Skills d'Emil Kowalski (`.claude/skills/`, repris de `emilkowalski/skills` @ `2d22863`, licence MIT copiée dans chaque dossier ; `write-swift`, `animate-expo` et `ask-sonner` non repris : pas de Swift, de React Native ni de Sonner ici) :
+- **emil-design-eng** : philosophie de finition d'interface (animations surtout, détails visuels).
+- **animate** (construire une animation), **review-animations** (revue stricte, sur demande seulement), **improve-animations** (audit + plans), **find-animation-opportunities**, **animation-performance** (images perdues), **animation-vocabulary** (nommer un effet).
+- **apple-design** (mouvement physique, gestes, feuilles), **mobile-native** (PWA qui fait « app » sur téléphone), **break-ui** (données pires cas sur un écran).
+- **pick-ui-library** et **prototype** : sur demande explicite seulement (`/pick-ui-library`, `/prototype`).
+- En cas de conflit, ce fichier et `DESIGN.md` font foi : animations via `framer-motion` déjà en place (pas de nouvelle librairie sans accord), règle `position:fixed` / `transform` ci-dessus, `safe-area-inset-top` sur le padding-top seulement.
 
 ## graphify
 
