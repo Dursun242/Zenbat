@@ -114,4 +114,24 @@ describe("message sans prestation (banc Mistral)", () => {
     expect(p).toContain("MESSAGE SANS AUCUNE PRESTATION");
     expect(p).toMatch(/JAMAIS de devis « diagnostic »/);
   });
+
+  // Coût IA : la partie commune (règles, format, exemples) doit être
+  // strictement identique pour tous les artisans, sinon le cache du
+  // fournisseur ne sert plus (cf commentaire en tête de prompt.js).
+  it("partie commune identique pour tous les artisans (cache de prompt)", () => {
+    const a = buildSystemPrompt({ brand: { trades: ["maconnerie"], companyName: "Maçon A", vatRegime: "normal" }, historySummary: null });
+    const b = buildSystemPrompt({ brand: { trades: ["coiffure"], companyName: "Salon B", vatRegime: "franchise" }, historySummary: null, priceHints: "REPÈRES" });
+    const profil = a.indexOf("PROFIL DE L'ARTISAN\n");
+    expect(profil).toBeGreaterThan(30_000);
+    expect(b.slice(0, profil)).toBe(a.slice(0, profil));
+  });
+
+  it("le profil de l'artisan porte métiers, unités, prix et TVA", () => {
+    const p = buildSystemPrompt({ brand: { trades: ["plomberie"], vatRegime: "franchise" }, historySummary: null });
+    const profil = p.slice(p.indexOf("PROFIL DE L'ARTISAN\n"));
+    expect(profil).toContain("Métiers déclarés (RÈGLE N°0) : Plomberie");
+    expect(profil).toContain("Unités du secteur :");
+    expect(profil).toContain("PRIX DE MARCHÉ");
+    expect(profil).toContain("293 B");
+  });
 });

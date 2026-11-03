@@ -7,6 +7,20 @@ import {
   mistralError, pipeMistralStream, completeText, MISTRAL_API_URL, mistralModel,
 } from "./_ai.js";
 
+// Journal de consommation IA (fire-and-forget). `cached_input_tokens` (Mistral :
+// part de input_tokens servie depuis le cache, facturée 10 %) vient de la
+// migration 0063 : sur une base où elle n'est pas encore appliquée, on retente
+// sans la colonne pour ne jamais perdre la ligne (42703 Postgres, PGRST204 API).
+function logAiUsage(admin, row) {
+  const { cached_input_tokens, ...base } = row;
+  const withCache = cached_input_tokens > 0 ? { ...base, cached_input_tokens } : base;
+  admin.from("claude_api_logs").insert(withCache).then(({ error } = {}) => {
+    if (error && withCache !== base && (error.code === "42703" || error.code === "PGRST204")) {
+      return admin.from("claude_api_logs").insert(base);
+    }
+  }).catch(() => {});
+}
+
 const ALLOWED_MODELS = [
   "claude-haiku-4-5-20251001",
   "claude-sonnet-4-6",
@@ -183,16 +197,17 @@ async function scrapeOneUrl(rawUrl, { admin, user, reservation }) {
   reservation.consumed = true;
 
   if (usage) {
-    admin.from("claude_api_logs").insert({
+    logAiUsage(admin, {
       model:          usedModel,
       use_case:       "scrape",
       input_tokens:   usage.input_tokens  || 0,
       output_tokens:  usage.output_tokens || 0,
+      cached_input_tokens: usage.cache_read_input_tokens || 0,
       latency_ms:     Date.now() - startTime,
       status_code:    200,
       stream_enabled: false,
       user_id:        user.id,
-    }).then(() => {}).catch(() => {});
+    });
   }
 
   const match = raw.match(/<CONTACT>([\s\S]*?)<\/CONTACT>/) || raw.match(/\{[\s\S]*\}/);
@@ -444,11 +459,12 @@ export default async function handler(req, res) {
         let sseBuffer = "";
         let inputTokens = 0;
         let outputTokens = 0;
+        let cachedInputTokens = 0;
         const startTime = Date.now();
 
         try {
           if (isMistral) {
-            ({ inputTokens, outputTokens } = await pipeMistralStream(upstream, res));
+            ({ inputTokens, outputTokens, cachedInputTokens } = await pipeMistralStream(upstream, res));
           } else while (true) {
             const { value, done } = await reader.read();
             if (done) break;
@@ -488,16 +504,17 @@ export default async function handler(req, res) {
 
         // Log token usage (fire-and-forget)
         if (inputTokens > 0 || outputTokens > 0) {
-          admin.from("claude_api_logs").insert({
+          logAiUsage(admin, {
             model:         loggedModel,
             use_case:      support_ticket_id ? "support" : "devis",
             input_tokens:  inputTokens,
             output_tokens: outputTokens,
+            cached_input_tokens: isMistral ? cachedInputTokens : 0,
             latency_ms:    Date.now() - startTime,
             status_code:   200,
             stream_enabled: true,
             user_id:       user.id,
-          }).then(() => {}).catch(() => {});
+          });
         }
 
         return res.end();
@@ -520,16 +537,17 @@ export default async function handler(req, res) {
 
     // Log token usage (fire-and-forget)
     if (upstream.ok && upstreamData?.usage) {
-      admin.from("claude_api_logs").insert({
+      logAiUsage(admin, {
         model:         loggedModel,
         use_case:      support_ticket_id ? "support" : "devis",
         input_tokens:  upstreamData.usage.input_tokens  || 0,
         output_tokens: upstreamData.usage.output_tokens || 0,
+        cached_input_tokens: isMistral ? upstreamData.usage.cache_read_input_tokens || 0 : 0,
         latency_ms:    Date.now() - startTime,
         status_code:   200,
         stream_enabled: false,
         user_id:       user.id,
-      }).then(() => {}).catch(() => {});
+      });
     }
 
     // Persistance support : si on est dans un ticket, on insère la réponse Claude
