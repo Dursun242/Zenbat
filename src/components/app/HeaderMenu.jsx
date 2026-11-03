@@ -156,8 +156,18 @@ export default function HeaderMenu({
               onMouseEnter={e => e.currentTarget.style.background = ZB.paper}
               onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
               <span style={{ color: ZB.ink2, display: "inline-flex", width: 22, justifyContent: "center", flexShrink: 0 }}>{I.crown}</span>
-              {isPro ? "Gérer mon abonnement" : "Passer en Pro"}
+              {isPro ? "Abonnement et factures" : "Passer en Pro"}
             </button>
+
+            {/* Gratuit : un ancien Pro y retrouve ses factures Zenbat. */}
+            {!isPro && (
+              <button role="menuitem" onClick={() => { close(); onOpenSubscription(); }} style={itemBase}
+                onMouseEnter={e => e.currentTarget.style.background = ZB.paper}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                <span style={{ color: ZB.ink2, display: "inline-flex", width: 22, justifyContent: "center", flexShrink: 0 }}>{I.receipt}</span>
+                Mon abonnement et factures
+              </button>
+            )}
 
             <button role="menuitem" onClick={() => { close(); onOpenProfile(); }} style={itemBase}
               onMouseEnter={e => e.currentTarget.style.background = ZB.paper}

@@ -1,24 +1,27 @@
 import { useState, useEffect } from "react"
 import { supabase } from "../lib/supabase.js"
 import { ZB, NUM } from "../lib/theme.js"
-import { btnPrimary } from "../components/ui/Register.jsx"
+import { btnPrimary, btnSecondary } from "../components/ui/Register.jsx"
 
 async function getToken() {
   const { data: { session } } = await supabase.auth.getSession()
   return session?.access_token ?? null
 }
 
-function formatDate(unix) {
-  if (!unix) return "—"
-  return new Date(unix * 1000).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
+function formatDate(iso) {
+  if (!iso) return "—"
+  return new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
 }
 
-function formatPrice(amount, currency) {
-  if (amount == null) return "—"
-  const v = (amount / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  const c = (currency || "eur").toUpperCase() === "EUR" ? "€" : currency.toUpperCase()
-  return `${v} ${c}`
+function formatEur(eur) {
+  if (eur == null) return "—"
+  return `${eur.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
 }
+
+const daysUntil = (iso) => iso ? Math.ceil((new Date(iso) - Date.now()) / 86400000) : null
+
+const PLAN_LABEL = { biannual: "Pro · 6 mois", monthly: "Pro · Mensuel" }
+const INVOICE_STATUS = { paid: "Payée", open: "À régler", void: "Annulée", uncollectible: "Impayée" }
 
 // Tons des statuts (même code que les tampons) : vert tampon pour ce qui est
 // acquis, rouge pour un problème de paiement, encre sinon.
@@ -39,14 +42,15 @@ function Stamp({ color, children }) {
   return <span style={{ ...s.badge, color, borderColor: color }}>{children}</span>
 }
 
-export default function SubscriptionScreen({ isAdmin, plan, billingCycle, onBack }) {
+export default function SubscriptionScreen({ isAdmin, plan, onBack, onUpgrade }) {
   const [info,    setInfo]    = useState(null)
-  const [loading, setLoading] = useState(!isAdmin && plan === "pro")
+  const [loading, setLoading] = useState(!isAdmin)
   const [error,   setError]   = useState(null)
   const [opening, setOpening] = useState(false)
 
   useEffect(() => {
-    if (isAdmin || plan !== "pro") { setLoading(false); return }
+    // Aussi en gratuit : un ancien Pro doit retrouver ses factures.
+    if (isAdmin) { setLoading(false); return }
     let cancelled = false
     ;(async () => {
       try {
@@ -89,8 +93,14 @@ export default function SubscriptionScreen({ isAdmin, plan, billingCycle, onBack
   }
 
   const sub        = info?.subscription
+  const invoices   = info?.invoices || []
+  const history    = info?.history  || []
   const statusInfo = sub ? (STATUS_LABELS[sub.status] || { text: sub.status, color: ZB.ink3 }) : null
-  const planLabel  = sub?.planLabel === "biannual" ? "Pro · 6 mois" : (sub?.planLabel === "monthly" ? "Pro · Mensuel" : "Pro")
+  const planLabel  = PLAN_LABEL[sub?.plan] || "Pro"
+  const ending     = sub?.ends_at ? daysUntil(sub.ends_at) : null
+  const proUntil   = info?.proUntil || null
+  const hasStripe  = !!sub || invoices.length > 0
+  const isPro      = plan === "pro"
 
   return (
     <div className="zb-sub" style={s.wrap}>
@@ -118,64 +128,139 @@ export default function SubscriptionScreen({ isAdmin, plan, billingCycle, onBack
           </div>
         )}
 
-        {/* ── Cas plan Pro ──────────────────────────────── */}
-        {!isAdmin && plan === "pro" && (
-          <>
-            {loading && <div style={s.loader}>Chargement de ton abonnement…</div>}
+        {!isAdmin && loading && <div style={s.loader}>Chargement de ton abonnement…</div>}
 
-            {!loading && !sub && (
-              <div style={s.card}>
-                <div style={s.row}><span style={s.label}>Statut</span><span style={s.value}>Pro · abonnement non détecté</span></div>
-                <p style={s.note}>
-                  Ton profil est marqué « Pro » mais aucun abonnement Stripe n'est associé.
-                  Si tu as payé récemment, le webhook Stripe peut prendre quelques secondes —
-                  recharge la page. Sinon, contacte le support.
-                </p>
-              </div>
+        {/* ── Abonnement Stripe (en cours ou dernier en date) ── */}
+        {!isAdmin && !loading && sub && (sub.ends_at || sub.renews_at || isPro) && (
+          <div style={s.card}>
+            <div style={s.cardHeader}>
+              <Stamp color={statusInfo.color}>{statusInfo.text.toUpperCase()}</Stamp>
+              {sub.ends_at && (
+                <Stamp color={ZB.ink2}>{sub.plan === "biannual" ? "SANS RENOUVELLEMENT" : "ANNULATION PROGRAMMÉE"}</Stamp>
+              )}
+            </div>
+            <div style={s.row}><span style={s.label}>Formule</span><span style={s.value}>{planLabel}</span></div>
+            <div style={s.row}><span style={s.label}>Montant</span><span style={{ ...s.value, ...NUM }}>
+              {formatEur(sub.amount_eur)}
+              {sub.interval === "month" && (
+                <span style={s.muted}> · {sub.interval_count > 1 ? `pour ${sub.interval_count} mois` : "par mois"}</span>
+              )}
+            </span></div>
+            <div style={s.row}><span style={s.label}>Souscrit le</span><span style={{ ...s.value, ...NUM }}>{formatDate(sub.started_at)}</span></div>
+            {sub.current_period_start && (
+              <div style={s.row}><span style={s.label}>Période en cours</span><span style={{ ...s.value, ...NUM }}>
+                {formatDate(sub.current_period_start)} → {formatDate(sub.current_period_end)}
+              </span></div>
             )}
-
-            {!loading && sub && (
-              <div style={s.card}>
-                <div style={s.cardHeader}>
-                  <Stamp color={statusInfo.color}>
-                    {statusInfo.text.toUpperCase()}
-                  </Stamp>
-                  {sub.cancelAtPeriodEnd && (
-                    <Stamp color={ZB.ink2}>
-                      ANNULATION PROGRAMMÉE
-                    </Stamp>
-                  )}
-                </div>
-                <div style={s.row}><span style={s.label}>Formule</span><span style={s.value}>{planLabel}</span></div>
-                <div style={s.row}><span style={s.label}>Montant</span><span style={{ ...s.value, ...NUM }}>
-                  {formatPrice(sub.unitAmount, sub.currency)}
-                  {sub.intervalCount && sub.interval && (
-                    <span style={s.muted}> · tous les {sub.intervalCount > 1 ? `${sub.intervalCount} ` : ""}{sub.interval === "month" ? "mois" : sub.interval === "year" ? "ans" : sub.interval}</span>
-                  )}
-                </span></div>
-                <div style={s.row}>
-                  <span style={s.label}>{sub.cancelAtPeriodEnd ? "Fin d'accès" : "Prochain prélèvement"}</span>
-                  <span style={{ ...s.value, ...NUM }}>{formatDate(sub.currentPeriodEnd)}</span>
-                </div>
-              </div>
+            {sub.ends_at && (
+              <div style={s.row}><span style={s.label}>Fin de l'accès Pro</span><span style={{ ...s.value, ...NUM }}>
+                {formatDate(sub.ends_at)}
+                {ending >= 0 && <span style={s.muted}> · {ending === 0 ? "aujourd'hui" : `dans ${ending} j`}</span>}
+              </span></div>
             )}
-
-            <button onClick={openPortal} disabled={opening} className="zb-sub-cta" style={{ ...s.cta, opacity: opening ? 0.7 : 1, cursor: opening ? "default" : "pointer" }}>
-              {opening ? "Ouverture du portail…" : "Gérer mon abonnement"}
-            </button>
-            <p style={s.help}>
-              Tu seras redirigé vers Stripe pour modifier ton moyen de paiement, télécharger tes factures ou annuler ton abonnement.
-            </p>
-          </>
+            {sub.renews_at && (
+              <div style={s.row}><span style={s.label}>Prochain prélèvement</span><span style={{ ...s.value, ...NUM }}>{formatDate(sub.renews_at)}</span></div>
+            )}
+            {sub.ends_at && ending !== null && ending <= 30 && (
+              <p style={s.warn}>
+                Ton accès Pro se termine le {formatDate(sub.ends_at)}. Ensuite ton compte repasse en gratuit :
+                tes devis, factures et clients restent là. Tu pourras reprendre un abonnement depuis cet écran.
+              </p>
+            )}
+          </div>
         )}
 
-        {/* ── Cas freemium permanent ───────────────────── */}
-        {!isAdmin && plan !== "pro" && (
+        {/* ── Pro offert (essai daté) ── */}
+        {!isAdmin && !loading && isPro && !sub?.renews_at && !sub?.ends_at && proUntil && (
+          <div style={s.card}>
+            <div style={s.cardHeader}><Stamp color={ZB.stamp}>PRO OFFERT</Stamp></div>
+            <div style={s.row}><span style={s.label}>Accès Pro jusqu'au</span><span style={{ ...s.value, ...NUM }}>{formatDate(proUntil)}</span></div>
+            <p style={s.note}>Aucun paiement : à cette date ton compte repasse en gratuit, sauf si tu t'abonnes d'ici là.</p>
+          </div>
+        )}
+
+        {/* ── Pro sans abonnement ni essai ── */}
+        {!isAdmin && !loading && isPro && !sub && !proUntil && !error && (
+          <div style={s.card}>
+            <div style={s.row}><span style={s.label}>Statut</span><span style={s.value}>Pro · abonnement non détecté</span></div>
+            <p style={s.note}>
+              Ton profil est marqué « Pro » mais aucun abonnement Stripe n'est associé.
+              Si tu as payé récemment, le webhook Stripe peut prendre quelques secondes —
+              recharge la page. Sinon, contacte le support.
+            </p>
+          </div>
+        )}
+
+        {/* ── Gratuit ── */}
+        {!isAdmin && !loading && !isPro && (
           <div style={s.card}>
             <div style={s.row}><span style={s.label}>Statut</span><span style={s.value}>Freemium (gratuit à vie)</span></div>
             <div style={s.row}><span style={s.label}>Quota</span><span style={s.value}>5 devis par semaine</span></div>
             <p style={s.note}>Le compteur repart à zéro chaque lundi. Passe Pro pour des devis illimités et l'accès aux factures.</p>
           </div>
+        )}
+
+        {/* ── Action principale ── */}
+        {!isAdmin && !loading && isPro && hasStripe && (
+          <>
+            <button onClick={openPortal} disabled={opening} className="zb-sub-cta" style={{ ...s.cta, opacity: opening ? 0.7 : 1, cursor: opening ? "default" : "pointer" }}>
+              {opening ? "Ouverture du portail…" : "Gérer mon abonnement"}
+            </button>
+            <p style={s.help}>Sur Stripe : moyen de paiement, coordonnées de facturation, résiliation.</p>
+          </>
+        )}
+        {!isAdmin && !loading && !isPro && onUpgrade && (
+          <button onClick={onUpgrade} className="zb-sub-cta" style={s.cta}>Passer Pro</button>
+        )}
+
+        {/* ── Factures Stripe ── */}
+        {!isAdmin && !loading && invoices.length > 0 && (
+          <section style={{ marginTop: 24 }}>
+            <h2 style={s.h2}>Mes factures Zenbat</h2>
+            <div style={s.card}>
+              {invoices.map(inv => (
+                <div key={inv.id} style={s.invRow}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ ...s.value, textAlign: "left", ...NUM }}>{formatDate(inv.created_at)} · {formatEur(inv.total_eur)}</div>
+                    <div style={{ color: ZB.ink2, fontSize: 13, ...NUM }}>
+                      {inv.number || "Facture"} · <span style={{ color: inv.status === "paid" ? ZB.stamp : inv.status === "open" ? ZB.danger : ZB.ink2 }}>{INVOICE_STATUS[inv.status] || inv.status}</span>
+                    </div>
+                  </div>
+                  {inv.invoice_pdf && (
+                    <a href={inv.invoice_pdf} target="_blank" rel="noopener noreferrer" style={s.invBtn}
+                      aria-label={`Télécharger la facture ${inv.number || ""} en PDF`}>PDF</a>
+                  )}
+                  {inv.status === "open" && inv.hosted_invoice_url && (
+                    <a href={inv.hosted_invoice_url} target="_blank" rel="noopener noreferrer" style={s.invBtn}>Régler</a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── Abonnements précédents ── */}
+        {!isAdmin && !loading && history.length > 0 && (
+          <section style={{ marginTop: 8 }}>
+            <h2 style={s.h2}>Abonnements précédents</h2>
+            <div style={s.card}>
+              {history.map(h => (
+                <div key={h.id} style={s.row}>
+                  <span style={s.label}>{PLAN_LABEL[h.plan] || "Pro"}</span>
+                  <span style={{ ...s.value, ...NUM }}>
+                    {formatDate(h.started_at)} → {formatDate(h.ended_at || h.ends_at || h.current_period_end)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Portail aussi pour un ancien Pro (factures, coordonnées). */}
+        {!isAdmin && !loading && !isPro && hasStripe && (
+          <button onClick={openPortal} disabled={opening} style={{ ...btnSecondary, width: "100%", marginTop: 8, opacity: opening ? 0.7 : 1 }}>
+            {opening ? "Ouverture du portail…" : "Espace de facturation Stripe"}
+          </button>
         )}
 
         {error && <div role="alert" style={s.error}>{error}</div>}
@@ -203,5 +288,9 @@ const s = {
   cta:    { ...btnPrimary, width: "100%", minHeight: 52, fontSize: 16, marginTop: 4 },
   help:   { color: ZB.ink2, fontSize: 13, textAlign: "center", margin: "8px 0 0", lineHeight: 1.5 },
   loader: { color: ZB.ink2, fontSize: 15, padding: 20, textAlign: "center" },
+  warn:   { background: ZB.warnSoft, color: ZB.warn, fontSize: 14, lineHeight: 1.5, margin: "12px 0 0", padding: "10px 12px", borderRadius: 6 },
+  h2:     { color: ZB.ink, fontSize: 16, fontWeight: 700, margin: "0 0 8px" },
+  invRow: { display: "flex", alignItems: "center", gap: 8, minHeight: 56, padding: "8px 0", borderBottom: `1px solid ${ZB.ruleSoft}` },
+  invBtn: { ...btnSecondary, minHeight: 44, padding: "0 14px", fontSize: 14, textDecoration: "none", flexShrink: 0 },
   error:  { background: ZB.dangerSoft, color: ZB.danger, border: `1px solid ${ZB.danger}`, padding: 12, borderRadius: 8, fontSize: 14, marginTop: 12 },
 }

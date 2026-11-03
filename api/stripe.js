@@ -12,6 +12,7 @@ import { createClient } from '@supabase/supabase-js'
 import { cors } from './_cors.js'
 import { authenticate, notifyTelegram } from './_withAuth.js'
 import { logServerError } from './_serverLog.js'
+import { subSummary, invoiceSummary } from './_stripeBilling.js'
 
 // Vercel doit recevoir le body brut pour vérifier la signature Stripe.
 // Pour les actions non-webhook on parse manuellement le JSON.
@@ -246,36 +247,40 @@ async function handleAction(req, res, rawBody) {
     const action = body.action || 'checkout'
     const stripe = new Stripe(stripeKey)
 
+    // Écran « Mon abonnement » : abonnement en cours (ou dernier en date),
+    // historique et factures Stripe. Aussi pour un ancien Pro repassé en
+    // gratuit, qui doit pouvoir retrouver ses factures.
     if (action === 'info') {
-      const { data: profile } = await admin.from('profiles')
-        .select('plan, stripe_customer_id, stripe_subscription_id')
+      let { data: profile, error: pErr } = await admin.from('profiles')
+        .select('plan, stripe_customer_id, stripe_subscription_id, pro_until')
         .eq('id', user.id).maybeSingle()
-
-      const subId = profile?.stripe_subscription_id
-      if (!subId) return res.status(200).json({ plan: profile?.plan || 'free', subscription: null })
-
-      try {
-        const sub = await stripe.subscriptions.retrieve(subId)
-        const item = sub.items?.data?.[0]
-        return res.status(200).json({
-          plan: profile?.plan || 'pro',
-          subscription: {
-            id:                  sub.id,
-            status:              sub.status,
-            cancelAtPeriodEnd:   sub.cancel_at_period_end,
-            currentPeriodEnd:    sub.current_period_end,
-            currentPeriodStart:  sub.current_period_start,
-            interval:            item?.price?.recurring?.interval || null,
-            intervalCount:       item?.price?.recurring?.interval_count || null,
-            unitAmount:          item?.price?.unit_amount || null,
-            currency:            item?.price?.currency || 'eur',
-            planLabel:           sub.metadata?.plan || null,
-          },
-        })
-      } catch (err) {
-        if (err?.code === 'resource_missing') return res.status(200).json({ plan: profile?.plan || 'free', subscription: null })
-        throw err
+      if (pErr?.code === '42703') {  // pro_until : migration 0056
+        ;({ data: profile } = await admin.from('profiles')
+          .select('plan, stripe_customer_id, stripe_subscription_id')
+          .eq('id', user.id).maybeSingle())
       }
+      const plan       = profile?.plan || 'free'
+      const proUntil   = profile?.pro_until || null
+      const customerId = profile?.stripe_customer_id
+      if (!customerId) return res.status(200).json({ plan, proUntil, subscription: null, history: [], invoices: [] })
+
+      const [subs, invoices] = await Promise.all([
+        stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 10 }),
+        stripe.invoices.list({ customer: customerId, limit: 24 }),
+      ])
+      const all = (subs.data || []).map(subSummary)
+      const subscription = all.find(x => x.id === profile.stripe_subscription_id)
+        || all.find(x => x.ends_at || x.renews_at) || all[0] || null
+      return res.status(200).json({
+        plan,
+        proUntil,
+        subscription: subscription && {
+          ...subscription,
+          currency: subs.data.find(x => x.id === subscription.id)?.items?.data?.[0]?.price?.currency || 'eur',
+        },
+        history:  all.filter(x => x !== subscription),
+        invoices: (invoices.data || []).filter(i => i.status !== 'draft').map(invoiceSummary),
+      })
     }
 
     if (action === 'portal') {

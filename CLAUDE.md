@@ -143,7 +143,7 @@ Helpers non déployés (préfixés `_`, importés par les endpoints) :
 | `facturx.js` | Génération PDF Factur-X (XML CII embarqué). Multi-actions par champ `action` du body : `action: 'emit'` = émission (montants recalculés depuis les lignes en base, puis `emit_invoice()` : numéro + date + verrou, migration 0060) ; par défaut = assemble + archive en Storage le Factur-X d'une facture **déjà émise** (numéro, dates, montants et lignes relus en base ; un brouillon reçoit 409 `emit_first`) ; `action: 'send'` = télécharge le PDF depuis Storage et l'envoie par email au client (au nom de `brand.companyName`, avec Reply-To = `brand.email`), met à jour `invoices.sent_to_client_at`. |
 | `crm.js` | CRM de prospection admin — CRUD prospects, scraping d'email (protégé `_ssrf.js`), file d'envoi programmée. Multi-actions par `?action=` (GET) / `action` du body (POST). Action `process_queue` appelée par pg_cron, auth par `CRON_SECRET` (timing-safe) |
 | `newsletter.js` | Inscription newsletter |
-| `stripe.js` | Stripe checkout/portal/info (POST authentifié) + webhook (détection par header `stripe-signature`) |
+| `stripe.js` | Stripe checkout/portal/info (POST authentifié) + webhook (détection par header `stripe-signature`). `info` (écran « Mon abonnement », aussi pour un ancien Pro repassé en gratuit) : abonnement en cours via `subSummary`, abonnements précédents, factures Stripe (liens PDF), `proUntil` |
 
 ### Architecture Telegram
 
