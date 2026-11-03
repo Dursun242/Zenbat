@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { fmtEur, fmtDT, relTime, SC, SL } from "../../lib/admin/format.js";
+import { fmtEur, fmtDT, relTime, SC, SL, SUB_PLAN, SUB_STATUS, daysUntil, inDays } from "../../lib/admin/format.js";
 import { sanitizeEmail, isValidEmail } from "../../lib/utils.js";
 import { useModalGuard } from "../../hooks/useModalGuard.js";
 import { compressLogoFile } from "../../lib/compressLogo.js";
@@ -43,6 +43,10 @@ export default function UserDetailDrawer({
   const isPro       = currentPlan === "pro";
   const proUntil    = data?.profile?.pro_until || null;
   const proUntilLabel = proUntil ? new Date(proUntil).toLocaleDateString("fr-FR") : null;
+  // Abonnement Stripe à mettre en avant : le premier encore en cours, sinon
+  // le plus récent (liste Stripe triée du plus récent au plus ancien).
+  const subs       = data?.billing?.subscriptions || [];
+  const currentSub = subs.find(x => x.ends_at || x.renews_at) || subs[0] || null;
 
   // Mode édition de l'onglet Profil — permet à l'admin de corriger
   // silencieusement les champs brand_data mal renseignés par l'utilisateur
@@ -149,6 +153,7 @@ export default function UserDetailDrawer({
             {[
               { k: "overview",  l: "Vue",            n: null },
               { k: "profil",    l: "Profil",         n: null },
+              { k: "billing",   l: "Abonnement",     n: data.billing?.invoices?.length || null },
               { k: "devis",     l: "Devis",          n: data.stats.devisTotal },
               { k: "invoices",  l: "Factures",       n: data.stats.invoicesTotal },
               { k: "clients",   l: "Clients",        n: data.stats.clientsTotal },
@@ -225,6 +230,16 @@ export default function UserDetailDrawer({
                       : "↑ Passer ce compte en Pro"}
                 </button>
               )}
+              {currentSub && (
+                <button type="button" onClick={() => onTabChange("billing")}
+                  style={{ background: "white", border: "1px solid #E8E2D8", borderRadius: 10, padding: "8px 12px", fontSize: 11, fontWeight: 600, color: "#1A1612", textAlign: "left", cursor: "pointer", font: "inherit" }}>
+                  {SUB_PLAN[currentSub.plan] || "Abonnement Pro"} ·{" "}
+                  {currentSub.ends_at ? `fin le ${fmtDT(currentSub.ends_at)} (${inDays(currentSub.ends_at)})`
+                    : currentSub.renews_at ? `renouvelé le ${fmtDT(currentSub.renews_at)}`
+                    : (SUB_STATUS[currentSub.status] || currentSub.status)}
+                  <span style={{ color: "#9A8E82" }}> · détail et factures →</span>
+                </button>
+              )}
               {isPro && proUntilLabel && (
                 <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "8px 12px", fontSize: 11, fontWeight: 600, color: "#92400e" }}>
                   🎁 Essai Pro en cours — expire le {proUntilLabel}
@@ -258,6 +273,80 @@ export default function UserDetailDrawer({
                   style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", borderRadius: 10, padding: "10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                   🗑 Supprimer ce compte définitivement
                 </button>
+              )}
+            </div>
+          )}
+
+          {data && tab === "billing" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {isPro && proUntilLabel && (
+                <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "8px 12px", fontSize: 11, fontWeight: 600, color: "#92400e" }}>
+                  Pro offert (essai) — expire le {proUntilLabel} ({inDays(proUntil)})
+                </div>
+              )}
+              {data.billing?.error && (
+                <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: 12, color: "#991b1b", fontSize: 12 }}>{data.billing.error}</div>
+              )}
+              {!data.billing && (
+                <div style={{ padding: 20, textAlign: "center", color: "#9A8E82", fontSize: 12 }}>
+                  {isPro && !proUntil ? "Pro accordé à la main : aucun client Stripe." : "Aucun client Stripe pour ce compte."}
+                </div>
+              )}
+              {data.billing && subs.length === 0 && !data.billing.error && (
+                <div style={{ padding: 12, textAlign: "center", color: "#9A8E82", fontSize: 12 }}>Client Stripe sans abonnement (paiement jamais finalisé).</div>
+              )}
+              {subs.map(sub => {
+                const soon = sub.ends_at && daysUntil(sub.ends_at) <= 30;
+                const row  = (l, v) => v ? (
+                  <div style={{ display: "flex", gap: 8, padding: "4px 0", borderBottom: "1px solid #F0EBE3", fontSize: 12 }}>
+                    <span style={{ width: 130, flexShrink: 0, color: "#9A8E82", fontWeight: 600 }}>{l}</span>
+                    <span style={{ color: "#1A1612" }}>{v}</span>
+                  </div>
+                ) : null;
+                return (
+                  <div key={sub.id} style={{ background: "white", borderRadius: 10, padding: 12, boxShadow: "0 1px 3px rgba(0,0,0,.04)", opacity: sub === currentSub ? 1 : 0.75 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1612" }}>
+                        {SUB_PLAN[sub.plan] || "Abonnement"}{sub.amount_eur != null && ` · ${fmtEur(sub.amount_eur)}`}
+                      </div>
+                      <span style={{ fontSize: 9, padding: "1px 7px", borderRadius: 20, background: "#F0EBE3", color: sub.status === "active" ? "#15803d" : "#6B6358", fontWeight: 700 }}>
+                        {SUB_STATUS[sub.status] || sub.status}
+                      </span>
+                    </div>
+                    {sub.ends_at && (
+                      <div style={{ background: soon ? "#fffbeb" : "#F5F0E8", border: `1px solid ${soon ? "#fde68a" : "#E8E2D8"}`, borderRadius: 8, padding: "6px 10px", fontSize: 12, fontWeight: 700, color: soon ? "#92400e" : "#1A1612", marginBottom: 6 }}>
+                        Fin d'accès Pro le {fmtDT(sub.ends_at)} ({inDays(sub.ends_at)}){sub.plan === "biannual" && " — pas de renouvellement automatique"}
+                      </div>
+                    )}
+                    {row("Souscrit le", fmtDT(sub.started_at))}
+                    {row("Période en cours", sub.current_period_start && `${fmtDT(sub.current_period_start)} → ${fmtDT(sub.current_period_end)}`)}
+                    {row("Prochain prélèvement", sub.renews_at && `${fmtDT(sub.renews_at)} (${inDays(sub.renews_at)})`)}
+                    {row("Terminé le", sub.ended_at && fmtDT(sub.ended_at))}
+                  </div>
+                );
+              })}
+              {data.billing?.invoices?.length > 0 && (
+                <div style={{ background: "white", borderRadius: 10, padding: 12, boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#9A8E82", letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 6 }}>Factures Stripe</div>
+                  {data.billing.invoices.map(inv => (
+                    <div key={inv.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #F0EBE3", fontSize: 12 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontFamily: "monospace", fontSize: 11, color: "#6B6358" }}>{inv.number || inv.id}</div>
+                        <div style={{ color: "#9A8E82", fontSize: 11 }}>
+                          {fmtDT(inv.created_at)} · {fmtEur(inv.total_eur)} · {inv.status === "paid" ? "payée" : inv.status === "open" ? "à payer" : inv.status}
+                        </div>
+                      </div>
+                      {inv.invoice_pdf && (
+                        <a href={inv.invoice_pdf} target="_blank" rel="noopener noreferrer"
+                          style={{ padding: "6px 10px", borderRadius: 8, background: "#1A1612", color: "white", fontSize: 11, fontWeight: 700, textDecoration: "none" }}>PDF</a>
+                      )}
+                      {inv.hosted_invoice_url && (
+                        <a href={inv.hosted_invoice_url} target="_blank" rel="noopener noreferrer"
+                          style={{ padding: "6px 10px", borderRadius: 8, background: "#F0EBE3", color: "#1A1612", fontSize: 11, fontWeight: 700, textDecoration: "none" }}>Voir</a>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           )}

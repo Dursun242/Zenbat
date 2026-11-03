@@ -498,7 +498,7 @@ export default function App({ emailVerification = null } = {}) {
   );
   if (screen === "subscription") return (
     <Suspense fallback={<ScreenLoader />}>
-      <SubscriptionScreen isAdmin={isAdmin} plan={effectivePlan} billingCycle={billingCycle} onBack={() => setScreen("app")}/>
+      <SubscriptionScreen isAdmin={isAdmin} plan={effectivePlan} onBack={() => setScreen("app")} onUpgrade={() => setScreen("paywall")}/>
     </Suspense>
   );
 

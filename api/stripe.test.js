@@ -8,7 +8,8 @@ import { Readable } from 'node:stream'
 // simulés.
 const { stripeApi, signer } = vi.hoisted(() => ({
   stripeApi: {
-    subscriptions:  { update: null, retrieve: null },
+    subscriptions:  { update: null, retrieve: null, list: null },
+    invoices:       { list: null },
     customers:      { retrieve: null, create: null },
     checkout:       { sessions: { create: null } },
     billingPortal:  { sessions: { create: null } },
@@ -407,14 +408,41 @@ describe('actions POST (checkout, portal, info)', () => {
     expect(r.statusCode).toBe(400)
   })
 
-  it('info sans abonnement → plan du profil, subscription null', async () => {
-    db = makeDb((t) => t === 'profiles' ? { data: { plan: 'free', stripe_subscription_id: null }, error: null } : {})
+  it('info sans client Stripe → plan du profil, rien d\'autre, Stripe non appelé', async () => {
+    db = makeDb((t) => t === 'profiles' ? { data: { plan: 'free', stripe_customer_id: null, stripe_subscription_id: null }, error: null } : {})
     supabaseMock.from = db.from
+    stripeApi.subscriptions.list = vi.fn()
     const r = makeRes()
     await handler(actionReq({ action: 'info' }, { token: 'good' }), r)
     expect(r.statusCode).toBe(200)
-    expect(r.body).toEqual({ plan: 'free', subscription: null })
+    expect(r.body).toEqual({ plan: 'free', proUntil: null, subscription: null, history: [], invoices: [] })
     expect(eqVal(db.calls[0].ops, 'id')).toBe('user-1')
+    expect(stripeApi.subscriptions.list).not.toHaveBeenCalled()
+  })
+
+  it('info Pro 6 mois → fin d\'accès, historique et factures (brouillons exclus)', async () => {
+    const T = (d) => Math.floor(new Date(d).getTime() / 1000)
+    db = makeDb(() => ({ data: { plan: 'pro', stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_new' }, error: null }))
+    supabaseMock.from = db.from
+    const price = { unit_amount: 5700, currency: 'eur', recurring: { interval: 'month', interval_count: 6 } }
+    stripeApi.subscriptions.list = vi.fn(async () => ({ data: [
+      { id: 'sub_new', status: 'active', metadata: { plan: 'biannual' }, cancel_at_period_end: true,
+        items: { data: [{ price, current_period_start: T('2026-09-01'), current_period_end: T('2027-03-01') }] } },
+      { id: 'sub_old', status: 'canceled', metadata: { plan: 'biannual' }, ended_at: T('2026-08-01'),
+        items: { data: [{ price }] } },
+    ] }))
+    stripeApi.invoices.list = vi.fn(async () => ({ data: [
+      { id: 'in_2', number: 'Z-2', status: 'paid', total: 5700, created: T('2026-09-01'), invoice_pdf: 'https://pay.stripe.com/x/pdf' },
+      { id: 'in_d', status: 'draft', total: 5700, created: T('2026-10-01') },
+    ] }))
+    const r = makeRes()
+    await handler(actionReq({ action: 'info' }, { token: 'good' }), r)
+    expect(r.statusCode).toBe(200)
+    expect(stripeApi.subscriptions.list).toHaveBeenCalledWith({ customer: 'cus_1', status: 'all', limit: 10 })
+    expect(r.body.subscription).toMatchObject({ id: 'sub_new', plan: 'biannual', ends_at: '2027-03-01T00:00:00.000Z', renews_at: null, currency: 'eur' })
+    expect(r.body.history.map(h => h.id)).toEqual(['sub_old'])
+    expect(r.body.invoices).toHaveLength(1)
+    expect(r.body.invoices[0]).toMatchObject({ number: 'Z-2', total_eur: 57, invoice_pdf: 'https://pay.stripe.com/x/pdf' })
   })
 
   it('portal sans client Stripe → 400', async () => {

@@ -7,6 +7,32 @@
 
 import { cors } from "./_cors.js"
 import { authenticate } from "./_withAuth.js"
+import { subSummary, invoiceSummary } from "./_stripeBilling.js"
+
+// Abonnement(s) et factures Stripe du client — lus en direct sur Stripe
+// (comme ?type=stripe_health) pour avoir les vraies dates et les liens PDF.
+// Jamais bloquant : une erreur Stripe remonte dans billing.error.
+async function loadBilling(customerId) {
+  if (!customerId) return null
+  const stripeKey = (process.env.STRIPE_SECRET_KEY || '').trim()
+  if (!stripeKey) return { customerId, subscriptions: [], invoices: [], error: 'STRIPE_SECRET_KEY non configurée' }
+  try {
+    const Stripe = (await import('stripe')).default
+    const stripe = new Stripe(stripeKey)
+    const [subs, invoices] = await Promise.all([
+      stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 10 }),
+      stripe.invoices.list({ customer: customerId, limit: 24 }),
+    ])
+    return {
+      customerId,
+      subscriptions: subs.data.map(subSummary),   // plus récent d'abord
+      invoices:      invoices.data.filter(i => i.status !== 'draft').map(invoiceSummary),
+      error:         null,
+    }
+  } catch (e) {
+    return { customerId, subscriptions: [], invoices: [], error: `Stripe : ${e?.message || e}` }
+  }
+}
 
 // Exécute une requête Supabase en tolérant l'absence de table (ex: migration
 // 0012 non appliquée sur l'env courant). Renvoie { data: [], error } au lieu
@@ -272,6 +298,7 @@ export default async function handler(req, res) {
       safe(admin.from('activity_log').select('*').eq('owner_id', userId).order('created_at', { ascending: false }).limit(200)),
     ])
 
+  const billing  = await loadBilling(profileR.data?.stripe_customer_id)
   const devis    = devisR.data    || []
   const invoices = invoicesR.data || []
   const clients  = clientsR.data  || []
@@ -315,6 +342,7 @@ export default async function handler(req, res) {
       user_metadata:  target.user_metadata,
     },
     profile:       profileR.data || null,
+    billing,
     stats,
     clients,
     devis:         devisWithLines,

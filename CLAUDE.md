@@ -9,7 +9,7 @@ Stack : React + Vite (frontend) · Vercel Serverless Functions (API) · Supabase
 
 ### Vercel : limite 12 fonctions serverless
 Le plan Hobby de Vercel autorise **maximum 12 fichiers** dans `/api/`.
-Fichiers actuels (11/12 — les helpers `_ai.js`, `_cors.js`, `_email.js`, `_quota.js`, `_rateLimit.js`, `_serverLog.js`, `_ssrf.js`, `_withAuth.js` ne comptent pas, `*.test.js` ignorés via `.vercelignore`, `fonts/` est un dossier d'assets) :
+Fichiers actuels (11/12 — les helpers `_ai.js`, `_cors.js`, `_email.js`, `_quota.js`, `_rateLimit.js`, `_serverLog.js`, `_ssrf.js`, `_stripeBilling.js`, `_withAuth.js` ne comptent pas, `*.test.js` ignorés via `.vercelignore`, `fonts/` est un dossier d'assets) :
 ```
 account.js             admin-delete-user.js   admin-stats.js     admin-user-detail.js
 claude.js              contact.js             crm.js             devis-public.js
@@ -128,21 +128,22 @@ Helpers non déployés (préfixés `_`, importés par les endpoints) :
 - `_ai.js` — sélection du fournisseur IA (`AI_PROVIDER`, sinon Mistral si `MISTRAL_API_KEY` posée, sinon Anthropic) + traduction Mistral ⇄ format Anthropic Messages (réponse, erreurs, flux SSE).
 - `_ssrf.js` — `assertPublicHost()` : bloque les URLs internes/privées avant un fetch sortant ; `safeFetch()` suit les redirections à la main (3 sauts max) en revérifiant chaque hôte (scraping de `claude.js` et `crm.js`).
 - `_quota.js` — quotas journaliers par utilisateur comptés en base (`consumeDailyQuota` / `refundDailyQuota`, migration 0059) : IA (`claude.js`) et emails envoyés par un artisan (`devis-public.js` send, `facturx.js` send, `account.js` export comptable).
+- `_stripeBilling.js` — `subSummary()` / `invoiceSummary()` : résumé d'un abonnement Stripe (formule mensuel / 6 mois, fin d'accès `ends_at` ou prochain prélèvement `renews_at`, montant ramené au mois ; dates de période lues sur l'abonnement ou ses items selon la version d'API) et d'une facture (numéro, montant, liens `invoice_pdf` / page Stripe). Utilisé par `admin-stats.js` (`?type=stripe_health`) et `admin-user-detail.js`.
 - `_email.js` exporte aussi `escapeHtml`, `safeColor`, `safeImageSrc` : toute donnée de `brand_data` insérée dans le HTML d'un email passe par eux.
 
 | Fichier | Rôle |
 |---------|------|
 | `account.js` | RGPD libre-service — `GET` = export portabilité, `POST` = suppression compte ou envoi comptable |
 | `admin-delete-user.js` | Suppression compte par l'admin |
-| `admin-stats.js` | Stats globales + logs IA (conversations, erreurs, négatifs, feedback, newsletter, cohérence) — paramètre `?type=` |
-| `admin-user-detail.js` | Données complètes d'un utilisateur (profil, devis, factures, clients, IA) |
+| `admin-stats.js` | Stats globales + logs IA (conversations, erreurs, négatifs, feedback, newsletter, cohérence) — paramètre `?type=`. `stripe_health` : liste des abonnés Pro (échéance la plus proche d'abord), past due, résiliations, MRR (6 mois ramené au mois) |
+| `admin-user-detail.js` | Données complètes d'un utilisateur (profil, devis, factures, clients, IA) + `billing` : abonnements et factures Stripe lus en direct (onglet « Abonnement » de la fiche admin, liens PDF) |
 | `claude.js` | Proxy IA (Claude **ou Mistral**, cf `_ai.js`) avec timeout 55s + AbortController. Le front parle toujours le format Anthropic ; en mode Mistral, requêtes/réponses/SSE sont traduites côté serveur. Comptes gratuits : modèle ramené à Haiku et `max_tokens` plafonné à 6000 (Pro : whitelist complète, 8000). `scrape_urls` consomme une unité de quota IA par URL. |
 | `contact.js` | Formulaire de contact public — POST avec honeypot anti-bot, envoie un email à l'admin |
 | `devis-public.js` | Endpoint public pour signature client de devis — token + OTP 8 chiffres + audit, multi-routes par `action` (`send`, `request_otp`, `verify_otp`, `accept`, `refuse`, `negotiate`, `artisan_respond`, `send_signed_pdf`). `send_signed_pdf` reçoit le PDF généré côté navigateur en base64 et l'email en pièce jointe au client + à l'artisan ; idempotence via audit log (`event = 'signed_pdf_sent'`). |
 | `facturx.js` | Génération PDF Factur-X (XML CII embarqué). Multi-actions par champ `action` du body : `action: 'emit'` = émission (montants recalculés depuis les lignes en base, puis `emit_invoice()` : numéro + date + verrou, migration 0060) ; par défaut = assemble + archive en Storage le Factur-X d'une facture **déjà émise** (numéro, dates, montants et lignes relus en base ; un brouillon reçoit 409 `emit_first`) ; `action: 'send'` = télécharge le PDF depuis Storage et l'envoie par email au client (au nom de `brand.companyName`, avec Reply-To = `brand.email`), met à jour `invoices.sent_to_client_at`. |
 | `crm.js` | CRM de prospection admin — CRUD prospects, scraping d'email (protégé `_ssrf.js`), file d'envoi programmée. Multi-actions par `?action=` (GET) / `action` du body (POST). Action `process_queue` appelée par pg_cron, auth par `CRON_SECRET` (timing-safe) |
 | `newsletter.js` | Inscription newsletter |
-| `stripe.js` | Stripe checkout/portal/info (POST authentifié) + webhook (détection par header `stripe-signature`) |
+| `stripe.js` | Stripe checkout/portal/info (POST authentifié) + webhook (détection par header `stripe-signature`). `info` (écran « Mon abonnement », aussi pour un ancien Pro repassé en gratuit) : abonnement en cours via `subSummary`, abonnements précédents, factures Stripe (liens PDF), `proUntil` |
 
 ### Architecture Telegram
 
