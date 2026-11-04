@@ -40,6 +40,7 @@ export default function HeaderMenu({
   onOpenAdmin,
   onOpenProfile,
   onOpenSubscription,
+  onOpenEInvoicing = null,
   onOpenPaywall,
   onOpenSupport,
   onOpenComptable,
@@ -166,6 +167,16 @@ export default function HeaderMenu({
                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                 <span style={{ color: ZB.ink2, display: "inline-flex", width: 22, justifyContent: "center", flexShrink: 0 }}>{I.receipt}</span>
                 Mon abonnement et factures
+              </button>
+            )}
+
+            {/* Factures fournisseurs reçues via Super PDP (plateforme agréée). */}
+            {onOpenEInvoicing && (
+              <button role="menuitem" onClick={() => { close(); onOpenEInvoicing(); }} style={itemBase}
+                onMouseEnter={e => e.currentTarget.style.background = ZB.paper}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                <span style={{ color: ZB.ink2, display: "inline-flex", width: 22, justifyContent: "center", flexShrink: 0 }}>{I.download}</span>
+                Factures reçues
               </button>
             )}
 

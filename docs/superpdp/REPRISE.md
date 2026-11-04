@@ -1,3 +1,12 @@
+> **Mise à jour 2026-11-04 — ce document est historique.** L'intégration a
+> repris sur un autre modèle : chaque artisan relie son propre compte Super
+> PDP (OAuth authorization code + PKCE), plus de compte bac à sable partagé.
+> Étape 1 (connexion + factures reçues) : `api/_pdp.js`, migration
+> `0065_pdp_accounts.sql`, `src/pages/EInvoicingScreen.jsx`. État et suite :
+> section « Facturation électronique — Super PDP » de `CLAUDE.md`. Le mapping
+> de statuts du §3 ci-dessous est faux (`fr:205` = approuvée, `fr:212` =
+> encaissée côté vendeur) ; les branches listées au §1 ne sont plus à rebaser.
+
 # Reprise intégration Super PDP — plan d'action
 
 > Document de reprise pour quand on relancera l'intégration **Super PDP**

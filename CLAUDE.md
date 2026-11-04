@@ -9,7 +9,7 @@ Stack : React + Vite (frontend) · Vercel Serverless Functions (API) · Supabase
 
 ### Vercel : limite 12 fonctions serverless
 Le plan Hobby de Vercel autorise **maximum 12 fichiers** dans `/api/`.
-Fichiers actuels (11/12 — les helpers `_ai.js`, `_cors.js`, `_email.js`, `_quota.js`, `_rateLimit.js`, `_serverLog.js`, `_ssrf.js`, `_stripeBilling.js`, `_withAuth.js` ne comptent pas, `*.test.js` ignorés via `.vercelignore`, `fonts/` est un dossier d'assets) :
+Fichiers actuels (11/12 — les helpers `_ai.js`, `_cors.js`, `_email.js`, `_pdp.js`, `_quota.js`, `_rateLimit.js`, `_serverLog.js`, `_ssrf.js`, `_stripeBilling.js`, `_withAuth.js` ne comptent pas, `*.test.js` ignorés via `.vercelignore`, `fonts/` est un dossier d'assets) :
 ```
 account.js             admin-delete-user.js   admin-stats.js     admin-user-detail.js
 claude.js              contact.js             crm.js             devis-public.js
@@ -41,7 +41,8 @@ L'utilisateur les copie-colle dans le SQL Editor de Supabase.
 - **En attente : `0062_signed_devis_lock.sql`** (audit du 2026-10-12) : depuis le navigateur, les lignes d'un devis accepté ou signé en ligne ne sont plus modifiables (trigger `protect_signed_devis_lines`) ; un devis signé en ligne par le client (`client_accepted_at`) ne quitte plus « accepté » sauf vers « remplacé », et son objet / montant / TVA sont figés (`protect_esigned_devis`) ; dossier Storage `{user}/devis-signes/` (PDF signés archivés par `/api/devis-public`) réservé au serveur.
 - **En attente : `0063_ai_cached_tokens.sql`** (optimisation coût IA du 2026-10-27) : colonne `claude_api_logs.cached_input_tokens` (part de `input_tokens` servie depuis le cache Mistral, facturée 10 %). Sans elle, `api/claude.js` journalise sans la colonne et `api/admin-stats.js` relit sans elle (fallback 42703 / PGRST204). Requête de suivi du taux de cache dans l'en-tête de la migration.
 - **En attente : `0064_disk_io.sql`** (alerte Supabase « Disk IO Budget » du 2026-11-03) : index `owner_id` sur `lignes_devis` et `lignes_invoices` (la RLS faisait parcourir les lignes de tous les artisans à chaque chargement), `log_activity()` ne journalise plus les UPDATE sans changement (hors `updated_at`), `admin_last_activity_per_owner()` passe par l'index au lieu d'un parcours complet d'`activity_log`. Requêtes de diagnostic (`pg_stat_statements`, tailles des tables) en fin de fichier.
-- Prochaine migration à créer : préfixer avec `0065_`.
+- **En attente : `0065_pdp_accounts.sql`** (Super PDP, étape 1, 2026-11-04) : tables `pdp_accounts` (compte Super PDP relié par artisan, jetons OAuth chiffrés) et `pdp_oauth_states` (state + PKCE à usage unique), réservées au serveur (RLS sans policy). Sans elle, l'écran « Factures reçues » affiche « non connecté » et la connexion échoue.
+- Prochaine migration à créer : préfixer avec `0066_`.
 
 **Tracking depuis 0043** : la table `public.schema_migrations(version, label, applied_at)` est créée par la migration `0043`. À partir de là, chaque nouvelle migration **doit** se terminer par un INSERT idempotent qui s'auto-enregistre :
 ```sql
@@ -128,6 +129,7 @@ Helpers non déployés (préfixés `_`, importés par les endpoints) :
 - `_ai.js` — sélection du fournisseur IA (`AI_PROVIDER`, sinon Mistral si `MISTRAL_API_KEY` posée, sinon Anthropic) + traduction Mistral ⇄ format Anthropic Messages (réponse, erreurs, flux SSE).
 - `_ssrf.js` — `assertPublicHost()` : bloque les URLs internes/privées avant un fetch sortant ; `safeFetch()` suit les redirections à la main (3 sauts max) en revérifiant chaque hôte (scraping de `claude.js` et `crm.js`).
 - `_quota.js` — quotas journaliers par utilisateur comptés en base (`consumeDailyQuota` / `refundDailyQuota`, migration 0059) : IA (`claude.js`) et emails envoyés par un artisan (`devis-public.js` send, `facturx.js` send, `account.js` export comptable).
+- `_pdp.js` — Super PDP (plateforme agréée) : connexion OAuth « authorization code » + PKCE du compte de chaque artisan, jetons chiffrés AES-256-GCM (`PDP_TOKEN_KEY`) avec rotation du refresh token (`token_version`), factures reçues (`direction=in`), téléchargement, statuts acheteur AFNOR (`fr:204/205/207/210/211`). Branché dans `facturx.js` (actions `pdp_*`, retour OAuth `GET ?route=pdp_callback` via la rewrite `/api/superpdp/callback`). Cf. section « Facturation électronique — Super PDP ».
 - `_stripeBilling.js` — `subSummary()` / `invoiceSummary()` : résumé d'un abonnement Stripe (formule mensuel / 6 mois, fin d'accès `ends_at` ou prochain prélèvement `renews_at`, montant ramené au mois ; dates de période lues sur l'abonnement ou ses items selon la version d'API) et d'une facture (numéro, montant, liens `invoice_pdf` / page Stripe). Utilisé par `admin-stats.js` (`?type=stripe_health`) et `admin-user-detail.js`.
 - `_email.js` exporte aussi `escapeHtml`, `safeColor`, `safeImageSrc` : toute donnée de `brand_data` insérée dans le HTML d'un email passe par eux.
 
@@ -140,7 +142,7 @@ Helpers non déployés (préfixés `_`, importés par les endpoints) :
 | `claude.js` | Proxy IA (Claude **ou Mistral**, cf `_ai.js`) avec timeout 55s + AbortController. Le front parle toujours le format Anthropic ; en mode Mistral, requêtes/réponses/SSE sont traduites côté serveur. Comptes gratuits : modèle ramené à Haiku et `max_tokens` plafonné à 6000 (Pro : whitelist complète, 8000). `scrape_urls` consomme une unité de quota IA par URL. |
 | `contact.js` | Formulaire de contact public — POST avec honeypot anti-bot, envoie un email à l'admin |
 | `devis-public.js` | Endpoint public pour signature client de devis — token + OTP 8 chiffres + audit, multi-routes par `action` (`send`, `request_otp`, `verify_otp`, `accept`, `refuse`, `negotiate`, `artisan_respond`, `send_signed_pdf`). `send_signed_pdf` reçoit le PDF généré côté navigateur en base64 et l'email en pièce jointe au client + à l'artisan ; idempotence via audit log (`event = 'signed_pdf_sent'`). |
-| `facturx.js` | Génération PDF Factur-X (XML CII embarqué). Multi-actions par champ `action` du body : `action: 'emit'` = émission (montants recalculés depuis les lignes en base, puis `emit_invoice()` : numéro + date + verrou, migration 0060) ; par défaut = assemble + archive en Storage le Factur-X d'une facture **déjà émise** (numéro, dates, montants et lignes relus en base ; un brouillon reçoit 409 `emit_first`) ; `action: 'send'` = télécharge le PDF depuis Storage et l'envoie par email au client (au nom de `brand.companyName`, avec Reply-To = `brand.email`), met à jour `invoices.sent_to_client_at`. |
+| `facturx.js` | Génération PDF Factur-X (XML CII embarqué). Multi-actions par champ `action` du body : `action: 'emit'` = émission (montants recalculés depuis les lignes en base, puis `emit_invoice()` : numéro + date + verrou, migration 0060) ; par défaut = assemble + archive en Storage le Factur-X d'une facture **déjà émise** (numéro, dates, montants et lignes relus en base ; un brouillon reçoit 409 `emit_first`) ; `action: 'send'` = télécharge le PDF depuis Storage et l'envoie par email au client (au nom de `brand.companyName`, avec Reply-To = `brand.email`), met à jour `invoices.sent_to_client_at`. Actions `pdp_*` + `GET ?route=pdp_callback` : Super PDP (cf. `_pdp.js`). |
 | `crm.js` | CRM de prospection admin — CRUD prospects, scraping d'email (protégé `_ssrf.js`), file d'envoi programmée. Multi-actions par `?action=` (GET) / `action` du body (POST). Action `process_queue` appelée par pg_cron, auth par `CRON_SECRET` (timing-safe) |
 | `newsletter.js` | Inscription newsletter |
 | `stripe.js` | Stripe checkout/portal/info (POST authentifié) + webhook (détection par header `stripe-signature`). `info` (écran « Mon abonnement », aussi pour un ancien Pro repassé en gratuit) : abonnement en cours via `subSummary`, abonnements précédents, factures Stripe (liens PDF), `proUntil` |
@@ -210,32 +212,30 @@ RLS activé sur toutes les tables — les endpoints admin contournent via `SUPAB
 | `STRIPE_SECRET_KEY` | Clé secrète Stripe (checkout / portal / abonnements) |
 | `STRIPE_WEBHOOK_SECRET` | Secret de signature webhook Stripe |
 | `CRON_SECRET` | Secret Bearer de l'action `process_queue` de `api/crm.js` (appelée par pg_cron) |
+| `PDP_CLIENT_ID` / `PDP_CLIENT_SECRET` | Application OAuth de Zenbat chez Super PDP (accès éditeur). Les trois `PDP_*` requis : sans eux, « Factures reçues » affiche « pas encore ouvert ». |
+| `PDP_TOKEN_KEY` | Clé AES-256 des jetons Super PDP, 32 octets en base64 (`openssl rand -base64 32`). Ne jamais la changer sans reconnecter les comptes. |
+| `PDP_API_BASE` | Optionnel, défaut `https://api.superpdp.tech` |
+| `PDP_REDIRECT_URI` | Optionnel, défaut `<1ʳᵉ origine ALLOWED_ORIGINS>/api/superpdp/callback` — à déclarer à l'identique chez Super PDP |
+| `VITE_PDP_ENABLED` | `true` = menu « Factures reçues » visible pour tous (sinon admin seulement) |
 
 > Variables d'env caduques (à supprimer côté Vercel) : `B2B_API_KEY`, `B2B_API_URL`, `B2B_WEBHOOK_SECRET`, `ODOO_URL`, `ODOO_DB`, `ODOO_USERNAME`, `ODOO_API_KEY`.
 
 ---
 
-## Travail en attente — intégration Super PDP (réforme facturation B2B 2026/2027)
+## Facturation électronique — Super PDP
 
-**État : code écrit, testé en sandbox, jamais mergé sur `main`.**
+Réforme : **réception** obligatoire pour toutes les entreprises depuis le 01/09/2026 ; **émission** et e-reporting (ventes aux particuliers) au 01/09/2027 pour les TPE. Zenbat n'est pas plateforme agréée : il se connecte à Super PDP (PA) au nom de chaque artisan.
 
-L'intégration **Super PDP** (Plateforme Agréée DGFiP) a été développée lors d'une grosse séance et validée en preview Vercel (envoi de factures sandbox fonctionnel). Elle vit aujourd'hui sur 3 branches non-mergées du remote :
+**Modèle retenu (multi-comptes)** : chaque artisan relie SON compte Super PDP (OAuth « authorization code » + PKCE, bouton « Connecter mon compte Super PDP ») ; Zenbat agit avec son SIREN, ne voit jamais son mot de passe. L'ancien POC (compte bac à sable partagé, branches `claude/integrate-superdpd-ZpSGG` etc.) est abandonné : il envoyait tout sous le SIREN de test de Zenbat. Historique et spec : `docs/superpdp/REPRISE.md`.
 
-| Branche origin | Rôle |
-|---|---|
-| `claude/audit-einvoicing-integration-awnev` | Audit faisabilité 850 lignes (`audit-einvoicing.md`) |
-| `claude/add-dpd-integration-x5GRw` | 1ʳᵉ itération + fixes Peppol BT-34/BT-49 |
-| `claude/integrate-superdpd-ZpSGG` | **Version la plus avancée** : superpdp.js (361 lignes) + tests (159 lignes, 13 cas) + migration `0039_pdp_accounts.sql` + bouton UI |
+**Étape 1 — connexion + réception (code sur `main`, en attente des accès éditeur Super PDP)** :
+- `api/_pdp.js` (helper, pas de slot Vercel) routé par `api/facturx.js` ; migration `0065_pdp_accounts.sql` ; écran `src/pages/EInvoicingScreen.jsx` (« Factures reçues », menu ⋯) + `src/lib/pdp.js`.
+- Retour OAuth : `/api/superpdp/callback` → `/app?pdp=connected|denied|expired|error` (lu par `App.jsx`, ouvre l'écran).
+- Visible pour l'admin seulement tant que `VITE_PDP_ENABLED` ≠ `true`.
+- Statuts AFNOR : `fr:205` = approuvée (pas `fr:202` comme dans l'ancien POC), `fr:210` refusée, `fr:211` paiement transmis (acheteur), `fr:212` encaissée (vendeur).
+- **À confirmer en bac à sable** : noms des champs de `en_invoice` (lus avec replis dans `summarizeInvoice`), présence de `events` dans la liste, refus `fr:210` qui exigerait un motif, PKCE accepté par Super PDP.
 
-**Plan de reprise complet** : voir [`docs/superpdp/REPRISE.md`](docs/superpdp/REPRISE.md). Il contient :
-- spec API SuperPDP confirmée (OAuth 2.1, `POST /v1.beta/invoices` binaire, polling `/v1.beta/invoice_events`, mapping AFNOR `fr:2xx` → statuts Zenbat)
-- variables d'env à poser (`PDP_CLIENT_ID`, `PDP_CLIENT_SECRET`, `PDP_API_BASE`, `PDP_SANDBOX_RECEIVER_PEPPOL`, `CRON_SECRET`)
-- conflits à résoudre au rebase (migrations à renuméroter `0039`→`0044` et `0040`→`0045`, `InvoiceDetail.jsx` à fusionner avec PRs #28/#60/#61/#69, `vercel.json` cron + maxDuration)
-- plan d'exécution en 10 étapes
-
-→ **Ne pas relancer cette intégration sans relire `docs/superpdp/REPRISE.md` d'abord.** Et confirmer avec l'utilisateur que les credentials sandbox Super PDP sont toujours valides.
-
----
+**Étape 2 (à faire)** : envoi des factures émises aux clients professionnels (`POST /v1.beta/invoices` avec le Factur-X archivé, `external_id` = id Zenbat), suivi des statuts (polling `invoice_events` par pg_cron), `fr:212` quand l'artisan marque payée. **Étape 3** : e-reporting B2C (vérifier l'offre Super PDP).
 
 ## Modèle IA
 Défini dans `src/lib/constants.js` :

@@ -48,6 +48,7 @@ import TradesQuickPicker  from "./pages/TradesQuickPicker.jsx"
 import PaywallScreen      from "./pages/PaywallScreen.jsx"
 import PWAInstallScreen   from "./pages/PWAInstallScreen.jsx"
 import SubscriptionScreen from "./pages/SubscriptionScreen.jsx"
+import EInvoicingScreen   from "./pages/EInvoicingScreen.jsx"
 
 // Exceptions, chargées à la demande : le panneau admin (une seule personne,
 // ~3 000 lignes avec admin/*) et l'onboarding (une fois par compte). Un
@@ -79,6 +80,21 @@ const SCREEN_TITLES = {
   agent: "Agent IA", admin: "Administration",
 };
 
+// Retour de Super PDP après « Connecter mon compte » (?pdp=connected|denied|
+// expired|error, posé par api/_pdp.js) : ouvre l'écran Factures reçues avec
+// le message, puis nettoie l'URL.
+function pdpReturnFromUrl() {
+  if (typeof window === "undefined") return null;
+  try {
+    const v = new URLSearchParams(window.location.search).get("pdp");
+    if (!v) return null;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("pdp");
+    window.history.replaceState({}, "", url.pathname + (url.search ? url.search : "") + url.hash);
+    return ["connected", "denied", "expired", "error"].includes(v) ? v : "error";
+  } catch { return null; }
+}
+
 // Onglet initial depuis ?tab= dans l'URL — utilisé par les liens dans les
 // emails artisan (ex. notification de négociation client). On nettoie
 // l'URL après lecture pour ne pas la re-jouer à chaque refresh.
@@ -99,7 +115,8 @@ function initialTabFromUrl() {
 
 // emailVerification : { blocking } quand l'email n'est pas encore confirmé (Root).
 export default function App({ emailVerification = null } = {}) {
-  const [screen, setScreen] = useState("app");
+  const [pdpReturn, setPdpReturn] = useState(pdpReturnFromUrl);
+  const [screen, setScreen] = useState(pdpReturn ? "einvoicing" : "app");
   const [tab,    setTab]    = useState(initialTabFromUrl);
   // Polices du PDF mises en cache local dès que le navigateur est libre
   // (hors précache SW depuis l'allègement du premier chargement).
@@ -144,6 +161,9 @@ export default function App({ emailVerification = null } = {}) {
   const isAdmin = isAdminViaEnv || serverIsAdmin;
 
   const effectivePlan = isAdmin ? "pro" : plan;
+  // Super PDP (Factures reçues) : visible pour l'admin, et pour tous quand
+  // VITE_PDP_ENABLED=true (après validation en bac à sable).
+  const pdpEnabled    = isAdmin || import.meta.env.VITE_PDP_ENABLED === "true";
   const isFreemium    = !isAdmin && effectivePlan === "free";
 
   // Compteur sticky : nombre de devis créés cette semaine ISO par
@@ -496,6 +516,9 @@ export default function App({ emailVerification = null } = {}) {
         onSubscribe={(type) => { setPlan("pro"); setBillingCycle(type); setScreen("app"); }}/>
     </Suspense>
   );
+  if (screen === "einvoicing") return (
+    <EInvoicingScreen returnStatus={pdpReturn} onBack={() => { setPdpReturn(null); setScreen("app"); }}/>
+  );
   if (screen === "subscription") return (
     <Suspense fallback={<ScreenLoader />}>
       <SubscriptionScreen isAdmin={isAdmin} plan={effectivePlan} onBack={() => setScreen("app")} onUpgrade={() => setScreen("paywall")}/>
@@ -566,6 +589,7 @@ export default function App({ emailVerification = null } = {}) {
             onOpenAdmin={() => setTab("admin")}
             onOpenProfile={() => setScreen("onboarding")}
             onOpenSubscription={() => setScreen("subscription")}
+            onOpenEInvoicing={pdpEnabled ? () => setScreen("einvoicing") : null}
             onOpenPaywall={() => setScreen("paywall")}
             onOpenSupport={tab !== "agent" && tab !== "admin" ? () => setSupportOpen(true) : null}
             onOpenComptable={() => setComptableOpen(true)}

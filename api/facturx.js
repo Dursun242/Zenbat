@@ -20,6 +20,7 @@ import { authenticate } from "./_withAuth.js"
 import { sendEmail, safeColor } from "./_email.js"
 import { consumeDailyQuota, refundDailyQuota, EMAIL_DAILY_LIMIT } from "./_quota.js"
 import { logServerError } from "./_serverLog.js"
+import { handlePdpAction, handlePdpCallback } from "./_pdp.js"
 import { computeTotals, isNoTva, lineRate, lineTotal } from "../src/lib/invoiceCalc.js"
 
 const XML_FILENAME    = "factur-x.xml";
@@ -374,6 +375,9 @@ function addSRGBOutputIntent(pdfDoc, iccBytes) {
 const FACTURX_MAX_BYTES = 8 * 1024 * 1024;
 
 export default async function handler(req, res) {
+  // Retour OAuth Super PDP (navigateur redirigé, sans JWT) — cf. api/_pdp.js.
+  if (req.method === "GET" && req.query?.route === "pdp_callback") return handlePdpCallback(req, res);
+
   cors(req, res, { methods: "POST, OPTIONS" });
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -396,6 +400,7 @@ export default async function handler(req, res) {
   if (req.body?.action === "set_status") return handleSetStatus(req, res, { user, admin });
   if (req.body?.action === "hide")       return handleHide(req, res, { user, admin });
   if (req.body?.action === "emit")       return handleEmit(req, res, { user, admin });
+  if (String(req.body?.action || "").startsWith("pdp_")) return handlePdpAction(req, res, { user, admin });
 
   const { pdf_base64, invoice, client, brand, sourceInvoice } = req.body || {};
   if (!pdf_base64 || !invoice?.id) {
